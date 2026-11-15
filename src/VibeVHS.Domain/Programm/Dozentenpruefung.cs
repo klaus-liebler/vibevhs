@@ -115,22 +115,32 @@ public static class Dozentenpruefung
         var code = Eignungscode.Geeignet;
         var mitAusnahme = false;
         var ausnahmeListe = ausnahmen?.Where(a => a.PersonId == person.Id).ToList() ?? [];
-        foreach (var schluessel in benoetigt.Distinct())
+        foreach (var anforderung in benoetigt.Distinct())
         {
-            if (person.QualifikationAm(schluessel, tag, bekanntAm) is not null)
+            var (schluessel, wert) = Anforderung.Zerlegen(anforderung);
+            var vorhanden = person.QualifikationAm(schluessel, tag, bekanntAm);
+            if (vorhanden is not null && Anforderung.WertPasst(vorhanden.WertText, wert))
             {
                 continue;
             }
 
             var merkmal = katalog.GetValueOrDefault(schluessel);
-            var name = merkmal?.Name ?? schluessel;
-            if (merkmal is { Gesetzlich: false } && ausnahmeListe.Any(a => a.Schluessel == schluessel))
+            var name = Anforderung.Anzeige(anforderung, katalog);
+            if (merkmal is { Gesetzlich: false } && ausnahmeListe.Any(a => a.Schluessel == schluessel || a.Schluessel == anforderung))
             {
                 mitAusnahme = true;
                 continue;
             }
 
-            fehlend.Add(schluessel);
+            fehlend.Add(anforderung);
+            if (vorhanden is not null)
+            {
+                // Freigabe vorhanden, aber für einen anderen Wert (z. B. Spanisch statt Englisch)
+                code = Schlechter(code, Eignungscode.MerkmalFehlt);
+                gruende.Add($"„{merkmal?.Name ?? schluessel}“ liegt nur für {vorhanden.WertText ?? "(ohne Angabe)"} vor, nicht für {wert}.");
+                continue;
+            }
+
             var verlauf = person.Qualifikationen.Where(q => q.Schluessel == schluessel && q.IstAktuellerWissensstand && !q.IstEndemarke).ToList();
             var frueher = verlauf.Where(q => q.GueltigBis is { } b && b <= tag).OrderByDescending(q => q.GueltigBis).FirstOrDefault();
             var spaeter = verlauf.Where(q => q.GueltigVon > tag).OrderBy(q => q.GueltigVon).FirstOrDefault();
@@ -157,7 +167,7 @@ public static class Dozentenpruefung
                 mitAusnahme ? "Eingesetzt mit Ausnahme der Fachbereichsleitung." : null, [], true);
         }
 
-        var moeglich = fehlend.All(s => katalog.GetValueOrDefault(s) is { Gesetzlich: false });
+        var moeglich = fehlend.All(s => katalog.GetValueOrDefault(Anforderung.Zerlegen(s).Schluessel) is { Gesetzlich: false });
         return new Tageseignung(tag, code, string.Join(" ", gruende), fehlend, moeglich);
     }
 
@@ -172,4 +182,100 @@ public static class Dozentenpruefung
     }
 
     private static Eignungscode Schlechter(Eignungscode bisher, Eignungscode neu) => bisher == Eignungscode.Geeignet ? neu : bisher;
+}
+
+/// <summary>
+/// Anforderung an Dozierende: ein Merkmalsschlüssel, optional mit verlangtem Wert („sprachfreigabe=Englisch“).
+/// Ohne Wert genügt die Qualifikation mit beliebigem Wert; mit Wert muss er unter den (ggf. mehreren, kommagetrennten) Werten sein.
+/// </summary>
+public static class Anforderung
+{
+    private static readonly char[] Trenner = [',', ';', '/'];
+
+    public static (string Schluessel, string? Wert) Zerlegen(string anforderung)
+    {
+        ArgumentNullException.ThrowIfNull(anforderung);
+        var i = anforderung.IndexOf('=', StringComparison.Ordinal);
+        return i < 0 ? (anforderung, null) : (anforderung[..i], anforderung[(i + 1)..].Trim());
+    }
+
+    public static string Basis(string anforderung) => Zerlegen(anforderung).Schluessel;
+
+    public static string Bilden(string schluessel, string? wert) => string.IsNullOrWhiteSpace(wert) ? schluessel : $"{schluessel}={wert.Trim()}";
+
+    public static IReadOnlyList<string> Werte(string? wertText)
+        => (wertText ?? "").Split(Trenner, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    public static bool WertPasst(string? vorhanden, string? verlangt)
+        => verlangt is null || Werte(vorhanden).Contains(verlangt, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>„Lehrfreigabe Sprachkurs: Englisch“.</summary>
+    public static string Anzeige(string anforderung, IReadOnlyDictionary<string, Merkmal> katalog)
+    {
+        var (schluessel, wert) = Zerlegen(anforderung);
+        var name = katalog.GetValueOrDefault(schluessel)?.Name ?? schluessel;
+        return wert is null ? name : $"{name}: {wert}";
+    }
+}
+
+/// <summary>
+/// Lehrfreigabe für Sprachkurse (Eignungsprüfung bzw. Freigabe der vhs je Sprache). Verlangt die Kursart die Freigabe ohne Sprache,
+/// bestimmt der Kurs die Sprache aus seinem Titel („Englisch A2 – Konversation“ → Englisch).
+/// </summary>
+public static class Sprachfreigabe
+{
+    public const string Schluessel = "sprachfreigabe";
+
+    public const string DeutschWert = "Deutsch (DaF/DaZ)";
+
+    public static IReadOnlyList<string> Sprachen { get; } =
+    [
+        "Arabisch", "Chinesisch", DeutschWert, "Englisch", "Französisch", "Griechisch", "Italienisch", "Japanisch", "Niederländisch", "Norwegisch",
+        "Plattdeutsch", "Polnisch", "Portugiesisch", "Russisch", "Schwedisch", "Spanisch", "Türkisch",
+    ];
+
+    /// <summary>Sprache aus dem Kurstitel (erstes passendes Wort), sonst null.</summary>
+    public static string? AusTitel(string titel)
+    {
+        foreach (var wort in (titel ?? "").Split([' ', '-', '–', ':', ',', '(', ')', '/'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (wort.Equals("Deutsch", StringComparison.OrdinalIgnoreCase) || wort.Equals("DaF", StringComparison.OrdinalIgnoreCase)
+                || wort.Equals("DaZ", StringComparison.OrdinalIgnoreCase))
+            {
+                return DeutschWert;
+            }
+
+            var treffer = Sprachen.FirstOrDefault(s => s.Equals(wort, StringComparison.OrdinalIgnoreCase));
+            if (treffer is not null)
+            {
+                return treffer;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Ersetzt eine allgemeine Sprachfreigabe durch die Freigabe für die Sprache des Kurses (falls erkennbar und noch nicht gesetzt).</summary>
+    public static IReadOnlyList<string> Konkretisieren(IEnumerable<string> anforderungen, string titel)
+    {
+        var liste = anforderungen.Distinct().ToList();
+        if (!liste.Contains(Schluessel))
+        {
+            return liste;
+        }
+
+        var konkret = liste.Any(a => a.StartsWith(Schluessel + "=", StringComparison.Ordinal));
+        var sprache = AusTitel(titel);
+        if (konkret || sprache is not null)
+        {
+            liste.Remove(Schluessel);
+        }
+
+        if (!konkret && sprache is not null)
+        {
+            liste.Add(Anforderung.Bilden(Schluessel, sprache));
+        }
+
+        return liste;
+    }
 }

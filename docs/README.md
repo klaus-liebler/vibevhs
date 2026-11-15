@@ -204,6 +204,12 @@ Einwilligung, bevorzugt) und E-Mail-Adressen (Art, bevorzugt). Die Kennzeichen �
   erteilen – nicht bei als „gesetzlich“ markierten Merkmalen (BAMF-Zulassung, Alpha, Führungszeugnis).
 - **Aufgaben** (täglicher Job, Korb Fachbereichsleitung): Qualifikation läuft bald ab (Vorlauf je Merkmal), Nachweis fehlt,
   künftige Veranstaltungen mit ungeeigneter Person. Betroffene Veranstaltungen sind im Kurs rot markiert.
+- **Lehrfreigabe Sprachkurs** (Eignungsprüfung/Hospitation der vhs, Merkmal `sprachfreigabe`): je Lehrkraft für eine oder
+  mehrere Sprachen (Mehrfachauswahl). Anforderungen können einen Wert verlangen (`sprachfreigabe=Englisch`). Verlangt die
+  Kursart die Freigabe allgemein, bestimmt jeder Kurs die Sprache aus dem Titel („Englisch A2“ → Englisch, „Deutsch B1“ →
+  Deutsch (DaF/DaZ)); im Kurs änderbar („Sprache des Kurses“). Begründung z. B. „liegt nur für Italienisch vor, nicht für
+  Spanisch“. Interne Freigabe – Ausnahme der Fachbereichsleitung möglich (anders als BAMF-Zulassung). Zusätzlich im Katalog:
+  „Qualifikation DaF/DaZ“. Bestehende Datenbanken: Kursarten mit „Sprach“ im Namen verlangen die Freigabe ab dem Update.
 - Demodaten: rund jede fünfte Lehrkraft festangestellt, Anna Becker wechselt zum 01.01.2026 in die Festanstellung;
   Integrationskurs-Lehrkräfte mit BAMF-Zulassung, eine läuft in 6 Wochen ab (Anschlusskurs 26H-405 ist ab Januar markiert),
   eine Deutsch-Lehrkraft ohne Zulassung (bei Integrationskursen gesperrt).

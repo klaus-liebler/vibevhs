@@ -56,7 +56,7 @@ public sealed class Merkmal
     }
 
     public Merkmal(string schluessel, string name, string gruppe, bool vererbbar = true, bool nachweisPflicht = false, string? ausschlussgruppe = null,
-        MerkmalBezug bezug = MerkmalBezug.Ort, bool gesetzlich = false, IEnumerable<string>? werte = null, int vorlaufTage = 60)
+        MerkmalBezug bezug = MerkmalBezug.Ort, bool gesetzlich = false, IEnumerable<string>? werte = null, int vorlaufTage = 60, bool mehrfach = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(schluessel);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -70,9 +70,13 @@ public sealed class Merkmal
         Gesetzlich = gesetzlich;
         Werte = werte?.ToList() ?? [];
         VorlaufTage = vorlaufTage;
+        Mehrfach = mehrfach && Werte.Count > 0;
     }
 
     public MerkmalBezug Bezug { get; private set; }
+
+    /// <summary>Mehrere Werte zugleich möglich (z. B. Lehrfreigabe für Englisch und Spanisch); gespeichert kommagetrennt.</summary>
+    public bool Mehrfach { get; private set; }
 
     /// <summary>Gesetzlich gefordert (z. B. BAMF-Lehrkraftzulassung): keine Ausnahme durch die Fachbereichsleitung möglich.</summary>
     public bool Gesetzlich { get; private set; }

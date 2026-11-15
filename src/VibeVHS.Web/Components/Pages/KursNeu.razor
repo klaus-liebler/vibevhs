@@ -66,7 +66,7 @@
     </div>
     @if (Kursart is { BenoetigteDozierendenmerkmale.Count: > 0 } kq)
     {
-        <p class="vhs-small vhs-muted" style="margin:0">Die Kursart verlangt von Dozierenden: @string.Join(", ", kq.BenoetigteDozierendenmerkmale.Select(s => katalog.GetValueOrDefault(s)?.Name ?? s)). Geprüft wird an jedem Veranstaltungstag; ungeeignete Personen sind gesperrt.</p>
+        <p class="vhs-small vhs-muted" style="margin:0">Die Kursart verlangt von Dozierenden: @string.Join(", ", VibeVHS.Domain.Programm.Sprachfreigabe.Konkretisieren(kq.BenoetigteDozierendenmerkmale, titel ?? "").Select(s => VibeVHS.Domain.Programm.Anforderung.Anzeige(s, katalog))).@(kq.BenoetigteDozierendenmerkmale.Contains(VibeVHS.Domain.Programm.Sprachfreigabe.Schluessel) ? " Die Sprache ergibt sich aus dem Titel (z. B. „Englisch A2“)." : "") Geprüft wird an jedem Veranstaltungstag; ungeeignete Personen sind gesperrt.</p>
     }
     @if (dozent is not null)
     {
@@ -277,7 +277,7 @@
 
     private async Task DozentSuchenAsync()
     {
-        var benoetigt = Kursart?.BenoetigteDozierendenmerkmale ?? [];
+        var benoetigt = VibeVHS.Domain.Programm.Sprachfreigabe.Konkretisieren(Kursart?.BenoetigteDozierendenmerkmale ?? [], titel ?? "");
         dozentTreffer = await Vorgang.AusfuehrenAsync(async d =>
         {
             var tage = Regel() is { } r && r.Wochentage.Count > 0 ? await d.GetRequiredService<ProgrammDienst>().SerientageAsync(r) : [];

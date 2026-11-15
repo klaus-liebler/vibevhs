@@ -82,7 +82,7 @@
             }
             @if (kurs.BenoetigteDozierendenmerkmale.Count > 0)
             {
-                <dt>Dozierende brauchen</dt><dd>@string.Join(", ", kurs.BenoetigteDozierendenmerkmale.Select(s => verzeichnis.Katalog.GetValueOrDefault(s)?.Name ?? s))</dd><dd></dd>
+                <dt>Dozierende brauchen</dt><dd>@string.Join(", ", kurs.BenoetigteDozierendenmerkmale.Select(s => VibeVHS.Domain.Programm.Anforderung.Anzeige(s, verzeichnis.Katalog)))</dd><dd></dd>
             }
         </dl>
     </section>
@@ -185,6 +185,17 @@
             }
         }
     </div>
+    @if (kurs.BenoetigteDozierendenmerkmale.Any(a => VibeVHS.Domain.Programm.Anforderung.Basis(a) == VibeVHS.Domain.Programm.Sprachfreigabe.Schluessel))
+    {
+        <div class="vhs-row">
+            <RadzenFormField Text="Sprache des Kurses (Lehrfreigabe)" Variant="Variant.Outlined">
+                <RadzenDropDown TValue="string" @bind-Value="kursSprache" Data="@VibeVHS.Domain.Programm.Sprachfreigabe.Sprachen" AllowClear="true" Placeholder="beliebige Sprache" />
+            </RadzenFormField>
+            <BegruendeterButton Text="Sprache übernehmen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Icon="translate"
+                                Freigabe="@Planen.Und(() => kursSprache == AktuelleSprache ? Freigabe.Nein("Keine Änderung.") : Freigabe.Ja)"
+                                Click="@(() => QualiAktionAsync(q => q.KursSpracheSetzenAsync(Id, kursSprache), "Sprache übernommen; die Eignung wird neu geprüft."))" />
+        </div>
+    }
     @if (kurs.BenoetigteDozierendenmerkmale.Count > 0)
     {
         <RadzenFormField Text="Begründung für eine Ausnahme (nur Fachbereichsleitung, wird protokolliert)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="ausnahmeText" /></RadzenFormField>
@@ -409,6 +420,11 @@
     private string? aBemerkung;
     private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
 
+    private string? kursSprache;
+
+    private string? AktuelleSprache => kurs?.BenoetigteDozierendenmerkmale.Select(VibeVHS.Domain.Programm.Anforderung.Zerlegen)
+        .FirstOrDefault(a => a.Schluessel == VibeVHS.Domain.Programm.Sprachfreigabe.Schluessel).Wert;
+
     private Freigabe Planen => kurs?.Archiviert == true
         ? Freigabe.Nein("Der Kurs ist archiviert und schreibgeschützt. Bitte zuerst wiederherstellen.")
         : Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Leitung);
@@ -463,6 +479,7 @@
             lage = VibeVHS.Application.Anmeldung.Einbuchungslage.Berechnen(teilnehmende.Select(t => t.Belegung));
             if (kurs is not null)
             {
+                kursSprache = AktuelleSprache;
                 await QualifikationenLadenAsync(d);
             }
             if (kurs is { Veranstaltungen.Count: > 0 })

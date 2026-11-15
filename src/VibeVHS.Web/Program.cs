@@ -126,6 +126,7 @@ if (app.Configuration.GetValue("Demodaten:Anlegen", false))
              {
                  ("Anmeldungen", AnmeldungDemodaten.AnlegenAsync),
                  ("Qualifikationen", QualifikationsDemodaten.AnlegenAsync),
+                 ("Sprachfreigaben", QualifikationsDemodaten.SprachfreigabenAnlegenAsync),
                  ("Durchführung", DurchfuehrungDemodaten.AnlegenAsync),
                  ("Integration", IntegrationDemodaten.AnlegenAsync),
                  ("Finanzen", FinanzDemodaten.AnlegenAsync),

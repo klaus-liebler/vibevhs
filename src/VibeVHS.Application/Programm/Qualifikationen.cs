@@ -76,6 +76,11 @@ public sealed class QualifikationsDienst(
         new("uebungsleiter", "Übungsleiterlizenz", "Qualifikation", nachweisPflicht: true, bezug: MerkmalBezug.Person),
         new("erste-hilfe", "Erste-Hilfe-Nachweis", "Sicherheit", nachweisPflicht: true, bezug: MerkmalBezug.Person),
         new("fuehrungszeugnis", "Erweitertes Führungszeugnis", "Sicherheit", nachweisPflicht: true, bezug: MerkmalBezug.Person, gesetzlich: true),
+        // Interne Freigabe der vhs (Eignungsprüfung, Hospitation, Gespräch mit der Fachbereichsleitung) je Sprache; Ausnahme möglich.
+        new(Sprachfreigabe.Schluessel, "Lehrfreigabe Sprachkurs (Eignungsprüfung der vhs)", "Freigabe", nachweisPflicht: true, bezug: MerkmalBezug.Person,
+            werte: Sprachfreigabe.Sprachen, vorlaufTage: 60, mehrfach: true),
+        new("daf-daz", "Qualifikation Deutsch als Fremd-/Zweitsprache (Studium oder Zusatzqualifikation)", "Qualifikation", nachweisPflicht: true,
+            bezug: MerkmalBezug.Person),
     ];
 
     private DateOnly Heute => DateOnly.FromDateTime(uhr.GetLocalNow().Date);
@@ -91,7 +96,24 @@ public sealed class QualifikationsDienst(
         var neu = Vorschlaege.Where(v => !katalog.ContainsKey(v.Schluessel)).ToList();
         foreach (var m in neu)
         {
-            speicher.Hinzufuegen(new Merkmal(m.Schluessel, m.Name, m.Gruppe, false, m.NachweisPflicht, null, m.Bezug, m.Gesetzlich, m.Werte, m.VorlaufTage));
+            speicher.Hinzufuegen(new Merkmal(m.Schluessel, m.Name, m.Gruppe, false, m.NachweisPflicht, null, m.Bezug, m.Gesetzlich, m.Werte, m.VorlaufTage, m.Mehrfach));
+        }
+
+        // Sprachfreigabe neu im Katalog: Sprachkurs-Kursarten verlangen sie, jeder Kurs für seine Sprache (aus dem Titel).
+        var sprachkurse = 0;
+        if (neu.Any(m => m.Schluessel == Sprachfreigabe.Schluessel))
+        {
+            foreach (var art in (await programm.KursartenAsync(abbruch))
+                         .Where(a => a.Nutzungsart != Nutzungsart.Integrationskurs && a.Name.Contains("Sprach", StringComparison.OrdinalIgnoreCase)))
+            {
+                var verfolgt = await speicher.KursartLadenAsync(art.Id, abbruch);
+                verfolgt?.MitDozierendenmerkmalen(art.BenoetigteDozierendenmerkmale.Append(Sprachfreigabe.Schluessel));
+                foreach (var kurs in await speicher.KurseDerKursartAsync(art.Id, abbruch))
+                {
+                    kurs.MitDozierendenmerkmalen(Sprachfreigabe.Konkretisieren(kurs.BenoetigteDozierendenmerkmale.Append(Sprachfreigabe.Schluessel), kurs.Titel));
+                    sprachkurse++;
+                }
+            }
         }
 
         if (ersteMal)
@@ -109,7 +131,8 @@ public sealed class QualifikationsDienst(
 
         if (neu.Count > 0)
         {
-            await protokoll.ProtokollierenAsync("Qualifikation.Katalog", $"{neu.Count} Qualifikationsmerkmale für Dozierende in den Merkmalskatalog aufgenommen (Vorschläge)",
+            await protokoll.ProtokollierenAsync("Qualifikation.Katalog", $"{neu.Count} Qualifikationsmerkmale für Dozierende in den Merkmalskatalog aufgenommen (Vorschläge)"
+                + (sprachkurse > 0 ? $"; {sprachkurse} Sprachkurse verlangen ab jetzt die Lehrfreigabe für ihre Sprache" : ""),
                 abbruch: abbruch);
             await speicher.SpeichernAsync(abbruch);
         }
@@ -144,12 +167,14 @@ public sealed class QualifikationsDienst(
         art.MitDozierendenmerkmalen(schluessel);
         foreach (var kurs in await speicher.KurseDerKursartAsync(kursartId, abbruch))
         {
-            kurs.MitDozierendenmerkmalen(kurs.BenoetigteDozierendenmerkmale.Except(alt).Concat(schluessel));
+            // Kurseigene Ergänzungen bleiben; was von der Kursart kam (auch als konkretisierte Sprachfreigabe), wird ersetzt.
+            var eigene = kurs.BenoetigteDozierendenmerkmale.Where(a => !alt.Contains(a) && !alt.Contains(Anforderung.Basis(a))).ToList();
+            kurs.MitDozierendenmerkmalen(Sprachfreigabe.Konkretisieren(eigene.Concat(schluessel), kurs.Titel));
         }
 
         var katalog = await speicher.KatalogAsync(abbruch);
         await protokoll.ProtokollierenAsync("Qualifikation.Kursart",
-            $"Kursart „{art.Name}“ verlangt von Dozierenden: {(schluessel.Count == 0 ? "nichts" : string.Join(", ", schluessel.Select(s => katalog.GetValueOrDefault(s)?.Name ?? s)))}",
+            $"Kursart „{art.Name}“ verlangt von Dozierenden: {(schluessel.Count == 0 ? "nichts" : string.Join(", ", schluessel.Select(s => Anforderung.Anzeige(s, katalog))))}",
             abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
     }
@@ -288,7 +313,8 @@ public sealed class QualifikationsDienst(
         var katalog = await speicher.KatalogAsync(abbruch);
         var vorhanden = await speicher.AusnahmenAsync(kursId, abbruch);
         var jetzt = uhr.GetUtcNow();
-        foreach (var s in schluessel.Distinct().Where(s => !vorhanden.Any(a => a.PersonId == personId && a.Schluessel == s)))
+        // Ausnahmen gelten je Merkmal (auch für „Lehrfreigabe Sprachkurs: Englisch“ die Lehrfreigabe insgesamt in diesem Kurs).
+        foreach (var s in schluessel.Select(Anforderung.Basis).Distinct().Where(s => !vorhanden.Any(a => a.PersonId == personId && a.Schluessel == s)))
         {
             var merkmal = katalog.GetValueOrDefault(s) ?? throw new InvalidOperationException("Merkmal nicht im Katalog.");
             speicher.Hinzufuegen(new Qualifikationsausnahme(kursId, personId, merkmal, begruendung, wer.Anzeige, jetzt));
@@ -342,6 +368,27 @@ public sealed class QualifikationsDienst(
 
         kurs.MitTeam(kurs.Team.Where(t => t.PersonId != personId));
         await protokoll.ProtokollierenAsync("Kurs.Team", $"{kurs.Kursnummer}: {Pseudonym.Person(personId)} aus dem Dozierendenteam entfernt", nameof(Kurs), kursId, abbruch: abbruch);
+        await programm.SpeichernAsync(abbruch);
+    }
+
+    /// <summary>
+    /// Sprache eines Sprachkurses festlegen (wenn der Titel sie nicht verrät oder sie abweicht): Dozierende brauchen dann die
+    /// Lehrfreigabe für genau diese Sprache. Null = Lehrfreigabe für irgendeine Sprache genügt.
+    /// </summary>
+    public async Task KursSpracheSetzenAsync(Guid kursId, string? sprache, CancellationToken abbruch = default)
+    {
+        await RolleAsync([Rolle.Fachbereichsleitung, Rolle.Leitung], abbruch);
+        if (sprache is not null && !Sprachfreigabe.Sprachen.Contains(sprache))
+        {
+            throw new InvalidOperationException("Unbekannte Sprache.");
+        }
+
+        var kurs = await programm.KursLadenAsync(kursId, abbruch) ?? throw new InvalidOperationException("Kurs nicht gefunden.");
+        kurs.MitDozierendenmerkmalen(kurs.BenoetigteDozierendenmerkmale.Where(a => Anforderung.Basis(a) != Sprachfreigabe.Schluessel)
+            .Append(Anforderung.Bilden(Sprachfreigabe.Schluessel, sprache)));
+        await protokoll.ProtokollierenAsync("Qualifikation.Kurs",
+            $"{kurs.Kursnummer}: Dozierende brauchen die Lehrfreigabe {(sprache is null ? "für eine beliebige Sprache" : $"für {sprache}")}", nameof(Kurs), kursId,
+            abbruch: abbruch);
         await programm.SpeichernAsync(abbruch);
     }
 

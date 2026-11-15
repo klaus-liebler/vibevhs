@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using VibeVHS.Application.Protokoll;
 using VibeVHS.Domain.Gemeinsam;
 using VibeVHS.Domain.Personen;
+using VibeVHS.Domain.Programm;
 using VibeVHS.Infrastructure.Datenbank;
 
 namespace VibeVHS.Web.Entwicklung;
@@ -133,6 +134,83 @@ internal static class QualifikationsDemodaten
 
         db.Protokoll.Add(new AuditEintrag(uhr.GetUtcNow(), "automatik", "Automatik", null, "Demodaten.Qualifikationen", null, null,
             $"Demo-Qualifikationen und Beschäftigungsarten für {dozierende.Count} Dozierende angelegt: {string.Join("; ", notizen)}"));
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Lehrfreigaben für Sprachkurse: Sprachkurse verlangen die Freigabe für ihre Sprache, ihre Kursleitungen bekommen sie –
+    /// bis auf eine Lehrkraft, die nur für eine andere Sprache freigegeben ist (Sperre mit Begründung sichtbar).
+    /// Läuft auch für bestehende Datenbanken einmal nach (Protokolleintrag "Demodaten.Sprachfreigaben").
+    /// </summary>
+    public static async Task SprachfreigabenAnlegenAsync(IServiceProvider dienste)
+    {
+        await using var bereich = dienste.CreateAsyncScope();
+        var db = bereich.ServiceProvider.GetRequiredService<VibeVhsDbContext>();
+        if (await db.Protokoll.AnyAsync(e => e.Aktion == "Demodaten.Sprachfreigaben") || !await db.Kurse.AnyAsync())
+        {
+            return;
+        }
+
+        var katalog = await db.Merkmale.AsNoTracking().ToDictionaryAsync(m => m.Schluessel);
+        if (!katalog.TryGetValue(Sprachfreigabe.Schluessel, out var freigabe))
+        {
+            return;
+        }
+
+        var uhr = bereich.ServiceProvider.GetRequiredService<TimeProvider>();
+        var jetzt = uhr.GetLocalNow();
+        var e = Erfassung.Erst(jetzt, Von);
+
+        // Kursart „Sprachkurs“ verlangt die Freigabe; die Kurse bestimmen ihre Sprache aus dem Titel.
+        foreach (var art in (await db.Kursarten.ToListAsync()).Where(a => a.Name.Contains("Sprach", StringComparison.OrdinalIgnoreCase)
+                                                                          && a.Nutzungsart != VibeVHS.Domain.Programm.Nutzungsart.Integrationskurs))
+        {
+            if (!art.BenoetigteDozierendenmerkmale.Contains(Sprachfreigabe.Schluessel))
+            {
+                art.MitDozierendenmerkmalen(art.BenoetigteDozierendenmerkmale.Append(Sprachfreigabe.Schluessel));
+            }
+
+            foreach (var kurs in await db.Kurse.Where(k => k.KursartId == art.Id && k.ArchiviertAm == null).ToListAsync())
+            {
+                var basis = kurs.BenoetigteDozierendenmerkmale.Any(a => Anforderung.Basis(a) == Sprachfreigabe.Schluessel)
+                    ? kurs.BenoetigteDozierendenmerkmale
+                    : kurs.BenoetigteDozierendenmerkmale.Append(Sprachfreigabe.Schluessel).ToList();
+                kurs.MitDozierendenmerkmalen(Sprachfreigabe.Konkretisieren(basis, kurs.Titel));
+            }
+        }
+
+        await db.SaveChangesAsync();
+
+        var kurse = (await db.Kurse.AsNoTracking().Where(k => k.ArchiviertAm == null).ToListAsync())
+            .Select(k => (Kurs: k, Sprache: k.BenoetigteDozierendenmerkmale.Select(Anforderung.Zerlegen).FirstOrDefault(a => a.Schluessel == Sprachfreigabe.Schluessel).Wert))
+            .Where(x => x.Sprache is not null && x.Kurs.Leitung is not null).OrderBy(x => x.Kurs.Kursnummer).ToList();
+        var sprachenJePerson = kurse.GroupBy(x => x.Kurs.Leitung!.PersonId).ToDictionary(g => g.Key, g => g.Select(x => x.Sprache!).Distinct().ToList());
+        var notizen = new List<string>();
+
+        // Eine Lehrkraft ist nur für eine andere Sprache freigegeben (z. B. Italienisch statt Spanisch).
+        var ohne = kurse.FirstOrDefault(x => x.Sprache == "Spanisch").Kurs?.Leitung?.PersonId ?? kurse.LastOrDefault().Kurs?.Leitung?.PersonId;
+        var nr = 0;
+        foreach (var (personId, sprachen) in sprachenJePerson)
+        {
+            var p = await db.Personen.FirstOrDefaultAsync(x => x.Id == personId);
+            if (p is null)
+            {
+                continue;
+            }
+
+            var werte = personId == ohne ? sprachen.Select(s => s == "Italienisch" ? "Französisch" : "Italienisch").Distinct().ToList() : sprachen;
+            p.QualifikationSetzenAb(freigabe, string.Join(", ", werte), $"Hospitation und Gespräch mit der Fachbereichsleitung, Protokoll FB5-{2024}-{++nr:000} (fiktiv)",
+                "vhs Emsdetten-Greven-Saerbeck", new DateOnly(2024, 8, 1), null, e);
+            if (werte.Contains(Sprachfreigabe.DeutschWert) && katalog.TryGetValue("daf-daz", out var daf))
+            {
+                p.QualifikationSetzenAb(daf, null, "Zertifikat Zusatzqualifikation DaF/DaZ (fiktiv)", "Goethe-Institut", new DateOnly(2021, 3, 1), null, e);
+            }
+
+            notizen.Add($"{p.Anzeigename}: {string.Join(", ", werte)}{(personId == ohne ? " (Absicht: nicht passend)" : "")}");
+        }
+
+        db.Protokoll.Add(new AuditEintrag(uhr.GetUtcNow(), "automatik", "Automatik", null, "Demodaten.Sprachfreigaben", null, null,
+            $"Lehrfreigaben für Sprachkurse angelegt: {string.Join("; ", notizen)}"));
         await db.SaveChangesAsync();
     }
 }

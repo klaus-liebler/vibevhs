@@ -125,7 +125,14 @@ else if (dubletten.Count > 0)
             <summary class="vhs-small">Qualifikation eintragen oder erneuern</summary>
             <div class="vhs-fields" style="margin-top:8px">
                 <RadzenFormField Text="Merkmal" Variant="Variant.Outlined"><RadzenDropDown TValue="string" @bind-Value="qSchluessel" Data="@personenmerkmale" TextProperty="Name" ValueProperty="Schluessel" /></RadzenFormField>
-                @if (personenmerkmale.FirstOrDefault(m => m.Schluessel == qSchluessel) is { Werte.Count: > 0 } mw)
+                @if (personenmerkmale.FirstOrDefault(m => m.Schluessel == qSchluessel) is { Werte.Count: > 0, Mehrfach: true } mm)
+                {
+                    <RadzenFormField Text="Freigegeben für (mehrere möglich)" Variant="Variant.Outlined">
+                        <RadzenDropDown TValue="IEnumerable<string>" Multiple="true" Chips="true" Value="@(VibeVHS.Domain.Programm.Anforderung.Werte(qWert))"
+                                        ValueChanged="@((IEnumerable<string> w) => qWert = w?.Any() == true ? string.Join(", ", w) : null)" Data="@mm.Werte" />
+                    </RadzenFormField>
+                }
+                else if (personenmerkmale.FirstOrDefault(m => m.Schluessel == qSchluessel) is { Werte.Count: > 0 } mw)
                 {
                     <RadzenFormField Text="Art / Wert" Variant="Variant.Outlined"><RadzenDropDown TValue="string" @bind-Value="qWert" Data="@mw.Werte" /></RadzenFormField>
                 }
@@ -429,7 +436,7 @@ else if (dubletten.Count > 0)
             : personenmerkmale.FirstOrDefault(m => m.Schluessel == qSchluessel) is { NachweisPflicht: true } && string.IsNullOrWhiteSpace(qNachweis)
                 ? Freigabe.Nein("Für dieses Merkmal ist ein Nachweis Pflicht (Dokument oder Aktenzeichen).")
                 : personenmerkmale.FirstOrDefault(m => m.Schluessel == qSchluessel) is { Werte.Count: > 0 } && qWert is null
-                    ? Freigabe.Nein("Bitte die Art auswählen (z. B. Zulassungsart).") : Freigabe.Ja);
+                    ? Freigabe.Nein("Bitte die Art bzw. die freigegebenen Werte auswählen (z. B. Zulassungsart, Sprachen).") : Freigabe.Ja);
 
     private async Task QualifikationAsync()
     {

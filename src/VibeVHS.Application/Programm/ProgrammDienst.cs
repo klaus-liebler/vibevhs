@@ -75,7 +75,7 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
         Dozenteneignung? dozent = null;
         if ((entwurf.Serie.DozentId ?? entwurf.Team.FirstOrDefault()?.PersonId) is { } dozentId)
         {
-            dozent = await einsatz.PruefenAsync(dozentId, kursart.BenoetigteDozierendenmerkmale, tage.Count > 0 ? tage : [DateOnly.FromDateTime(jetzt.Date)], null, abbruch);
+            dozent = await einsatz.PruefenAsync(dozentId, Sprachfreigabe.Konkretisieren(kursart.BenoetigteDozierendenmerkmale, entwurf.Titel), tage.Count > 0 ? tage : [DateOnly.FromDateTime(jetzt.Date)], null, abbruch);
         }
 
         return new KursVorschau(termine, orte, konflikte, entwurf.Kursnummer ?? await NaechsteNummerAsync(entwurf, abbruch), dozent);
@@ -161,6 +161,7 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
         var kurs = new Kurs(vorschau.Kursnummer, entwurf.Titel, semester, entwurf.Fachbereich, kursart, entwurf.MinTeilnehmende, entwurf.MaxTeilnehmende)
             .MitTeam(entwurf.Team)
             .MitBeschreibung(entwurf.Beschreibung);
+        kurs.MitDozierendenmerkmalen(Sprachfreigabe.Konkretisieren(kurs.BenoetigteDozierendenmerkmale, kurs.Titel));
         if (entwurf.Sichtbarkeit is { } s)
         {
             kurs.MitSichtbarkeit(s, entwurf.AuftraggeberId, entwurf.AuftraggeberName);
