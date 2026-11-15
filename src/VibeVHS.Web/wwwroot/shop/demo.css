@@ -1,0 +1,2 @@
+/* Beispiel: Anpassung an das Erscheinungsbild der VHS-Website über CSS-Variablen */
+    vhs-kurse { --vhs-farbe: #00506b; --vhs-schrift: Georgia, serif; --vhs-radius: 2px; }

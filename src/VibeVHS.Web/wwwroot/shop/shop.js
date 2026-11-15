@@ -123,7 +123,15 @@ export class VhsKurse extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
-    this.shadowRoot.innerHTML = `<style>${STIL}</style><div class="nur-sr" role="status" aria-live="polite" aria-atomic="true" id="ansage"></div><div id="inhalt"></div>`;
+    // Stile als Constructable Stylesheet: funktioniert auch unter einer strengen CSP ohne 'unsafe-inline' (fremde Websites, VibeVHS selbst).
+    let mitBlatt = false;
+    try {
+      const blatt = new CSSStyleSheet();
+      blatt.replaceSync(STIL);
+      this.shadowRoot.adoptedStyleSheets = [blatt];
+      mitBlatt = true;
+    } catch { /* ältere Browser: <style> im Shadow DOM */ }
+    this.shadowRoot.innerHTML = `${mitBlatt ? '' : `<style>${STIL}</style>`}<div class="nur-sr" role="status" aria-live="polite" aria-atomic="true" id="ansage"></div><div id="inhalt"></div>`;
     this.$ = this.shadowRoot.getElementById('inhalt');
     this.einstellungen = null;
   }

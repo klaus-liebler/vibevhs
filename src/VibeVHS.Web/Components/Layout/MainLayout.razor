@@ -44,7 +44,7 @@
                                 <AntiforgeryToken />
                                 <input type="hidden" name="zurueck" value="@AktuellerPfad" />
                                 <label for="rolle-wahl">Rolle</label>
-                                <select id="rolle-wahl" name="rolle" class="vhs-select" onchange="this.form.submit()"
+                                <select id="rolle-wahl" name="rolle" class="vhs-select" data-auto-absenden
                                         title="Aktive Rolle wechseln: Aufgaben und Rechte richten sich nach ihr.">
                                     @foreach (var r in benutzer.Rollen)
                                     {

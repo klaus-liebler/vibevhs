@@ -18,7 +18,7 @@
 <section class="vhs-portal-karte">
     <form method="get">
         <label for="sprache">Sprache / Language / Dil / Мова / اللغة</label>
-        <select id="sprache" name="sprache" onchange="this.form.submit()">
+        <select id="sprache" name="sprache" data-auto-absenden>
             @foreach (var s in VibeVHS.Web.Sprachen.Alle)
             {
                 <option value="@s.Code" selected="@(s.Code == sprache)">@s.Name</option>

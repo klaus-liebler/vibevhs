@@ -34,7 +34,7 @@
         @if (kalenderLink is not null)
         {
             <label for="kal">Ihre Kalenderadresse (kopieren und im Kalender „Kalender abonnieren“ wählen)</label>
-            <input id="kal" readonly value="@kalenderLink" onclick="this.select()" />
+            <input id="kal" readonly value="@kalenderLink" data-markieren />
         }
         <div class="vhs-row">
             <form method="post" @formname="kalender" @onsubmit="KalenderAsync"><AntiforgeryToken /><button type="submit" class="vhs-btn">@(kalenderAktiv ? "Neue Adresse erzeugen (alte sperren)" : "Kalenderadresse erzeugen")</button></form>
