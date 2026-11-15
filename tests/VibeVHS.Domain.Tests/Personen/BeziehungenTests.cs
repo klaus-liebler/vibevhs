@@ -94,6 +94,17 @@ public class BeziehungenTests
     }
 
     [Fact]
+    public void Rueckdatierte_Erfassung_setzt_den_Zwischenstand_nicht_zurueck()
+    {
+        var p = Person.Anlegen("Anna", "Schmitt", new DateOnly(2019, 3, 1), Start.AddYears(-7));
+        p.NameAendernAb("Anna", "Becker", new DateOnly(2025, 6, 14), "Heirat", Heute);
+        p.RolleHinzufuegen(Personenrolle.Dozierende, new DateOnly(2019, 3, 1), Erfassung.Erst(Start.AddYears(-7)));
+
+        p.Anzeigename.ShouldBe("Anna Becker");
+        p.Rollen.ShouldBe(Personenrolle.Dozierende);
+    }
+
+    [Fact]
     public void Suchtext_enthaelt_auch_fruehere_Namen()
     {
         var p = Person.Anlegen("Anna", "Schmidt", new DateOnly(2019, 3, 1), Start, new DateOnly(1986, 8, 12));

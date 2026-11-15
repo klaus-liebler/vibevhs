@@ -16,10 +16,28 @@
     return;
 }
 
+@if (person.ZusammengefuehrtIn is { } zielId)
+{
+    <div class="vhs-alert vhs-warn" role="alert">
+        Dieser Datensatz ist eine <b>zusammengeführte Dublette</b>. Er bleibt mit seiner Historie erhalten, gepflegt wird aber
+        <a href="@($"personen/{zielId}")">der zusammengeführte Datensatz</a>.
+    </div>
+}
+else if (dubletten.Count > 0)
+{
+    <div class="vhs-alert vhs-warn" role="alert">
+        <b>Mögliche Dublette:</b>
+        @foreach (var k in dubletten)
+        {
+            <span> <a href="@($"personen/dubletten?a={Id}&b={k.Id}")">@k.Anzeigename vergleichen</a> (@k.Grund)</span>
+        }
+    </div>
+}
+
 <div class="vhs-head">
     <div>
         <h1>@stand.NameMitTitel</h1>
-        <p class="vhs-sub">@PersonMerkmal.RollenAnzeige(stand.Rollen) · Korrespondenz auf @Sprachen.Name(stand.Sprache ?? "de")</p>
+        <p class="vhs-sub">@PersonMerkmal.RollenAnzeige(stand.Rollen) · @PersonenstatusAnzeige.Text(person.Status) · Korrespondenz auf @Sprachen.Name(stand.Sprache ?? "de")@(person.Fachbereiche.Count > 0 ? $" · FB {string.Join(", ", person.Fachbereiche)}" : "")</p>
     </div>
     <div class="vhs-row">
         <RadzenButton Text="Datenhistorie" Icon="history" ButtonStyle="ButtonStyle.Light"
@@ -38,8 +56,69 @@
             data-why="Die ID vergibt das System; sie ändert sich nie. Der Erfassungszeitpunkt ist Teil der Nachvollziehbarkeit.">angelegt
             @person.AngelegtAm.ToLocalTime().ToString("dd.MM.yyyy") · ID @person.Id.ToString()[..8]…</span></span>
     </div>
-    <StammdatenKompakt Stand="@stand" PersonId="@Id" />
+    <StammdatenKompakt Stand="@stand" PersonId="@Id" Widerrufen="@VollmachtWiderrufenAsync" />
 </section>
+
+<details class="vhs-card">
+    <summary><b>Einwilligung ändern</b> <span class="vhs-small vhs-muted">– je Kanal und Zweck, mit Nachweis; die bisherige bleibt in der Historie</span></summary>
+    <div class="vhs-fields">
+        <RadzenFormField Text="Kanal" Variant="Variant.Outlined">
+            <RadzenDropDown TValue="Kontaktkanal" @bind-Value="ewKanal" Data="@(Enum.GetValues<Kontaktkanal>())" />
+        </RadzenFormField>
+        <RadzenFormField Text="Zweck" Variant="Variant.Outlined">
+            <RadzenDropDown TValue="Kontaktzweck" @bind-Value="ewZweck" Data="@(Enum.GetValues<Kontaktzweck>())" />
+        </RadzenFormField>
+        <RadzenFormField Text="Gültig ab" Variant="Variant.Outlined">
+            <RadzenDatePicker TValue="DateOnly?" @bind-Value="ewAb" DateFormat="dd.MM.yyyy" />
+        </RadzenFormField>
+        <RadzenFormField Text="Nachweis *" Variant="Variant.Outlined">
+            <RadzenTextBox @bind-Value="ewNachweis" Placeholder="z. B. Anmeldeformular vom …, telefonisch" />
+        </RadzenFormField>
+    </div>
+    <div class="vhs-row">
+        <label><RadzenSwitch @bind-Value="ewErteilt" /> Einwilligung erteilt</label>
+        <BegruendeterButton Text="Einwilligung speichern" Icon="save" Click="EinwilligungSpeichernAsync"
+                            Freigabe="@(string.IsNullOrWhiteSpace(ewNachweis) || ewAb is null ? Freigabe.Nein("Bitte Datum und Nachweis angeben (DSGVO: Einwilligungen müssen nachweisbar sein).") : Freigabe.Ja)" />
+    </div>
+</details>
+
+<details class="vhs-card">
+    <summary><b>Buchungsvollmacht erteilen</b> <span class="vhs-small vhs-muted">– eine andere Person oder eine Organisation darf diese Person anmelden</span></summary>
+    <RadzenRadioButtonList TValue="Bevollmaechtigtenart" @bind-Value="vmArt" Orientation="Orientation.Horizontal">
+        <Items>
+            <RadzenRadioButtonListItem Text="Person (z. B. Elternteil, Betreuung)" Value="Bevollmaechtigtenart.Person" />
+            <RadzenRadioButtonListItem Text="Organisation (z. B. Arbeitgeber, Jobcenter)" Value="Bevollmaechtigtenart.Organisation" />
+        </Items>
+    </RadzenRadioButtonList>
+    @if (vmArt == Bevollmaechtigtenart.Person)
+    {
+        <RadzenFormField Text="Bevollmächtigte Person suchen" Variant="Variant.Outlined" Style="width:100%">
+            <RadzenTextBox @bind-Value="vmSuche" @bind-Value:after="VollmachtSucheAsync" Placeholder="Name eingeben, Enter" />
+        </RadzenFormField>
+        <div class="vhs-row">
+            @foreach (var t in vmTreffer)
+            {
+                <button class="vhs-chip @(vmPersonId == t.Id ? "on" : "")" @onclick="@(() => { vmPersonId = t.Id; vmPersonName = t.Anzeigename; })">
+                    @t.Anzeigename @(t.Geburtsdatum is { } g ? $"({g:dd.MM.yyyy})" : "")
+                </button>
+            }
+        </div>
+    }
+    else
+    {
+        <RadzenFormField Text="Organisation" Variant="Variant.Outlined" Style="width:100%">
+            <RadzenDropDown TValue="Guid?" @bind-Value="vmOrganisationId" Data="@organisationen" TextProperty="Name" ValueProperty="Id" AllowClear="true" />
+        </RadzenFormField>
+    }
+    <div class="vhs-fields">
+        <RadzenFormField Text="Gültig ab *" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly?" @bind-Value="vmVon" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+        <RadzenFormField Text="Gültig bis einschließlich" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly?" @bind-Value="vmBis" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+        <RadzenFormField Text="Nachweis *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="vmNachweis" Placeholder="z. B. Sorgerecht (Geburtsurkunde), Betreuerausweis" /></RadzenFormField>
+    </div>
+    <div class="vhs-row">
+        <BegruendeterButton Text="Vollmacht erteilen" Icon="how_to_reg" Click="VollmachtErteilenAsync" Freigabe="@VollmachtFreigabe" />
+    </div>
+</details>
 
 <details class="vhs-card" open="@nameOffen">
     <summary><b>Namen ändern</b> <span class="vhs-small vhs-muted">– Namen werden nie überschrieben, ältere Dokumente behalten den damals gültigen Namen</span></summary>
@@ -83,6 +162,29 @@
     private DateOnly? aenderungsdatum;
     private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
 
+    // Dubletten, Einwilligungen, Vollmachten
+    private IReadOnlyList<DublettenKandidat> dubletten = [];
+    private Kontaktkanal ewKanal = Kontaktkanal.EMail;
+    private Kontaktzweck ewZweck = Kontaktzweck.Werbung;
+    private bool ewErteilt = true;
+    private DateOnly? ewAb;
+    private string? ewNachweis;
+    private Bevollmaechtigtenart vmArt = Bevollmaechtigtenart.Person;
+    private string? vmSuche, vmPersonName, vmNachweis;
+    private Guid? vmPersonId, vmOrganisationId;
+    private DateOnly? vmVon, vmBis;
+    private IReadOnlyList<PersonZeile> vmTreffer = [];
+    private IReadOnlyList<Organisation> organisationen = [];
+
+    private Freigabe VollmachtFreigabe =>
+        (vmArt == Bevollmaechtigtenart.Person ? vmPersonId : vmOrganisationId) is null
+            ? Freigabe.Nein(vmArt == Bevollmaechtigtenart.Person ? "Bitte die bevollmächtigte Person suchen und auswählen." : "Bitte eine Organisation auswählen.")
+            : vmVon is null || string.IsNullOrWhiteSpace(vmNachweis)
+                ? Freigabe.Nein("Bitte Beginn und Nachweis angeben. Ohne Nachweis keine Vollmacht.")
+                : vmBis is { } b && b < vmVon
+                    ? Freigabe.Nein("Das Ende liegt vor dem Beginn.")
+                    : Freigabe.Ja;
+
     private Freigabe MailFreigabe => string.IsNullOrWhiteSpace(person?.EMail)
         ? Freigabe.Nein("Für diese Person ist keine E-Mail-Adresse hinterlegt.")
         : Freigabe.Ja;
@@ -100,6 +202,9 @@
     {
         await LadenAsync();
         aenderungsdatum ??= DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+        ewAb ??= DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+        vmVon ??= DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+        organisationen = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IOrganisationen>().AlleAsync());
         folgeschritte = [new("Datenhistorie ansehen", $"personen/{Id}/historie"), new("Zur Personenliste", "personen")];
     }
 
@@ -112,6 +217,10 @@
         {
             neuVorname ??= name.Vorname;
             neuNachname ??= name.Nachname;
+            dubletten = person!.Status == Personenstatus.Zusammengefuehrt
+                ? []
+                : await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IDublettenSuche>()
+                    .KandidatenAsync(name.Vorname, name.Nachname, person.Geburtsdatum, Id));
         }
     }
 
@@ -148,6 +257,54 @@
         }
     }
 
+    private async Task EinwilligungSpeichernAsync()
+    {
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<PersonenDienst>()
+            .EinwilligungSetzenAsync(Id, ewKanal, ewZweck, ewErteilt, ewAb!.Value, ewNachweis!));
+        Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", $"Einwilligung {Einwilligung.KanalAnzeige(ewKanal)} · {Einwilligung.ZweckAnzeige(ewZweck)} gespeichert.");
+        ewNachweis = null;
+        await LadenAsync();
+        folgeschritte = [new("Änderung in der Datenhistorie ansehen", $"personen/{Id}/historie?art=Einwilligungen", Hauptschritt: true), new("Zur Personenliste", "personen")];
+    }
+
+    private async Task VollmachtSucheAsync()
+    {
+        vmTreffer = string.IsNullOrWhiteSpace(vmSuche)
+            ? []
+            : (await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenAbfrage>().SeiteAsync(new PersonenFilter(vmSuche), null, 8)))
+                .Where(t => t.Id != Id).ToList();
+    }
+
+    private async Task VollmachtErteilenAsync()
+    {
+        var (bevId, bevName) = vmArt == Bevollmaechtigtenart.Person
+            ? (vmPersonId!.Value, vmPersonName!)
+            : (vmOrganisationId!.Value, organisationen.First(o => o.Id == vmOrganisationId).Name);
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<PersonenDienst>()
+                .VollmachtErteilenAsync(Id, vmArt, bevId, bevName, vmNachweis!, vmVon!.Value, vmBis?.AddDays(1)));
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", $"{bevName} darf {stand?.NameMitTitel} jetzt buchen.");
+            vmNachweis = vmSuche = null;
+            vmPersonId = vmOrganisationId = null;
+            vmTreffer = [];
+            await LadenAsync();
+            folgeschritte = [new("Vollmacht in der Datenhistorie ansehen", $"personen/{Id}/historie?art=Vollmachten", Hauptschritt: true)];
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task VollmachtWiderrufenAsync(Guid vollmachtId)
+    {
+        var heute = DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<PersonenDienst>()
+            .VollmachtWiderrufenAsync(Id, vollmachtId, heute, "Widerruf"));
+        Hinweise.Notify(NotificationSeverity.Info, "Widerrufen", "Die Vollmacht gilt ab heute nicht mehr; sie bleibt in der Historie.");
+        await LadenAsync();
+    }
     private async Task TestmailAsync()
     {
         if (person?.EMail is null || stand is null)

@@ -117,6 +117,30 @@ pre.vhs-code { background: var(--vhs-surface-2); border: 1px solid var(--vhs-lin
 /* Anmeldung und schlichte Seiten */
 .vhs-leer { min-height: 100vh; display: flex; justify-content: center; padding: 48px 16px; }
 .vhs-login { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 16px; background: var(--vhs-surface); border: 1px solid var(--vhs-line); border-radius: 12px; padding: 24px; align-self: flex-start; }
+/* Große Personenliste: Suche, Filter-Chips, virtuelle Liste */
+.vhs-suche { display: flex; align-items: center; gap: 8px; border: 2px solid var(--vhs-accent); border-radius: 10px; padding: 8px 12px; background: var(--vhs-surface); }
+.vhs-suche input { border: 0; outline: none; font: inherit; font-size: 16px; width: 100%; background: transparent; color: var(--vhs-fg); }
+.vhs-filter { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.vhs-filter-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--vhs-muted); margin-left: 8px; }
+.vhs-filter-lbl:first-child { margin-left: 0; }
+.vhs-chip-n { font-variant-numeric: tabular-nums; opacity: 0.75; margin-left: 2px; }
+.vhs-vliste-kopf, .vhs-vzeile { display: grid; grid-template-columns: minmax(0, 2.4fr) 110px minmax(0, 1fr) minmax(0, 1.3fr) 150px; gap: 12px; align-items: center; padding: 0 10px; }
+.vhs-vliste-kopf { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--vhs-muted); font-weight: 600; padding-bottom: 6px; border-bottom: 1px solid var(--vhs-line); }
+.vhs-vliste { height: min(62vh, 640px); overflow-y: auto; border-bottom: 1px solid var(--vhs-line); }
+.vhs-vzeile { height: 46px; border-bottom: 1px solid var(--vhs-line); color: var(--vhs-fg); text-decoration: none; }
+a.vhs-vzeile:hover, a.vhs-vzeile:focus-visible { background: var(--vhs-surface-2); }
+.vhs-vname { display: flex; gap: 8px; align-items: center; min-width: 0; overflow: hidden; white-space: nowrap; }
+.vhs-ellipse { overflow: hidden; text-overflow: ellipsis; }
+.vhs-vergleich { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.vhs-vergleich .vhs-kv { grid-template-columns: minmax(90px, 130px) minmax(0, 1fr) 0; }
+.vhs-gewaehlt { background: var(--vhs-accent-weak); }
+@media (max-width: 920px) { .vhs-vergleich { grid-template-columns: minmax(0, 1fr); } }
+ul.vhs-kompakt { margin: 6px 0; padding-left: 20px; }
+@media (max-width: 860px) {
+    .vhs-vliste-kopf { display: none; }
+    .vhs-vzeile { grid-template-columns: minmax(0, 1fr) auto; height: 46px; }
+    .vhs-vzeile > span:nth-child(2), .vhs-vzeile > span:nth-child(3), .vhs-vzeile > span:nth-child(4) { display: none; }
+}
 /* Kompakte Stammdaten: Feld | Wert | Uhr */
 .vhs-kv { display: grid; grid-template-columns: minmax(120px, 180px) minmax(0, 1fr) 28px; gap: 6px 12px; margin: 0; align-items: start; }
 .vhs-kv dt { color: var(--vhs-muted); font-size: 12.5px; padding-top: 2px; }

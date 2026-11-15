@@ -37,10 +37,13 @@ werden automatisch eingespielt). Danach werden die **Startdaten** der Pilot-VHS 
 Briefkopf, Fachbereiche 1 bis 8 und die Benutzerkonten samt zugehöriger Person (Rolle Mitarbeitende).
 In der Entwicklungsumgebung kommen fünf fiktive Beispielpersonen dazu, darunter Anna Becker mit Namenshistorie.
 
-Mehr Testdaten (reproduzierbar, fester Startwert):
+In der Entwicklungsumgebung legt die Anwendung beim ersten Start außerdem **3.000 fiktive Testpersonen** an
+(fester Startwert, `Demodaten:Massendaten` in `appsettings.Development.json`): Rollen, Status, Fachbereiche,
+Adressen, Rufnummern, Einwilligungen, Organisationen, Vollmachten und einige absichtlich angelegte Dubletten.
+Dasselbe für eine beliebige Datenbankdatei:
 
 ```powershell
-dotnet run --project tools\Testdaten -- 500
+dotnet run --project tools\Testdaten -- 3000
 ```
 
 Zurücksetzen: Anwendung beenden und den Ordner `src/VibeVHS.Web/data` löschen.
@@ -97,6 +100,19 @@ Einwilligung, bevorzugt) und E-Mail-Adressen (Art, bevorzugt). Die Kennzeichen �
   Beendet) und Grund/Nachweis; ersetzte Erfassungen blass. Dazu die Stichtagsabfrage „Wie war der Stand am … / was war
   bekannt am …“ für den gesamten Datensatz.
 - Demodaten: Olena Kovalenko (Umzug, c/o-Korrespondenzadresse, Signal-Einwilligung), Anna Becker (Korrektur, Heirat).
+
+## Personenliste, Dubletten, Organisationen, Vollmachten, Einwilligungen (I1)
+
+- **Personenliste** `/personen`: Suche zuerst (FTS5, normalisierte Schreibweisen), Filter-Chips mit Trefferzahlen,
+  virtuelles Scrollen mit Keyset-Nachladen in 50er-Blöcken, „Alle n Treffer anschreiben“ und Excel-Export.
+  Aufbau und gemessene Ladezeiten: [personenliste-ladezeiten.md](personenliste-ladezeiten.md).
+- **Dubletten**: Prüfung beim Anlegen (gleiches Geburtsdatum + ähnlicher normalisierter Name), Hinweis in Liste und
+  Personenseite, Vergleichsansicht `/personen/dubletten` mit Zusammenführen (beide Historien bleiben, protokolliert)
+  oder „Keine Dublette“.
+- **Organisationen** (Firma, Behörde, Jobcenter …) mit zeitlich gültiger Zugehörigkeit von Personen.
+- **Buchungsvollmachten**: Person oder Organisation darf eine Person buchen – mit Zeitraum und Nachweis.
+- **Einwilligungen** je Kanal (E-Mail, SMS, Messenger, Telefon, Brief) und Zweck (Kursorganisation, Werbung).
+- Alles davon ist bitemporal und erscheint in der Datenhistorie der Person.
 
 ## Testbenutzer der Pilot-VHS
 

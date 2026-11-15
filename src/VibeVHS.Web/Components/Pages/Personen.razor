@@ -1,8 +1,12 @@
 @page "/personen"
+@using System.Diagnostics
+@using Microsoft.AspNetCore.Components.Web.Virtualization
 @using VibeVHS.Application.Personen
+@using VibeVHS.Application.Stammdaten
 @using VibeVHS.Domain.Personen
+@using VibeVHS.Domain.Stammdaten
+@implements IDisposable
 @inject Vorgang Vorgang
-@inject TimeProvider Uhr
 @inject NavigationManager Navigation
 @inject NotificationService Hinweise
 
@@ -11,12 +15,22 @@
 <div class="vhs-head">
     <div>
         <h1>Personen</h1>
-        <p class="vhs-sub">Teilnehmende, Dozierende und Ansprechpersonen. Jede Person gibt es nur einmal.</p>
+        <p class="vhs-sub">Suchen statt blättern: Name, früherer Name, E-Mail, Geburtsdatum oder Ort. Schreibweisen wie „Yilmaz“/„Yılmaz“ werden gleich behandelt.</p>
     </div>
     <div class="vhs-row">
-        @if (!formularOffen)
+        <BegruendeterButton Text="Person anlegen" Icon="person_add" Click="@(() => { formularOffen = true; rundschreibenOffen = false; })" />
+        <BegruendeterButton Text="@($"Alle {zahlen?.Gesamt ?? 0} Treffer anschreiben")" Icon="forward_to_inbox" ButtonStyle="ButtonStyle.Light"
+                            Freigabe="@RundschreibenFreigabe" Click="@(() => { rundschreibenOffen = true; formularOffen = false; vorschau = null; })" />
+        @if (zahlen is { Gesamt: > 0 })
         {
-            <BegruendeterButton Text="Person anlegen" Icon="person_add" Click="@(() => formularOffen = true)" />
+            <a class="rz-button rz-button-md rz-variant-filled rz-light rz-shade-default" href="@ExportAdresse" download
+               title="Alle Treffer mit den gesetzten Filtern als Excel-Datei (der Export wird protokolliert)">
+                <span class="rz-button-box"><RadzenIcon Icon="download" /><span class="rz-button-text">Excel</span></span>
+            </a>
+        }
+        else
+        {
+            <BegruendeterButton Text="Excel" Icon="download" ButtonStyle="ButtonStyle.Light" Freigabe="@(Freigabe.Nein("Keine Treffer zum Exportieren."))" />
         }
     </div>
 </div>
@@ -26,100 +40,318 @@
     <section class="vhs-card">
         <h2>Neue Person</h2>
         <div class="vhs-fields">
-            <RadzenFormField Text="Vorname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="vorname" /></RadzenFormField>
-            <RadzenFormField Text="Nachname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nachname" /></RadzenFormField>
+            <RadzenFormField Text="Vorname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="vorname" @bind-Value:after="DublettenPruefenAsync" /></RadzenFormField>
+            <RadzenFormField Text="Nachname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nachname" @bind-Value:after="DublettenPruefenAsync" /></RadzenFormField>
             <RadzenFormField Text="Geburtsdatum" Variant="Variant.Outlined">
-                <RadzenDatePicker TValue="DateOnly?" @bind-Value="geburtsdatum" DateFormat="dd.MM.yyyy" ShowCalendarWeek="false" />
+                <RadzenDatePicker TValue="DateOnly?" @bind-Value="geburtsdatum" @bind-Value:after="DublettenPruefenAsync" DateFormat="dd.MM.yyyy" />
             </RadzenFormField>
             <RadzenFormField Text="E-Mail" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="eMail" /></RadzenFormField>
             <RadzenFormField Text="Korrespondenzsprache" Variant="Variant.Outlined">
                 <RadzenDropDown TValue="string" @bind-Value="sprache" Data="@Sprachen.Alle" TextProperty="Name" ValueProperty="Code" />
             </RadzenFormField>
         </div>
+        @if (kandidaten.Count > 0)
+        {
+            <div class="vhs-alert vhs-warn" role="alert">
+                <b>Mögliche Dublette:</b> Mit gleichem Geburtsdatum gibt es schon
+                <ul class="vhs-kompakt">
+                    @foreach (var k in kandidaten)
+                    {
+                        <li><a href="@($"personen/{k.Id}")" target="_blank">@k.Anzeigename</a>@(k.Wohnort is null ? "" : $", {k.Wohnort}") – @k.Grund</li>
+                    }
+                </ul>
+                <label><input type="checkbox" @bind="dublettenGeprueft" /> Geprüft: Es ist trotzdem eine andere Person.</label>
+            </div>
+        }
+        else if (geburtsdatum is null && !string.IsNullOrWhiteSpace(nachname))
+        {
+            <p class="vhs-small vhs-muted">Tipp: Mit Geburtsdatum prüft das System, ob die Person schon erfasst ist.</p>
+        }
         @if (fehler is not null)
         {
             <div class="vhs-alert vhs-crit" role="alert">@fehler</div>
         }
         <div class="vhs-row">
             <BegruendeterButton Text="Speichern" Icon="save" Click="SpeichernAsync" IsBusy="@speichert" Freigabe="@SpeichernFreigabe" />
-            <RadzenButton Text="Abbrechen" ButtonStyle="ButtonStyle.Light" Click="@(() => { formularOffen = false; fehler = null; })" />
+            <RadzenButton Text="Abbrechen" ButtonStyle="ButtonStyle.Light" Click="@(() => { formularOffen = false; fehler = null; kandidaten = []; })" />
         </div>
     </section>
 }
 
-@if (folgeschritte.Count > 0)
+@if (rundschreibenOffen)
 {
-    <NaechsteSchritte Titel="@($"{zuletztAngelegt} wurde angelegt. Wie geht es weiter?")" Schritte="@folgeschritte" />
+    <section class="vhs-card">
+        <h2>Rundschreiben an alle @zahlen?.Gesamt Treffer</h2>
+        <p class="vhs-small vhs-muted" style="margin-top:-6px">Jede Mail landet im Postausgang und bekommt den Übersetzungslink in der Sprache der Person. Werbung geht nur an Personen mit Einwilligung.</p>
+        <RadzenRadioButtonList TValue="Kontaktzweck" @bind-Value="zweck" @bind-Value:after="@(() => vorschau = null)" Orientation="Orientation.Horizontal">
+            <Items>
+                <RadzenRadioButtonListItem Text="Kursorganisation (z. B. Raumänderung)" Value="Kontaktzweck.Kursorganisation" />
+                <RadzenRadioButtonListItem Text="Werbung (z. B. neues Programm)" Value="Kontaktzweck.Werbung" />
+            </Items>
+        </RadzenRadioButtonList>
+        <RadzenFormField Text="Betreff *" Variant="Variant.Outlined" Style="width:100%"><RadzenTextBox @bind-Value="betreff" /></RadzenFormField>
+        <RadzenFormField Text="Text *" Variant="Variant.Outlined" Style="width:100%"><RadzenTextArea @bind-Value="text" Rows="4" /></RadzenFormField>
+        @if (vorschau is { } v)
+        {
+            <div class="vhs-alert vhs-info">
+                @v.Treffer Treffer · @v.MitEMail mit E-Mail-Adresse · <b>@v.Empfaenger Empfänger</b>
+                @if (v.OhneEinwilligung > 0) { <span> · @v.OhneEinwilligung ohne Einwilligung werden übersprungen</span> }
+            </div>
+        }
+        <div class="vhs-row">
+            <RadzenButton Text="Empfänger zählen" Icon="calculate" ButtonStyle="ButtonStyle.Light" Click="VorschauAsync" IsBusy="@rechnet" />
+            <BegruendeterButton Text="In den Postausgang legen" Icon="send" Click="RundschreibenSendenAsync" IsBusy="@sendet"
+                                Freigabe="@SendenFreigabe" />
+            <RadzenButton Text="Abbrechen" ButtonStyle="ButtonStyle.Light" Click="@(() => rundschreibenOffen = false)" />
+        </div>
+    </section>
 }
 
+<NaechsteSchritte Titel="@folgeTitel" Schritte="@folgeschritte" />
+
 <section class="vhs-card">
-    <div class="vhs-head">
-        <RadzenTextBox @bind-Value="suche" @bind-Value:after="Filtern" Placeholder="Name, E-Mail oder Geburtsdatum filtern" style="min-width:300px" />
-        <span class="vhs-small vhs-muted">@gefiltert.Count von @alle.Count</span>
+    <div class="vhs-suche">
+        <RadzenIcon Icon="search" />
+        <input type="search" @bind="suche" @bind:event="oninput" @bind:after="SucheGeaendert" placeholder="z. B. yilmaz, müller emsdetten, 12.08.1986"
+               aria-label="Personen suchen" autofocus />
     </div>
-    <RadzenDataGrid TItem="PersonZeile" Data="@gefiltert" AllowSorting="true" AllowPaging="true" PageSize="25"
-                    PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true"
-                    PagingSummaryFormat="Seite {0} von {1} ({2} Personen)" EmptyText="Keine Personen gefunden."
-                    RowClick="@(a => Navigation.NavigateTo($"personen/{a.Data?.Id}"))" class="vhs-klickbar">
-        <Columns>
-            <RadzenDataGridColumn TItem="PersonZeile" Property="@nameof(PersonZeile.Name)" Title="Name" />
-            <RadzenDataGridColumn TItem="PersonZeile" Property="@nameof(PersonZeile.Geburtsdatum)" Title="Geburtsdatum" FormatString="{0:dd.MM.yyyy}" Width="140px" />
-            <RadzenDataGridColumn TItem="PersonZeile" Property="@nameof(PersonZeile.EMail)" Title="E-Mail" />
-            <RadzenDataGridColumn TItem="PersonZeile" Property="@nameof(PersonZeile.SpracheName)" Title="Sprache" Width="140px" />
-            <RadzenDataGridColumn TItem="PersonZeile" Property="@nameof(PersonZeile.AngelegtAm)" Title="Angelegt" FormatString="{0:dd.MM.yyyy}" Width="130px" />
-        </Columns>
-    </RadzenDataGrid>
+
+    @if (zahlen is { } z)
+    {
+        <div class="vhs-filter">
+            <span class="vhs-filter-lbl">Rolle</span>
+            @foreach (var (r, n) in z.Rollen)
+            {
+                @Chip(PersonMerkmal.RollenAnzeige(r), n, filter.Rolle == r, () => Setzen(filter with { Rolle = filter.Rolle == r ? null : r }))
+            }
+            <span class="vhs-filter-lbl">Status</span>
+            @foreach (var (s, n) in z.Status)
+            {
+                @Chip(PersonenstatusAnzeige.Text(s), n, filter.Status == s, () => Setzen(filter with { Status = filter.Status == s ? null : s }))
+            }
+            <span class="vhs-filter-lbl">Fachbereich</span>
+            @foreach (var (nr, n) in z.Fachbereiche)
+            {
+                @Chip($"FB {nr}", n, filter.Fachbereich == nr, () => Setzen(filter with { Fachbereich = filter.Fachbereich == nr ? null : nr }), FachbereichName(nr))
+            }
+            <span class="vhs-filter-lbl">Hinweise</span>
+            @Chip("mögliche Dubletten", z.DublettenHinweise, filter.NurDublettenHinweise, () => Setzen(filter with { NurDublettenHinweise = !filter.NurDublettenHinweise }))
+            @if (z.DublettenHinweise > 0)
+            {
+                <a href="personen/dubletten" class="vhs-small">Dubletten vergleichen</a>
+            }
+            @if (!filter.IstLeer)
+            {
+                <button class="vhs-linkbutton" @onclick="@(async () => { suche = null; await Setzen(new PersonenFilter()); })">alle Filter zurücksetzen</button>
+            }
+        </div>
+    }
+
+    <div class="vhs-vliste-kopf" aria-hidden="true">
+        <span>Name</span><span>Geburtsdatum</span><span>Wohnort</span><span>Rollen</span><span>Status</span>
+    </div>
+    <div class="vhs-vliste" role="list" aria-label="Personen">
+        <Virtualize @ref="liste" TItem="PersonZeile" ItemsProvider="LadenAsync" ItemComparer="@GleicheId" ItemSize="46" OverscanCount="15" Context="p">
+            <ItemContent>
+                <a class="vhs-vzeile" role="listitem" href="@($"personen/{p.Id}")">
+                    <span class="vhs-vname">
+                        <b>@p.Anzeigename</b>
+                        @if (dublettenIds.Contains(p.Id))
+                        {
+                            <span class="vhs-why" tabindex="-1" data-why="Mögliche Dublette: gleiches Geburtsdatum, ähnlicher Name. Auf der Personenseite vergleichen.">
+                                <StatusPille Stil="warn">Dublette?</StatusPille>
+                            </span>
+                        }
+                        <span class="vhs-small vhs-muted vhs-ellipse">@p.EMail</span>
+                    </span>
+                    <span class="vhs-mono vhs-small">@p.Geburtsdatum?.ToString("dd.MM.yyyy")</span>
+                    <span class="vhs-small">@p.Wohnort</span>
+                    <span class="vhs-small">@PersonMerkmal.RollenAnzeige(p.Rollen)@(p.Fachbereiche.Count > 0 ? $" · FB {string.Join(", ", p.Fachbereiche)}" : "")</span>
+                    <span><StatusPille Stil="@StatusStil(p.Status)">@PersonenstatusAnzeige.Text(p.Status)</StatusPille></span>
+                </a>
+            </ItemContent>
+            <Placeholder>
+                <div class="vhs-vzeile vhs-muted">wird geladen …</div>
+            </Placeholder>
+            <EmptyContent>
+                <div class="vhs-vzeile vhs-muted">Keine Personen gefunden. Suchbegriff kürzen oder Filter zurücksetzen.</div>
+            </EmptyContent>
+        </Virtualize>
+    </div>
+    <p class="vhs-small vhs-muted" style="margin:0">@(zahlen?.Gesamt ?? 0) Treffer · beim Scrollen werden je @Blockgroesse weitere nachgeladen</p>
 </section>
 
 @code {
-    private sealed record PersonZeile(Guid Id, string Name, DateOnly? Geburtsdatum, string? EMail, string SpracheName, DateTime AngelegtAm, string Suchtext);
+    private const int Blockgroesse = 50;
 
+    private static readonly IEqualityComparer<PersonZeile> GleicheId = EqualityComparer<PersonZeile>.Create((a, b) => a?.Id == b?.Id, z => z.Id.GetHashCode());
+
+    private Virtualize<PersonZeile>? liste;
+    private PersonenFilter filter = new();
+    private string? suche;
+    private Filterzahlen? zahlen;
+    private IReadOnlyList<Fachbereich> fachbereiche = [];
+    private HashSet<Guid> dublettenIds = [];
+    private readonly List<PersonZeile> geladen = [];
+    private bool ende;
+    private double? ersteMs;
+    private readonly SemaphoreSlim ladesperre = new(1, 1);
+    private CancellationTokenSource? sucheVerzoegerung;
+
+    // Anlegen
     [SupplyParameterFromQuery(Name = "neu")]
     private int? Neu { get; set; }
 
-    private List<PersonZeile> alle = [];
-    private List<PersonZeile> gefiltert = [];
-    private string? suche;
-
-    private bool formularOffen, speichert;
+    private bool formularOffen, speichert, dublettenGeprueft;
     private string? vorname, nachname, eMail, fehler;
     private string sprache = "de";
     private DateOnly? geburtsdatum;
-    private string? zuletztAngelegt;
+    private IReadOnlyList<DublettenKandidat> kandidaten = [];
+
+    // Rundschreiben
+    private bool rundschreibenOffen, rechnet, sendet;
+    private Kontaktzweck zweck = Kontaktzweck.Kursorganisation;
+    private string? betreff, text;
+    private RundschreibenVorschau? vorschau;
+
+    private string? folgeTitel;
     private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
 
     private Freigabe SpeichernFreigabe =>
         string.IsNullOrWhiteSpace(vorname) || string.IsNullOrWhiteSpace(nachname)
             ? Freigabe.Nein("Bitte zuerst Vor- und Nachnamen eintragen (Pflichtfelder).")
-            : Freigabe.Ja;
+            : kandidaten.Count > 0 && !dublettenGeprueft
+                ? Freigabe.Nein("Es gibt eine mögliche Dublette. Bitte prüfen und bestätigen, dass es eine andere Person ist – oder die vorhandene Person öffnen.")
+                : Freigabe.Ja;
+
+    private Freigabe RundschreibenFreigabe => zahlen is not { Gesamt: > 0 }
+        ? Freigabe.Nein("Keine Treffer: Suche oder Filter anpassen.")
+        : Freigabe.Ja;
+
+    private Freigabe SendenFreigabe =>
+        string.IsNullOrWhiteSpace(betreff) || string.IsNullOrWhiteSpace(text)
+            ? Freigabe.Nein("Bitte Betreff und Text eingeben.")
+            : vorschau is null
+                ? Freigabe.Nein("Bitte zuerst „Empfänger zählen“: so sehen Sie vor dem Versand, wie viele Mails entstehen.")
+                : vorschau.Empfaenger == 0
+                    ? Freigabe.Nein("Keine Empfänger: Niemand in der Trefferliste hat eine E-Mail-Adresse (bzw. eine Einwilligung).")
+                    : Freigabe.Ja;
+
+    private string ExportAdresse
+    {
+        get
+        {
+            var teile = new List<string>();
+            if (!string.IsNullOrWhiteSpace(filter.Suche)) teile.Add($"suche={Uri.EscapeDataString(filter.Suche)}");
+            if (filter.Rolle is { } r) teile.Add($"rolle={r}");
+            if (filter.Status is { } s) teile.Add($"status={s}");
+            if (filter.Fachbereich is { } fb) teile.Add($"fb={fb}");
+            if (filter.NurDublettenHinweise) teile.Add("dubletten=true");
+            return "personen/export" + (teile.Count > 0 ? "?" + string.Join("&", teile) : "");
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
         formularOffen = Neu == 1;
-        await LadenAsync();
+        fachbereiche = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IStammdaten>().FachbereicheAsync());
+        await HinweiseUndZahlenLadenAsync();
     }
 
-    private async Task LadenAsync()
+    private async Task HinweiseUndZahlenLadenAsync()
     {
-        var jetzt = Uhr.GetLocalNow();
-        var personen = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenSpeicher>().AlleAsync());
-        alle = personen
-            .Select(p =>
+        var paare = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IDublettenSuche>().PaareAsync());
+        dublettenIds = paare.SelectMany(p => new[] { p.A, p.B }).ToHashSet();
+        zahlen = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenAbfrage>().ZaehlenAsync(filter));
+    }
+
+    /// <summary>Virtualize fragt nach Positionen; geladen wird per Keyset in Blöcken, bis die Position erreicht ist.</summary>
+    private async ValueTask<ItemsProviderResult<PersonZeile>> LadenAsync(ItemsProviderRequest anfrage)
+    {
+        await ladesperre.WaitAsync(anfrage.CancellationToken);
+        try
+        {
+            var aktuellerFilter = filter;
+            // Mindestens den ersten Block laden: Virtualize fragt beim ersten Rendern auch mit Anzahl 0 an.
+            while (!ende && (geladen.Count == 0 || geladen.Count < anfrage.StartIndex + anfrage.Count))
             {
-                var name = p.AktuellerName(jetzt);
-                var anzeige = $"{name.Nachname}, {name.Vorname}";
-                return new PersonZeile(p.Id, anzeige, p.Geburtsdatum, p.EMail, Sprachen.Name(p.Sprache),
-                    p.AngelegtAm.LocalDateTime, $"{anzeige} {name.Vorname} {name.Nachname} {p.EMail} {p.Geburtsdatum:dd.MM.yyyy}".ToLowerInvariant());
-            })
-            .OrderBy(z => z.Name, StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("de-DE"), true))
-            .ToList();
-        Filtern();
+                var nach = geladen.Count == 0 ? null : Seitenschluessel.Von(geladen[^1]);
+                var uhr = Stopwatch.StartNew();
+                var block = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenAbfrage>()
+                    .SeiteAsync(aktuellerFilter, nach, Blockgroesse, anfrage.CancellationToken));
+                if (geladen.Count == 0)
+                {
+                    ersteMs = uhr.Elapsed.TotalMilliseconds;
+                }
+
+                geladen.AddRange(block);
+                ende = block.Count < Blockgroesse;
+            }
+
+            var gesamt = ende ? geladen.Count : Math.Max(zahlen?.Gesamt ?? 0, geladen.Count + 1);
+            return new ItemsProviderResult<PersonZeile>(geladen.Skip(anfrage.StartIndex).Take(anfrage.Count).ToList(), gesamt);
+        }
+        finally
+        {
+            ladesperre.Release();
+        }
     }
 
-    private void Filtern()
+    private async Task Setzen(PersonenFilter neu)
     {
-        var teile = (suche ?? string.Empty).ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        gefiltert = alle.Where(z => teile.All(t => z.Suchtext.Contains(t, StringComparison.Ordinal))).ToList();
+        filter = neu with { Suche = suche };
+        geladen.Clear();
+        ende = false;
+        ersteMs = null;
+        vorschau = null;
+        zahlen = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenAbfrage>().ZaehlenAsync(filter));
+        if (liste is not null)
+        {
+            await liste.RefreshDataAsync();
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task SucheGeaendert()
+    {
+        sucheVerzoegerung?.Cancel();
+        sucheVerzoegerung = new CancellationTokenSource();
+        var token = sucheVerzoegerung.Token;
+        try
+        {
+            await Task.Delay(250, token);
+            await Setzen(filter);
+        }
+        catch (TaskCanceledException)
+        {
+            // Nutzer tippt noch.
+        }
+    }
+
+    private RenderFragment Chip(string text, int anzahl, bool an, Func<Task> klick, string? titel = null) => __builder =>
+    {
+        <button class="vhs-chip @(an ? "on" : "")" title="@titel" disabled="@(anzahl == 0 && !an)" @onclick="klick" aria-pressed="@(an ? "true" : "false")">
+            @text <span class="vhs-chip-n">@anzahl</span>
+        </button>
+    };
+
+    private string FachbereichName(int nr) => fachbereiche.FirstOrDefault(f => f.Nr == nr)?.Anzeige ?? $"FB {nr}";
+
+    private static string StatusStil(Personenstatus s) => s switch
+    {
+        Personenstatus.Aktiv => "gut",
+        Personenstatus.Ruhend => "neutral",
+        Personenstatus.LoeschungVorgemerkt => "warn",
+        _ => "info",
+    };
+
+    private async Task DublettenPruefenAsync()
+    {
+        dublettenGeprueft = false;
+        kandidaten = string.IsNullOrWhiteSpace(vorname) || string.IsNullOrWhiteSpace(nachname)
+            ? []
+            : await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IDublettenSuche>().KandidatenAsync(vorname!, nachname!, geburtsdatum));
     }
 
     private async Task SpeichernAsync()
@@ -130,19 +362,22 @@
         {
             var person = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<PersonenDienst>()
                 .AnlegenAsync(vorname!, nachname!, geburtsdatum, eMail, sprache));
-            zuletztAngelegt = $"{vorname} {nachname}";
-            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", $"{zuletztAngelegt} wurde angelegt und protokolliert.");
+            var name = $"{vorname} {nachname}";
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", $"{name} wurde angelegt und protokolliert.");
+            folgeTitel = $"{name} wurde angelegt. Wie geht es weiter?";
             folgeschritte =
             [
-                new("Person öffnen", $"personen/{person.Id}", "Daten prüfen, Namenshistorie ansehen", Hauptschritt: true),
+                new("Person öffnen", $"personen/{person.Id}", "Adresse, Einwilligungen und Vollmachten ergänzen", Hauptschritt: true),
                 new("Kursanmeldung erfassen", "anmeldung", Freigabe: Freigabe.Geplant("Die Kursanmeldung")),
                 new("Weitere Person anlegen", "personen?neu=1"),
             ];
             vorname = nachname = eMail = null;
             geburtsdatum = null;
             sprache = "de";
+            kandidaten = [];
             formularOffen = false;
-            await LadenAsync();
+            await HinweiseUndZahlenLadenAsync();
+            await Setzen(filter);
         }
         catch (ArgumentException ex)
         {
@@ -152,5 +387,38 @@
         {
             speichert = false;
         }
+    }
+
+    private async Task VorschauAsync()
+    {
+        rechnet = true;
+        vorschau = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<Rundschreiben>().VorschauAsync(filter, zweck));
+        rechnet = false;
+    }
+
+    private async Task RundschreibenSendenAsync()
+    {
+        sendet = true;
+        try
+        {
+            var ergebnis = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<Rundschreiben>().SendenAsync(filter, zweck, betreff!, text!));
+            Hinweise.Notify(NotificationSeverity.Success, "Im Postausgang", $"{ergebnis.Eingereiht} Mails eingereiht, {ergebnis.Uebersprungen} übersprungen.");
+            rundschreibenOffen = false;
+            folgeTitel = $"{ergebnis.Eingereiht} Mails liegen im Postausgang.";
+            folgeschritte = [new("Postausgang ansehen", "postausgang", Hauptschritt: true), new("Protokoll ansehen", "protokoll")];
+            betreff = text = null;
+            vorschau = null;
+        }
+        finally
+        {
+            sendet = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        sucheVerzoegerung?.Cancel();
+        sucheVerzoegerung?.Dispose();
+        ladesperre.Dispose();
     }
 }

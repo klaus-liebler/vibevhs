@@ -449,7 +449,12 @@ public sealed class Person
 
     private void ZwischenstandAktualisieren(DateTimeOffset jetzt)
     {
-        var stand = StandAm(DateOnly.FromDateTime(jetzt.Date), jetzt);
+        // Rückdatierte Erfassungen (z. B. Datenübernahme) dürfen den Zwischenstand nicht auf einen alten Stand zurücksetzen:
+        // maßgeblich ist der jüngste bekannte Stand.
+        var juengste = AlleVersionen.Select(v => v.ErfasstAm).DefaultIfEmpty(jetzt).Max();
+        var stichzeit = juengste > jetzt ? juengste : jetzt;
+        var stand = StandAm(DateOnly.FromDateTime(stichzeit.Date), stichzeit);
+
         // Felder ohne versionierte Daten (Altbestand vor Einführung der Versionierung) bleiben, wie sie sind.
         if (_merkmale.Any(m => m.Art == MerkmalArt.Geburtsdatum))
         {

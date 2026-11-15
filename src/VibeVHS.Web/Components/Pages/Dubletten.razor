@@ -1,0 +1,145 @@
+@page "/personen/dubletten"
+@using VibeVHS.Application.Personen
+@using VibeVHS.Domain.Personen
+@inject Vorgang Vorgang
+@inject TimeProvider Uhr
+@inject NotificationService Hinweise
+@inject NavigationManager Navigation
+
+<PageTitle>Dubletten · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Mögliche Dubletten</h1>
+        <p class="vhs-sub">Gleiches Geburtsdatum und ähnlicher Name. Vergleichen, dann zusammenführen oder als verschiedene Personen bestätigen.</p>
+    </div>
+    <div class="vhs-row">
+        <RadzenButton Text="Zur Personenliste" Icon="arrow_back" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("personen"))" />
+    </div>
+</div>
+
+<div class="vhs-split">
+    <section class="vhs-card">
+        <h2>@paare.Count Paare</h2>
+        <div class="vhs-list">
+            @if (paare.Count == 0)
+            {
+                <div class="vhs-muted">Keine möglichen Dubletten.</div>
+            }
+            @foreach (var p in paare)
+            {
+                <div class="@(p.A == A && p.B == B ? "vhs-gewaehlt" : "")">
+                    <span class="vhs-grow">
+                        <a href="@($"personen/dubletten?a={p.A}&b={p.B}")">@Name(p.A) ↔ @Name(p.B)</a><br />
+                        <span class="vhs-small vhs-muted">@p.Grund</span>
+                    </span>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="vhs-card">
+        @if (a is null || b is null || standA is null || standB is null)
+        {
+            <p class="vhs-muted">Paar links auswählen, um beide Datensätze zu vergleichen.</p>
+        }
+        else
+        {
+            <h2>Vergleich</h2>
+            <div class="vhs-vergleich">
+                <div>
+                    <h3><a href="@($"personen/{a.Id}")">@standA.NameMitTitel</a></h3>
+                    <p class="vhs-small vhs-muted">angelegt @a.AngelegtAm.ToLocalTime().ToString("dd.MM.yyyy") · @PersonenstatusAnzeige.Text(a.Status) · @a.AlleVersionen.Count() Versionen</p>
+                    <StammdatenKompakt Stand="@standA" />
+                </div>
+                <div>
+                    <h3><a href="@($"personen/{b.Id}")">@standB.NameMitTitel</a></h3>
+                    <p class="vhs-small vhs-muted">angelegt @b.AngelegtAm.ToLocalTime().ToString("dd.MM.yyyy") · @PersonenstatusAnzeige.Text(b.Status) · @b.AlleVersionen.Count() Versionen</p>
+                    <StammdatenKompakt Stand="@standB" />
+                </div>
+            </div>
+            <div class="vhs-alert vhs-info">
+                Beim Zusammenführen bleibt der gewählte Datensatz bestehen und übernimmt fehlende Adressen, Nummern, E-Mail-Adressen,
+                Rollen, Organisationen und Vollmachten. Der andere bleibt mit seiner ganzen Historie erhalten, wird als „zusammengeführt“
+                markiert und verweist auf den bleibenden Datensatz. Beides steht im Protokoll.
+            </div>
+            <div class="vhs-row">
+                <BegruendeterButton Text="@($"{standA.NameMitTitel} behalten")" Icon="merge" Freigabe="@Darf" IsBusy="@arbeitet"
+                                    Click="@(() => ZusammenfuehrenAsync(a.Id, b.Id))" />
+                <BegruendeterButton Text="@($"{standB.NameMitTitel} behalten")" Icon="merge" Freigabe="@Darf" IsBusy="@arbeitet"
+                                    Click="@(() => ZusammenfuehrenAsync(b.Id, a.Id))" />
+                <BegruendeterButton Text="Keine Dublette" Icon="call_split" ButtonStyle="ButtonStyle.Light" Freigabe="@Darf"
+                                    Click="KeineDubletteAsync" />
+            </div>
+        }
+    </section>
+</div>
+
+<NaechsteSchritte Schritte="@folgeschritte" />
+
+@code {
+    [SupplyParameterFromQuery(Name = "a")]
+    private Guid? A { get; set; }
+
+    [SupplyParameterFromQuery(Name = "b")]
+    private Guid? B { get; set; }
+
+    private IReadOnlyList<DublettenPaar> paare = [];
+    private Dictionary<Guid, string> namen = [];
+    private Person? a, b;
+    private PersonenStand? standA, standB;
+    private bool arbeitet;
+    private Rolle? rolle;
+    private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
+
+    private Freigabe Darf => Freigabe.NurFuer(rolle, Rolle.Teilnehmerservice, Rolle.Verwaltungsleitung, Rolle.Leitung, Rolle.Systemverwaltung);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync()
+    {
+        paare = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IDublettenSuche>().PaareAsync());
+        var ids = paare.SelectMany(p => new[] { p.A, p.B }).Concat(new[] { A, B }.OfType<Guid>()).Distinct().ToList();
+        var personen = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenSpeicher>().LadenAsync(ids));
+        namen = personen.ToDictionary(p => p.Id, p => p.Anzeigename);
+        var jetzt = Uhr.GetLocalNow();
+        var heute = DateOnly.FromDateTime(jetzt.Date);
+        a = A is { } ia ? personen.FirstOrDefault(p => p.Id == ia) : null;
+        b = B is { } ib ? personen.FirstOrDefault(p => p.Id == ib) : null;
+        standA = a?.StandAm(heute, jetzt);
+        standB = b?.StandAm(heute, jetzt);
+    }
+
+    private string Name(Guid id) => namen.GetValueOrDefault(id, "(unbekannt)");
+
+    private async Task ZusammenfuehrenAsync(Guid ziel, Guid dublette)
+    {
+        arbeitet = true;
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<PersonenDienst>().ZusammenfuehrenAsync(ziel, dublette));
+            Hinweise.Notify(NotificationSeverity.Success, "Zusammengeführt", "Beide Historien bleiben erhalten; der Vorgang ist protokolliert.");
+            folgeschritte = [new("Zusammengeführte Person öffnen", $"personen/{ziel}", Hauptschritt: true), new("Datenhistorie ansehen", $"personen/{ziel}/historie")];
+            Navigation.NavigateTo("personen/dubletten", replace: true);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+        finally
+        {
+            arbeitet = false;
+        }
+    }
+
+    private async Task KeineDubletteAsync()
+    {
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<PersonenDienst>().KeineDubletteAsync(A!.Value, B!.Value));
+        Hinweise.Notify(NotificationSeverity.Info, "Festgehalten", "Die beiden Datensätze gelten als verschiedene Personen.");
+        Navigation.NavigateTo("personen/dubletten", replace: true);
+    }
+}

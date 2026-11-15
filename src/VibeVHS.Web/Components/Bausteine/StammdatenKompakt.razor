@@ -75,6 +75,54 @@
         }
     </dd>
     <dd class="vhs-kv-uhr">@Uhr("E-Mail")</dd>
+
+    <dt>Organisationen</dt>
+    <dd>
+        @if (Stand.Organisationen.Count == 0)
+        {
+            <span class="vhs-muted">–</span>
+        }
+        @foreach (var o in Stand.Organisationen)
+        {
+            <div class="vhs-kv-wert"><span>@o.OrganisationName</span><span class="vhs-small vhs-muted">@o.Funktion · seit @o.GueltigVon.ToString("dd.MM.yyyy")</span></div>
+        }
+    </dd>
+    <dd class="vhs-kv-uhr">@Uhr("Organisationen")</dd>
+
+    <dt>Buchungsvollmachten</dt>
+    <dd>
+        @if (Stand.Vollmachten.Count == 0)
+        {
+            <span class="vhs-muted">–</span>
+        }
+        @foreach (var v in Stand.Vollmachten)
+        {
+            <div class="vhs-kv-wert">
+                <span>@v.BevollmaechtigterName</span>
+                <span class="vhs-small vhs-muted">@(v.Art == Bevollmaechtigtenart.Person ? "Person" : "Organisation") · @Zeitraum(v.GueltigVon, v.GueltigBis) · @v.Nachweis</span>
+                @if (Widerrufen.HasDelegate)
+                {
+                    <button class="vhs-linkbutton" @onclick="@(() => Widerrufen.InvokeAsync(v.VollmachtId))">widerrufen</button>
+                }
+            </div>
+        }
+    </dd>
+    <dd class="vhs-kv-uhr">@Uhr("Vollmachten")</dd>
+
+    <dt>Einwilligungen</dt>
+    <dd>
+        @if (Stand.Einwilligungen.Count == 0)
+        {
+            <span class="vhs-muted">keine Angaben (ohne Einwilligung keine Werbung, keine SMS/Messenger)</span>
+        }
+        <div class="vhs-kv-wert">
+            @foreach (var e in Stand.Einwilligungen.OrderBy(e => e.Zweck).ThenBy(e => e.Kanal))
+            {
+                <StatusPille Stil="@(e.Erteilt ? "gut" : "neutral")">@Einwilligung.KanalAnzeige(e.Kanal) · @Einwilligung.ZweckAnzeige(e.Zweck): @(e.Erteilt ? "ja" : "nein")</StatusPille>
+            }
+        </div>
+    </dd>
+    <dd class="vhs-kv-uhr">@Uhr("Einwilligungen")</dd>
 </dl>
 
 @code {
@@ -84,6 +132,13 @@
     /// <summary>Mit Id: Uhr-Symbole verlinken in die Datenhistorie.</summary>
     [Parameter]
     public Guid? PersonId { get; set; }
+
+    /// <summary>Wenn gesetzt: Link "widerrufen" je Vollmacht.</summary>
+    [Parameter]
+    public EventCallback<Guid> Widerrufen { get; set; }
+
+    private static string Zeitraum(DateOnly von, DateOnly? bis)
+        => bis is { } b ? $"{von:dd.MM.yyyy} bis {b.AddDays(-1):dd.MM.yyyy}" : $"ab {von:dd.MM.yyyy}";
 
     private RenderFragment Zeile(string feld, string wert, string datenart) => __builder =>
     {

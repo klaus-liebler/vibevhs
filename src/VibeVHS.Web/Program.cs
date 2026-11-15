@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
+using VibeVHS.Application.Personen;
 using VibeVHS.Application.Protokoll;
+using VibeVHS.Domain.Personen;
 using VibeVHS.Infrastructure.Startdaten;
 using Radzen;
 using Serilog;
@@ -139,6 +141,23 @@ app.MapPost("/rolle-wechseln", async (HttpContext http, [FromForm] string rolle,
     var ziel = zurueck ?? string.Empty;
     var lokal = !ziel.Contains("//", StringComparison.Ordinal) && !ziel.Contains('\\') && !ziel.Contains(':');
     return Results.LocalRedirect("~/" + (lokal ? ziel.TrimStart('/') : string.Empty));
+}).RequireAuthorization();
+// Excel-Export der Personenliste mit den aktuellen Filtern. Jeder Export wird protokolliert (DSGVO).
+app.MapGet("/personen/export", async (string? suche, string? rolle, string? status, int? fb, bool? dubletten,
+    IPersonenExport export, IAuditProtokoll protokoll, VibeVhsDbContext db, TimeProvider uhr) =>
+{
+    var filter = new PersonenFilter(
+        suche,
+        Enum.TryParse<Personenrolle>(rolle, out var r) ? r : null,
+        Enum.TryParse<Personenstatus>(status, out var s) ? s : null,
+        fb,
+        dubletten == true);
+    var datei = await export.ExcelAsync(filter);
+    await protokoll.ProtokollierenAsync("Personen.Export",
+        $"Personenliste als Excel exportiert (Suche: {suche ?? "–"}, Rolle: {rolle ?? "–"}, Status: {status ?? "–"}, Fachbereich: {fb?.ToString() ?? "–"})");
+    await db.SaveChangesAsync();
+    return Results.File(datei, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        $"personen-{uhr.GetLocalNow():yyyy-MM-dd-HHmm}.xlsx");
 }).RequireAuthorization();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
