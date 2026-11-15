@@ -1,0 +1,51 @@
+@page "/brief/{Token}"
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@layout LeeresLayout
+@using VibeVHS.Application.Dokumente
+@inject IServiceScopeFactory Bereiche
+
+<PageTitle>Translate this letter · Volkshochschule</PageTitle>
+
+<div class="vhs-login">
+    <div class="vhs-brand"><b>Translate this letter</b><span>Diesen Brief in Ihrer Sprache lesen</span></div>
+    @if (fehler is not null)
+    {
+        <div class="vhs-alert vhs-warn">@fehler</div>
+    }
+    else if (dokument is not null)
+    {
+        <nav class="vhs-chips" aria-label="Sprache / language">
+            @foreach (var (code, name) in Sprachen.Alle)
+            {
+                <a class="vhs-chip @(code == Sprache ? "on" : "")" href="@($"brief/{Token}?sprache={code}")" style="text-decoration:none">@name</a>
+            }
+        </nav>
+        <h1 style="font-size:18px">@dokument.Titel</h1>
+        <p class="vhs-small vhs-muted">@dokument.ErstelltAm.ToLocalTime().ToString("dd.MM.yyyy") · Link gültig bis @dokument.UebersetzbarBis.ToLocalTime().ToString("dd.MM.yyyy")</p>
+        <pre class="vhs-code" dir="@(Sprache is "ar" or "fa" ? "rtl" : "ltr")">@text</pre>
+        <p class="vhs-small vhs-muted">Maßgeblich ist der deutsche Originalbrief. / The German original is legally binding.</p>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Token { get; set; } = string.Empty;
+
+    [SupplyParameterFromQuery(Name = "sprache")]
+    private string? Sprache { get; set; }
+
+    private VibeVHS.Domain.Dokumente.Dokument? dokument;
+    private string? fehler, text;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var bereich = Bereiche.CreateAsyncScope();
+        (dokument, fehler) = await bereich.ServiceProvider.GetRequiredService<DokumentDienst>().UebersetzungAsync(Token);
+        Sprache ??= "en";
+        if (dokument is not null)
+        {
+            text = bereich.ServiceProvider.GetRequiredService<IUebersetzer>().Uebersetzen(dokument.Klartext, Sprache);
+        }
+    }
+}

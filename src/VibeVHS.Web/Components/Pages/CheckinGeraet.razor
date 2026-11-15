@@ -1,0 +1,109 @@
+@page "/checkin/geraet/{Token}"
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@layout LeeresLayout
+@using VibeVHS.Application.Durchfuehrung
+@using VibeVHS.Application.Personen
+@inject IServiceScopeFactory Bereiche
+
+<PageTitle>Mein Check-in · Volkshochschule</PageTitle>
+
+<div class="vhs-login" style="max-width:480px">
+    <div class="vhs-brand"><b>Mein Check-in</b><span>Volkshochschule</span></div>
+    @if (ungueltig)
+    {
+        <div class="vhs-alert vhs-warn">Dieser persönliche Link ist ungültig oder wurde gesperrt. Bitte wenden Sie sich an den Teilnehmerservice. / This personal link is invalid or has been revoked.</div>
+    }
+    else
+    {
+        <p>Guten Tag <b>@name</b>! Tippen Sie im Kursraum auf <b>Einchecken</b> und halten Sie die Kamera auf den QR-Code am Aushang.<br />
+            <span class="vhs-small vhs-muted">Tap “Check in” in your course room and point the camera at the QR code.</span></p>
+
+        @if (antwort is { } a)
+        {
+            <div class="vhs-alert @(a.Ergebnis.Ok || a.Ergebnis.Code == VibeVHS.Domain.Durchfuehrung.Checkincode.BereitsEingecheckt ? "vhs-info" : "vhs-warn")" role="status">
+                <b style="font-size:18px">@(a.Ergebnis.Ok || a.Ergebnis.Code == VibeVHS.Domain.Durchfuehrung.Checkincode.BereitsEingecheckt ? "✔" : "✖") @a.Ergebnis.Text</b>
+                @if (a.Kurs is not null) { <br /><span class="vhs-small">@a.Kurs</span> }
+            </div>
+        }
+
+        <button type="button" id="vhs-checkin-start" class="vhs-btn" style="justify-content:center;font-size:20px;padding:16px;width:100%"
+                onclick="vhsSelbstCheckin('vhs-checkin-leser', 'vhs-checkin-termin', 'vhs-checkin-form', 'vhs-checkin-start')">📷 Einchecken / Check in</button>
+        <div id="vhs-checkin-leser" style="width:100%"></div>
+        <form method="post" @formname="checkin" @onsubmit="EincheckenAsync" id="vhs-checkin-form">
+            <AntiforgeryToken />
+            <input type="hidden" name="Termin" id="vhs-checkin-termin" />
+        </form>
+
+        @if (gemerkt)
+        {
+            <p class="vhs-small vhs-muted">✔ Dieses Gerät ist für Sie gemerkt: Sie können den Aushang auch mit der normalen Kamera-App scannen.</p>
+        }
+        else
+        {
+            <form method="post" @formname="merken" @onsubmit="MerkenAsync">
+                <AntiforgeryToken />
+                <button type="submit" class="vhs-linkbutton">Dieses Gerät merken (dann genügt auch die normale Kamera-App) / remember this device</button>
+            </form>
+        }
+        <p class="vhs-small vhs-muted">Dieser Link ist persönlich – bitte nicht weitergeben. Bei Verlust sperrt der Teilnehmerservice ihn sofort.</p>
+    }
+</div>
+
+@code {
+    private const string Cookie = "vhs-geraete";
+
+    [Parameter]
+    public string Token { get; set; } = string.Empty;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private string? Termin { get; set; }
+
+    private string? name;
+    private bool ungueltig, gemerkt;
+    private CheckinAntwort? antwort;
+
+    /// <summary>Geräte-Tokens aus dem Cookie (mehrere Personen möglich).</summary>
+    public static IReadOnlyList<string> Geraete(HttpContext http)
+        => http.Request.Cookies.TryGetValue(Cookie, out var wert) && !string.IsNullOrWhiteSpace(wert) ? wert.Split('.', StringSplitOptions.RemoveEmptyEntries) : [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var bereich = Bereiche.CreateAsyncScope();
+        var zugang = bereich.ServiceProvider.GetRequiredService<CheckinZugang>();
+        var person = await zugang.PersonZumLinkAsync(Token);
+        if (person is null)
+        {
+            ungueltig = true;
+            return;
+        }
+
+        name = (await bereich.ServiceProvider.GetRequiredService<IPersonenSpeicher>().AnzeigenamenAsync([person.Value])).GetValueOrDefault(person.Value);
+        gemerkt = (await zugang.GemerktePersonenAsync(Geraete(HttpContext))).Any(p => p.PersonId == person);
+    }
+
+    /// <summary>Ein Scan: persönliches Token + Termin-Code gehen gemeinsam an den Server.</summary>
+    private async Task EincheckenAsync()
+    {
+        await using var bereich = Bereiche.CreateAsyncScope();
+        antwort = await bereich.ServiceProvider.GetRequiredService<AnwesenheitDienst>().LinkCheckinAsync(Token, Termin ?? string.Empty);
+    }
+
+    private async Task MerkenAsync()
+    {
+        await using var bereich = Bereiche.CreateAsyncScope();
+        if (await bereich.ServiceProvider.GetRequiredService<CheckinZugang>().GeraetVerbindenAsync(Token) is not { } e)
+        {
+            ungueltig = true;
+            return;
+        }
+
+        var liste = Geraete(HttpContext).Append(e.Geheimnis).Distinct().TakeLast(8).ToList();
+        HttpContext.Response.Cookies.Append(Cookie, string.Join('.', liste),
+            new CookieOptions { HttpOnly = true, Secure = HttpContext.Request.IsHttps, SameSite = SameSiteMode.Lax, Expires = DateTimeOffset.UtcNow.AddYears(1) });
+        gemerkt = true;
+    }
+}

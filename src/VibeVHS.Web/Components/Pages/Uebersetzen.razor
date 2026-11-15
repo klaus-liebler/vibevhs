@@ -2,25 +2,62 @@
 @attribute [AllowAnonymous]
 @attribute [ExcludeFromInteractiveRouting]
 @layout LeeresLayout
+@using VibeVHS.Application.Dokumente
+@using VibeVHS.Application.Postausgang
+@inject IServiceScopeFactory Bereiche
+@inject TimeProvider Uhr
 
-<PageTitle>Übersetzung · VHS Musterstadt</PageTitle>
+<PageTitle>Übersetzung · Volkshochschule</PageTitle>
 
 <div class="vhs-login">
-    <div class="vhs-brand"><b>VHS Musterstadt</b></div>
-    <h1>Übersetzung / Translation</h1>
-    <div class="vhs-alert vhs-info">
-        Die Übersetzung von Nachrichten wird in einer späteren Ausbaustufe angebunden.
-        Bis dahin wenden Sie sich bitte an den Teilnehmerservice.
-        <br /><br />
-        Translation of messages will be available soon. Until then, please contact our participant service.
-    </div>
-    <p class="vhs-small vhs-muted">Gewünschte Sprache / requested language: @Sprache</p>
+    <div class="vhs-brand"><b>Übersetzung / Translation</b><span>Diese Nachricht in Ihrer Sprache lesen</span></div>
+    @if (text is null)
+    {
+        <div class="vhs-alert vhs-warn">Dieser Link ist ungültig oder abgelaufen. Bitte wenden Sie sich an den Teilnehmerservice. / This link is invalid or has expired.</div>
+    }
+    else
+    {
+        <nav class="vhs-chips" aria-label="Sprache / language">
+            @foreach (var (code, name) in Sprachen.Alle)
+            {
+                <a class="vhs-chip @(code == Sprache ? "on" : "")" href="@($"uebersetzen/{NachrichtId}?sprache={code}")" style="text-decoration:none">@name</a>
+            }
+        </nav>
+        <h1 style="font-size:18px">@betreff</h1>
+        <pre class="vhs-code" dir="@(Sprache is "ar" or "fa" ? "rtl" : "ltr")">@text</pre>
+        <p class="vhs-small vhs-muted">Maßgeblich ist die deutsche Originalnachricht. / The German original is binding.</p>
+    }
 </div>
 
 @code {
+    /// <summary>So lange ist eine Nachricht über den Link lesbar (QA-22).</summary>
+    private static readonly TimeSpan Gueltig = TimeSpan.FromDays(180);
+
     [Parameter]
     public string NachrichtId { get; set; } = string.Empty;
 
     [SupplyParameterFromQuery(Name = "sprache")]
     private string? Sprache { get; set; }
+
+    private string? betreff, text;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Guid.TryParseExact(NachrichtId, "N", out var id))
+        {
+            return;
+        }
+
+        await using var bereich = Bereiche.CreateAsyncScope();
+        var n = await bereich.ServiceProvider.GetRequiredService<INachrichtenSpeicher>().LadenAsync(id);
+        if (n is null || n.Kanal != Kanal.EMail || n.Empfaenger == "anonymisiert" || n.ErstelltAm + Gueltig < Uhr.GetUtcNow())
+        {
+            return;
+        }
+
+        Sprache ??= n.Sprache;
+        betreff = n.Betreff;
+        var original = n.Inhalt.Split("➜", 2)[0].TrimEnd();
+        text = bereich.ServiceProvider.GetRequiredService<IUebersetzer>().Uebersetzen(original, Sprache);
+    }
 }

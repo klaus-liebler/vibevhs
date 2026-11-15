@@ -187,6 +187,38 @@ else if (dubletten.Count > 0)
     }
 </section>
 
+<section class="vhs-card">
+    <div class="vhs-head">
+        <h2>Dokumente</h2>
+        <div class="vhs-row">
+            <BegruendeterButton Text="Teilnehmerausweis drucken" Icon="badge" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="AusweisAsync"
+                                Freigabe="@(Schreibschutz.Und(() => Freigabe.NurFuer(rolle, VibeVHS.Application.Dokumente.DokumentDienst.AusstellRollen)))" />
+        </div>
+    </div>
+    <p class="vhs-small vhs-muted" style="margin-top:-6px">Archiv: Jedes Dokument ist mit PDF, eingefrorenem Datenstand und SHA-256-Prüfsumme gespeichert. Ein Nachdruck liefert immer das Original.</p>
+    @if (dokumente.Count == 0)
+    {
+        <p class="vhs-muted">Noch keine Dokumente.</p>
+    }
+    else
+    {
+        <div class="vhs-list">
+            @foreach (var dok in dokumente)
+            {
+                <div>
+                    <span class="vhs-grow"><b>@dok.Titel</b><br />
+                        <span class="vhs-small vhs-muted">@dok.ErstelltAm.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @dok.ErstelltVon@(dok.IstAnonymisiert ? " · Inhalt gelöscht (anonymisiert)" : $" · SHA-256 {dok.Sha256[..16]}…")@(dok.NeuausstellungGrund is { } g ? $" · Neuausstellung: {g}" : "")</span>
+                    </span>
+                    @if (dok.ErsetztDurch is not null) { <StatusPille Stil="neutral">ersetzt</StatusPille> }
+                    @if (dok.BelegungId is { } bid) { <a class="vhs-small" href="@($"belegungen/{bid}")">Belegung</a> }
+                    <BegruendeterButton Text="Nachdruck" Icon="print" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo($"dokumente/{dok.Id}.pdf", true))"
+                                        Freigabe="@(dok.IstAnonymisiert ? Freigabe.Nein("Der Inhalt wurde bei der Anonymisierung gelöscht.") : rolle is null or Rolle.Dozierende ? Freigabe.Nein("Archivdokumente drucken Verwaltung und Leitung.") : Freigabe.Ja)" />
+                </div>
+            }
+        </div>
+    }
+</section>
+
 <details class="vhs-card">
     <summary><b>Einwilligung ändern</b> <span class="vhs-small vhs-muted">– je Kanal und Zweck, mit Nachweis; die bisherige bleibt in der Historie</span></summary>
     <div class="vhs-fields">
@@ -277,7 +309,35 @@ else if (dubletten.Count > 0)
 </details>
 
 <details class="vhs-card" open="@dsOffen">
-    <summary><b>Datenschutz</b> <span class="vhs-small vhs-muted">– Status @DatenschutzAnzeige.Text(person.Datenschutz) · Auskunft, Archivieren, Löschverlangen</span></summary>
+    <summary><b>Datenschutz</b> <span class="vhs-small vhs-muted">– Status @DatenschutzAnzeige.Text(person.Datenschutz) · Auskunft, Check-in-Zugänge, Archivieren, Löschverlangen</span></summary>
+    <div>
+        <b class="vhs-small">Check-in-Zugänge</b> <span class="vhs-small vhs-muted">(persönlicher Link aus der Bestätigungsmail, gemerkte Geräte, Teilnehmerausweise; gespeichert ist nur ein Hash)</span>
+        @if (zugaenge.Count == 0)
+        {
+            <p class="vhs-small vhs-muted" style="margin:4px 0">Keine.</p>
+        }
+        else
+        {
+            <div class="vhs-list">
+                @foreach (var z in zugaenge)
+                {
+                    <div>
+                        <span class="vhs-grow vhs-small">@VibeVHS.Domain.Durchfuehrung.TokenAnzeige.Art(z.Art) · erstellt @z.ErstelltAm.ToLocalTime().ToString("dd.MM.yyyy")@(z.ZuletztGenutzt is { } g ? $" · zuletzt genutzt {g.ToLocalTime():dd.MM.yyyy HH:mm}" : "")</span>
+                        @if (z.Gueltig)
+                        {
+                            <BegruendeterButton Text="Sperren" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@VerwaltenFreigabe" Click="@(() => ZugangSperrenAsync(z.Id))" />
+                        }
+                        else
+                        {
+                            <StatusPille Stil="neutral">gesperrt @z.WiderrufenAm?.ToLocalTime().ToString("dd.MM.yyyy")</StatusPille>
+                        }
+                    </div>
+                }
+            </div>
+            <BegruendeterButton Text="Alle Zugänge sperren" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="AlleZugaengeSperrenAsync"
+                                Freigabe="@(VerwaltenFreigabe.Und(() => zugaenge.Any(z => z.Gueltig) ? Freigabe.Ja : Freigabe.Nein("Es gibt keine gültigen Zugänge.")))" />
+        }
+    </div>
     <div class="vhs-row">
         @if (AuskunftFreigabe.Erlaubt)
         {
@@ -326,6 +386,37 @@ else if (dubletten.Count > 0)
     private IReadOnlyList<VibeVHS.Application.Anmeldung.PersonBelegung> belegungen = [];
     private IReadOnlyList<VibeVHS.Domain.Anmeldung.Ermaessigung> ermaessigungen = [];
     private IReadOnlyList<VibeVHS.Domain.Programm.Merkmal> personenmerkmale = [];
+    private IReadOnlyList<VibeVHS.Domain.Dokumente.Dokument> dokumente = [];
+    private IReadOnlyList<VibeVHS.Domain.Durchfuehrung.Zugangstoken> zugaenge = [];
+
+    private async Task ZugangSperrenAsync(Guid tokenId)
+    {
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Durchfuehrung.CheckinZugang>().WiderrufenAsync(tokenId, "auf Wunsch / Gerät verloren"));
+        Hinweise.Notify(NotificationSeverity.Info, "Gesperrt", "Der Zugang ist gesperrt und protokolliert.");
+        await LadenAsync();
+    }
+
+    private async Task AlleZugaengeSperrenAsync()
+    {
+        var n = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Durchfuehrung.CheckinZugang>().AlleWiderrufenAsync(Id, "alle Zugänge gesperrt"));
+        Hinweise.Notify(NotificationSeverity.Info, "Gesperrt", $"{n} Zugänge gesperrt.");
+        await LadenAsync();
+    }
+
+    private async Task AusweisAsync()
+    {
+        try
+        {
+            var dok = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Dokumente.DokumentDienst>().TeilnehmerausweisAsync(Id));
+            Hinweise.Notify(NotificationSeverity.Success, "Archiviert", "Teilnehmerausweis erstellt.");
+            await LadenAsync();
+            Navigation.NavigateTo($"dokumente/{dok.Id}.pdf", true);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
     private string? qSchluessel, qWert, qNachweis, qStelle, bGrund;
     private DateOnly? qAb, qBis, bAb;
     private Beschaeftigungsart bArt = Beschaeftigungsart.Freiberuflich;
@@ -501,6 +592,8 @@ else if (dubletten.Count > 0)
                 belegungen = await anmeldung.BelegungenDerPersonAsync(Id);
                 ermaessigungen = await anmeldung.ErmaessigungenAsync(Id);
                 personenmerkmale = await d.GetRequiredService<VibeVHS.Application.Programm.QualifikationsDienst>().PersonenmerkmaleAsync();
+                dokumente = await d.GetRequiredService<VibeVHS.Application.Dokumente.DokumentDienst>().DerPersonAsync(Id);
+                zugaenge = await d.GetRequiredService<VibeVHS.Application.Durchfuehrung.CheckinZugang>().DerPersonAsync(Id);
             });
         }
         if (stand?.Name is { } name)

@@ -1,0 +1,295 @@
+@page "/anwesenheit/{Id:guid}"
+@using VibeVHS.Application.Durchfuehrung
+@using VibeVHS.Application.Dokumente
+@using VibeVHS.Domain.Durchfuehrung
+@implements IAsyncDisposable
+@inject Vorgang Vorgang
+@inject TimeProvider Uhr
+@inject NotificationService Hinweise
+@inject IJSRuntime Js
+@inject IConfiguration Konfiguration
+
+<PageTitle>Anwesenheit · VibeVHS</PageTitle>
+
+@if (liste is null)
+{
+    <h1>Veranstaltung nicht gefunden</h1>
+    <NaechsteSchritte Schritte="@([new NaechsterSchritt("Zur Tagesübersicht", "anwesenheit", Hauptschritt: true)])" />
+    return;
+}
+
+@{
+    var v = liste.Veranstaltung;
+    var jetzt = Uhr.GetLocalNow().LocalDateTime;
+    var nacherfassung = jetzt > v.Ende.AddHours(1);
+}
+
+<div class="vhs-head">
+    <div>
+        <p class="vhs-sub vhs-mono"><a href="@($"kurse/{liste.Kurs.Id}")">@liste.Kurs.Kursnummer</a> · Termin @v.Nummer</p>
+        <h1>@liste.Kurs.Titel</h1>
+        <p class="vhs-sub">@v.Beginn.ToString("dddd, dd.MM.yyyy · HH:mm")–@v.Ende.ToString("HH:mm") (@liste.Dauer Min. = @AnwesenheitAnzeige.Ue(liste.Dauer) UE) · @string.Join(" + ", v.Orte.Select(o => o.OrtName)) · @v.DozentName</p>
+    </div>
+    <div class="vhs-row">
+        <BegruendeterButton Text="@(scannt ? "Scanner stoppen" : "Ausweise scannen")" Icon="qr_code_scanner" ButtonStyle="ButtonStyle.Light" Click="ScannerAsync"
+                            Freigabe="@(Bearbeiten.Und(() => liste.Abschluss is not null ? Freigabe.Nein("Die Liste ist abgeschlossen.") : Freigabe.Ja))" />
+        <BegruendeterButton Text="Liste abschließen" Icon="task_alt" Click="AbschliessenAsync"
+                            Freigabe="@(Bearbeiten.Und(() => liste.Abschluss is { } a ? Freigabe.Nein($"Abgeschlossen am {a.Am.ToLocalTime():dd.MM.yyyy HH:mm} von {a.Von}.") : jetzt < v.Beginn ? Freigabe.Nein($"Abschließen ist ab Beginn ({v.Beginn:HH:mm} Uhr) möglich.") : Freigabe.Ja))" />
+    </div>
+</div>
+
+@if (zugriff is not null)
+{
+    <div class="vhs-alert vhs-warn">@zugriff Sie können die Liste ansehen, aber nicht bearbeiten.</div>
+}
+@if (v.Ausgefallen)
+{
+    <div class="vhs-alert vhs-info">Diese Veranstaltung fällt aus: @v.Bemerkung</div>
+}
+@if (nacherfassung && liste.Abschluss is null)
+{
+    <div class="vhs-alert vhs-info">Die Veranstaltung ist vorbei: Änderungen gelten als <b>Nacherfassung</b> und brauchen einen Grund (wird protokolliert).</div>
+}
+
+<NaechsteSchritte Titel="Wie geht es weiter?" Schritte="@folgeschritte" />
+
+<div class="vhs-split">
+    <section class="vhs-card">
+        <div class="vhs-head">
+            <h2>Anwesenheitsliste · @liste.Anwesend von @liste.Zeilen.Count anwesend</h2>
+            <span class="vhs-small vhs-muted">@(liste.Kurs.Richtlinie.Belegung == VibeVHS.Domain.Programm.Belegungsart.Kontingent ? $"Kontingent: nur Eingebuchte · Nichterscheinen {(liste.Kurs.Richtlinie.NichterscheinenZaehlt ? "verbraucht die Einheit" : "zählt nicht")}" : "")</span>
+        </div>
+        @if (nacherfassung)
+        {
+            <RadzenFormField Text="Grund der Nacherfassung (Pflicht)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="grund" /></RadzenFormField>
+        }
+        @if (liste.Zeilen.Count == 0)
+        {
+            <p class="vhs-muted">Für diese Veranstaltung ist niemand angemeldet bzw. eingebucht.</p>
+        }
+        <div class="vhs-list">
+            @foreach (var z in liste.Zeilen)
+            {
+                var a = z.Anwesenheit;
+                var minuten = MinutenFuer(z);
+                <div>
+                    <span class="vhs-grow">
+                        <a href="@($"belegungen/{z.Belegung.Id}")"><b>@z.Name</b></a>
+                        @if (a is not null)
+                        {
+                            <StatusPille Stil="@(a.Status == Anwesenheitsstatus.Anwesend ? "gut" : a.Status == Anwesenheitsstatus.Unbestaetigt ? "warn" : a.Status == Anwesenheitsstatus.Entschuldigt ? "info" : "neutral")">@AnwesenheitAnzeige.Status(a.Status)@(a.Status == Anwesenheitsstatus.Anwesend ? $" · {a.Minuten} Min. ({a.Ue:0.##} UE)" : "")</StatusPille>
+                            <br /><span class="vhs-small vhs-muted">@AnwesenheitAnzeige.Weg(a.Weg) · @a.ErfasstVon · @a.ErfasstAm.ToLocalTime().ToString("dd.MM. HH:mm")@(a.Bemerkung is null ? "" : $" · {a.Bemerkung}")</span>
+                        }
+                        else if (z.Belegung.IstKontingent)
+                        {
+                            <span class="vhs-small vhs-muted"> · @(z.Eingebucht ? "eingebucht" : "nicht eingebucht") · Kontingent: @z.Belegung.Kontingent.Verbleibend übrig</span>
+                        }
+                    </span>
+                    <RadzenNumeric TValue="int" Value="@minuten" ValueChanged="@((int m) => minutenJe[z.Belegung.Id] = m)" Min="1" Max="@liste.Dauer" Style="width:90px" title="anwesende Minuten" Disabled="@(!Bearbeiten.Erlaubt)" />
+                    <BegruendeterButton Text="@(a?.Status == Anwesenheitsstatus.Unbestaetigt ? "bestätigen" : "anwesend")" Size="ButtonSize.Small" ButtonStyle="@(a?.Status == Anwesenheitsstatus.Anwesend ? ButtonStyle.Primary : ButtonStyle.Light)"
+                                        Click="@(() => ErfassenAsync(z, Anwesenheitsstatus.Anwesend))" Freigabe="@ErfassenFreigabe(z, Anwesenheitsstatus.Anwesend)" />
+                    <BegruendeterButton Text="nicht da" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => ErfassenAsync(z, Anwesenheitsstatus.Abwesend))"
+                                        Freigabe="@ErfassenFreigabe(z, Anwesenheitsstatus.Abwesend)" />
+                    <BegruendeterButton Text="entschuldigt" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => ErfassenAsync(z, Anwesenheitsstatus.Entschuldigt))"
+                                        Freigabe="@ErfassenFreigabe(z, Anwesenheitsstatus.Entschuldigt)" />
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="vhs-card">
+        <h2>Check-in per QR-Code</h2>
+        <p class="vhs-small vhs-muted" style="margin-top:-6px">Immer nur ein Scan: <b>Termin-QR</b> aushängen oder per Beamer zeigen – Teilnehmende tippen auf ihrer persönlichen Check-in-Seite (Link aus der Bestätigungsmail) auf „Einchecken“. Der Code ist ein zufälliger Verweis und gilt nur für diese Veranstaltung und diesen Ort, 30 Minuten vor bis 30 Minuten nach Beginn. Oder: <b>Ausweise scannen</b> (QR aus Ausweis-PDF oder Bestätigungsmail).@(liste.Kurs.Richtlinie.SelbstCheckin == VibeVHS.Domain.Programm.SelbstCheckin.MitBestaetigung ? " In diesem Kurs werden Selbst-Check-ins von der Kursleitung bestätigt." : liste.Kurs.Richtlinie.SelbstCheckin == VibeVHS.Domain.Programm.SelbstCheckin.Aus ? " In diesem Kurs ist der Selbst-Check-in abgeschaltet." : "")</p>
+        <div class="vhs-row">
+            @foreach (var o in v.Orte)
+            {
+                <BegruendeterButton Text="@($"Termin-QR {o.OrtName}")" Icon="qr_code_2" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => RaumQrAsync(o.OrtId, o.OrtName))"
+                                    Freigabe="@(Bearbeiten.Und(() => v.Ausgefallen ? Freigabe.Nein("Die Veranstaltung fällt aus.") : liste.Kurs.Richtlinie.SelbstCheckin == VibeVHS.Domain.Programm.SelbstCheckin.Aus ? Freigabe.Nein("Selbst-Check-in ist für diesen Kurs abgeschaltet (abrechnungsrelevante Anwesenheit).") : Freigabe.Ja))" />
+            }
+        </div>
+        @if (raumQr is not null)
+        {
+            <div style="max-width:320px">@((MarkupString)raumQr)</div>
+            <p class="vhs-small"><b>@raumOrt</b> · gültig @((v.Beginn - Checkinregel.Vorlauf).ToString("HH:mm"))–@((v.Beginn + Checkinregel.Vorlauf).ToString("HH:mm")) Uhr<br /><a href="@raumLink" target="_blank" rel="noopener" class="vhs-small">Link zum Testen öffnen</a></p>
+        }
+        <div id="vhs-scanner" style="width:100%;max-width:420px"></div>
+        @if (scannt)
+        {
+            <p class="vhs-small vhs-muted">Kamera aktiv: Teilnehmerausweis vor die Kamera halten. Jeder erkannte Ausweis wird sofort eingecheckt.</p>
+        }
+        @if (letzterScan is { } s)
+        {
+            <div class="vhs-alert @(s.Ergebnis.Ok ? "vhs-info" : "vhs-warn")"><b>@(s.Name ?? "Unbekannt")</b>: @s.Ergebnis.Text</div>
+        }
+        <details>
+            <summary class="vhs-small">Ohne Kamera: Inhalt des Ausweis-Codes eingeben</summary>
+            <div class="vhs-row" style="margin-top:6px">
+                <RadzenTextBox @bind-Value="handeingabe" Placeholder="VHS-A:…" Style="min-width:260px" />
+                <BegruendeterButton Text="Einchecken" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@Bearbeiten" Click="@(() => Gescannt(handeingabe ?? ""))" />
+            </div>
+        </details>
+    </section>
+</div>
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private Anwesenheitsliste? liste;
+    private string? zugriff, grund, raumQr, raumOrt, raumLink, handeingabe;
+    private bool scannt;
+    private CheckinAntwort? letzterScan;
+    private readonly Dictionary<Guid, int> minutenJe = [];
+    private DotNetObjectReference<AnwesenheitListe>? selbst;
+    private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
+
+    private Freigabe Bearbeiten => zugriff is null ? Freigabe.Ja : Freigabe.Nein(zugriff);
+
+    private int MinutenFuer(ListenZeile z) => minutenJe.TryGetValue(z.Belegung.Id, out var m) ? m : z.Anwesenheit is { Status: Anwesenheitsstatus.Anwesend } a ? a.Minuten : liste!.Dauer;
+
+    private Freigabe ErfassenFreigabe(ListenZeile z, Anwesenheitsstatus status) => Bearbeiten.Und(() =>
+    {
+        var v = liste!.Veranstaltung;
+        var jetzt = Uhr.GetLocalNow().LocalDateTime;
+        if (jetzt < v.Beginn - Checkinregel.Vorlauf)
+        {
+            return Freigabe.Nein($"Die Anwesenheit kann erst ab {v.Beginn - Checkinregel.Vorlauf:dd.MM. HH:mm} Uhr erfasst werden.");
+        }
+
+        if (status == Anwesenheitsstatus.Anwesend && !z.Erfassbar.Ok && z.Anwesenheit?.Status is not (Anwesenheitsstatus.Anwesend or Anwesenheitsstatus.Unbestaetigt))
+        {
+            return Freigabe.Nein(z.Erfassbar.Text);
+        }
+
+        if (z.Belegung.IstKontingent && z.Anwesenheit is { Status: not Anwesenheitsstatus.Unbestaetigt } a && a.Status != status
+            && z.Belegung.Ereignisse.Any(e => e.VeranstaltungId == v.Id && e.Art is VibeVHS.Domain.Anmeldung.Kontingentereignisart.Besucht or VibeVHS.Domain.Anmeldung.Kontingentereignisart.NichtErschienen or VibeVHS.Domain.Anmeldung.Kontingentereignisart.NichtErschienenOhneAnrechnung))
+        {
+            return Freigabe.Nein("Im Kontingent bereits verbucht (unveränderliche Ereignisse). Korrektur nur über die Verwaltung.");
+        }
+
+        return jetzt > v.Ende.AddHours(1) && string.IsNullOrWhiteSpace(grund) ? Freigabe.Nein("Nacherfassung: Bitte oben einen Grund angeben.") : Freigabe.Ja;
+    });
+
+    protected override async Task OnParametersSetAsync() => await LadenAsync();
+
+    private async Task LadenAsync()
+    {
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var dienst = d.GetRequiredService<AnwesenheitDienst>();
+            liste = await dienst.ListeAsync(Id);
+            zugriff = liste is null ? null : await dienst.ZugriffVerweigertAsync(liste.Kurs, liste.Veranstaltung);
+        });
+    }
+
+    private async Task ErfassenAsync(ListenZeile z, Anwesenheitsstatus status)
+    {
+        try
+        {
+            var min = status == Anwesenheitsstatus.Anwesend ? MinutenFuer(z) : (int?)null;
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AnwesenheitDienst>().ErfassenAsync(Id, z.Belegung.Id, status, min, grund));
+            await LadenAsync();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task AbschliessenAsync()
+    {
+        try
+        {
+            var n = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AnwesenheitDienst>().AbschliessenAsync(Id));
+            Hinweise.Notify(NotificationSeverity.Success, "Abgeschlossen", $"Liste abgeschlossen; {n} Person(en) als nicht anwesend vermerkt.");
+            await LadenAsync();
+            folgeschritte =
+            [
+                new("Nächste Veranstaltung des Tages", "anwesenheit", Hauptschritt: true),
+                new("Zum Kurs", $"kurse/{liste!.Kurs.Id}", "Teilnehmende und Bescheinigungen"),
+            ];
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task RaumQrAsync(Guid ortId, string ortName)
+    {
+        try
+        {
+            var token = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AnwesenheitDienst>().RaumTokenAsync(Id, ortId));
+            var basis = (Konfiguration["OeffentlicheAdresse"] ?? "http://localhost:5189/").TrimEnd('/');
+            raumLink = $"{basis}/checkin/{token}";
+            raumOrt = ortName;
+            raumQr = await Vorgang.AusfuehrenAsync(d => Task.FromResult(d.GetRequiredService<IQrCode>().Svg(raumLink)));
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task ScannerAsync()
+    {
+        if (scannt)
+        {
+            try
+            {
+                await Js.InvokeVoidAsync("vhsScanner.stop");
+            }
+            catch (JSException)
+            {
+            }
+
+            scannt = false;
+            return;
+        }
+
+        selbst ??= DotNetObjectReference.Create(this);
+        try
+        {
+            scannt = true;
+            StateHasChanged();
+            await Js.InvokeVoidAsync("vhsScanner.start", "vhs-scanner", selbst);
+        }
+        catch (JSException ex)
+        {
+            scannt = false;
+            Hinweise.Notify(NotificationSeverity.Warning, "Kamera nicht verfügbar", $"Die Kamera konnte nicht gestartet werden ({ex.Message}). Ausweis-Code alternativ unten eingeben.");
+        }
+    }
+
+    [JSInvokable]
+    public async Task Gescannt(string text)
+    {
+        try
+        {
+            letzterScan = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AnwesenheitDienst>().AusweisCheckinAsync(Id, text.Trim()));
+            await LadenAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            letzterScan = new CheckinAntwort(new Checkinergebnis(Checkincode.NichtAngemeldet, ex.Message), null, null);
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (scannt)
+        {
+            try
+            {
+                await Js.InvokeVoidAsync("vhsScanner.stop");
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+        }
+
+        selbst?.Dispose();
+    }
+}

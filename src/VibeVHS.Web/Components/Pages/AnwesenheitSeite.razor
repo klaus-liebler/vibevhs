@@ -1,0 +1,94 @@
+@page "/anwesenheit"
+@using VibeVHS.Application.Durchfuehrung
+@using VibeVHS.Domain.Durchfuehrung
+@inject Vorgang Vorgang
+@inject TimeProvider Uhr
+@inject NavigationManager Navigation
+
+<PageTitle>Anwesenheit · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Anwesenheit</h1>
+        <p class="vhs-sub">Veranstaltungen des Tages. Liste öffnen, Raum-QR anzeigen oder Teilnehmerausweise scannen.@(rolle == Rolle.Dozierende ? " Sie sehen Ihre eigenen Veranstaltungen." : "")</p>
+    </div>
+    <div class="vhs-row">
+        <RadzenButton Icon="chevron_left" ButtonStyle="ButtonStyle.Light" Click="@(() => TagAsync(tag.AddDays(-1)))" title="Vortag" />
+        <RadzenDatePicker TValue="DateOnly" Value="@tag" ValueChanged="@((DateOnly d) => TagAsync(d))" DateFormat="ddd dd.MM.yyyy" />
+        <RadzenButton Icon="chevron_right" ButtonStyle="ButtonStyle.Light" Click="@(() => TagAsync(tag.AddDays(1)))" title="Folgetag" />
+        <RadzenButton Text="Heute" ButtonStyle="ButtonStyle.Light" Click="@(() => TagAsync(DateOnly.FromDateTime(Uhr.GetLocalNow().Date)))" />
+    </div>
+</div>
+
+@if (!Erfassen.Erlaubt)
+{
+    <div class="vhs-alert vhs-warn">@Erfassen.Begruendung</div>
+}
+
+<section class="vhs-card">
+    <div class="vhs-row">
+        @if (rolle != Rolle.Dozierende)
+        {
+            <label class="vhs-small"><input type="checkbox" @bind="nurEigene" @bind:after="LadenAsync" /> nur eigene Veranstaltungen (als Kursleitung)</label>
+        }
+        <span class="vhs-small vhs-muted">@termine.Count Veranstaltungen</span>
+    </div>
+    @if (termine.Count == 0)
+    {
+        <p class="vhs-muted">An diesem Tag finden keine Veranstaltungen statt.</p>
+    }
+    else
+    {
+        <div class="vhs-tbl">
+            <table>
+                <thead><tr><th>Zeit</th><th>Kurs</th><th>Ort</th><th>Kursleitung</th><th>Liste</th></tr></thead>
+                <tbody>
+                    @foreach (var t in termine)
+                    {
+                        <tr class="vhs-klickzeile" @onclick="@(() => Navigation.NavigateTo($"anwesenheit/{t.VeranstaltungId}"))">
+                            <td class="vhs-mono">@t.Beginn.ToString("HH:mm")–@t.Ende.ToString("HH:mm")</td>
+                            <td><a href="@($"anwesenheit/{t.VeranstaltungId}")"><b>@t.Kursnummer</b> @t.Titel</a></td>
+                            <td class="vhs-small">@t.Orte</td>
+                            <td class="vhs-small">@t.Dozent @if (t.Eigene) { <StatusPille Stil="info">eigene</StatusPille> }</td>
+                            <td>
+                                @if (t.Abgeschlossen) { <StatusPille Stil="gut">abgeschlossen</StatusPille> }
+                                else if (t.Ende < Uhr.GetLocalNow().LocalDateTime) { <StatusPille Stil="warn">offen</StatusPille> }
+                                else if (t.Beginn - Checkinregel.Vorlauf <= Uhr.GetLocalNow().LocalDateTime) { <StatusPille Stil="info">läuft · Check-in offen</StatusPille> }
+                                else { <StatusPille Stil="neutral">geplant</StatusPille> }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "tag")]
+    private string? TagAusAdresse { get; set; }
+
+    private DateOnly tag;
+    private bool nurEigene;
+    private Rolle? rolle;
+    private IReadOnlyList<TerminZeile> termine = [];
+
+    private Freigabe Erfassen => Freigabe.NurFuer(rolle, AnwesenheitDienst.ErfassungsRollen);
+
+    protected override async Task OnInitializedAsync()
+    {
+        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        nurEigene = rolle == Rolle.Dozierende;
+        tag = TagAusAdresse is { } t && DateOnly.TryParse(t, System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+        await LadenAsync();
+    }
+
+    private async Task TagAsync(DateOnly neu)
+    {
+        tag = neu;
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync()
+        => termine = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AnwesenheitDienst>().TermineAsync(tag, nurEigene || rolle == Rolle.Dozierende));
+}

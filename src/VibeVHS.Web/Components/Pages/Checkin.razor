@@ -1,0 +1,91 @@
+@page "/checkin/{Token}"
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@layout LeeresLayout
+@using VibeVHS.Application.Durchfuehrung
+@inject IServiceScopeFactory Bereiche
+
+<PageTitle>Check-in · Volkshochschule</PageTitle>
+
+<div class="vhs-login" style="max-width:480px">
+    <div class="vhs-brand"><b>Check-in</b><span>Volkshochschule</span></div>
+    @if (antwort is { } a)
+    {
+        @if (a.Kurs is not null)
+        {
+            <p class="vhs-small vhs-muted">@a.Kurs</p>
+        }
+
+        @switch (a.Status)
+        {
+            case RaumCheckinStatus.Eingecheckt:
+                <div class="vhs-alert vhs-info" role="status"><b style="font-size:20px">✔ @a.Checkin?.Name</b><br />@a.Text</div>
+                break;
+            case RaumCheckinStatus.AuswahlNoetig:
+                <p><b>@a.Text</b> / Who is checking in?</p>
+                <form method="post" @formname="auswahl" @onsubmit="Auswaehlen" style="display:flex;flex-direction:column;gap:8px">
+                    <AntiforgeryToken />
+                    @foreach (var (id, name) in a.Personen)
+                    {
+                        <button type="submit" name="Person" value="@id" class="vhs-btn" style="justify-content:center;font-size:16px">@name</button>
+                    }
+                </form>
+                break;
+            default:
+                <div class="vhs-alert vhs-warn" role="status">
+                    <b>✖ @(a.Checkin?.Name)</b> @a.Text
+                    @if (a.Status == RaumCheckinStatus.KeinGeraet)
+                    {
+                        <br /><br /><span class="vhs-small">This device does not know you yet. Please open the personal check-in link from your registration email once, or ask your course leader.</span>
+                    }
+                </div>
+                break;
+        }
+
+        @if (a.Status == RaumCheckinStatus.Eingecheckt && a.Personen.Count > 1)
+        {
+            <form method="post" @formname="auswahl" @onsubmit="Auswaehlen" style="display:flex;flex-direction:column;gap:8px">
+                <AntiforgeryToken />
+                <p class="vhs-small">Weitere Person auf diesem Gerät einchecken / check in another person:</p>
+                @foreach (var (id, name) in a.Personen.Where(p => p.PersonId != gewaehlt))
+                {
+                    <button type="submit" name="Person" value="@id" class="vhs-btn" style="justify-content:center">@name</button>
+                }
+            </form>
+        }
+    }
+    <p class="vhs-small vhs-muted">Probleme? Bitte an die Kursleitung wenden. / Problems? Please ask your course leader.</p>
+</div>
+
+@code {
+    [Parameter]
+    public string Token { get; set; } = string.Empty;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private Guid? Person { get; set; }
+
+    private RaumCheckinAntwort? antwort;
+    private Guid? gewaehlt;
+
+    /// <summary>Ein Scan genügt: Beim Öffnen des Links wird sofort eingecheckt (mehrere gemerkte Personen: Auswahl).</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpMethods.IsGet(HttpContext.Request.Method))
+        {
+            await CheckinAsync(null);
+        }
+    }
+
+    private Task Auswaehlen() => CheckinAsync(Person);
+
+    private async Task CheckinAsync(Guid? person)
+    {
+        gewaehlt = person;
+        await using var bereich = Bereiche.CreateAsyncScope();
+        antwort = await bereich.ServiceProvider.GetRequiredService<AnwesenheitDienst>().RaumCheckinAsync(Token, CheckinGeraet.Geraete(HttpContext), person);
+        gewaehlt ??= antwort.Checkin is null ? null : antwort.Personen.Count == 1 ? antwort.Personen[0].PersonId : null;
+    }
+}

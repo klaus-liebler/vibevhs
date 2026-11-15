@@ -208,6 +208,37 @@ Einwilligung, bevorzugt) und E-Mail-Adressen (Art, bevorzugt). Die Kennzeichen �
   Integrationskurs-Lehrkräfte mit BAMF-Zulassung, eine läuft in 6 Wochen ab (Anschlusskurs 26H-405 ist ab Januar markiert),
   eine Deutsch-Lehrkraft ohne Zulassung (bei Integrationskursen gesperrt).
 
+## Durchführung (I4): Anwesenheit, Check-in, Bescheinigungen, Briefe
+
+- **Anwesenheitsliste** je Veranstaltung (`/anwesenheit`, Tagesübersicht; Dozierende sehen nur eigene Termine), minuten- und
+  UE-genau (45 Min.). Nach Ende gilt jede Änderung als **Nacherfassung** mit Pflichtgrund (protokolliert). „Liste abschließen“
+  (oder nachts automatisch) vermerkt Nichterfasste als nicht anwesend; bei Kontingenten greift die Nichterscheinen-Regel.
+- **Check-in – immer nur ein Scan**:
+  - **A, Teilnehmende**: Die Anmeldebestätigung enthält einen persönlichen Check-in-Link (zufälliges, widerrufbares Token, keine
+    Personen-ID). Auf dieser Seite tippt man „Einchecken“, die Kamera (html5-qrcode) liest den **Termin-QR** (Aushang/Beamer)
+    und Personen-Token + Termin-Code gehen gemeinsam an den Server. Komfort: „Gerät merken“ (Cookie) – dann genügt auch die
+    normale Kamera-App; mehrere gemerkte Personen (Familie) sind auswählbar. Ohne gemerkte Person bittet die Seite, den Link zu öffnen.
+  - **B, Kursleitung**: scannt auf der Anwesenheitsliste persönliche QR-Ausweise (Ausweis-PDF oder Bild in der Bestätigungsmail);
+    der QR enthält nur ein Pseudonym-Token.
+  - **C**: Liste abhaken.
+  - Geprüft wird jedes Mal mit Begründung: Person im Kurs, bei Kontingent eingebucht, richtiger Ort (Online-Teilnahme separat in
+    der Liste, kein Termin-QR für virtuelle Räume), Zeitfenster (Termin-Code: zufälliger Verweis, 30 Min. vor bis 30 Min. nach
+    Beginn), doppelter Check-in.
+  - Kursweise einstellbar: Selbst-Check-in erlaubt / **mit Bestätigung durch die Kursleitung** (Standard bei Integrationskursen) /
+    aus. Alle Zugänge (Link, Geräte, Ausweise) sind auf der Personenseite (Bereich Datenschutz) sperrbar; die Anonymisierung
+    entwertet sie. Gespeichert werden nur Hashes.
+- **Bescheinigungen** (Teilnahme, Bildungsurlaub nach AWbG) mit PDFsharp/MigraDoc nach Stichtagsregel: Name der Person und der
+  Kursleitung wie zum Kurszeitpunkt, Anschrift aktuell. **Archiv** je Dokument: PDF, eingefrorener JSON-Datenstand, SHA-256.
+  Nachdruck liefert das Original nach Hash-Prüfung; Neuausstellung nur bewusst mit Begründung (FBL, Verwaltungsleitung, Leitung).
+- **Jeder Brief** (Bescheinigung, Teilnehmerausweis, Auskunft Art. 15) trägt den QR-Code „Translate this letter in your language“
+  (QRCoder) zur Übersetzungsseite `/brief/{token}` (ohne Login, nicht erratbares Token, 180 Tage gültig). Übersetzt wird in
+  Stufe 1 durch einen Mock-Adapter (Platzhalter in der Zielsprache); dasselbe gilt für Mails (`/uebersetzen/…`).
+- Dokumentarchiv je Person (Personenseite) und je Belegung; eingebunden in Auskunft, Anonymisierung (Inhalt gelöscht, Hash bleibt)
+  und Aufbewahrungsfristen (Bescheinigungen).
+- Demodaten: Anwesenheiten aller vergangenen Termine (Listen abgeschlossen), Testkonto der Pilates-Kursleitung mit Rolle
+  „Dozierende“, Kurs 25F-501 (Frühjahr 2025, Kursleitung damals Anna Schmidt) mit archivierter Bescheinigung für Olena Kovalenko,
+  Zwischenbescheinigung für Mehmet Yılmaz, Bildungsurlaub 26H-602.
+
 ## Testbenutzer der Pilot-VHS
 
 Die Startdaten liegen in [`tools/Testdaten/testbenutzer-vhs-egs.json`](../tools/Testdaten/testbenutzer-vhs-egs.json)

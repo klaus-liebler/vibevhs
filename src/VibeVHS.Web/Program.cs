@@ -109,6 +109,7 @@ if (app.Configuration.GetValue("Demodaten:Anlegen", false))
              {
                  ("Anmeldungen", AnmeldungDemodaten.AnlegenAsync),
                  ("Qualifikationen", QualifikationsDemodaten.AnlegenAsync),
+                 ("Durchführung", DurchfuehrungDemodaten.AnlegenAsync),
              })
     {
         try
@@ -181,7 +182,9 @@ app.MapGet("/personen/{id:guid}/auskunft.{format}", async (Guid id, string forma
     var datei = $"auskunft-{VibeVHS.Domain.Datenschutz.Pseudonym.Kurz(id)}-{DateTime.Today:yyyy-MM-dd}";
     return format switch
     {
-        "pdf" => Results.File(pdf.Erzeugen(auskunft), "application/pdf", datei + ".pdf"),
+        // Als Brief archiviert (PDF, Datenstand, SHA-256) und mit QR-Code „Translate this letter in your language“.
+        "pdf" => Results.File((await http.RequestServices.GetRequiredService<VibeVHS.Application.Dokumente.DokumentDienst>()
+            .AuskunftArchivierenAsync(auskunft, link => pdf.Erzeugen(auskunft, link))).Pdf, "application/pdf", datei + ".pdf"),
         "json" => Results.File(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(auskunft, new System.Text.Json.JsonSerializerOptions
         {
             WriteIndented = true,
@@ -197,6 +200,25 @@ app.MapGet("/belegungen/{id:guid}/termine.ics", async (Guid id, VibeVHS.Applicat
 {
     var (datei, inhalt) = await anmeldung.KalenderdateiAsync(id);
     return Results.File(System.Text.Encoding.UTF8.GetBytes(inhalt), "text/calendar", datei);
+}).RequireAuthorization();
+
+app.MapGet("/postausgang/{id:guid}/anhang/{nr:int}", async (Guid id, int nr, VibeVHS.Application.Postausgang.INachrichtenSpeicher speicher) =>
+    await speicher.LadenAsync(id) is { } n && nr >= 0 && nr < n.WeitereAnhaenge.Count
+        ? Results.File(System.Text.Encoding.UTF8.GetBytes(n.WeitereAnhaenge[nr].Inhalt), n.WeitereAnhaenge[nr].Typ, n.WeitereAnhaenge[nr].Name)
+        : Results.NotFound()).RequireAuthorization();
+
+// Nachdruck aus dem Dokumentarchiv: immer das Original, nach Prüfung des SHA-256-Hashs (protokolliert).
+app.MapGet("/dokumente/{id:guid}.pdf", async (Guid id, VibeVHS.Application.Dokumente.DokumentDienst dokumente) =>
+{
+    try
+    {
+        var (datei, inhalt) = await dokumente.NachdruckAsync(id);
+        return Results.File(inhalt, "application/pdf", datei);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Problem(ex.Message, statusCode: StatusCodes.Status409Conflict);
+    }
 }).RequireAuthorization();
 
 // Anhang einer Nachricht im Postausgang (z. B. Kalenderdatei der Anmeldebestätigung).

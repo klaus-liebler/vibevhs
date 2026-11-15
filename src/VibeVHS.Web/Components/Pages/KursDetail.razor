@@ -60,6 +60,22 @@
                     · Warteliste @(kurs.Richtlinie.Warteliste ? "ja" : "nein") · Storno bis @kurs.Richtlinie.StornofristTage Tage vorher
                 </span>
             </dd><dd></dd>
+            <dt>Selbst-Check-in</dt>
+            <dd>
+                @if (Planen.Erlaubt)
+                {
+                    <select class="vhs-select" value="@kurs.Richtlinie.SelbstCheckin" @onchange="SelbstCheckinAsync" title="Für Kurse mit abrechnungsrelevanter Anwesenheit (z. B. Integrationskurse) abschalten oder Bestätigung verlangen.">
+                        @foreach (var s in Enum.GetValues<SelbstCheckin>())
+                        {
+                            <option value="@s">@SelbstCheckinAnzeige.Text(s)</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <span class="vhs-why" tabindex="0" data-why="@Planen.Begruendung">@SelbstCheckinAnzeige.Text(kurs.Richtlinie.SelbstCheckin)</span>
+                }
+            </dd><dd></dd>
             @if (kurs.BenoetigteMerkmale.Count > 0)
             {
                 <dt>Ort braucht</dt><dd>@string.Join(", ", kurs.BenoetigteMerkmale.Select(s => verzeichnis.Katalog.GetValueOrDefault(s)?.Name ?? s))</dd><dd></dd>
@@ -189,7 +205,7 @@
                 {
                     var konflikt = konflikte.FirstOrDefault(k => k.A.VeranstaltungId == v.Id || k.B.VeranstaltungId == v.Id);
                     <tr class="vhs-klickzeile @(gewaehlt?.Id == v.Id ? "vhs-gewaehlt" : "") @(v.Ausgefallen ? "vhs-ersetzt" : "")" @onclick="@(() => Waehlen(v))">
-                        <td class="vhs-mono">@v.Nummer</td>
+                        <td class="vhs-mono"><a href="@($"anwesenheit/{v.Id}")" title="Anwesenheitsliste" @onclick:stopPropagation="true">@v.Nummer</a></td>
                         <td>@v.Beginn.ToString("ddd dd.MM.yyyy")</td>
                         <td class="vhs-mono">@v.Beginn.ToString("HH:mm")–@v.Ende.ToString("HH:mm")</td>
                         <td>@string.Join(" + ", v.Orte.Select(o => o.OrtName))</td>
@@ -355,6 +371,16 @@
     private IReadOnlyList<VibeVHS.Application.Anmeldung.TeilnehmerZeile> teilnehmende = [];
     private VibeVHS.Application.Anmeldung.Einbuchungslage lage = new(new Dictionary<(Guid, Guid?), int>(), new Dictionary<Guid, int>());
     private bool alleBelegungen;
+
+    private async Task SelbstCheckinAsync(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<SelbstCheckin>(e.Value?.ToString(), out var wert))
+        {
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().SelbstCheckinSetzenAsync(Id, wert));
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", $"Selbst-Check-in: {SelbstCheckinAnzeige.Text(wert)}.");
+            await LadenAsync();
+        }
+    }
 
     private async Task NachrueckenAsync()
     {

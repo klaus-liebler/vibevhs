@@ -115,6 +115,62 @@
     </section>
 </div>
 
+<section class="vhs-card">
+    <div class="vhs-head">
+        <h2>Anwesenheit und Bescheinigungen</h2>
+        <div class="vhs-row">
+            <BegruendeterButton Text="Teilnahmebescheinigung" Icon="workspace_premium" Size="ButtonSize.Small" Click="@(() => BescheinigungAsync(VibeVHS.Domain.Dokumente.Dokumentart.Teilnahmebescheinigung))"
+                                Freigabe="@BescheinigungFreigabe(VibeVHS.Domain.Dokumente.Dokumentart.Teilnahmebescheinigung)" />
+            @if (kurs.Bildungsurlaub is not null)
+            {
+                <BegruendeterButton Text="Bildungsurlaub (AWbG)" Icon="work_history" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => BescheinigungAsync(VibeVHS.Domain.Dokumente.Dokumentart.Bildungsurlaub))"
+                                    Freigabe="@BescheinigungFreigabe(VibeVHS.Domain.Dokumente.Dokumentart.Bildungsurlaub)" />
+            }
+        </div>
+    </div>
+    @{
+        var anwesend = anwesenheiten.Where(a => a.Status == VibeVHS.Domain.Durchfuehrung.Anwesenheitsstatus.Anwesend).ToList();
+    }
+    <p class="vhs-small">
+        @anwesend.Count Termine anwesend (@anwesend.Sum(a => a.Ue).ToString("0.##") UE) · @anwesenheiten.Count(a => a.Status == VibeVHS.Domain.Durchfuehrung.Anwesenheitsstatus.Abwesend) nicht anwesend · @anwesenheiten.Count(a => a.Status == VibeVHS.Domain.Durchfuehrung.Anwesenheitsstatus.Entschuldigt) entschuldigt
+        @if (kurs.Bildungsurlaub is { } bu) { <span class="vhs-muted"> · Bildungsurlaub anerkannt: @bu</span> }
+    </p>
+    @if (anwesenheiten.Count > 0)
+    {
+        <details>
+            <summary class="vhs-small">Einzelne Termine</summary>
+            <div class="vhs-list">
+                @foreach (var a in anwesenheiten.OrderBy(a => a.Datum))
+                {
+                    <div>
+                        <span class="vhs-mono vhs-small vhs-zeit"><a href="@($"anwesenheit/{a.VeranstaltungId}")">@a.Datum.ToString("ddd dd.MM.yyyy")</a></span>
+                        <span class="vhs-grow">@VibeVHS.Domain.Durchfuehrung.AnwesenheitAnzeige.Status(a.Status)@(a.Minuten > 0 ? $" · {a.Minuten} Min. ({a.Ue:0.##} UE)" : "")</span>
+                        <span class="vhs-small vhs-muted">@VibeVHS.Domain.Durchfuehrung.AnwesenheitAnzeige.Weg(a.Weg) · @a.ErfasstVon</span>
+                    </div>
+                }
+            </div>
+        </details>
+    }
+    @foreach (var dok in dokumente)
+    {
+        <div class="vhs-row">
+            <span class="vhs-grow"><b>@dok.Titel</b> <span class="vhs-small vhs-muted">· @dok.ErstelltAm.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @dok.ErstelltVon · SHA-256 @dok.Sha256[..12]…</span></span>
+            @if (dok.ErsetztDurch is not null) { <StatusPille Stil="neutral">ersetzt</StatusPille> }
+            <BegruendeterButton Text="Nachdruck (Original)" Icon="print" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo($"dokumente/{dok.Id}.pdf", true))"
+                                Freigabe="@(dok.IstAnonymisiert ? Freigabe.Nein("Der Inhalt wurde bei der Anonymisierung gelöscht.") : Freigabe.Ja)" />
+            @if (dok.ErsetztDurch is null)
+            {
+                <BegruendeterButton Text="Neu ausstellen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => NeuAusstellenAsync(dok.Id))"
+                                    Freigabe="@(Freigabe.NurFuer(rolle, VibeVHS.Application.Dokumente.DokumentDienst.NeuausstellRollen).Und(() => string.IsNullOrWhiteSpace(neuGrund) ? Freigabe.Nein("Eine Neuausstellung ist eine bewusste Entscheidung: bitte unten den Grund angeben. Für eine weitere Ausfertigung genügt der Nachdruck des Originals.") : Freigabe.Ja))" />
+            }
+        </div>
+    }
+    @if (dokumente.Count > 0)
+    {
+        <RadzenFormField Text="Grund für eine Neuausstellung (z. B. Namenskorrektur)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="neuGrund" /></RadzenFormField>
+    }
+</section>
+
 @if (b.IstKontingent)
 {
     var stand = b.Kontingent;
@@ -165,9 +221,7 @@
                                     {
                                         @if (abgeschlossen is null && (eingebucht || !kurs.Richtlinie.VorabEinbuchung))
                                         {
-                                            <BegruendeterButton Text="besucht" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@Buchen" Click="@(() => AktionAsync(d => d.AnwesenheitAsync(Id, v.Id, true), "Besuch verbucht"))" />
-                                            <BegruendeterButton Text="nicht erschienen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => AktionAsync(d => d.AnwesenheitAsync(Id, v.Id, false), "Nichterscheinen verbucht"))"
-                                                                Freigabe="@(Buchen.Und(() => eingebucht ? Freigabe.Ja : Freigabe.Nein("Nichterscheinen gibt es nur bei eingebuchten Veranstaltungen.")))" />
+                                            <a class="vhs-small" href="@($"anwesenheit/{v.Id}")">Anwesenheitsliste</a>
                                         }
                                     }
                                     else if (eingebucht || wartet)
@@ -235,6 +289,52 @@
 
     private Freigabe Buchen => Freigabe.NurFuer(rolle, AnmeldungDienst.BuchungsRollen);
 
+    private IReadOnlyList<VibeVHS.Domain.Durchfuehrung.Anwesenheit> anwesenheiten = [];
+    private IReadOnlyList<VibeVHS.Domain.Dokumente.Dokument> dokumente = [];
+    private string? neuGrund;
+
+    private Freigabe BescheinigungFreigabe(VibeVHS.Domain.Dokumente.Dokumentart art)
+        => Freigabe.NurFuer(rolle, VibeVHS.Application.Dokumente.DokumentDienst.AusstellRollen)
+            .Und(() => dokumente.FirstOrDefault(d => d.Art == art && d.ErsetztDurch is null) is { } d
+                ? Freigabe.Nein($"Bereits ausgestellt am {d.ErstelltAm.ToLocalTime():dd.MM.yyyy}. Unten das Original nachdrucken – oder bewusst neu ausstellen.")
+                : anwesenheiten.All(a => a.Status != VibeVHS.Domain.Durchfuehrung.Anwesenheitsstatus.Anwesend)
+                    ? Freigabe.Nein("Noch keine Anwesenheit erfasst; eine Bescheinigung ist erst danach möglich.") : Freigabe.Ja);
+
+    private async Task BescheinigungAsync(VibeVHS.Domain.Dokumente.Dokumentart art)
+    {
+        try
+        {
+            var dok = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Dokumente.DokumentDienst>().BescheinigungErstellenAsync(Id, art));
+            Hinweise.Notify(NotificationSeverity.Success, "Archiviert", $"{dok.Titel} erstellt (SHA-256 {dok.Sha256[..12]}…).");
+            await LadenAsync();
+            folgeschritte =
+            [
+                new("PDF öffnen", $"dokumente/{dok.Id}.pdf", "Original aus dem Archiv", Hauptschritt: true),
+                new("Dokumente der Person", $"personen/{b!.PersonId}"),
+                new("Zum Kurs", $"kurse/{kurs!.Id}"),
+            ];
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task NeuAusstellenAsync(Guid dokumentId)
+    {
+        try
+        {
+            var dok = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Dokumente.DokumentDienst>().NeuAusstellenAsync(dokumentId, neuGrund!));
+            Hinweise.Notify(NotificationSeverity.Success, "Neu ausgestellt", $"{dok.Titel}; das alte Dokument bleibt im Archiv.");
+            neuGrund = null;
+            await LadenAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
     private static string Stil(Belegungsstatus s) => s switch
     {
         Belegungsstatus.Angemeldet => "gut",
@@ -271,6 +371,8 @@
             name = (await d.GetRequiredService<IPersonenSpeicher>().AnzeigenamenAsync([b.PersonId])).GetValueOrDefault(b.PersonId) ?? "?";
             storno = b.Offen ? await dienst.StornoVorschauAsync(Id) : null;
             vorschlaege = b.Offen ? await dienst.UmbuchungsvorschlaegeAsync(Id) : [];
+            anwesenheiten = await d.GetRequiredService<VibeVHS.Application.Durchfuehrung.AnwesenheitDienst>().AnwesenheitenDerBelegungAsync(b);
+            dokumente = await d.GetRequiredService<VibeVHS.Application.Dokumente.DokumentDienst>().ZurBelegungAsync(Id);
         });
     }
 
