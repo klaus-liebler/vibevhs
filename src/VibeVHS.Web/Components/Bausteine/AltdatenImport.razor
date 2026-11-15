@@ -1,0 +1,147 @@
+@* Altdatenimport für Kurse und Belegungen: Datei, Spalten zuordnen, Probelauf (schreibt nichts), Importieren. *@
+@using VibeVHS.Application.Betrieb
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+
+<section class="vhs-card">
+    <h2>1. Datei (@(Art == Altdatenart.Kurse ? "Kurse" : "Belegungen"))</h2>
+    <InputFile @key="Art" OnChange="LesenAsync" accept=".csv,.txt" aria-label="CSV-Datei wählen" />
+    @if (datei is { } d)
+    {
+        <p class="vhs-small">@d.Name · @d.Zeilen.Count Zeilen · Zeichensatz @d.Kodierung · SHA-256 @d.Sha256[..16]…</p>
+    }
+    <p class="vhs-small vhs-muted">
+        @if (Art == Altdatenart.Kurse)
+        {
+            <span>Pflicht: Kursnummer, Titel, Semester (Name oder Kürzel), Beginn. Optional: Fachbereich, Kursart, Min/Max, Entgelt, Uhrzeit („18:00-19:30“), Termine, Ort, Beschreibung, Status.
+                Beispiel: <code>tools/Testdaten/kufer-kurse-beispiel.csv</code></span>
+        }
+        else
+        {
+            <span>Belegungen finden ihre Person über die <b>TN-Nr aus dem Personenimport</b> und ihren Kurs über die Kursnummer – bitte zuerst Personen und Kurse importieren.
+                Es werden keine Mails verschickt. Beispiel: <code>tools/Testdaten/kufer-belegungen-beispiel.csv</code></span>
+        }
+    </p>
+</section>
+
+@if (datei is { } dd)
+{
+    <section class="vhs-card">
+        <h2>2. Spalten zuordnen</h2>
+        <div class="vhs-form">
+            @for (var i = 0; i < dd.Spalten.Count; i++)
+            {
+                var nr = i;
+                <RadzenFormField Text="@dd.Spalten[nr]">
+                    <RadzenDropDown TValue="string" Data="@(AltdatenImportDienst.Felder(Art))" Value="@zuordnung.GetValueOrDefault(nr, "Ignorieren")"
+                                    ValueChanged="@(v => { zuordnung[nr] = v; pruefung = null; })" />
+                </RadzenFormField>
+            }
+        </div>
+        <div class="vhs-row">
+            <BegruendeterButton Text="Probelauf (schreibt nichts)" Icon="fact_check" IsBusy="@laeuft" Click="ProbelaufAsync" />
+        </div>
+    </section>
+}
+
+@if (pruefung is { } p)
+{
+    <section class="vhs-card">
+        <div class="vhs-head">
+            <h2>3. @(p.Ausgefuehrt ? "Ergebnis" : "Probelauf")</h2>
+            <BegruendeterButton Text="@($"{p.Neu} {(Art == Altdatenart.Kurse ? "Kurse" : "Belegungen")} importieren")" Icon="upload" ButtonStyle="ButtonStyle.Primary" IsBusy="@laeuft"
+                                Freigabe="@(p.Ausgefuehrt ? Freigabe.Nein("Diese Datei ist importiert.") : p.Neu == 0 ? Freigabe.Nein("Keine neuen Zeilen in der Datei.") : Freigabe.Ja)"
+                                Click="ImportierenAsync" />
+        </div>
+        <div class="vhs-row">
+            <StatusPille Stil="gut">@p.Neu neu</StatusPille><StatusPille Stil="warn">@p.Dubletten Dubletten</StatusPille><StatusPille Stil="krit">@p.Fehler Fehler</StatusPille>
+            @if (p.Ausgefuehrt) { <StatusPille Stil="info">@p.Angelegt angelegt</StatusPille> }
+        </div>
+        <div class="vhs-tbl">
+            <table>
+                <thead><tr><th>Zeile</th><th>@(Art == Altdatenart.Kurse ? "Kurs" : "TN-Nr / Kurs")</th><th>Status</th><th>Hinweis</th></tr></thead>
+                <tbody>
+                    @foreach (var z in p.Zeilen.Take(300))
+                    {
+                        <tr>
+                            <td>@z.Nr</td>
+                            <td>@(Art == Altdatenart.Kurse ? $"{z.Wert("Kursnummer")} {z.Wert("Titel")}" : $"{z.Wert("TeilnehmerAltnummer")} → {z.Wert("Kursnummer")}")</td>
+                            <td><StatusPille Stil="@(z.Status == Importstatus.Neu ? "gut" : z.Status == Importstatus.Fehler ? "krit" : "warn")">@z.Status</StatusPille></td>
+                            <td class="vhs-small">@z.Hinweis</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public Altdatenart Art { get; set; }
+
+    [Parameter]
+    public EventCallback Importiert { get; set; }
+
+    private ImportDatei? datei;
+    private Dictionary<int, string> zuordnung = [];
+    private Altdatenpruefung? pruefung;
+    private bool laeuft;
+    private Altdatenart? bisher;
+
+    protected override void OnParametersSet()
+    {
+        if (bisher != Art)
+        {
+            bisher = Art;
+            datei = null;
+            pruefung = null;
+            zuordnung = [];
+        }
+    }
+
+    private async Task LesenAsync(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            using var ms = new MemoryStream();
+            await e.File.OpenReadStream(10_000_000).CopyToAsync(ms);
+            datei = ImportDienst.Lesen(e.File.Name, ms.ToArray());
+            zuordnung = AltdatenImportDienst.ZuordnungVorschlagen(Art, datei.Spalten).ToDictionary();
+            pruefung = null;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException)
+        {
+            Hinweise.Notify(NotificationSeverity.Warning, "Datei", ex.Message);
+        }
+    }
+
+    private async Task Ausfuehren(Func<AltdatenImportDienst, Task<Altdatenpruefung>> arbeit)
+    {
+        laeuft = true;
+        try
+        {
+            pruefung = await Vorgang.AusfuehrenAsync(d => arbeit(d.GetRequiredService<AltdatenImportDienst>()));
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Warning, "Nicht möglich", ex.Message);
+        }
+        finally
+        {
+            laeuft = false;
+        }
+    }
+
+    private Task ProbelaufAsync() => Ausfuehren(d => d.ProbelaufAsync(Art, datei!, zuordnung));
+
+    private async Task ImportierenAsync()
+    {
+        await Ausfuehren(d => d.ImportierenAsync(Art, datei!, zuordnung));
+        if (pruefung is { Ausgefuehrt: true } p)
+        {
+            Hinweise.Notify(NotificationSeverity.Success, "Import", $"{p.Angelegt} angelegt.");
+            await Importiert.InvokeAsync();
+        }
+    }
+}

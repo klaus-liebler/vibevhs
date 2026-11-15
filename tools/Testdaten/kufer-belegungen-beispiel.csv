@@ -1,0 +1,8 @@
+﻿TN-Nr;KursNr;Status;Anmeldedatum;Zahlart
+100231;K-9001;angemeldet;02.12.2026;Lastschrift
+100232;K-9001;warteliste;03.12.2026;Rechnung
+100238;K-9002;angemeldet;;Bar
+100231;K-9001;angemeldet;04.12.2026;Lastschrift
+999999;K-9001;angemeldet;;
+100233;K-0000;angemeldet;;
+100236;K-9002;storniert;01.12.2026;

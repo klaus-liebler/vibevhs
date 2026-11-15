@@ -33,6 +33,7 @@ public static class Registrierung
         dienste.AddScoped<Integration.IntegrationDienst>();
         dienste.AddScoped<Betrieb.AuswertungsDienst>();
         dienste.AddScoped<Betrieb.ImportDienst>();
+        dienste.AddScoped<Betrieb.AltdatenImportDienst>();
         dienste.AddScoped<Integration.IntegrationRoutinen>();
         dienste.AddScoped<Finanzen.FinanzDienst>();
         dienste.AddScoped<Finanzen.ZahlungsDienst>();

@@ -15,7 +15,7 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261115122027_Abwesenheit";
+    public override string LastMigrationId => "20261115122359_ImportArt";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -2055,6 +2055,10 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
 
                 b.Property<int>("Angelegt")
                     .HasColumnType("INTEGER");
+
+                b.Property<string>("Art")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
 
                 b.Property<string>("Datei")
                     .IsRequired()

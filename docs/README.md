@@ -371,7 +371,12 @@ Fachbereichsleitung und Prüfung lesen).
 - **Import** `/import`: KuferSQL-CSV (UTF-8 oder Windows-Zeichensatz, Trennzeichen erkannt), Zuordnungsvorschlag aus
   typischen Spaltennamen, Vorschau, **Probelauf ohne Schreiben** mit Prüfung (Pflichtfelder, Datum, PLZ, E-Mail) und
   Dublettensuche (Datenbank und Datei); der Import legt nur neue Personen an und merkt sich die Altnummern.
-  Beispieldatei: `tools/Testdaten/kufer-export-beispiel.csv`. Kurse und Belegungen aus Altdaten folgen bei Bedarf.
+  Beispieldatei: `tools/Testdaten/kufer-export-beispiel.csv`.
+- **Kurse und Belegungen** (gleiche Seite, Reiter 2 und 3): Kurse mit Semester (Name/Kürzel), Fachbereich, Kursart, Min/Max,
+  Entgelt, Beginn, Uhrzeit, Terminzahl, Ort, Status → Serie wird erzeugt; Belegungen finden ihre Person über die **TN-Nr aus
+  dem Personenimport** und den Kurs über die Kursnummer (Status angemeldet/Warteliste/storniert, Anmeldedatum, Zahlart). Probelauf
+  mit Fehlern, Dubletten (Datei und Datenbank) und Überbuchungshinweis; beim Import gehen keine Mails hinaus. Beispiele:
+  `tools/Testdaten/kufer-kurse-beispiel.csv`, `tools/Testdaten/kufer-belegungen-beispiel.csv`.
 
 ## Webshop (I9): Buchungs-API, Web-Komponente, TYPO3
 

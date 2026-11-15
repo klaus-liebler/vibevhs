@@ -15,8 +15,11 @@ public sealed class Importlauf
         Von = string.Empty;
     }
 
-    public Importlauf(string datei, string sha256, int zeilen, int angelegt, int dubletten, int fehler, IEnumerable<Importzuordnung> zuordnungen, DateTimeOffset am, string von)
+    /// <param name="art">„Personen“, „Kurse“ oder „Belegungen“; bei Kursen und Belegungen enthält <see cref="Importzuordnung.PersonId"/> die Kurs- bzw. Belegungs-ID.</param>
+    public Importlauf(string datei, string sha256, int zeilen, int angelegt, int dubletten, int fehler, IEnumerable<Importzuordnung> zuordnungen, DateTimeOffset am, string von,
+        string art = "Personen")
     {
+        Art = art;
         Id = Ids.Neu();
         Datei = datei;
         Sha256 = sha256;
@@ -48,4 +51,6 @@ public sealed class Importlauf
     public DateTimeOffset Am { get; private set; }
 
     public string Von { get; private set; }
+
+    public string Art { get; private set; } = "Personen";
 }

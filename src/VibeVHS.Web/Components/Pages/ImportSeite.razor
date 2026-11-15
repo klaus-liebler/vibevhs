@@ -8,13 +8,34 @@
 <div class="vhs-head">
     <div>
         <h1>Altdaten importieren</h1>
-        <p class="vhs-sub">Personen aus KuferSQL-Exporten (CSV): Datei wählen, Spalten zuordnen, Probelauf mit Vorschau und Dublettenprüfung – erst „Importieren“ schreibt.</p>
+        <p class="vhs-sub">KuferSQL-Exporte (CSV): Datei wählen, Spalten zuordnen, Probelauf mit Vorschau und Dublettenprüfung – erst „Importieren“ schreibt.
+            Reihenfolge: Personen, dann Kurse, dann Belegungen (Zuordnung über TN-Nr und Kursnummer).</p>
     </div>
+    <RadzenSelectBar TValue="string" @bind-Value="art" Size="ButtonSize.Small" aria-label="Was importieren?">
+        <Items>
+            <RadzenSelectBarItem Text="1. Personen" Value="@("Personen")" />
+            <RadzenSelectBarItem Text="2. Kurse" Value="@("Kurse")" />
+            <RadzenSelectBarItem Text="3. Belegungen" Value="@("Belegungen")" />
+        </Items>
+    </RadzenSelectBar>
 </div>
 
 @if (!recht.Erlaubt)
 {
     <div class="vhs-alert vhs-info">@recht.Begruendung</div>
+}
+else if (art != "Personen")
+{
+    <AltdatenImport Art="@(art == "Kurse" ? Altdatenart.Kurse : Altdatenart.Belegungen)" Importiert="LaeufeAsync" />
+    <section class="vhs-card">
+        <h2>Bisherige Importe</h2>
+        <div class="vhs-list">
+            @foreach (var l in laeufe)
+            {
+                <div><span class="vhs-grow">@l.Am.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @l.Art · @l.Datei · @l.Angelegt angelegt, @l.Dubletten Dubletten, @l.Fehler Fehler · @l.Von</span></div>
+            }
+        </div>
+    </section>
 }
 else
 {
@@ -92,7 +113,7 @@ else
             @if (laeufe.Count == 0) { <div class="vhs-small vhs-muted">Noch keine.</div> }
             @foreach (var l in laeufe)
             {
-                <div><span class="vhs-grow">@l.Am.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @l.Datei · @l.Angelegt angelegt, @l.Dubletten Dubletten, @l.Fehler Fehler · @l.Von</span></div>
+                <div><span class="vhs-grow">@l.Am.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @l.Art · @l.Datei · @l.Angelegt angelegt, @l.Dubletten Dubletten, @l.Fehler Fehler · @l.Von</span></div>
             }
         </div>
     </section>
@@ -100,6 +121,9 @@ else
 
 @code {
     private Freigabe recht = Freigabe.Ja;
+    private string art = "Personen";
+
+    private async Task LaeufeAsync() => laeufe = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ImportDienst>().LaeufeAsync());
     private ImportDatei? datei;
     private Dictionary<int, Importfeld> zuordnung = [];
     private Importpruefung? pruefung;
