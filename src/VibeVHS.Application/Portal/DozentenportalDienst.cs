@@ -134,7 +134,13 @@ public sealed class DozentenportalDienst(
         }
         else if (!konto.Rollen.Contains(Rolle.Dozierende))
         {
-            return null;
+            // Portal-Konto einer Teilnehmerin, die inzwischen auch Kurse leitet: Zugang zum Dozierendenportal ergänzen.
+            if (!konto.IstPortalkonto || await personen.LadenAsync(t.PersonId, abbruch) is not { } p || !p.Rollen.HasFlag(Personenrolle.Dozierende))
+            {
+                return null;
+            }
+
+            konto.Aendern(konto.Name, konto.Funktion, [.. konto.Rollen, Rolle.Dozierende], konto.Fachbereiche);
         }
 
         await protokoll.ProtokollierenAsync("Portal.Angemeldet", $"Anmeldung Dozierendenportal per Link: {Pseudonym.Person(t.PersonId)}", nameof(Person), t.PersonId, abbruch: abbruch);

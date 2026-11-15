@@ -185,8 +185,13 @@ public sealed class TeilnehmendenportalDienst(
         }
         else if (!konto.Rollen.Contains(Rolle.Teilnehmende))
         {
-            // Mitarbeitende/Kursleitungen nutzen ihr eigenes Konto; das Teilnehmendenportal bekommt es nicht mit.
-            return null;
+            // Mitarbeitende nutzen ihr eigenes Konto. Ein Portal-Konto einer Kursleitung, die auch Teilnehmende ist, bekommt den Zugang dazu.
+            if (!konto.IstPortalkonto || await personen.LadenAsync(t.PersonId, abbruch) is not { } p || !p.Rollen.HasFlag(Personenrolle.Teilnehmende))
+            {
+                return null;
+            }
+
+            konto.Aendern(konto.Name, konto.Funktion, [.. konto.Rollen, Rolle.Teilnehmende], konto.Fachbereiche);
         }
 
         await protokoll.ProtokollierenAsync("Portal.Angemeldet", $"Anmeldung Teilnehmendenportal per Link: {Pseudonym.Person(t.PersonId)}", nameof(Person), t.PersonId, abbruch: abbruch);

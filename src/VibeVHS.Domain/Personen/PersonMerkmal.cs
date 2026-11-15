@@ -9,6 +9,9 @@ public enum MerkmalArt
     Sprache,
     Rollen,
     Beschaeftigung,
+    Anrede,
+    Geschlecht,
+    Geburtsname,
 }
 
 /// <summary>
@@ -39,6 +42,7 @@ public sealed class PersonMerkmal : BitemporaleVersion<PersonMerkmal>
         MerkmalArt.Geburtsdatum => "Geburtsdatum",
         MerkmalArt.Sprache => "Sprache",
         MerkmalArt.Beschaeftigung => "Beschäftigung",
+        MerkmalArt.Anrede or MerkmalArt.Geschlecht or MerkmalArt.Geburtsname => "Name",
         _ => "Rollen",
     };
 
@@ -47,6 +51,9 @@ public sealed class PersonMerkmal : BitemporaleVersion<PersonMerkmal>
         MerkmalArt.Geburtsdatum => "Geburtsdatum",
         MerkmalArt.Sprache => "Bevorzugte Sprache",
         MerkmalArt.Beschaeftigung => "Beschäftigungsart",
+        MerkmalArt.Anrede => "Anrede",
+        MerkmalArt.Geschlecht => "Geschlecht",
+        MerkmalArt.Geburtsname => "Geburtsname",
         _ => "Rollen",
     };
 
@@ -57,7 +64,7 @@ public sealed class PersonMerkmal : BitemporaleVersion<PersonMerkmal>
         MerkmalArt.Geburtsdatum => AlsDatum()?.ToString("dd.MM.yyyy", CultureInfo.GetCultureInfo("de-DE")) ?? "–",
         MerkmalArt.Rollen => RollenAnzeige(AlsRollen()),
         MerkmalArt.Beschaeftigung => AlsBeschaeftigung() is { } b ? $"{BeschaeftigungAnzeige.Text(b)} ({BeschaeftigungAnzeige.Erklaerung(b)})" : "–",
-        _ => Inhalt,
+        _ => Inhalt.Length == 0 ? "(keine Angabe)" : Inhalt,
     };
 
     internal void InhaltLeeren() => Inhalt = string.Empty;

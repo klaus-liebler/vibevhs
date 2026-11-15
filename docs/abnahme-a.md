@@ -37,10 +37,13 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
 
 - **Testkonto:** Katja Friesen · **Startpunkt:** Startseite → **Person anlegen**
 - **Aufgabe:** Legen Sie *Mira Albers*, geboren 12.03.1992, mit E-Mail und Anschrift in Emsdetten an. Frau Albers hat
-  geheiratet und heißt ab dem 1. des Monats *Mira Albers-Kühn* – tragen Sie die Namensänderung ein.
+  geheiratet und heißt ab dem 1. des Monats *Mira Albers-Kühn*, ihr Geburtsname ist *Albers* – tragen Sie das über
+  **Stammdaten ändern** auf der Personenseite ein.
 - **Erwartung:**
   - Beim Anlegen erscheinen mögliche Dubletten, falls es ähnliche Personen gibt.
-  - Die Namensänderung fragt: „Änderung ab einem Datum“ oder „Korrektur“; gewählt wird „Änderung ab“ mit Grund.
+  - **Stammdaten ändern** zeigt alle Stammdaten (Anrede, Titel, Name, Geburtsname, Geburtsdatum, Geschlecht, Sprache,
+    Anschrift, Telefon, E-Mail) und fragt: „Änderung ab einem Datum“ oder „Korrektur“; gewählt wird „Änderung ab“ mit Grund.
+  - Als Folgeschritt erscheint „Bescheinigungen neu ausstellen“ (nur weil sich der Name geändert hat).
   - Unter **Datenhistorie** stehen beide Namen mit Gültigkeit; ältere Dokumente behalten den alten Namen.
 - **Zeit:** ____ min · **Beobachtungen:**
 
