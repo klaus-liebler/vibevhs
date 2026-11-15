@@ -154,6 +154,9 @@ internal sealed class DokumentSpeicher(VibeVhsDbContext db) : IDokumentSpeicher
 
 internal sealed class QrCodeErzeuger : IQrCode
 {
+    private static readonly byte[] Schwarz = [0, 0, 0];
+    private static readonly byte[] Weiss = [255, 255, 255];
+
     public string Svg(string inhalt)
     {
         using var daten = QRCodeGenerator.GenerateQrCode(inhalt, QRCodeGenerator.ECCLevel.M);
@@ -163,6 +166,8 @@ internal sealed class QrCodeErzeuger : IQrCode
     public byte[] Png(string inhalt)
     {
         using var daten = QRCodeGenerator.GenerateQrCode(inhalt, QRCodeGenerator.ECCLevel.M);
-        return new PngByteQRCode(daten).GetGraphic(10);
+        // Explizit RGB-Farben: Das Standard-PNG von QRCoder (1 Bit Graustufen) erkennt PDFsharp/MigraDoc nicht
+        // („Image has no valid type.“ statt QR-Code in Briefen, Ausweisen und dem Kurs-QR-Bogen).
+        return new PngByteQRCode(daten).GetGraphic(10, Schwarz, Weiss, drawQuietZones: true);
     }
 }
