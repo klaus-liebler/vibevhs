@@ -1,0 +1,1088 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>VibeVHS Verwaltung</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: Arbeitsoberfläche mit Seitennavigation links, Kopfzeile mit Suche und Rolle, Inhalt in Karten-Rastern */
+:root {
+  --bg: #f3f5f5; --surface: #ffffff; --surface-2: #eaf0f0; --line: #d5dfdf;
+  --fg: #172629; --muted: #57696d; --accent: #0d6870; --accent-weak: #d6ecee; --accent-fg: #ffffff;
+  --good: #2c7a4c; --good-weak: #dbeee2; --warn: #9a5b00; --warn-weak: #fbebcf;
+  --crit: #b3261e; --crit-weak: #f7dcd9; --tip-bg: #1b2a2e; --tip-fg: #f1f6f6;
+  --paper: #ffffff; --paper-ink: #1b1b1b; --paper-line: #c9c9c9;
+  --font-ui: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1618; --surface: #152024; --surface-2: #1b2a2e; --line: #2a3c40;
+  --fg: #e2eced; --muted: #9bafb3; --accent: #52b6be; --accent-weak: #15393d; --accent-fg: #052528;
+  --good: #6cc191; --good-weak: #163326; --warn: #e5a64c; --warn-weak: #3a2a12;
+  --crit: #f07e75; --crit-weak: #3d1b19; --tip-bg: #e2eced; --tip-fg: #0e1618; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0e1618; --surface: #152024; --surface-2: #1b2a2e; --line: #2a3c40;
+  --fg: #e2eced; --muted: #9bafb3; --accent: #52b6be; --accent-weak: #15393d; --accent-fg: #052528;
+  --good: #6cc191; --good-weak: #163326; --warn: #e5a64c; --warn-weak: #3a2a12;
+  --crit: #f07e75; --crit-weak: #3d1b19; --tip-bg: #e2eced; --tip-fg: #0e1618; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; }
+button, input, select, textarea { font: inherit; color: inherit; }
+.app { display: grid; grid-template-columns: 228px minmax(0, 1fr); min-height: 100%; }
+.side { background: var(--surface); border-right: 1px solid var(--line); padding-block: 16px; padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: 12px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.brand { display: flex; align-items: baseline; gap: 6px; padding: 4px 10px 14px; }
+.brand b { font-size: 18px; letter-spacing: -0.01em; }
+.brand span { font-size: 12px; color: var(--muted); }
+.nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; color: var(--fg); text-decoration: none; font-weight: 500; }
+.nav a:hover { background: var(--surface-2); }
+.nav a.on { background: var(--accent-weak); color: var(--accent); }
+.nav a .cnt { margin-left: auto; font-size: 11.5px; background: var(--warn-weak); color: var(--warn); border-radius: 10px; padding: 0 7px; font-weight: 600; }
+.nav .grp { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 14px 10px 4px; }
+.side .foot { margin-top: auto; font-size: 12px; color: var(--muted); padding: 10px; border-top: 1px solid var(--line); }
+.main { min-width: 0; display: flex; flex-direction: column; }
+.top { display: flex; gap: 12px; align-items: center; padding-block: 12px; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); border-bottom: 1px solid var(--line); background: var(--surface); position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; flex-wrap: wrap; }
+.search { position: relative; flex: 1 1 260px; min-width: 0; max-width: 520px; }
+.search input { width: 100%; padding: 8px 12px 8px 34px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+.results { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 40; overflow: hidden; }
+.results button { display: flex; width: 100%; text-align: left; gap: 10px; padding: 8px 12px; background: none; border: 0; cursor: pointer; }
+.results button:hover, .results button:focus { background: var(--surface-2); }
+.results small { color: var(--muted); margin-left: auto; }
+.role { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.role select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.proto { font-size: 12px; background: var(--warn-weak); color: var(--warn); border-radius: 12px; padding: 3px 10px; font-weight: 600; white-space: nowrap; }
+.content { padding-block: 22px 60px; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; max-width: 1280px; width: 100%; }
+h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 16px; margin: 0; }
+h3 { font-size: 14px; margin: 0; }
+.sub { color: var(--muted); margin: 2px 0 0; }
+.head { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.grid-2 { display: grid; gap: 16px; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+.kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.kpi .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.kpi .val { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.kpi .note { font-size: 12.5px; color: var(--muted); }
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--surface-2); }
+.num { text-align: right; }
+td.mono { white-space: nowrap; }
+.mono { font-family: var(--font-mono); font-size: 12.5px; }
+.pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 12px; padding: 1px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.p-good { background: var(--good-weak); color: var(--good); }
+.p-warn { background: var(--warn-weak); color: var(--warn); }
+.p-crit { background: var(--crit-weak); color: var(--crit); }
+.p-info { background: var(--accent-weak); color: var(--accent); }
+.p-mute { background: var(--surface-2); color: var(--muted); }
+.bar { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; min-width: 70px; }
+.bar i { display: block; height: 100%; background: var(--accent); }
+.bar i.full { background: var(--warn); }
+.bar i.low { background: var(--crit); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 500; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn.pri { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn.pri:hover { filter: brightness(1.08); }
+.btn.dang { color: var(--crit); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.sm { padding: 4px 9px; font-size: 13px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.why { position: relative; display: inline-flex; }
+.why:hover::after, .why:focus-within::after, .why:focus::after { content: attr(data-why); position: absolute; bottom: calc(100% + 8px); left: 0; width: max-content; max-width: min(300px, 78vw); background: var(--tip-bg); color: var(--tip-fg); padding: 8px 10px; border-radius: 6px; font-size: 12.5px; font-weight: 400; line-height: 1.4; z-index: 60; white-space: normal; box-shadow: 0 6px 18px rgba(0,0,0,0.18); }
+.why.lock { cursor: help; }
+.lockicon { color: var(--muted); display: inline-flex; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label, .field .lbl { font-size: 12px; color: var(--muted); font-weight: 500; }
+.field .val { display: flex; align-items: center; gap: 6px; min-height: 34px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); }
+.field .val.ro { background: var(--surface-2); }
+.field input, .field select, .field textarea { padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); width: 100%; }
+.field input[type=checkbox], .field input[type=radio] { width: auto; }
+.fields { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
+.histbtn { margin-left: auto; background: none; border: 0; color: var(--accent); cursor: pointer; display: inline-flex; padding: 2px; border-radius: 4px; }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs button { background: none; border: 0; padding: 9px 14px; cursor: pointer; color: var(--muted); font-weight: 500; border-bottom: 2px solid transparent; white-space: nowrap; }
+.tabs button.on { color: var(--accent); border-bottom-color: var(--accent); }
+.next { border: 1px solid var(--accent); background: var(--accent-weak); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.next h3 { color: var(--accent); }
+.alert { display: flex; gap: 12px; align-items: flex-start; border-radius: 10px; padding: 12px 14px; border: 1px solid; flex-wrap: wrap; }
+.alert.warn { background: var(--warn-weak); border-color: var(--warn); }
+.alert.crit { background: var(--crit-weak); border-color: var(--crit); }
+.alert .txt { flex: 1 1 260px; min-width: 0; }
+.list { display: flex; flex-direction: column; }
+.list > div { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); align-items: center; flex-wrap: wrap; }
+.list > div:last-child { border-bottom: 0; }
+.list .grow { flex: 1 1 220px; min-width: 0; }
+.muted { color: var(--muted); }
+a { color: var(--accent); text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); text-underline-offset: 2px; }
+.small { font-size: 12.5px; }
+.steps { display: flex; gap: 8px; flex-wrap: wrap; }
+.steps span { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 20px; background: var(--surface-2); color: var(--muted); font-weight: 500; font-size: 13px; }
+.steps span.on { background: var(--accent); color: var(--accent-fg); }
+.steps span.done { background: var(--accent-weak); color: var(--accent); }
+.opt { display: flex; gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; flex-wrap: wrap; background: var(--surface); text-align: left; width: 100%; }
+.opt:hover { background: var(--surface-2); }
+.opt.sel { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.opt.no { cursor: not-allowed; opacity: 0.75; }
+.opt .grow { flex: 1 1 200px; min-width: 0; }
+.plan { display: grid; grid-template-columns: 150px repeat(6, minmax(120px, 1fr)); min-width: 900px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.plan > div { padding: 8px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); min-height: 64px; display: flex; flex-direction: column; gap: 4px; }
+.plan .ph { background: var(--surface-2); font-weight: 600; font-size: 12.5px; min-height: 0; }
+.plan .rh { background: var(--surface-2); font-size: 12.5px; }
+.slot { border-radius: 6px; padding: 4px 6px; font-size: 12px; background: var(--accent-weak); color: var(--fg); border-left: 3px solid var(--accent); cursor: pointer; }
+.slot.conf { background: var(--crit-weak); border-left-color: var(--crit); }
+.slot b { display: block; font-weight: 600; }
+.paper { background: var(--paper); color: var(--paper-ink); border: 1px solid var(--paper-line); border-radius: 4px; padding: 36px 40px; max-width: 640px; width: 100%; font-size: 13.5px; line-height: 1.6; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 4px 18px rgba(0,0,0,0.08); }
+.paper .lh { display: flex; justify-content: space-between; gap: 12px; border-bottom: 2px solid var(--paper-ink); padding-bottom: 10px; flex-wrap: wrap; }
+.paper h2 { font-size: 20px; letter-spacing: 0.02em; }
+.paper .qrbox { display: flex; gap: 12px; align-items: center; border: 1px dashed var(--paper-line); padding: 8px; border-radius: 4px; }
+.paper .foot { font-size: 11px; color: #555555; border-top: 1px solid var(--paper-line); padding-top: 8px; }
+.paper s { color: #b3261e; }
+.qr { background: #ffffff; padding: 6px; border-radius: 4px; display: inline-flex; }
+.qr canvas, .qr img { display: block; }
+.timeline { display: flex; flex-direction: column; gap: 0; border-left: 2px solid var(--line); margin-left: 6px; }
+.timeline > div { position: relative; padding: 2px 0 14px 18px; }
+.timeline > div::before { content: ""; position: absolute; left: -7px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--surface); border: 2px solid var(--accent); }
+.timeline > div.old::before { border-color: var(--muted); }
+.timeline > div.sup { opacity: 0.6; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--muted); font-size: 11px; font-family: var(--font-ui); }
+.chart .lab { fill: var(--fg); font-weight: 600; }
+.toast { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--tip-bg); color: var(--tip-fg); padding: 10px 14px; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 80; max-width: min(380px, calc(100vw - 32px)); }
+.split { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 16px; }
+.pick { display: flex; flex-direction: column; gap: 2px; }
+.pick button { text-align: left; background: none; border: 0; padding: 9px 10px; border-radius: 7px; cursor: pointer; display: flex; flex-direction: column; }
+.pick button:hover { background: var(--surface-2); }
+.pick button.on { background: var(--accent-weak); }
+.pick small { color: var(--muted); }
+pre.code { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow-x: auto; font-family: var(--font-mono); font-size: 12px; line-height: 1.5; margin: 0; white-space: pre; }
+.check { width: 18px; height: 18px; accent-color: var(--accent); }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+@media (max-width: 920px) {
+  .grid-2, .split { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 860px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; height: auto; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); padding-block: 8px; padding-right: max(12px, env(safe-area-inset-right, 0px)); align-items: center; }
+  .side .brand { padding: 0 8px 0 4px; flex-shrink: 0; }
+  .nav { display: flex; gap: 2px; }
+  .nav .grp, .side .foot, .brand span { display: none; }
+  .nav a { white-space: nowrap; padding: 7px 10px; }
+  .top { position: static; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand"><b>VibeVHS</b><span>VHS Musterstadt</span></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="foot">Stand: Sa, 14.11.2026<br>Herbstsemester 2026 · NRW</div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <div class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="q" type="search" placeholder="Person, Kurs oder Kursnummer suchen" autocomplete="off" aria-label="Suche">
+        <div class="results" id="results" hidden></div>
+      </div>
+      <div class="role"><label for="role">Angemeldet als J. Krüger, Rolle</label>
+        <select id="role">
+          <option value="ts">Teilnehmerservice</option>
+          <option value="fbl">Fachbereichsleitung (Sprachen)</option>
+          <option value="bh">Buchhaltung</option>
+          <option value="ik">Integrationskurs-Team</option>
+        </select>
+      </div>
+      <span class="proto">Prototyp · Beispieldaten</span>
+    </header>
+    <main class="content" id="view"></main>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+(function () {
+'use strict';
+const ROLES = { ts: 'Teilnehmerservice', fbl: 'Fachbereichsleitung', bh: 'Buchhaltung', ik: 'Integrationskurs-Team' };
+const ICON = {
+  lock: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+  clock: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  arrow: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'
+};
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const eur = n => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+
+/* ---------- Beispieldaten ---------- */
+const COURSES = [
+  { id: 'c301', nr: '26H-301', titel: 'Englisch A2 – Konversation', fb: 'Sprachen', status: 'läuft', sicht: 'öffentlich', raum: 'R 2.14', doz: 'p-becker', team: ['p-becker', 'p-garcia'], tag: 'Di', zeit: '18:00–19:30', beginn: '06.10.2026', ende: '08.12.2026', ue: 20, belegt: 11, max: 14, min: 8, warte: 0, entgelt: 98 },
+  { id: 'c302', nr: '26H-302', titel: 'Spanisch A1 – Einstieg', fb: 'Sprachen', status: 'veröffentlicht', sicht: 'öffentlich', raum: 'R 2.15', doz: 'p-garcia', tag: 'Mi', zeit: '19:30–21:00', beginn: '18.11.2026', ende: '03.02.2027', ue: 20, belegt: 6, max: 14, min: 8, warte: 0, entgelt: 98 },
+  { id: 'c410', nr: '26H-410', titel: 'Excel für Einsteiger', fb: 'Beruf', status: 'veröffentlicht', sicht: 'öffentlich', raum: 'EDV 3.01', nutzung: 'PC-Kurs', doz: 'p-hahn', tag: 'Sa', zeit: '09:00–15:00', beginn: '21.11.2026', ende: '28.11.2026', ue: 14, belegt: 12, max: 12, min: 6, warte: 3, entgelt: 129 },
+  { id: 'c411', nr: '26H-411', titel: 'Bildungsurlaub: Projektmanagement kompakt', fb: 'Beruf', status: 'veröffentlicht', sicht: 'öffentlich', raum: 'R 1.02', doz: 'p-hahn', tag: 'Mo–Fr', zeit: '09:00–16:00', beginn: '30.11.2026', ende: '04.12.2026', ue: 40, belegt: 9, max: 16, min: 8, warte: 0, entgelt: 345 },
+  { id: 'c520', nr: '26H-520', titel: 'Yoga am Abend', fb: 'Gesundheit', status: 'läuft', sicht: 'öffentlich', raum: 'Bewegungsraum', nutzung: 'Bewegung', doz: 'p-lang', tag: 'Do', zeit: '19:00–20:30', beginn: '08.10.2026', ende: '10.12.2026', ue: 20, belegt: 15, max: 16, min: 8, warte: 0, entgelt: 84 },
+  { id: 'c521', nr: '26H-521', titel: 'Rückenfit', fb: 'Gesundheit', status: 'läuft', sicht: 'öffentlich', raum: 'Bewegungsraum', nutzung: 'Bewegung', doz: 'p-lang', tag: 'Di', zeit: '17:00–18:00', beginn: '06.10.2026', ende: '08.12.2026', ue: 13, belegt: 9, max: 14, min: 8, warte: 0, entgelt: 62 },
+  { id: 'c540', nr: '26H-540', titel: 'Pilates fortlaufend (10er-Karte)', fb: 'Gesundheit', status: 'läuft', sicht: 'öffentlich', raum: 'Bewegungsraum', nutzung: 'Bewegung', kapEigen: 14, umfang: 'unbefristet', kontingent: { n: 10, monate: 6 }, doz: 'p-lang', team: ['p-lang', 'p-roth'], tag: 'Mo', zeit: '18:00–19:00', beginn: '07.09.2026', ende: 'unbefristet', ue: 1, belegt: 23, max: 60, min: 8, warte: 0, entgelt: 89 },
+  { id: 'c610', nr: '26H-610', titel: 'Aquarellmalerei für Fortgeschrittene', fb: 'Kultur', status: 'läuft', sicht: 'öffentlich', raum: 'Atelier', doz: 'p-ko', tag: 'Mo', zeit: '18:30–21:00', beginn: '05.10.2026', ende: '30.11.2026', ue: 27, belegt: 8, max: 10, min: 6, warte: 0, entgelt: 132 },
+  { id: 'c110', nr: '26H-110', titel: 'Vortrag: Kommunalfinanzen verstehen', fb: 'Gesellschaft', status: 'veröffentlicht', sicht: 'öffentlich', raum: 'R 1.02 + online', orte: ['R 1.02', 'Online Vortrag'], nutzung: 'Vortrag', doz: 'p-brandt', tag: 'Do', zeit: '19:00–20:30', beginn: '26.11.2026', ende: '26.11.2026', ue: 2, belegt: 34, max: 80, min: 10, warte: 0, entgelt: 0 },
+  { id: 'c120', nr: '26H-120', titel: 'Rhetorik für Ehrenamtliche', fb: 'Gesellschaft', status: 'veröffentlicht', sicht: 'öffentlich', raum: 'R 2.15', doz: 'p-ko', tag: 'Di', zeit: '18:30–20:00', beginn: '17.11.2026', ende: '15.12.2026', ue: 10, belegt: 5, max: 14, min: 6, warte: 0, entgelt: 49 },
+  { id: 'c701', nr: '26H-701', titel: 'Integrationskurs allgemein, Modul 3', fb: 'Integration', status: 'läuft', sicht: 'intern', raum: 'R 2.20', nutzung: 'Integrationskurs', doz: 'p-garcia', tag: 'Mo–Fr', zeit: '08:30–12:30', beginn: '02.11.2026', ende: '04.12.2026', ue: 100, belegt: 19, max: 25, min: 12, warte: 0, entgelt: 0 },
+  { id: 'c430', nr: '26H-430', titel: 'Deutsch am Arbeitsplatz (Stadtwerke Musterstadt)', fb: 'Beruf', status: 'läuft', sicht: 'geschlossen', raum: 'R 1.04', doz: 'p-becker', tag: 'Mi', zeit: '14:00–15:30', beginn: '07.10.2026', ende: '16.12.2026', ue: 22, belegt: 10, max: 12, min: 6, warte: 0, entgelt: 0, ziel: 'Stadtwerke Musterstadt GmbH' },
+  { id: 'c303', nr: '26H-303', titel: 'Französisch B1', fb: 'Sprachen', status: 'abgesagt', sicht: 'öffentlich', raum: 'R 2.15', doz: 'p-garcia', tag: 'Do', zeit: '18:00–19:30', beginn: '05.11.2026', ende: '28.01.2027', ue: 20, belegt: 3, max: 14, min: 8, warte: 0, entgelt: 98 },
+  { id: 'c612', nr: '27F-612', titel: 'Fotografie: Grundlagen', fb: 'Kultur', status: 'Entwurf', sicht: 'öffentlich', raum: 'Atelier', doz: 'p-ko', tag: 'Sa', zeit: '10:00–16:00', beginn: '13.03.2027', ende: '20.03.2027', ue: 14, belegt: 0, max: 12, min: 6, warte: 0, entgelt: 115 }
+];
+const PEOPLE = {
+  'p-becker': { name: 'Anna Becker', rollen: ['Dozentin'], ort: 'Musterstadt', sprache: 'Deutsch', geb: '12.08.1986',
+    versions: [
+      { n: 'Schmitt', von: '2019-03-01', bis: 'offen', erf: '2019-03-01', ers: '2019-03-04', grund: 'Ersterfassung mit Tippfehler' },
+      { n: 'Schmidt', von: '2019-03-01', bis: 'offen', erf: '2019-03-04', ers: '2025-07-02', grund: 'Korrektur (gilt rückwirkend)' },
+      { n: 'Schmidt', von: '2019-03-01', bis: '2025-06-14', erf: '2025-07-02', ers: '', grund: 'Ende der Gültigkeit wegen Heirat' },
+      { n: 'Becker', von: '2025-06-14', bis: 'offen', erf: '2025-07-02', ers: '', grund: 'Änderung ab Heiratsdatum, Nachweis: Heiratsurkunde' }
+    ] },
+  'p-yilmaz': { name: 'Mehmet Yılmaz', rollen: ['Teilnehmer'], ort: 'Musterstadt-Nord', sprache: 'Türkisch', geb: '03.05.1988', mandat: true },
+  'p-kovalenko': { name: 'Olena Kovalenko', rollen: ['Teilnehmerin', 'Integrationskurs'], ort: 'Musterstadt', sprache: 'Ukrainisch', geb: '21.01.1991' },
+  'p-weber': { name: 'Sabine Weber', rollen: ['Teilnehmerin'], ort: 'Altdorf', sprache: 'Deutsch', geb: '14.11.1972', mandat: true },
+  'p-hoffmann': { name: 'Jonas Hoffmann', rollen: ['Teilnehmer', 'Stadtwerke Musterstadt'], ort: 'Musterstadt', sprache: 'Deutsch', geb: '30.09.1995' },
+  'p-garcia': { name: 'Lucía García', rollen: ['Dozentin'], ort: 'Musterstadt', sprache: 'Spanisch', geb: '02.02.1980' },
+  'p-hahn': { name: 'Markus Hahn', rollen: ['Dozent'], ort: 'Neustadt', sprache: 'Deutsch', geb: '19.07.1969' },
+  'p-roth': { name: 'Jana Roth', rollen: ['Dozentin'], ort: 'Altdorf', sprache: 'Deutsch', geb: '22.05.1990' },
+  'p-lang': { name: 'Petra Lang', rollen: ['Dozentin'], ort: 'Musterstadt', sprache: 'Deutsch', geb: '05.03.1977' },
+  'p-ko': { name: 'Min-ji Ko', rollen: ['Dozentin'], ort: 'Musterstadt', sprache: 'Koreanisch', geb: '11.12.1983' },
+  'p-brandt': { name: 'Dr. Ulrike Brandt', rollen: ['Referentin', 'Leitung bis 31.03.2025'], ort: 'Musterstadt', sprache: 'Deutsch', geb: '08.04.1961' },
+  'p-demir': { name: 'Ayşe Demir', rollen: ['Teilnehmerin'], ort: 'Musterstadt', sprache: 'Türkisch', geb: '17.06.1979' },
+  'p-haddad': { name: 'Nadia Haddad', rollen: ['Teilnehmerin', 'Integrationskurs'], ort: 'Musterstadt', sprache: 'Arabisch', geb: '09.10.1993' }
+};
+/* 3.000 generierte Personen für die Listenanzeige (fester Zufallsstartwert, immer gleich) */
+const norm = s => String(s).toLowerCase().replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ß/g, 'ss').replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u').normalize('NFD').replace(/[̀-ͯ]/g, '');
+(function genPeople() {
+  let seed = 20261114;
+  const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const pick = a => a[Math.floor(rnd() * a.length)];
+  const FN = ['Anna', 'Lena', 'Marie', 'Sophie', 'Laura', 'Julia', 'Sarah', 'Katharina', 'Sabine', 'Petra', 'Monika', 'Ursula', 'Karin', 'Ayşe', 'Fatma', 'Elif', 'Zeynep', 'Olena', 'Iryna', 'Daria', 'Nadia', 'Fatima', 'Amira', 'Lucía', 'Maria', 'Giulia', 'Agnieszka', 'Ewa', 'Min-ji', 'Grace', 'Lukas', 'Jonas', 'Leon', 'Paul', 'Felix', 'Thomas', 'Michael', 'Peter', 'Stefan', 'Andreas', 'Mehmet', 'Mustafa', 'Emre', 'Ali', 'Ahmad', 'Samir', 'Omar', 'Dmytro', 'Oleksandr', 'Piotr', 'Marco', 'Jan', 'Tobias', 'Kai', 'Hans', 'Wolfgang', 'Jürgen', 'Rainer', 'Ibrahim', 'Yusuf'];
+  const LN = ['Müller', 'Schmidt', 'Schneider', 'Fischer', 'Weber', 'Meyer', 'Wagner', 'Becker', 'Schulz', 'Hoffmann', 'Koch', 'Richter', 'Klein', 'Wolf', 'Schröder', 'Neumann', 'Schwarz', 'Zimmermann', 'Braun', 'Krüger', 'Hofmann', 'Hartmann', 'Lange', 'Schmitt', 'Werner', 'Krause', 'Meier', 'Lehmann', 'Schmid', 'Schulze', 'Maier', 'Köhler', 'Herrmann', 'König', 'Walter', 'Mayer', 'Huber', 'Kaiser', 'Fuchs', 'Peters', 'Yılmaz', 'Kaya', 'Demir', 'Şahin', 'Çelik', 'Öztürk', 'Aydın', 'Kovalenko', 'Shevchenko', 'Bondarenko', 'Melnyk', 'Nowak', 'Kowalski', 'Wiśniewska', 'Rossi', 'Russo', 'García', 'Martínez', 'Haddad', 'Al-Hassan', 'Nouri', 'Rahimi', 'Okafor', 'Nguyen', 'Popescu', 'Ivanova'];
+  const ORT = ['Musterstadt', 'Musterstadt', 'Musterstadt', 'Musterstadt-Nord', 'Musterstadt-Süd', 'Altdorf', 'Neustadt', 'Bergheim', 'Talhausen', 'Lindenau'];
+  const LANG = ['Deutsch', 'Deutsch', 'Deutsch', 'Deutsch', 'Deutsch', 'Deutsch', 'Deutsch', 'Türkisch', 'Ukrainisch', 'Arabisch', 'Englisch', 'Polnisch', 'Spanisch'];
+  const FBS = ['Sprachen', 'Sprachen', 'Beruf', 'Gesundheit', 'Kultur', 'Gesellschaft', 'Integration'];
+  const SEM = [['Herbst 2026', 'aktiv'], ['Herbst 2026', 'aktiv'], ['Herbst 2026', 'aktiv'], ['Frühjahr 2026', 'aktiv'], ['Frühjahr 2026', 'aktiv'], ['Herbst 2025', 'ruhend'], ['Frühjahr 2025', 'ruhend'], ['Herbst 2024', 'ruhend'], ['Frühjahr 2023', 'Löschung vorgemerkt']];
+  for (let i = 1; i <= 3000; i++) {
+    const doz = rnd() < 0.06, both = doz && rnd() < 0.3, s = pick(SEM);
+    const d = String(1 + Math.floor(rnd() * 28)).padStart(2, '0') + '.' + String(1 + Math.floor(rnd() * 12)).padStart(2, '0') + '.' + (1950 + Math.floor(rnd() * 56));
+    PEOPLE['g' + i] = { name: pick(FN) + ' ' + pick(LN), rollen: doz ? (both ? ['Dozierende', 'Teilnehmende'] : ['Dozierende']) : ['Teilnehmende'], ort: pick(ORT), sprache: pick(LANG), geb: d, last: s[0], status: s[1], fb: doz ? pick(FBS) : null, gen: true };
+  }
+  Object.keys(PEOPLE).forEach(k => { const p = PEOPLE[k]; const r = p.rollen.join(' '); p.isDoz = /Dozent|Dozierende|Referentin/.test(r); p.isTn = /Teilnehm|Integrationskurs/.test(r); if (!p.status) { p.status = 'aktiv'; p.last = 'Herbst 2026'; } p.key = norm(p.name + ' ' + p.ort + ' ' + p.geb); });
+})();
+const PEOPLE_IDS = Object.keys(PEOPLE);
+const ENGLISCH_TN = [
+  ['Mehmet Yılmaz', 'p-yilmaz', 12, 'SEPA'], ['Sabine Weber', 'p-weber', 12, 'SEPA'], ['Ayşe Demir', 'p-demir', 10, 'Überweisung'],
+  ['Thomas Wagner', null, 12, 'SEPA'], ['Karin Fischer', null, 8, 'bar'], ['Lukas Schneider', null, 12, 'SEPA'],
+  ['Maria Rossi', null, 10, 'SEPA'], ['Peter Krause', null, 12, 'Überweisung'], ['Fatima Al-Hassan', null, 11, 'SEPA (ermäßigt)'],
+  ['Jan Kowalski', null, 12, 'SEPA'], ['Elif Kaya', null, 6, 'SEPA']
+];
+const IK_TN = [
+  { n: 'Olena Kovalenko', id: 'p-kovalenko', ber: 'Berechtigung (Ausländerbehörde)', befr: 'beantragt', ue: 41, soll: 44, fk: 'ja', miss: 'Nachweis Kostenbefreiung fehlt' },
+  { n: 'Nadia Haddad', id: 'p-haddad', ber: 'Verpflichtung (Jobcenter)', befr: 'ja', ue: 44, soll: 44, fk: 'ja' },
+  { n: 'Samir Nouri', ber: 'Verpflichtung (Jobcenter)', befr: 'ja', ue: 36, soll: 44, fk: 'ja' },
+  { n: 'Daria Melnyk', ber: 'Berechtigung (Ausländerbehörde)', befr: 'ja', ue: 44, soll: 44, fk: 'nein' },
+  { n: 'Ahmad Rahimi', ber: 'Verpflichtung (Ausländerbehörde)', befr: 'ja', ue: 28, soll: 44, fk: 'ja', miss: 'Fehlzeiten über 30 %' },
+  { n: 'Grace Okafor', ber: 'Zulassung auf Antrag', befr: 'nein (Kostenbeitrag)', ue: 40, soll: 44, fk: 'nein' }
+];
+const WEEKS = [['KW 35', 62], ['KW 36', 148], ['KW 37', 211], ['KW 38', 176], ['KW 39', 120], ['KW 40', 95], ['KW 41', 88], ['KW 42', 74], ['KW 43', 69], ['KW 44', 58], ['KW 45', 81], ['KW 46', 64]];
+const FB_LOAD = [['Integration', 96], ['Beruf', 91], ['Gesundheit', 88], ['Sprachen', 84], ['Kultur', 72], ['Gesellschaft', 55]];
+
+const state = {
+  pf: { q: '', rolle: 'alle', status: 'alle' }, pScroll: 0,
+  role: 'ts', course: null, tab: 'ueberblick', person: 'p-becker', personEdit: false, cert: false, naive: false,
+  wiz: { step: 1, person: null, course: null, pay: 'sepa', q: 'Yılmaz', done: false },
+  att: { termin: '17.11.2026', scanned: [] },
+  cancelled: {}, decided: {}, conflictSolved: false, mahnFrei: false, sepaDone: false, fibuDone: false, ikDone: false,
+  outSel: 0,
+  ort: 'R 2.20', ortFilter: 'alle', bamfRenewed: false, vas: {}, gen: null, single: null, showPast: false,
+  k: { p: 'p-weber', n: 10, besucht: 4, verfallen: 1, res: ['2026-11-23|Bewegungsraum'], bis: '2027-03-06' },
+  log: [
+    { t: '14.11.2026 06:00', who: 'Automatik', what: 'Erinnerung vor Kursbeginn: 46 Mails versendet (je Mail mit Übersetzungslink)', ok: true },
+    { t: '14.11.2026 06:05', who: 'Automatik', what: 'Mindestteilnehmerprüfung: 2 Kurse unter Mindestzahl gemeldet (26H-302, 26H-120)', ok: false },
+    { t: '14.11.2026 06:10', who: 'Automatik', what: 'Warteliste 26H-410: Nachrückangebot an Sabine Weber, Frist 16.11.2026', ok: true },
+    { t: '14.11.2026 06:15', who: 'Automatik', what: 'Mahnvorschlag: 4 Mahnungen vorbereitet, warten auf Freigabe', ok: false },
+    { t: '14.11.2026 02:00', who: 'Automatik', what: 'Löschfristen: 12 Personen ohne Belegung seit 3 Jahren anonymisiert', ok: true }
+  ],
+  outbox: [
+    { typ: 'E-Mail', an: 'Ayşe Demir', betreff: 'Erinnerung: Ihr Kurs „Englisch A2 – Konversation“ geht am 17.11. weiter', zeit: '14.11.2026 06:00', body: 'An: ayse.demir@example.org\nBetreff: Erinnerung: Ihr Kurs „Englisch A2 – Konversation“ geht am 17.11. weiter\n\nGuten Tag Frau Demir,\n\nIhr Kurs findet am Dienstag, 17.11.2026, 18:00–19:30 Uhr in Raum R 2.14 statt.\nBitte checken Sie im Raum mit dem QR-Code ein.\n\n➜ Bu mesajı Türkçe okuyun / Diese Nachricht in Ihrer Sprache lesen:\n  https://vhs-musterstadt.example/t/Qx7vK2pL9mWd\n\nIhre VHS Musterstadt' },
+    { typ: 'Finanzsoftware (CSV)', an: 'Kämmerei', betreff: 'Buchungsübergabe 13.11.2026, 38 Buchungen', zeit: '13.11.2026 18:00', body: 'Belegdatum;Personenkonto;Sachkonto;Kostenstelle;Betrag;Text\n13.11.2026;40011284;431100;VHS-SPR;98,00;26H-301 Entgelt Yilmaz\n13.11.2026;40011302;431100;VHS-GES;84,00;26H-520 Entgelt Weber\n13.11.2026;40011377;431100;VHS-BER;129,00;26H-410 Entgelt Fischer\n…' },
+    { typ: 'BAMF (Mock)', an: 'InGe-Online', betreff: 'Kursbeginnmeldung 26H-701 Modul 3, bestätigt', zeit: '02.11.2026 08:12', body: 'Meldung: Kursbeginn Modul 3\nKurs: 26H-701 (Integrationskurs allgemein)\nBeginn: 02.11.2026 · 19 Teilnehmende\nAntwort (simuliert): angenommen, Vorgang 2026-ABC-0815' }
+  ]
+};
+const course = id => COURSES.find(c => c.id === id);
+const can = { cancel: () => state.role === 'fbl', policy: () => state.role === 'fbl', money: () => state.role === 'bh', ik: () => state.role === 'ik' || state.role === 'fbl' };
+const roleWhy = need => 'Nur für die Rolle „' + need + '“. Ihre Rolle: ' + ROLES[state.role] + '. Zum Ausprobieren oben die Rolle wechseln.';
+
+/* ---------- Bausteine ---------- */
+function btn(label, action, opt) {
+  opt = opt || {};
+  const cls = 'btn' + (opt.pri ? ' pri' : '') + (opt.sm ? ' sm' : '') + (opt.dang ? ' dang' : '');
+  const data = action ? ' data-a="' + esc(action) + '"' + (opt.arg ? ' data-arg="' + esc(opt.arg) + '"' : '') : '';
+  if (opt.why) return '<span class="why" tabindex="0" data-why="' + esc(opt.why) + '"><button class="' + cls + '" disabled>' + label + '</button></span>';
+  return '<button class="' + cls + '"' + data + '>' + label + '</button>';
+}
+function locked(label, value, why) {
+  return '<div class="field"><span class="lbl">' + label + '</span><span class="why lock" tabindex="0" data-why="' + esc(why) + '"><span class="val ro" style="width:100%">' + value + '<span class="lockicon" style="margin-left:auto">' + ICON.lock + '</span></span></span></div>';
+}
+function plain(label, value, hist) {
+  return '<div class="field"><span class="lbl">' + label + '</span><span class="val">' + value + (hist ? '<button class="histbtn" data-a="hist" data-arg="' + esc(hist) + '" title="Historie anzeigen: Wert ist zeitlich versioniert">' + ICON.clock + '</button>' : '') + '</span></div>';
+}
+function statusPill(c) {
+  if (state.cancelled[c.id] || c.status === 'abgesagt') return '<span class="pill p-mute">abgesagt</span>';
+  if (c.status === 'Entwurf') return '<span class="pill p-mute">Entwurf</span>';
+  if (c.status !== 'läuft' && c.belegt < c.min && !state.decided[c.id]) return '<span class="pill p-crit">unter Mindestzahl</span>';
+  if (c.belegt >= c.max) return '<span class="pill p-warn">ausgebucht' + (c.warte ? ', Warteliste ' + c.warte : '') + '</span>';
+  if (c.status === 'läuft') return '<span class="pill p-good">läuft</span>';
+  return '<span class="pill p-info">Anmeldung offen</span>';
+}
+function loadBar(c) {
+  const p = Math.min(100, Math.round(c.belegt / c.max * 100));
+  const cls = c.belegt >= c.max ? 'full' : (c.belegt < c.min ? 'low' : '');
+  return '<div class="row" style="gap:8px;flex-wrap:nowrap"><div class="bar" style="flex:1"><i class="' + cls + '" style="width:' + p + '%"></i></div><span class="small mono">' + c.belegt + '/' + c.max + '</span></div>';
+}
+function nextSteps(title, items) {
+  return '<div class="next"><h3>' + title + '</h3><div class="row">' + items.join('') + '</div></div>';
+}
+function addLog(what, who) { state.log.unshift({ t: '14.11.2026 ' + new Date().toTimeString().slice(0, 5), who: who || 'J. Krüger (' + ROLES[state.role] + ')', what: what, ok: true }); }
+function addOut(o) { state.outbox.unshift(Object.assign({ zeit: '14.11.2026 ' + new Date().toTimeString().slice(0, 5) }, o)); }
+let toastTimer;
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 4200); }
+
+/* ---------- Ansichten ---------- */
+const VIEWS = {
+  start: { label: 'Start', grp: 'Übersicht' },
+  kurse: { label: 'Kurse', grp: 'Programm' },
+  raumplan: { label: 'Raumplan', grp: 'Programm' },
+  orte: { label: 'Orte', grp: 'Programm' },
+  anmeldung: { label: 'Anmeldung', grp: 'Teilnahme' },
+  personen: { label: 'Personen', grp: 'Teilnahme' },
+  anwesenheit: { label: 'Anwesenheit', grp: 'Teilnahme' },
+  integration: { label: 'Integrationskurse', grp: 'Teilnahme' },
+  finanzen: { label: 'Finanzen', grp: 'Verwaltung' },
+  postausgang: { label: 'Postausgang', grp: 'Verwaltung' }
+};
+function current() { const h = (location.hash || '').slice(1); return VIEWS[h] ? h : 'start'; }
+function go(v) { if (location.hash.slice(1) === v) render(); else location.hash = v; window.scrollTo(0, 0); }
+
+function renderNav() {
+  const cur = current(); let g = ''; let html = '';
+  const badges = { start: openTasks().length, postausgang: state.outbox.length };
+  Object.keys(VIEWS).forEach(k => {
+    if (VIEWS[k].grp !== g) { g = VIEWS[k].grp; html += '<div class="grp">' + g + '</div>'; }
+    html += '<a href="#' + k + '" class="' + (k === cur ? 'on' : '') + '">' + VIEWS[k].label + (badges[k] ? '<span class="cnt">' + badges[k] + '</span>' : '') + '</a>';
+  });
+  document.getElementById('nav').innerHTML = html;
+}
+
+/* Aufgaben: Regeln erzeugen sie, Rolle + Fachbereich bestimmen den Gruppenkorb */
+const GROUP = { ts: 'Teilnehmerservice', fbl: 'Fachbereichsleitung Sprachen', bh: 'Buchhaltung', ik: 'Integrationskurs-Team' };
+const TASKS = [
+  { id: 't1', rolle: 'fbl', fb: 'Sprachen', sev: 'crit', due: 'Mo 16.11.', txt: 'Spanisch A1 (26H-302): 6 von mindestens 8 Anmeldungen, Beginn Mi 18.11.', act: ['Entscheiden', 'openCourse', 'c302'], open: () => !state.decided.c302 && !state.cancelled.c302, done: 'entschieden' },
+  { id: 't2', rolle: 'fbl', fb: 'Gesellschaft', sev: 'crit', due: 'Mo 16.11.', txt: 'Rhetorik für Ehrenamtliche (26H-120): 5 von mindestens 6, Beginn Di 17.11.', act: ['Entscheiden', 'openCourse', 'c120'], open: () => !state.decided.c120 && !state.cancelled.c120 },
+  { id: 't3', rolle: 'ts', sev: 'crit', due: 'Mo 16.11.', txt: 'Raumkonflikt Di 17.11. in R 2.14: Englisch A2 und Rhetorik überschneiden sich', act: ['Konflikt lösen', 'goto', 'raumplan'], open: () => !state.conflictSolved, done: 'Raum verlegt' },
+  { id: 't4', rolle: 'bh', sev: 'warn', due: 'Di 17.11.', txt: '4 Mahnvorschläge warten auf Freigabe (insgesamt 389,00 €)', act: ['Prüfen', 'goto', 'finanzen'], open: () => !state.mahnFrei, done: 'freigegeben' },
+  { id: 't5', rolle: 'ik', who: 'me', sev: 'warn', due: 'Fr 20.11.', txt: 'Integrationskurs 26H-701: Nachweis Kostenbefreiung fehlt für Olena Kovalenko', act: ['Ansehen', 'goto', 'integration'] },
+  { id: 't6', rolle: 'ts', who: 'me', sev: 'info', due: 'Mo 16.11.', txt: 'Excel für Einsteiger: Nachrückangebot an Sabine Weber läuft ab, dann nächste Person anbieten', act: ['Kurs öffnen', 'openCourse', 'c410'] },
+  { id: 't7', rolle: 'ts', who: 'M. Öztürk', sev: 'warn', due: 'heute', txt: '3 Online-Anmeldungen mit möglicher Dublette prüfen', act: ['Ansehen', 'goto', 'anmeldung'] },
+  { id: 't8', rolle: 'fbl', fb: 'Kultur', sev: 'warn', due: 'Fr 20.11.', txt: 'Honorarvertrag Fotografie (27F-612) unterschreiben lassen', act: ['Kurs öffnen', 'openCourse', 'c612'] },
+  { id: 't9', rolle: 'bh', who: 'me', sev: 'crit', due: 'Do 12.11.', overdue: true, txt: '2 SEPA-Rücklastschriften klären (196,00 €)', act: ['Ansehen', 'goto', 'finanzen'] },
+  { id: 't14', rolle: 'ik', who: 'me', sev: 'crit', due: 'seit 30.09.', overdue: true, txt: 'Kursort B 1.10: BAMF-Meldung abgelaufen. Erneuern oder Raum nicht mehr für Integrationskurse nutzen', act: ['Ort öffnen', 'ortOpen', 'B 1.10'], open: () => !state.bamfRenewed, done: 'Meldung erneuert' },
+  { id: 't10', rolle: 'ik', sev: 'warn', due: 'Mi 18.11.', txt: 'Fehlzeiten über 30 %: Ahmad Rahimi (26H-701), Gespräch anbieten', act: ['Ansehen', 'goto', 'integration'] },
+  { id: 't11', rolle: 'ts', sev: 'info', due: 'Mo 30.11.', txt: 'Bescheinigungen Aquarellmalerei vorbereiten (Kursende 30.11.)', act: ['Kurs öffnen', 'openCourse', 'c610'] },
+  { id: 't12', rolle: 'fbl', fb: 'Sprachen', who: 'me', sev: 'info', due: 'Fr 20.11.', txt: 'Entgelte Sprachen Frühjahr 2027 freigeben (14 Kurse)', act: ['Kurse öffnen', 'goto', 'kurse'] },
+  { id: 't13', rolle: 'fbl', fb: 'Sprachen', who: 'S. Lorenz (Leitung)', sev: 'info', due: 'Mi 25.11.', txt: 'Neue Englisch-Dozentin: Probestunde auswerten', act: ['Personen', 'goto', 'personen'] }
+];
+const AUTO_DONE = [
+  { rolle: 'fbl', fb: 'Sprachen', t: '09:12', txt: 'Italienisch A1 (26H-308): Mindestzahl erreicht, Aufgabe automatisch geschlossen' },
+  { rolle: 'ts', t: '07:40', txt: 'Nachrückangebot Yoga am Abend angenommen, Aufgabe automatisch geschlossen' },
+  { rolle: 'bh', t: '06:30', txt: 'Zahlungseingang Ayşe Demir (camt) zugeordnet, Mahnvorschlag entfällt' },
+  { rolle: 'ik', t: '08:05', txt: 'Teilnahmeberechtigung Daria Melnyk eingegangen, Aufgabe automatisch geschlossen' }
+];
+const visibleTask = t => t.rolle === state.role && (state.role !== 'fbl' || !t.fb || t.fb === 'Sprachen');
+function openTasks() { return TASKS.filter(t => visibleTask(t) && (!t.open || t.open())); }
+function taskRow(t, mode) {
+  const pill = t.overdue ? '<span class="pill p-crit">überfällig, an Leitung gemeldet</span>' : '<span class="pill ' + (t.sev === 'crit' ? 'p-crit' : t.sev === 'warn' ? 'p-warn' : 'p-info') + '">fällig ' + t.due + '</span>';
+  let acts = '';
+  if (mode === 'mine') acts = btn(t.act[0], t.act[1], { sm: true, pri: true, arg: t.act[2] });
+  else if (mode === 'group') acts = btn('Übernehmen', 'claim', { sm: true, pri: true, arg: t.id }) + btn('Zuweisen', 'assign', { sm: true, arg: t.id });
+  else acts = '<span class="small muted">bei ' + esc(t.who) + '</span>';
+  return '<div>' + pill + '<span class="grow">' + t.txt + '</span><span class="row" style="gap:6px">' + acts + '</span></div>';
+}
+
+function viewStart() {
+  const max = Math.max.apply(null, WEEKS.map(w => w[1]));
+  const W = 560, H = 190, l = 34, b = 24, bw = (W - l - 8) / WEEKS.length;
+  let bars = '';
+  [0, 50, 100, 150, 200].forEach(v => { const y = H - b - (v / 220) * (H - b - 14); bars += '<line x1="' + l + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="var(--line)"/><text x="' + (l - 6) + '" y="' + (y + 4) + '" text-anchor="end">' + v + '</text>'; });
+  WEEKS.forEach((w, i) => {
+    const h = (w[1] / 220) * (H - b - 14), x = l + i * bw + 5, y = H - b - h, last = i === WEEKS.length - 1;
+    bars += '<rect x="' + x + '" y="' + y + '" width="' + (bw - 10) + '" height="' + h + '" rx="3" fill="var(--accent)" opacity="' + (w[1] === max ? 1 : 0.55) + '"><title>' + w[0] + ': ' + w[1] + ' Anmeldungen</title></rect>';
+    bars += '<text x="' + (x + (bw - 10) / 2) + '" y="' + (H - 8) + '" text-anchor="middle">' + w[0].slice(3) + '</text>';
+    if (w[1] === max || last) bars += '<text class="lab" x="' + (x + (bw - 10) / 2) + '" y="' + (y - 5) + '" text-anchor="middle">' + w[1] + '</text>';
+  });
+  let fb = '';
+  FB_LOAD.forEach((f, i) => {
+    const y = 8 + i * 30, w = f[1] / 100 * 300;
+    fb += '<text x="0" y="' + (y + 14) + '" class="lab" style="font-weight:500">' + f[0] + '</text><rect x="100" y="' + (y + 3) + '" width="300" height="14" rx="3" fill="var(--surface-2)"/><rect x="100" y="' + (y + 3) + '" width="' + w + '" height="14" rx="3" fill="' + (f[1] < 60 ? 'var(--warn)' : 'var(--accent)') + '"/><text x="408" y="' + (y + 14) + '">' + f[1] + ' %</text>';
+  });
+  const ot = openTasks();
+  const mine = ot.filter(t => t.who === 'me'), group = ot.filter(t => !t.who), others = ot.filter(t => t.who && t.who !== 'me');
+  const closed = TASKS.filter(t => visibleTask(t) && t.open && !t.open()).map(t => ({ t: 'eben', txt: t.txt.split(':')[0] + ': ' + (t.done || 'erledigt') })).concat(AUTO_DONE.filter(a => a.rolle === state.role));
+  const sec = (title, list, mode, empty) => '<h3 style="margin-top:6px">' + title + ' <span class="muted small">(' + list.length + ')</span></h3><div class="list">' + (list.length ? list.map(t => taskRow(t, mode)).join('') : '<div class="small muted">' + empty + '</div>') + '</div>';
+  const tasks = sec('Meine Aufgaben', mine, 'mine', 'Nichts in Ihrer Liste. Übernehmen Sie eine Aufgabe aus dem Gruppenkorb.') + sec('Offen in der Gruppe ' + GROUP[state.role], group, 'group', 'Der Gruppenkorb ist leer.') + (others.length ? sec('Bei Kolleginnen und Kollegen', others, 'others', '') : '') +
+    '<details><summary class="small" style="cursor:pointer">Heute erledigt (' + closed.length + ')</summary><div class="list">' + closed.map(c => '<div><span class="mono small muted">' + c.t + '</span><span class="grow small">' + esc(c.txt) + '</span><span class="pill p-good">erledigt</span></div>').join('') + '</div></details>';
+  const log = state.log.slice(0, 6).map(e => '<div><span class="mono small muted" style="width:118px">' + e.t + '</span><span class="grow">' + esc(e.what) + '<br><span class="small muted">' + esc(e.who) + '</span></span>' + (e.ok ? '<span class="pill p-good">erledigt</span>' : '<span class="pill p-warn">Freigabe nötig</span>') + '</div>').join('');
+  return '<div class="head"><div><h1>Guten Tag, Frau Krüger</h1><p class="sub">Samstag, 14. November 2026 · Herbstsemester 2026</p></div><div class="row">' + btn('Neue Anmeldung', 'goto', { pri: true, arg: 'anmeldung' }) + btn('Kurs anlegen', null, { why: 'Kurse legt die Programmplanung an. Ihre Rolle: ' + ROLES[state.role] + '. Im Prototyp nicht umgesetzt.' }) + '</div></div>' +
+    '<div class="kpis"><div class="kpi"><div class="lbl">Belegungen Herbst 2026</div><div class="val">1.284</div><div class="note">+64 in KW 46</div></div><div class="kpi"><div class="lbl">Auslastung</div><div class="val">78 %</div><div class="note">212 laufende Kurse</div></div><div class="kpi"><div class="lbl">Unter Mindestzahl</div><div class="val">' + ['c302', 'c120'].filter(i => !state.decided[i] && !state.cancelled[i]).length + '</div><div class="note">Beginn in den nächsten 7 Tagen</div></div><div class="kpi"><div class="lbl">Offene Posten</div><div class="val">4.120 €</div><div class="note">davon 389 € mahnreif</div></div></div>' +
+    '<div class="grid-2"><section class="card"><div class="head"><h2>Aufgaben</h2><span class="small muted">Sie sehen den Korb „' + GROUP[state.role] + '“. Rolle oben wechseln, um andere Körbe zu sehen.</span></div>' + tasks + '</section>' +
+    '<section class="card"><h2>Anmeldungen je Woche</h2><p class="sub small" style="margin-top:-8px">Herbstsemester 2026, Spitze nach Erscheinen des Programmhefts in KW 37</p><div class="chart"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Anmeldungen je Kalenderwoche">' + bars + '</svg></div></section></div>' +
+    '<div class="grid-2"><section class="card"><div class="head"><h2>Automatische Abläufe</h2><span class="small muted">jeder Lauf ist protokolliert</span></div><div class="list">' + log + '</div></section>' +
+    '<section class="card"><h2>Auslastung nach Fachbereich</h2><div class="chart"><svg viewBox="0 0 450 ' + (FB_LOAD.length * 30 + 10) + '" role="img" aria-label="Auslastung nach Fachbereich in Prozent">' + fb + '</svg></div><p class="small muted">Gesellschaft liegt unter 60 %: viele Einzelvorträge mit großer Raumkapazität.</p></section></div>';
+}
+
+function viewKurse() {
+  if (state.course) return viewKurs(course(state.course));
+  const rows = COURSES.map(c => '<tr class="click" data-a="openCourse" data-arg="' + c.id + '"><td class="mono">' + c.nr + '</td><td><b>' + esc(c.titel) + '</b><br><span class="small muted">' + esc(PEOPLE[c.doz].name) + ' · ' + c.tag + ' ' + c.zeit + '</span></td><td>' + c.fb + '</td><td>' + c.beginn + '</td><td style="min-width:130px">' + loadBar(c) + '</td><td>' + statusPill(c) + '</td><td><span class="pill ' + (c.sicht === 'öffentlich' ? 'p-mute' : 'p-info') + '">' + c.sicht + '</span></td></tr>').join('');
+  return '<div class="head"><div><h1>Kurse</h1><p class="sub">Herbstsemester 2026 und Planung Frühjahr 2027 · ' + COURSES.length + ' Beispielkurse</p></div><div class="row">' + btn('Semester kopieren', null, { why: 'Kopiert ein ganzes Semester mit Datumsverschiebung und Feiertagsprüfung (NRW). Nur Fachbereichsleitung; im Prototyp nicht umgesetzt.' }) + btn('Kurs anlegen', null, { why: 'Kurse legt die Programmplanung an. Im Prototyp nicht umgesetzt.' }) + '</div></div>' +
+    '<section class="card"><div class="tbl-wrap"><table><thead><tr><th>Nr.</th><th>Kurs</th><th>Fachbereich</th><th>Beginn</th><th>Belegung</th><th>Status</th><th>Sichtbarkeit</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
+}
+
+function viewKurs(c) {
+  const tabs = [['ueberblick', 'Überblick'], ['termine', 'Veranstaltungen'], ['teilnehmende', c.kontingent ? 'Kontingente' : 'Teilnehmende'], ['richtlinie', 'Buchungsrichtlinie'], ['protokoll', 'Protokoll']];
+  const isCancelled = state.cancelled[c.id] || c.status === 'abgesagt';
+  let alert = '';
+  if (!isCancelled && c.status !== 'läuft' && c.belegt < c.min && !state.decided[c.id]) {
+    alert = '<div class="alert crit"><div class="txt"><b>Mindestteilnehmerzahl nicht erreicht.</b> ' + c.belegt + ' von mindestens ' + c.min + ' Anmeldungen, Beginn ' + c.beginn + '. Erkannt von der automatischen Prüfung heute um 06:05.</div><div class="row">' +
+      btn('Trotzdem durchführen', 'decide', { arg: c.id }) +
+      (can.cancel() ? btn('Absagen und alle informieren', 'cancel', { dang: true, arg: c.id }) : btn('Absagen und alle informieren', null, { why: roleWhy('Fachbereichsleitung') })) + '</div></div>';
+  }
+  if (state.cancelled[c.id]) {
+    alert = nextSteps('Kurs abgesagt. Wie geht es weiter?', [btn('Erstattungen prüfen (' + c.belegt + ')', 'goto', { arg: 'finanzen' }), btn('Alternativkurse vorschlagen', 'toast', { arg: 'Den ' + c.belegt + ' Teilnehmenden wurden 2 ähnliche Kurse vorgeschlagen (Mock).' }), btn('Benachrichtigungen ansehen', 'goto', { arg: 'postausgang' })]);
+  }
+  let body = '';
+  if (state.tab === 'ueberblick') {
+    const started = c.status === 'läuft';
+    body = '<div class="fields">' + plain('Kursnummer', c.nr) + plain('Titel', esc(c.titel), 'Kurstitel') + plain('Fachbereich', c.fb) + plain('Kursleitung', esc(PEOPLE[c.doz].name), c.doz === 'p-becker' ? 'p-becker' : null) +
+      plain('Ort(e)', (c.orte || [c.raum]).map(o => esc(ortName(o))).join(' + ') + ((c.orte || []).length > 1 ? ' <span class="pill p-info">hybrid</span>' : ''), 'Ort') + plain('Zeit', c.tag + ', ' + c.zeit) + plain('Zeitraum', c.umfang === 'unbefristet' ? 'ab ' + c.beginn + ', unbefristet regelmäßig' : c.beginn + ' – ' + c.ende + ' (' + vasOf(c).length + ' Veranstaltungen)') + plain('Belegungsart', c.kontingent ? c.kontingent.n + 'er-Kontingent, ' + c.kontingent.monate + ' Monate gültig, Vorab-Einbuchung erforderlich' : 'alle Veranstaltungen') + plain('Unterrichtseinheiten', c.ue + ' UE à 45 Min.') +
+      (c.belegt > 0 ? locked('Entgelt', c.entgelt ? eur(c.entgelt) : 'entgeltfrei', 'Gesperrt, weil schon ' + c.belegt + ' Belegungen bestehen. Bestehende Buchungen behalten ihren Preis. Ein neues Entgelt legen Sie mit „gültig ab Datum“ an; es gilt dann nur für neue Buchungen.') : plain('Entgelt', eur(c.entgelt), 'Entgelt')) +
+      locked('Mindest- / Höchstzahl', c.min + ' / ' + c.max, started ? 'Der Kurs läuft bereits. Teilnehmerzahlen ändert nur die Fachbereichsleitung.' : 'Änderbar durch die Fachbereichsleitung.') + plain('Sichtbarkeit', c.sicht + (c.ziel ? ' (Zielgruppe: ' + esc(c.ziel) + ')' : '')) + plain('Status', statusPill(c)) + '</div>' +
+      '<div class="row">' + btn('Teilnehmerliste drucken', 'toast', { arg: 'Teilnehmerliste als PDF erzeugt und im Dokumentarchiv abgelegt (Mock).' }) +
+      (started ? btn('Bescheinigungen erzeugen', null, { why: 'Der Kurs läuft noch bis ' + c.ende + '. Bescheinigungen gibt es ab dem letzten Termin, damit die Anwesenheit vollständig ist.' }) : btn('Bescheinigungen erzeugen', null, { why: 'Der Kurs hat noch nicht begonnen.' })) +
+      btn('Nachricht an alle Teilnehmenden', 'toast', { arg: 'Mail-Entwurf an ' + c.belegt + ' Teilnehmende geöffnet; jede Mail enthält einen Übersetzungslink (Mock).' }) +
+      (isCancelled ? btn('Kurs absagen', null, { why: 'Der Kurs ist bereits abgesagt.' }) : can.cancel() ? btn('Kurs absagen', 'cancel', { dang: true, arg: c.id }) : btn('Kurs absagen', null, { why: roleWhy('Fachbereichsleitung') })) + '</div>';
+  } else if (state.tab === 'termine') {
+    body = viewVeranstaltungen(c);
+  } else if (state.tab === 'teilnehmende' && c.kontingent) {
+    body = kontingentTab(c);
+  } else if (state.tab === 'teilnehmende') {
+    const list = c.id === 'c301' ? ENGLISCH_TN : ENGLISCH_TN.slice(0, Math.min(c.belegt, 11));
+    body = '<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Anwesenheit</th><th>Zahlung</th><th>Gebucht von</th><th></th></tr></thead><tbody>' + list.map((p, i) => '<tr><td>' + (p[1] ? '<a href="#personen" data-a="openPerson" data-arg="' + p[1] + '">' + esc(p[0]) + '</a>' : esc(p[0])) + '</td><td class="mono">' + p[2] + ' / 12 UE</td><td>' + p[3] + '</td><td class="small">' + (i === 2 ? 'Ehemann (Vollmacht bis 31.12.2027)' : i % 4 === 0 ? 'Teilnehmerservice, Tresen' : 'Online, selbst') + '</td><td>' + btn('Umbuchen', 'toast', { sm: true, arg: 'Umbuchung: Das System schlägt passende Kurse mit freien Plätzen vor (Mock).' }) + '</td></tr>').join('') + '</tbody></table></div>' +
+      (c.warte ? '<p><span class="pill p-warn">Warteliste: ' + c.warte + '</span> Nachrückangebot an Sabine Weber läuft bis 16.11.2026.</p>' : '');
+  } else if (state.tab === 'richtlinie') {
+    const dis = can.policy() ? '' : ' disabled';
+    const wrap = h => can.policy() ? h : '<span class="why" tabindex="0" data-why="' + esc(roleWhy('Fachbereichsleitung')) + '">' + h + '</span>';
+    const rows = [['Verwaltung', 1, 1, 'immer, nach Fachbereichsrecht'], ['Registrierte Teilnehmende', c.sicht === 'öffentlich' ? 1 : 0, c.sicht === 'öffentlich' ? 1 : 0, 'andere nur mit gültiger Vollmacht'], ['Firmenbevollmächtigte', 0, c.sicht !== 'intern' ? 1 : 0, 'nur eigene Mitarbeitende'], ['Dozierende', 0, 0, '']];
+    body = '<p>Sichtbarkeit: <span class="pill ' + (c.sicht === 'öffentlich' ? 'p-mute' : 'p-info') + '">' + c.sicht + '</span> · Vorlage: <b>' + (c.sicht === 'intern' ? 'Integrationskurs' : c.sicht === 'geschlossen' ? 'Firmenkurs' : 'Offener Kurs') + '</b></p>' +
+      '<div class="tbl-wrap"><table><thead><tr><th>Rolle</th><th>Darf sich selbst buchen</th><th>Darf andere buchen</th><th>Einschränkung</th></tr></thead><tbody>' + rows.map(r => '<tr><td>' + r[0] + '</td><td>' + wrap('<input type="checkbox" class="check"' + (r[1] ? ' checked' : '') + dis + ' aria-label="' + r[0] + ' selbst">') + '</td><td>' + wrap('<input type="checkbox" class="check"' + (r[2] ? ' checked' : '') + dis + ' aria-label="' + r[0] + ' andere">') + '</td><td class="small muted">' + r[3] + '</td></tr>').join('') + '</tbody></table></div>' +
+      '<p class="small muted">Feste Regel unabhängig von der Richtlinie: Selbst registrierte Teilnehmende buchen nur öffentliche Kurse. In Stufe 1 bucht nur die Verwaltung; die Portale nutzen später dieselbe Prüfung.</p>';
+  } else {
+    const ent = [['14.11.2026 06:05', 'Automatik', 'Mindestteilnehmerprüfung durchgeführt'], ['13.11.2026 18:00', 'Automatik', 'Entgelte an Finanzsoftware übergeben'], ['10.11.2026 19:41', 'A. Becker (QR)', 'Anwesenheit Termin 6 abgeschlossen, 10 von 11 eingecheckt'], ['02.10.2026 10:14', 'J. Krüger', 'Raum geändert: R 2.15 → R 2.14 (gültig ab 06.10.2026)'], ['15.07.2026 09:02', 'S. Lorenz', 'Kurs veröffentlicht']];
+    body = '<div class="list">' + state.log.filter(e => e.what.indexOf(c.nr) >= 0).map(e => [e.t, e.who, e.what]).concat(ent).map(e => '<div><span class="mono small muted" style="width:118px">' + e[0] + '</span><span class="grow">' + esc(e[2]) + '</span><span class="small muted">' + esc(e[1]) + '</span></div>').join('') + '</div>';
+  }
+  const steps = state.tab === 'ueberblick' && !isCancelled ? nextSteps('Nächste sinnvolle Schritte', [btn('Veranstaltungen planen', 'tab', { arg: 'termine' }), btn('Teilnehmende ansehen', 'tab', { arg: 'teilnehmende' }), btn('Nächsten Termin: QR-Check-in', 'goto', { arg: 'anwesenheit' }), btn('Person anmelden', 'enroll', { arg: c.id })]) : '';
+  return '<div><button class="btn sm" data-a="back">← Alle Kurse</button></div><div class="head"><div><p class="sub mono">' + c.nr + ' · ' + c.fb + '</p><h1>' + esc(c.titel) + '</h1><p class="sub">' + c.tag + ', ' + c.zeit + ' · ' + c.raum + ' · ' + esc(PEOPLE[c.doz].name) + '</p></div><div style="min-width:180px">' + loadBar(c) + '<div style="margin-top:6px">' + statusPill(c) + '</div></div></div>' + alert +
+    '<section class="card"><div class="tabs" role="tablist">' + tabs.map(t => '<button role="tab" data-a="tab" data-arg="' + t[0] + '" class="' + (state.tab === t[0] ? 'on' : '') + '">' + t[1] + '</button>').join('') + '</div>' + body + '</section>' + steps;
+}
+
+function bookingCheck(c, p) {
+  if (state.cancelled[c.id] || c.status === 'abgesagt') return { ok: false, why: 'Der Kurs ist abgesagt.' };
+  if (c.status === 'Entwurf') return { ok: false, why: 'Der Kurs ist noch ein Entwurf und nicht freigegeben.' };
+  if (c.sicht === 'geschlossen' && p.rollen.indexOf('Stadtwerke Musterstadt') < 0) return { ok: false, why: 'Geschlossener Kurs für ' + c.ziel + '. ' + p.name + ' gehört nicht zur Zielgruppe.' };
+  if (c.sicht === 'intern' && p.rollen.indexOf('Integrationskurs') < 0) return { ok: false, why: 'Integrationskurs: Buchung nur mit erfasster Teilnahmeberechtigung (BAMF). Für ' + p.name + ' liegt keine vor.' };
+  if (c.id === 'c301' && p.name === 'Mehmet Yılmaz') return { ok: false, why: p.name + ' ist in diesem Kurs bereits angemeldet.' };
+  if (c.belegt >= c.max) return { ok: true, warte: true, why: 'Ausgebucht: Anmeldung auf die Warteliste (Platz ' + (c.warte + 1) + ').' };
+  return { ok: true };
+}
+
+function viewAnmeldung() {
+  const w = state.wiz, p = w.person ? PEOPLE[w.person] : null, c = w.course ? course(w.course) : null;
+  const steps = '<div class="steps">' + ['Person', 'Kurs', 'Zahlung'].map((s, i) => '<span class="' + (w.step === i + 1 && !w.done ? 'on' : (w.step > i + 1 || w.done ? 'done' : '')) + '">' + (i + 1) + ' · ' + s + '</span>').join('') + '</div>';
+  let body = '';
+  if (w.done) {
+    const chk = bookingCheck(c, p);
+    body = '<section class="card"><h2>' + (chk.warte ? 'Auf die Warteliste gesetzt' : 'Anmeldung gespeichert') + '</h2><p>' + esc(p.name) + ' ist ' + (chk.warte ? 'auf der Warteliste für' : 'angemeldet für') + ' <b>' + esc(c.titel) + '</b> (' + c.nr + '), Beginn ' + c.beginn + '. Zahlart: ' + ({ sepa: 'SEPA-Lastschrift', ueb: 'Überweisung', bar: 'Barzahlung' })[w.pay] + '.</p><p class="small muted">Protokolliert: gebucht von J. Krüger (Teilnehmerservice) für ' + esc(p.name) + ', Kanal Tresen.</p></section>' +
+      nextSteps('Wie geht es weiter?', [(c.kontingent ? btn('In Veranstaltungen einbuchen', 'kPerson', { pri: true, arg: w.person }) : ''), btn('Bestätigung mailen (mit Übersetzungslink, ' + p.sprache + ')', 'sendConfirm', { pri: true }), btn('Termine als Kalenderdatei', 'toast', { arg: 'Kalenderdatei (ICS) mit allen Terminen erzeugt (Mock).' }), btn('QR-Teilnehmerausweis drucken', 'toast', { arg: 'Persönlicher QR-Ausweis als PDF erzeugt (Mock).' }), btn('Weitere Anmeldung für ' + esc(p.name.split(' ')[0]), 'wizAgain'), btn('Zur Person', 'openPerson', { arg: w.person })]);
+  } else if (w.step === 1) {
+    const q = w.q.toLowerCase();
+    const hits = Object.keys(PEOPLE).filter(k => PEOPLE[k].name.toLowerCase().indexOf(q) >= 0 || !q);
+    body = '<section class="card"><div class="field"><label for="wq">Name, Geburtsdatum oder E-Mail</label><input id="wq" value="' + esc(w.q) + '" data-in="wq"></div><div class="pick">' + hits.slice(0, 8).map(k => '<button data-a="wizPerson" data-arg="' + k + '"><b>' + esc(PEOPLE[k].name) + '</b><small>geb. ' + PEOPLE[k].geb + ' · ' + PEOPLE[k].ort + ' · ' + PEOPLE[k].rollen.join(', ') + '</small></button>').join('') + '</div>' +
+      (w.q.toLowerCase().indexOf('yilmaz') >= 0 || w.q.toLowerCase().indexOf('yılmaz') >= 0 ? '<div class="alert warn"><div class="txt"><b>Dublettenhinweis:</b> Es gibt außerdem eine Online-Anmeldung von „Mehmet Yilmaz“ (ohne ı) mit gleichem Geburtsdatum. Wahrscheinlich dieselbe Person.</div>' + btn('Zusammenführen prüfen', 'toast', { arg: 'Vergleichsansicht der beiden Datensätze geöffnet (Mock).' }) + '</div>' : '') +
+      '<div class="row">' + btn('Neue Person anlegen', 'toast', { arg: 'Neue Person: Das System prüft beim Speichern auf Dubletten (Mock).' }) + '</div></section>';
+  } else if (w.step === 2) {
+    body = '<section class="card"><p>Kurse für <b>' + esc(p.name) + '</b>. Die Buchungsprüfung zeigt sofort, was möglich ist und warum nicht.</p><div style="display:flex;flex-direction:column;gap:8px">' + COURSES.map(cc => {
+      const chk = bookingCheck(cc, p);
+      const inner = '<span class="grow"><b>' + esc(cc.titel) + '</b><br><span class="small muted">' + cc.nr + ' · ' + cc.tag + ' ' + cc.zeit + ' · ab ' + cc.beginn + ' · ' + (cc.entgelt ? eur(cc.entgelt) : 'entgeltfrei') + '</span></span>' + (chk.ok ? (chk.warte ? '<span class="pill p-warn">Warteliste</span>' : '<span class="pill p-good">buchbar</span>') : '<span class="pill p-mute">nicht buchbar</span>');
+      if (!chk.ok) return '<span class="why" tabindex="0" data-why="' + esc(chk.why) + '" style="display:flex"><button class="opt no" disabled>' + inner + '</button></span>';
+      return '<button class="opt' + (w.course === cc.id ? ' sel' : '') + '" data-a="wizCourse" data-arg="' + cc.id + '"' + (chk.warte ? ' title="' + esc(chk.why) + '"' : '') + '>' + inner + '</button>';
+    }).join('') + '</div><div class="row">' + btn('← Zurück', 'wizBack') + '</div></section>';
+  } else {
+    const ermaessigt = p.name === 'Olena Kovalenko';
+    body = '<section class="card"><p><b>' + esc(p.name) + '</b> → <b>' + esc(c.titel) + '</b> (' + c.nr + ')</p><div class="fields"><div class="field"><label for="pay">Zahlart</label><select id="pay" data-in="pay"><option value="sepa"' + (w.pay === 'sepa' ? ' selected' : '') + '>SEPA-Lastschrift' + (p.mandat ? ' (Mandat vorhanden)' : '') + '</option><option value="ueb"' + (w.pay === 'ueb' ? ' selected' : '') + '>Überweisung</option><option value="bar"' + (w.pay === 'bar' ? ' selected' : '') + '>Barzahlung am Tresen</option></select></div>' +
+      plain('Entgelt', c.entgelt ? eur(c.entgelt) : 'entgeltfrei') + (c.kontingent ? plain('Belegungsart', c.kontingent.n + 'er-Kontingent, gültig ' + c.kontingent.monate + ' Monate') : '') +
+      (ermaessigt ? plain('Ermäßigung', '50 % · Nachweis gültig bis 31.03.2027', 'Ermäßigung') : locked('Ermäßigung', 'keine', 'Keine Ermäßigung hinterlegt. Ermäßigungen werden an der Person mit Nachweis und Gültigkeitszeitraum erfasst.')) + '</div>' +
+      (w.pay === 'sepa' && !p.mandat ? '<div class="alert warn"><div class="txt">Für ' + esc(p.name) + ' liegt noch kein SEPA-Mandat vor. Das Formular wird mit der Bestätigung verschickt.</div></div>' : '') +
+      '<div class="row">' + btn('← Zurück', 'wizBack') + btn('Anmeldung speichern', 'wizSave', { pri: true }) + '</div></section>';
+  }
+  return '<div class="head"><div><h1>Anmeldung am Tresen</h1><p class="sub">In drei Schritten: Person, Kurs, Zahlung</p></div></div>' + steps + body;
+}
+
+function viewRaumplan() {
+  const days = ['Mo 16.11.', 'Di 17.11.', 'Mi 18.11.', 'Do 19.11.', 'Fr 20.11.', 'Sa 21.11.'];
+  const plan = {
+    'R 1.02': [[], [], [], [['19:00', 'Info-Abend Bildungsurlaub', null]], [], []],
+    'R 1.04': [[], [], [['14:00', 'Deutsch am Arbeitsplatz', 'c430']], [], [], []],
+    'R 2.14': [[], state.conflictSolved ? [['18:00', 'Englisch A2', 'c301']] : [['18:00', 'Englisch A2', 'c301', 1], ['18:30', 'Rhetorik für Ehrenamtliche', 'c120', 1]], [], [], [], []],
+    'R 2.15': [[], state.conflictSolved ? [['18:30', 'Rhetorik für Ehrenamtliche', 'c120']] : [], [['19:30', 'Spanisch A1', 'c302']], [], [], []],
+    'R 2.20': [[['08:30', 'Integrationskurs M3', 'c701']], [['08:30', 'Integrationskurs M3', 'c701']], [['08:30', 'Integrationskurs M3', 'c701']], [['08:30', 'Integrationskurs M3', 'c701']], [['08:30', 'Integrationskurs M3', 'c701']], []],
+    'EDV 3.01': [[], [], [], [], [], [['09:00', 'Excel für Einsteiger', 'c410']]],
+    'Bewegungsraum': [[['18:00', 'Pilates (10er)', 'c540']], [['17:00', 'Rückenfit', 'c521']], [], [['19:00', 'Yoga am Abend', 'c520']], [], []],
+    'Atelier': [[['18:30', 'Aquarellmalerei', 'c610']], [], [], [], [], []]
+  };
+  let g = '<div class="ph">Raum</div>' + days.map(d => '<div class="ph">' + d + '</div>').join('');
+  Object.keys(plan).forEach(r => {
+    g += '<div class="rh"><a href="#orte" data-a="ortOpen" data-arg="' + esc(r) + '"><b>' + r + '</b></a><span class="small muted">' + Object.keys(ORTE[r].kap).slice(0, 2).map(n => n + ' ' + ORTE[r].kap[n]).join(', ') + '</span>' + (zugang(r) ? '<span class="small muted">' + zugang(r)[1] + (mOk(merkmale(r).bamf) ? ', BAMF' : '') + '</span>' : '') + '</div>';
+    plan[r].forEach(cell => { g += '<div>' + cell.map(s => '<div class="slot' + (s[3] ? ' conf' : '') + '"' + (s[2] ? ' data-a="openCourse" data-arg="' + s[2] + '"' : '') + '><b>' + s[0] + '</b>' + esc(s[1]) + '</div>').join('') + '</div>'; });
+  });
+  const conflict = state.conflictSolved ? nextSteps('Konflikt gelöst. Wie geht es weiter?', [btn('Teilnehmende Rhetorik informieren', 'notifyRoom', { pri: true }), btn('Hausmeisterliste aktualisieren', 'toast', { arg: 'Hausmeisterliste für KW 47 neu erzeugt (Mock).' })]) :
+    '<div class="alert crit"><div class="txt"><b>Raumkonflikt Di 17.11. in R 2.14:</b> Englisch A2 (18:00–19:30) und Rhetorik für Ehrenamtliche (18:30–20:00). Vorschlag: Rhetorik in R 2.15, dort frei und gleich groß.</div>' + btn('Rhetorik nach R 2.15 verlegen', 'solveConflict', { pri: true }) + '</div>';
+  return '<div class="head"><div><h1>Raumplan</h1><p class="sub">KW 47 · 16.–21. November 2026</p></div><div class="row">' + btn('← KW 46', 'toast', { arg: 'Im Prototyp ist nur KW 47 gefüllt.' }) + btn('KW 48 →', 'toast', { arg: 'Im Prototyp ist nur KW 47 gefüllt.' }) + '</div></div>' + conflict +
+    '<section class="card"><div class="tbl-wrap"><div class="plan">' + g + '</div></div><div class="legend"><span><span class="pill p-info">Belegung</span> Klick öffnet den Kurs</span><span><span class="pill p-crit">Konflikt</span> automatisch erkannt</span></div></section>';
+}
+
+function viewPersonen() {
+  const p = PEOPLE[state.person];
+  const list = personListPanel();
+  let detail = '';
+  if (state.person === 'p-becker') {
+    const vs = p.versions;
+    detail = '<section class="card"><div class="head"><div><h2>' + esc(p.name) + '</h2><p class="sub">Dozentin seit 2019 · Englisch, Deutsch als Zweitsprache</p></div>' + btn('Name ändern', 'personEdit') + '</div>' +
+      '<div class="fields">' + plain('Nachname', esc(vs[vs.length - 1].n), 'name') + plain('Vorname', 'Anna') + plain('Geburtsdatum', p.geb) + plain('Wohnort', p.ort, 'Anschrift') + locked('Honorarsatz', '32,00 € je UE', 'Honorarsätze ändert die Fachbereichsleitung mit Gültigkeitsdatum. Laufende Verträge behalten ihren Satz.') + plain('Bevorzugte Sprache', p.sprache) + '</div>' +
+      (state.personEdit ? '<div class="card" style="background:var(--surface-2)"><h3>Nachname ändern</h3><div class="fields"><div class="field"><label for="nn">Neuer Nachname</label><input id="nn" value="Becker-Schmidt"></div><div class="field"><span class="lbl">Art der Änderung</span><label class="row small"><input type="radio" name="art" value="aend" checked> Änderung ab Datum (z. B. Heirat)</label><label class="row small"><input type="radio" name="art" value="korr"> Korrektur (war schon immer so, z. B. Tippfehler)</label></div><div class="field"><label for="ab">Gültig ab</label><input id="ab" type="date" value="2026-11-14"></div><div class="field"><label for="nw">Nachweis</label><select id="nw"><option>Heiratsurkunde</option><option>Personalausweis</option><option>ohne Nachweis</option></select></div></div><p class="small muted">Alte Bescheinigungen und Verträge behalten den bisherigen Namen. Briefe gehen ab sofort an die aktuelle Anschrift.</p><div class="row">' + btn('Abbrechen', 'personEdit') + btn('Speichern', 'saveName', { pri: true }) + '</div></div>' : '') +
+      '<div class="grid"><div><h3 style="margin-bottom:10px">Historie Nachname</h3><div class="timeline">' + vs.slice().reverse().map(v => '<div class="' + (v.ers ? 'sup' : (v.bis !== 'offen' ? 'old' : '')) + '"><b>' + esc(v.n) + '</b> <span class="small muted">gültig ' + v.von + ' bis ' + v.bis + '</span><br><span class="small">' + esc(v.grund) + '</span><br><span class="small muted">erfasst ' + v.erf + (v.ers ? ' · ersetzt ' + v.ers : '') + '</span></div>').join('') + '</div></div>' +
+      '<div><h3 style="margin-bottom:10px">Was zeigt das System wann?</h3><div class="list"><div><span class="grow">Bescheinigung für einen Kurs im Herbst 2024</span><b>Schmidt</b></div><div><span class="grow">Honorarvertrag Herbst 2026</span><b>' + esc(vs[vs.length - 1].n) + '</b></div><div><span class="grow">„Was stand am 02.03.2019 im System?“ (Revision)</span><b>Schmitt</b></div></div><p class="small muted">Blasse Einträge sind ersetzte Erfassungen. Sie bleiben für Prüfungen erhalten.</p></div></div></section>';
+  } else if (state.person === 'p-yilmaz') {
+    detail = '<section class="card"><div class="head"><div><h2>' + esc(p.name) + '</h2><p class="sub">Teilnehmer seit 2024 · bevorzugte Sprache: Türkisch · SEPA-Mandat vorhanden</p></div>' + btn('Neue Anmeldung', 'enrollPerson', { pri: true, arg: 'p-yilmaz' }) + '</div>' +
+      '<div class="tbl-wrap"><table><thead><tr><th>Kurs</th><th>Zeitraum</th><th>Kursleitung</th><th>Status</th><th></th></tr></thead><tbody>' +
+      '<tr><td>26H-301 Englisch A2 – Konversation</td><td>06.10.–08.12.2026</td><td>Anna Becker</td><td><span class="pill p-good">läuft</span></td><td>' + btn('Bescheinigung', null, { sm: true, why: 'Der Kurs läuft noch bis 08.12.2026. Die Bescheinigung gibt es ab dem letzten Termin.' }) + '</td></tr>' +
+      '<tr><td>24H-305 Englisch A1 – Einstieg</td><td>01.10.–10.12.2024</td><td>Anna Schmidt</td><td><span class="pill p-mute">abgeschlossen</span></td><td>' + btn('Bescheinigung nachdrucken', 'cert', { sm: true, pri: true }) + '</td></tr></tbody></table></div>' +
+      '<p class="small muted">Die Kursleitung erscheint so, wie sie zum Kurszeitpunkt hieß.</p></section>' +
+      (state.cert ? certificate() : '');
+  } else {
+    detail = '<section class="card"><div class="head"><h2>' + esc(p.name) + '</h2>' + statusPillP(p) + '</div><div class="fields">' + plain('Rollen', p.rollen.join(', ')) + plain('Geburtsdatum', p.geb) + plain('Wohnort', p.ort, 'Anschrift') + plain('Bevorzugte Sprache', p.sprache) + plain('Letzte Belegung', p.last) + (p.fb ? plain('Fachbereich (Lehre)', p.fb) : '') + '</div><div class="row">' + btn('Neue Anmeldung', 'enrollPerson', { pri: true, arg: state.person }) + btn('Datenauskunft (Art. 15)', 'toast', { arg: 'Auskunft mit allen Daten und Historie als PDF und JSON erzeugt (Mock).' }) + '</div><p class="small muted">Generierte Beispielperson. Ausgearbeitet sind „Anna Becker“ (Historie) und „Mehmet Yılmaz“ (Nachdruck), beide oben in der Liste.</p></section>';
+  }
+  return '<div class="head"><div><h1>Personen</h1><p class="sub">' + PEOPLE_IDS.length.toLocaleString('de-DE') + ' Personen, eine Person mit vielen Rollen: Teilnehmende, Dozierende, Ansprechpartner</p></div></div><div class="split">' + list + '<div style="display:flex;flex-direction:column;gap:16px;min-width:0">' + detail + contactCard(state.person) + '</div></div>';
+}
+
+/* Personenliste: Suche zuerst, Filter mit Trefferzahlen, virtuelles Scrollen mit Nachladen */
+const ROW_H = 56, CHUNK = 50;
+let FL = [], loaded = new Set(), pending = new Set(), flKey = '';
+function statusPillP(p) { return '<span class="pill ' + (p.status === 'aktiv' ? 'p-good' : p.status === 'ruhend' ? 'p-mute' : 'p-warn') + '">' + p.status + '</span>'; }
+function matches(p, f, ignore) {
+  if (f.q && p.key.indexOf(norm(f.q)) < 0) return false;
+  if (ignore !== 'rolle' && f.rolle === 'doz' && !p.isDoz) return false;
+  if (ignore !== 'rolle' && f.rolle === 'tn' && !p.isTn) return false;
+  if (ignore !== 'status' && f.status !== 'alle' && p.status !== f.status) return false;
+  return true;
+}
+function computeFL() {
+  const f = state.pf, key = f.q + '|' + f.rolle + '|' + f.status;
+  if (key === flKey) return;
+  flKey = key; loaded = new Set(); pending = new Set(); state.pScroll = 0;
+  FL = PEOPLE_IDS.filter(k => matches(PEOPLE[k], f)).sort((a, b) => { const ga = PEOPLE[a].gen ? 1 : 0, gb = PEOPLE[b].gen ? 1 : 0; return ga - gb || PEOPLE[a].name.localeCompare(PEOPLE[b].name, 'de'); });
+}
+function facet(kind, val) { const f = Object.assign({}, state.pf); f[kind] = val; return PEOPLE_IDS.filter(k => matches(PEOPLE[k], f)).length; }
+function chip(kind, val, label) {
+  const on = state.pf[kind] === val;
+  return '<button class="btn sm' + (on ? ' pri' : '') + '" data-a="pfilter" data-arg="' + kind + ':' + val + '">' + label + ' <span class="mono" style="opacity:.8">' + facet(kind, val).toLocaleString('de-DE') + '</span></button>';
+}
+function personListPanel() {
+  computeFL();
+  return '<section class="card" style="gap:10px"><div class="field"><label for="pq">Suchen (Name, Ort, Geburtsdatum)</label><input id="pq" type="search" data-in="pq" value="' + esc(state.pf.q) + '" placeholder="z. B. yilmaz, mueller, 1988" autocomplete="off"></div>' +
+    '<div class="row" style="gap:6px">' + chip('rolle', 'alle', 'Alle') + chip('rolle', 'tn', 'Teilnehmende') + chip('rolle', 'doz', 'Dozierende') + '</div>' +
+    '<div class="row" style="gap:6px">' + chip('status', 'alle', 'Jeder Status') + chip('status', 'aktiv', 'aktiv') + chip('status', 'ruhend', 'ruhend') + chip('status', 'Löschung vorgemerkt', 'Löschung vorgemerkt') + '</div>' +
+    '<div class="head" style="align-items:center"><b id="pcount">' + FL.length.toLocaleString('de-DE') + ' Treffer</b><span class="small muted" id="pload"></span></div>' +
+    '<div id="vlist" style="height:min(560px, 62vh);overflow-y:auto;position:relative;border:1px solid var(--line);border-radius:8px" tabindex="0" aria-label="Personenliste"><div id="vspace" style="position:relative"></div></div>' +
+    '<div class="row">' + btn('Alle ' + FL.length.toLocaleString('de-DE') + ' Treffer anschreiben', 'toast', { sm: true, arg: 'Serienmail an alle Treffer des Filters wird als Hintergrundauftrag erstellt; jede Mail mit Übersetzungslink (Mock).' }) + btn('Export (Excel)', 'toast', { sm: true, arg: 'Export des gesamten Filterergebnisses als Excel-Datei (Mock).' }) + '</div></section>';
+}
+function renderVList() {
+  const box = document.getElementById('vlist'), sp = document.getElementById('vspace');
+  if (!box || !sp) return;
+  sp.style.height = Math.max(FL.length * ROW_H, 1) + 'px';
+  const top = box.scrollTop, vh = box.clientHeight || 500;
+  const start = Math.max(0, Math.floor(top / ROW_H) - 6), end = Math.min(FL.length, Math.ceil((top + vh) / ROW_H) + 6);
+  let h = '';
+  if (!FL.length) h = '<div style="padding:16px" class="muted">Keine Treffer. Suchbegriff kürzen oder Filter lockern.</div>';
+  for (let i = start; i < end; i++) {
+    const c = Math.floor(i / CHUNK), y = i * ROW_H;
+    if (!loaded.has(c)) { requestChunk(c); h += '<div style="position:absolute;left:0;right:0;top:' + y + 'px;height:' + ROW_H + 'px;padding:10px 12px;border-bottom:1px solid var(--line)"><div style="height:12px;width:55%;background:var(--surface-2);border-radius:4px"></div><div style="height:10px;width:35%;background:var(--surface-2);border-radius:4px;margin-top:8px"></div></div>'; continue; }
+    const k = FL[i], p = PEOPLE[k];
+    h += '<button data-a="openPerson" data-arg="' + k + '" style="position:absolute;left:0;right:0;top:' + y + 'px;height:' + ROW_H + 'px;text-align:left;border:0;border-bottom:1px solid var(--line);background:' + (k === state.person ? 'var(--accent-weak)' : 'transparent') + ';padding:8px 12px;cursor:pointer;display:flex;gap:10px;align-items:center"><span style="flex:1;min-width:0;overflow:hidden"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.name) + '</b><small class="muted">' + p.rollen.join(', ') + ' · ' + esc(p.ort) + (p.fb ? ' · ' + p.fb : '') + '</small></span>' + (p.status !== 'aktiv' ? statusPillP(p) : '') + '</button>';
+  }
+  sp.innerHTML = h;
+  const li = document.getElementById('pload');
+  if (li) li.textContent = 'geladen: ' + Math.min(FL.length, loaded.size * CHUNK).toLocaleString('de-DE') + ' von ' + FL.length.toLocaleString('de-DE') + (pending.size ? ' · lädt …' : '');
+}
+function requestChunk(c) {
+  if (pending.has(c) || loaded.has(c)) return;
+  pending.add(c);
+  const key = flKey;
+  setTimeout(() => { if (key !== flKey) return; pending.delete(c); loaded.add(c); renderVList(); }, 350);
+}
+function initVList() {
+  const box = document.getElementById('vlist'); if (!box) return;
+  computeFL();
+  box.scrollTop = state.pScroll;
+  let raf = 0;
+  box.addEventListener('scroll', () => { state.pScroll = box.scrollTop; if (!raf) raf = requestAnimationFrame(() => { raf = 0; renderVList(); }); });
+  renderVList();
+}
+
+function certificate() {
+  const n = state.naive;
+  return '<section class="card"><div class="head"><div><h2>Nachdruck aus dem Dokumentarchiv</h2><p class="sub">Original erzeugt am 10.12.2024 · unverändert</p></div><label class="row small"><input type="checkbox" class="check" data-a="naive"' + (n ? ' checked' : '') + '> Zum Vergleich: Was hätte ein naives System gedruckt?</label></div>' +
+    '<div style="display:flex;justify-content:center"><div class="paper"><div class="lh"><div><b>Volkshochschule Musterstadt</b><br><span style="font-size:12px">Am Markt 1 · 40000 Musterstadt</span></div><div style="text-align:right;font-size:12px">Musterstadt, 10.12.2024</div></div>' +
+    '<h2>Teilnahmebescheinigung</h2><p>Herr <b>Mehmet Yılmaz</b>, geboren am 03.05.1988, hat vom 01.10.2024 bis 10.12.2024 am Kurs <b>24H-305 „Englisch A1 – Einstieg“</b> mit 20 Unterrichtseinheiten à 45 Minuten teilgenommen. Anwesenheit: 18 von 20 Unterrichtseinheiten.</p>' +
+    '<p>Kursleitung: ' + (n ? '<s>Anna Schmidt</s> <b style="color:#b3261e">Anna Becker</b>' : '<b>Anna Schmidt</b>') + '</p>' +
+    '<p style="margin-top:12px">' + (n ? '<s>Dr. Ulrike Brandt</s> <b style="color:#b3261e">Stefan Lorenz</b>' : 'Dr. Ulrike Brandt') + '<br><span style="font-size:12px">Leitung der Volkshochschule</span></p>' +
+    '<div class="qrbox"><span class="qr" id="certqr"></span><div style="font-size:12.5px"><b>Translate this letter in your language</b><br>Bu mektubu kendi dilinizde okuyun · Scan the code</div></div>' +
+    '<div class="foot">' + (n ? '<b style="color:#b3261e">Falsch: Ein naives System liest die heutigen Daten. Anna Schmidt heißt seit 2025 Becker, die Leitung hat 2025 gewechselt. Die Bescheinigung von 2024 wäre damit verfälscht.</b>' : 'Nachdruck des archivierten Originals vom 10.12.2024 · Stichtag Kursende · Prüfwert 7f3a9c…c21e') + '</div></div></div>' +
+    nextSteps('Wie geht es weiter?', [btn('Per Mail senden (mit Übersetzungslink)', 'sendCert', { pri: true }), btn('Neu ausstellen mit aktuellen Daten', null, { why: 'Eine Neuausstellung ändert ein amtliches Dokument. Sie braucht eine Begründung und wird als „Neuausstellung vom …“ gekennzeichnet. Nur Fachbereichsleitung.' }), btn('Schließen', 'cert')]) + '</section>';
+}
+
+function viewAnwesenheit() {
+  const termine = [['03.11.2026', 'past'], ['10.11.2026', 'past'], ['17.11.2026', 'next']];
+  const t = state.att.termin, isNext = t === '17.11.2026';
+  const names = ENGLISCH_TN.map(x => x[0]);
+  let rows;
+  if (isNext) {
+    rows = names.map(nm => { const s = state.att.scanned.find(x => x[0] === nm); return '<tr><td>' + esc(nm) + '</td><td>' + (s ? '<span class="pill p-good">eingecheckt ' + s[1] + '</span>' : '<span class="pill p-mute">erwartet</span>') + '</td><td>' + (s ? 'QR (eigenes Handy)' : '') + '</td><td>' + (s ? '' : btn('manuell', 'checkManual', { sm: true, arg: nm })) + '</td></tr>'; }).join('');
+  } else {
+    rows = names.map((nm, i) => { const miss = (t === '10.11.2026' && i === 10) || (t === '03.11.2026' && (i === 4 || i === 10)); return '<tr><td>' + esc(nm) + '</td><td>' + (miss ? '<span class="pill p-crit">fehlt</span>' : '<span class="pill p-good">anwesend</span>') + '</td><td>' + (miss ? '' : (i % 5 === 3 ? 'manuell (Dozentin)' : 'QR ' + (t === '10.11.2026' ? '17:5' + (i % 9) : '17:4' + (i % 9)))) + '</td><td>' + (t === '03.11.2026' ? btn('ändern', null, { sm: true, why: 'Der Termin liegt mehr als 7 Tage zurück. Nachträgliche Änderungen nur durch die Fachbereichsleitung, mit Begründung.' }) : btn('ändern', 'toast', { sm: true, arg: 'Änderung wird mit Begründung protokolliert (Mock).' })) + '</td></tr>'; }).join('');
+  }
+  return '<div class="head"><div><h1>Anwesenheit und QR-Check-in</h1><p class="sub">26H-301 Englisch A2 – Konversation · R 2.14 · Kursleitung Anna Becker</p></div><div class="field" style="min-width:200px"><label for="ter">Termin</label><select id="ter" data-in="termin">' + termine.map(x => '<option' + (x[0] === t ? ' selected' : '') + '>' + x[0] + (x[1] === 'next' ? ' (nächster)' : '') + '</option>').join('') + '</select></div></div>' +
+    '<div class="grid-2"><section class="card"><div class="head"><h2>Teilnehmende</h2><span class="mono small">' + (isNext ? state.att.scanned.length : (t === '10.11.2026' ? 10 : 9)) + ' / 11</span></div><div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Status</th><th>Erfasst über</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></section>' +
+    '<section class="card">' + (isNext ? '<h2>QR-Code für den Raum</h2><p class="small muted" style="margin-top:-6px">Gültig am 17.11.2026 von 17:45 bis 19:45 Uhr. Teilnehmende scannen mit dem eigenen Handy, angemeldete Personen werden erkannt.</p><div style="display:flex;justify-content:center"><span class="qr" id="roomqr"></span></div><p class="mono small" style="text-align:center;word-break:break-all">vhs-musterstadt.example/c/26H-301/7?k=Hq4…</p><div class="row">' + btn('Scan simulieren', 'scan', { pri: true }) + btn('Aushang drucken', 'toast', { arg: 'A4-Aushang mit QR-Code erzeugt (Mock).' }) + '</div>' : '<h2>Termin ' + t + '</h2><p>Erfasst: ' + (t === '10.11.2026' ? '10' : '9') + ' von 11 Teilnehmenden. Unterrichtsinhalt: ' + (t === '10.11.2026' ? 'Unit 6, Talking about plans' : 'Unit 5, At the doctor') + '.</p>' + nextSteps('Wie geht es weiter?', [btn('Fehlende Personen anschreiben', 'toast', { arg: 'Mail an Fehlende mit Übersetzungslink vorbereitet (Mock).' }), btn('Nächsten Termin öffnen', 'termin17')])) + '</section></div>';
+}
+
+function viewIntegration() {
+  const rows = IK_TN.map(t => { const pct = Math.round(t.ue / t.soll * 100); return '<tr><td>' + (t.id ? '<a href="#personen" data-a="openPerson" data-arg="' + t.id + '">' + esc(t.n) + '</a>' : esc(t.n)) + '</td><td class="small">' + t.ber + '</td><td>' + t.befr + '</td><td class="mono">' + t.ue + ' / ' + t.soll + ' UE</td><td><span class="pill ' + (pct < 70 ? 'p-crit' : pct < 90 ? 'p-warn' : 'p-good') + '">' + pct + ' %</span></td><td>' + t.fk + '</td><td class="small">' + (t.miss ? '<span class="pill p-warn">' + t.miss + '</span>' : '') + '</td></tr>'; }).join('');
+  const done = state.ikDone;
+  return '<div class="head"><div><h1>Integrationskurse</h1><p class="sub">26H-701 Integrationskurs allgemein · Modul 3 von 6 · 02.11.–04.12.2026 · R 2.20</p></div></div>' +
+    '<div class="kpis"><div class="kpi"><div class="lbl">Fortschritt Modul 3</div><div class="val">44 / 100 UE</div><div class="bar" style="margin-top:8px"><i style="width:44%"></i></div></div><div class="kpi"><div class="lbl">Teilnehmende</div><div class="val">19</div><div class="note">6 im Beispiel unten</div></div><div class="kpi"><div class="lbl">Fehlende Nachweise</div><div class="val">1</div><div class="note">Kostenbefreiung</div></div><div class="kpi"><div class="lbl">Letzte BAMF-Meldung</div><div class="val" style="font-size:18px">02.11.2026</div><div class="note">Kursbeginn Modul 3, bestätigt (Mock)</div></div></div>' +
+    '<section class="card"><h2>Teilnehmende (Auszug)</h2><div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Grundlage</th><th>Kostenbefreiung</th><th>Anwesenheit</th><th>Quote</th><th>Fahrtkosten</th><th>Hinweis</th></tr></thead><tbody>' + rows + '</tbody></table></div><p class="small muted">Anwesenheit kommt direkt aus dem QR-Check-in bzw. der digitalen Liste, je Unterrichtseinheit.</p></section>' +
+    (done ? nextSteps('Abrechnung erstellt. Wie geht es weiter?', [btn('Im Postausgang ansehen', 'goto', { pri: true, arg: 'postausgang' }), btn('Fahrtkosten auszahlen', null, { why: 'Auszahlungen gibt die Buchhaltung frei. Ihre Rolle: ' + ROLES[state.role] + '.' })]) :
+      '<section class="card"><h2>Abrechnung Oktober/November 2026</h2><p>Abrechnungsliste und Anwesenheitsliste werden aus den erfassten Unterrichtseinheiten erzeugt und an das BAMF gemeldet (in Stufe 1 als Mock).</p><div class="row">' + (can.ik() ? btn('Abrechnung erstellen', 'ikBill', { pri: true }) : btn('Abrechnung erstellen', null, { why: roleWhy('Integrationskurs-Team') })) + btn('Nachweis anfordern (O. Kovalenko)', 'toast', { arg: 'Brief mit QR-Code „Translate this letter in your language“ erzeugt; Sprache Ukrainisch (Mock).' }) + '</div></section>');
+}
+
+function viewFinanzen() {
+  const posten = [['Ayşe Demir', '26H-301', 98, '15.10.2026', '1. Mahnung'], ['Karin Fischer', '26H-301', 98, '15.10.2026', '1. Mahnung'], ['Peter Krause', '26H-301', 98, '15.10.2026', '2. Mahnung'], ['Thomas Wagner', '26H-610', 95, '20.10.2026', '1. Mahnung'], ['Elif Kaya', '26H-520', 84, '01.11.2026', 'noch nicht fällig'], ['Stadtwerke Musterstadt GmbH', '26H-430', 2860, '30.11.2026', 'XRechnung offen']];
+  const mahn = posten.filter(p => p[4].indexOf('Mahnung') >= 0);
+  const mrows = posten.map(p => '<tr><td>' + esc(p[0]) + '</td><td class="mono">' + p[1] + '</td><td class="num">' + eur(p[2]) + '</td><td>' + p[3] + '</td><td>' + (p[4].indexOf('Mahnung') >= 0 ? (state.mahnFrei ? '<span class="pill p-good">' + p[4] + ' versendet</span>' : '<span class="pill p-warn">Vorschlag: ' + p[4] + '</span>') : '<span class="pill p-mute">' + p[4] + '</span>') + '</td></tr>').join('');
+  return '<div class="head"><div><h1>Finanzen</h1><p class="sub">Offene Posten, Mahnwesen, Lastschrift und Übergabe an die Finanzsoftware der Stadt</p></div></div>' +
+    '<section class="card"><div class="head"><h2>Offene Posten</h2><span class="small muted">Mahnvorschlag heute 06:15, wartet auf Freigabe</span></div><div class="tbl-wrap"><table><thead><tr><th>Schuldner</th><th>Kurs</th><th class="num">Betrag</th><th>Fällig seit</th><th>Stand</th></tr></thead><tbody>' + mrows + '</tbody></table></div><div class="row">' +
+    (state.mahnFrei ? '' : (can.money() ? btn(mahn.length + ' Mahnungen freigeben und versenden', 'mahn', { pri: true }) : btn(mahn.length + ' Mahnungen freigeben und versenden', null, { why: roleWhy('Buchhaltung') + ' Mahnungen laufen nie ohne menschliche Freigabe.' }))) + btn('Einzelne Mahnung zurückstellen', 'toast', { arg: 'Mahnung zurückgestellt bis 30.11.2026, Grund wird protokolliert (Mock).' }) + '</div>' +
+    (state.mahnFrei ? nextSteps('Mahnungen versendet. Wie geht es weiter?', [btn('Briefe ansehen', 'goto', { arg: 'postausgang', pri: true }), btn('Wiedervorlage in 14 Tagen', 'toast', { arg: 'Wiedervorlage für 28.11.2026 angelegt.' })]) : '') + '</section>' +
+    '<div class="grid"><section class="card"><h2>Lastschrifteinzug</h2><p>Nächster Einzug am 01.12.2026: <b>23 Mandate</b>, <b>2.346,00 €</b>.</p>' + (state.sepaDone ? '<p><span class="pill p-good">Datei pain.008 erzeugt</span></p>' : '<div class="row">' + (can.money() ? btn('Lastschriftdatei erzeugen', 'sepa', { pri: true }) : btn('Lastschriftdatei erzeugen', null, { why: roleWhy('Buchhaltung') })) + '</div>') + '</section>' +
+    '<section class="card"><h2>Übergabe an die Finanzsoftware</h2><p>Seit der letzten Übergabe (13.11.2026, 18:00): <b>12 neue Buchungen</b>, 1.104,00 €.</p>' + (state.fibuDone ? '<p><span class="pill p-good">Übergabe erstellt</span></p>' : '<div class="row">' + (can.money() ? btn('Jetzt übergeben (Mock)', 'fibu', { pri: true }) : btn('Jetzt übergeben (Mock)', null, { why: roleWhy('Buchhaltung') + ' Die Übergabe läuft außerdem täglich um 18:00 automatisch.' })) + '</div>') + '</section></div>';
+}
+
+function viewPostausgang() {
+  const sel = state.outbox[state.outSel] || state.outbox[0];
+  return '<div class="head"><div><h1>Postausgang</h1><p class="sub">Was das System an Menschen und Schnittstellen gesendet hätte. In Stufe 1 landet alles hier, nichts verlässt das Haus.</p></div></div>' +
+    '<div class="split"><section class="card"><div class="pick">' + state.outbox.map((o, i) => '<button data-a="outSel" data-arg="' + i + '" class="' + (o === sel ? 'on' : '') + '"><b>' + esc(o.typ) + ' · ' + esc(o.an) + '</b><small>' + esc(o.betreff) + '<br>' + o.zeit + '</small></button>').join('') + '</div></section>' +
+    '<section class="card"><div class="head"><div><h2>' + esc(sel.betreff) + '</h2><p class="sub">' + esc(sel.typ) + ' an ' + esc(sel.an) + ' · ' + sel.zeit + '</p></div><span class="pill p-info">Mock</span></div><pre class="code">' + esc(sel.body) + '</pre>' +
+    (sel.typ === 'Brief' ? '<div class="row"><span class="qr" id="letterqr"></span><span class="small">QR-Code „Translate this letter in your language“ auf jedem Brief</span></div>' : '') + '</section></div>';
+}
+
+/* ---------- Orte: Liegenschaft → Gebäude → Raum, allgemeine Orte, virtuelle Räume ---------- */
+const HEUTE = '2026-11-14';
+const MERKMALE = {
+  bf: { n: 'Barrierefreier Zugang (DIN 18040)', g: 'Zugänglichkeit' },
+  ba: { n: 'Barrierearmer Zugang', g: 'Zugänglichkeit' },
+  nbf: { n: 'Nicht barrierefrei', g: 'Zugänglichkeit' },
+  lift: { n: 'Aufzug', g: 'Zugänglichkeit' },
+  wc: { n: 'Rollstuhlgerechtes WC', g: 'Zugänglichkeit' },
+  hoer: { n: 'Induktive Höranlage', g: 'Zugänglichkeit' },
+  bamf: { n: 'Kursort für Integrationskurse (beim BAMF gemeldet)', g: 'Zulassung' },
+  telc: { n: 'Prüfungsort telc', g: 'Zulassung' },
+  beamer: { n: 'Beamer', g: 'Ausstattung' },
+  pc: { n: 'PC-Arbeitsplätze', g: 'Ausstattung' },
+  schwing: { n: 'Schwingboden', g: 'Ausstattung' },
+  kueche: { n: 'Lehrküche', g: 'Ausstattung' },
+  wasser: { n: 'Waschbecken', g: 'Ausstattung' },
+  park: { n: 'Parkplätze', g: 'Organisation' },
+  oepnv: { n: 'ÖPNV-Haltestelle', g: 'Organisation' }
+};
+const ORTE = {
+  'L-campus': { art: 'liegenschaft', name: 'Campus Bahnhofstraße', adr: 'Bahnhofstraße 12, 40000 Musterstadt', geo: '51.2277, 6.7735', km: 18.4, lage: 'Zufahrt über die Bahnhofstraße. Parkplatz hinter Haus B (12 Plätze, davon 2 für Menschen mit Behinderung). Die Haltestelle „Bahnhof Musterstadt“ (Bus 3 und 7, S-Bahn) liegt 200 m entfernt.', m: [['park', '12, davon 2 barrierefrei'], ['oepnv', 'Bahnhof Musterstadt, 200 m']] },
+  'G-A': { art: 'gebaeude', name: 'Haus A (VHS-Zentrum)', parent: 'L-campus', lage: 'Haus A ist das Gebäude direkt an der Straße. Der Haupteingang hat eine Rampe, der Tresen liegt im Erdgeschoss links.', m: [['bf', 'stufenlos, Rampe, automatische Tür'], ['lift', 'bis 3. OG'], ['wc', 'Erdgeschoss']] },
+  'G-B': { art: 'gebaeude', name: 'Haus B (Altbau)', parent: 'L-campus', lage: 'Haus B steht hinter Haus A am Parkplatz. Eingang über den Hof.', m: [['ba', 'eine Stufe (4 cm), Klingel am Eingang'], ['wc', 'Erdgeschoss']] },
+  'G-alt': { art: 'gebaeude', name: 'Außenstelle Altdorf (Grundschule)', adr: 'Schulstraße 3, 40100 Altdorf', geo: '51.1902, 6.8410', km: 9.7, lage: 'Eingang über den Schulhof, Seiteneingang neben der Turnhalle. Parken auf dem Lehrerparkplatz ab 16 Uhr.', m: [['ba', 'Rampe am Seiteneingang']] },
+  'R 1.02': { art: 'raum', name: 'R 1.02 Vortragssaal', parent: 'G-A', lage: 'Im Erdgeschoss vom Eingang geradeaus durch die Glastür.', kap: { Vortrag: 80, Seminar: 40, 'Prüfung': 30 }, m: [['hoer', ''], ['beamer', '']] },
+  'R 1.04': { art: 'raum', name: 'R 1.04', parent: 'G-A', lage: 'Im Erdgeschoss rechts hinter dem Tresen.', kap: { Seminar: 16, 'Prüfung': 10 }, m: [] },
+  'R 2.14': { art: 'raum', name: 'R 2.14', parent: 'G-A', lage: 'Mit Aufzug oder Treppe ins 2. OG, dann rechts, dritte Tür links.', kap: { Seminar: 16, Vortrag: 24, 'Prüfung': 10 }, m: [['beamer', ''], ['telc', 'Lizenz', '2027-08-31', 'Lizenzvertrag 2024']] },
+  'R 2.15': { art: 'raum', name: 'R 2.15', parent: 'G-A', lage: 'Mit Aufzug oder Treppe ins 2. OG, dann rechts, vierte Tür links.', kap: { Seminar: 16, 'Prüfung': 10 }, m: [] },
+  'R 2.20': { art: 'raum', name: 'R 2.20', parent: 'G-A', lage: 'Mit Aufzug oder Treppe ins 2. OG, am Ende des Flurs links.', kap: { Seminar: 25, Integrationskurs: 25, 'Prüfung': 15 }, m: [['bamf', 'gemeldet', '2027-12-31', 'InGe-Online, Meldung 2024-0412'], ['beamer', '']] },
+  'EDV 3.01': { art: 'raum', name: 'EDV 3.01', parent: 'G-A', lage: 'Mit Aufzug oder Treppe ins 3. OG, links die erste Tür.', kap: { 'PC-Kurs': 12, Seminar: 16 }, m: [['pc', '12']] },
+  'Bewegungsraum': { art: 'raum', name: 'Bewegungsraum', parent: 'G-B', lage: 'Im Erdgeschoss die erste Tür rechts. Straßenschuhe bitte im Vorraum ausziehen.', kap: { Bewegung: 16, Vortrag: 40 }, m: [['schwing', '']] },
+  'Atelier': { art: 'raum', name: 'Atelier', parent: 'G-B', lage: 'Über die Treppe im Hof ins 1. OG, Tür geradeaus.', kap: { Seminar: 12 }, m: [['nbf', '1. OG ohne Aufzug'], ['wasser', '']] },
+  'B 1.10': { art: 'raum', name: 'B 1.10', parent: 'G-B', lage: 'Über die Treppe im Hof ins 1. OG, zweite Tür links.', kap: { Seminar: 20, Integrationskurs: 18 }, m: [['nbf', '1. OG ohne Aufzug'], ['bamf', 'gemeldet', '2026-09-30', 'InGe-Online, Meldung 2022-0917']] },
+  'Mensa Altdorf': { art: 'raum', name: 'Mensa Altdorf', parent: 'G-alt', lage: 'Im Erdgeschoss vom Seiteneingang links.', kap: { Seminar: 20, Kochkurs: 12 }, m: [['kueche', '6 Kochstellen']] },
+  'Stadtwald': { art: 'allgemein', name: 'Treffpunkt Parkplatz Stadtwald', adr: 'Wanderparkplatz an der L 239, Musterstadt', geo: '51.2410, 6.7612', km: 22.1, lage: 'Treffpunkt ist der Wanderparkplatz an der L 239 an der großen Infotafel. Bitte festes Schuhwerk mitbringen.', kap: { Exkursion: 25 }, m: [['park', 'Wanderparkplatz']] },
+  'Online 3': { art: 'virtuell', name: 'Online-Raum 3', plattform: 'Videokonferenz der Stadt', lage: 'Den Zugangslink erhalten Sie 24 Stunden vor Beginn per E-Mail. Kamera und Mikrofon können Sie vorher mit dem Technik-Check testen.', kap: { Seminar: 20, Online: 30 }, m: [] },
+  'Online Vortrag': { art: 'virtuell', name: 'Online-Raum Vorträge', plattform: 'Videokonferenz der Stadt', lage: 'Den Zugangslink erhalten Sie 24 Stunden vor Beginn per E-Mail.', kap: { Vortrag: 200, Online: 200 }, m: [] }
+};
+const ORTART = { liegenschaft: 'Liegenschaft', gebaeude: 'Gebäude', raum: 'Raum', allgemein: 'Allgemeiner Ort', virtuell: 'Virtueller Raum' };
+const chain = id => { const a = []; let o = id; while (o) { a.unshift(o); o = ORTE[o].parent; } return a; };
+const dDE = iso => iso.slice(8, 10) + '.' + iso.slice(5, 7) + '.' + iso.slice(0, 4);
+const toIso = de => de.slice(6, 10) + '-' + de.slice(3, 5) + '-' + de.slice(0, 2);
+const isoAdd = (iso, d) => { const t = new Date(iso + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + d); return t.toISOString().slice(0, 10); };
+const WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+const wd = iso => WD[new Date(iso + 'T12:00:00Z').getUTCDay()];
+const FREI = [['2026-12-23', '2027-01-06', 'Weihnachtsferien NRW'], ['2026-12-25', '2026-12-26', 'Weihnachten'], ['2027-01-01', '2027-01-01', 'Neujahr']];
+const freiAm = iso => { const f = FREI.find(x => iso >= x[0] && iso <= x[1]); return f ? f[2] : null; };
+function merkmale(id) {
+  const out = {}, z = ['bf', 'ba', 'nbf'];
+  chain(id).forEach(k => ORTE[k].m.forEach(m => { if (z.indexOf(m[0]) >= 0) z.forEach(x => delete out[x]); out[m[0]] = { key: m[0], wert: m[1], bis: m[2], nachweis: m[3], von: k }; }));
+  return out;
+}
+const mOk = (mm, am) => !!mm && (!mm.bis || mm.bis >= (am || HEUTE));
+function zugang(id) { const m = merkmale(id); return m.bf ? ['p-good', 'barrierefrei'] : m.ba ? ['p-info', 'barrierearm'] : m.nbf ? ['p-warn', 'nicht barrierefrei'] : null; }
+function ortAdresse(id) { const c = chain(id); for (let i = c.length - 1; i >= 0; i--) if (ORTE[c[i]].adr) return [ORTE[c[i]].adr, c[i]]; return ['', null]; }
+function kapOf(o, n) { const k = ORTE[o].kap || {}; return ORTE[o].art === 'virtuell' ? (k[n] || k.Online) : k[n]; }
+const ortName = o => ORTE[o] ? ORTE[o].name : o;
+const nutzung = c => c.nutzung || 'Seminar';
+const mins = z => { const p = z.split('–')[0].split(':'); return Number(p[0]) * 60 + Number(p[1]); };
+const minsEnd = z => { const p = (z.split('–')[1] || z).split(':'); return Number(p[0]) * 60 + Number(p[1]); };
+const overlap = (a, b) => mins(a) < minsEnd(b) && mins(b) < minsEnd(a);
+
+/* Veranstaltungen eines Kurses: aus Serienregel erzeugt, einzeln änderbar */
+const RES540 = { '2026-11-16': 14, '2026-11-23': 9, '2026-11-30': 6, '2026-12-07': 3, '2026-12-14': 1 };
+function vasOf(c) {
+  if (state.vas[c.id]) return state.vas[c.id];
+  let list = [];
+  if (c.id === 'c301') list = ['10-06', '10-13', '10-20', '10-27', '11-03', '11-10', '11-17', '11-24', '12-01', '12-08'].map(x => '2026-' + x);
+  else if (/–/.test(c.tag)) { let d = toIso(c.beginn); const e = toIso(c.ende); while (d <= e && list.length < 60) { if (wd(d) !== 'Sa' && wd(d) !== 'So' && !freiAm(d)) list.push(d); d = isoAdd(d, 1); } }
+  else { let d = toIso(c.beginn); const e = c.umfang === 'unbefristet' ? isoAdd(HEUTE, 84) : toIso(c.ende); while (d <= e) { if (!freiAm(d)) list.push(d); d = isoAdd(d, 7); } }
+  const base = c.orte || [c.raum];
+  state.vas[c.id] = list.map(d => {
+    const v = { d: d, zeit: c.zeit, doz: c.doz, orte: base.map(o => ({ o: o, kap: c.kapEigen || null })), herkunft: 'Serie 1' };
+    if (c.id === 'c120' && d === '2026-11-17') { v.orte = [{ o: 'R 2.14', kap: null }]; v.herkunft = 'Serie 1, Ausnahme'; }
+    if (c.id === 'c540' && d === '2026-11-30') { v.orte.push({ o: 'Online 3', kap: 10 }); v.herkunft = 'Serie 1, Ausnahme'; }
+    return v;
+  });
+  return state.vas[c.id];
+}
+const kapEff = (c, x) => x.kap || kapOf(x.o, nutzung(c)) || 0;
+function conflictAt(c, v, o) {
+  return COURSES.some(k => k.id !== c.id && k.status !== 'abgesagt' && !state.cancelled[k.id] && ORTE[o] && ORTE[o].art !== 'virtuell' && vasOf(k).some(w => w.d === v.d && w.orte.some(x => x.o === o) && overlap(w.zeit, v.zeit)));
+}
+function ortOptions(c, d) {
+  return Object.keys(ORTE).filter(k => ['raum', 'allgemein', 'virtuell'].indexOf(ORTE[k].art) >= 0).map(k => {
+    let why = '';
+    const n = nutzung(c), mm = merkmale(k).bamf;
+    if (n === 'Integrationskurs' && ORTE[k].art === 'virtuell') why = 'Online-Integrationskurse brauchen eine eigene Zulassung';
+    else if (n === 'Integrationskurs' && !mOk(mm, d)) why = mm ? 'BAMF-Meldung abgelaufen am ' + dDE(mm.bis) : 'kein beim BAMF gemeldeter Kursort';
+    else if (!kapOf(k, n)) why = 'keine Kapazität für „' + n + '“ hinterlegt';
+    return [k, ORTE[k].name + (kapOf(k, n) ? ' (' + kapOf(k, n) + ' Plätze)' : ''), why];
+  });
+}
+function ortSelect(id, c, d, sel, attr) {
+  return '<select id="' + id + '" ' + (attr || '') + '>' + ortOptions(c, d).map(o => '<option value="' + esc(o[0]) + '"' + (o[2] ? ' disabled' : '') + (o[0] === sel ? ' selected' : '') + '>' + esc(o[1] + (o[2] ? ' – ' + o[2] : '')) + '</option>').join('') + '</select>';
+}
+function genDates(g) {
+  const out = []; let d = g.start, guard = 0; const end = isoAdd(HEUTE, 84);
+  while (guard++ < 120) {
+    if (g.unbef ? d > end : out.filter(x => !x.skip).length >= g.n) break;
+    out.push({ d: d, skip: freiAm(d) }); d = isoAdd(d, 7 * g.rh);
+  }
+  return out;
+}
+const canPlan = () => state.role === 'ts' || state.role === 'fbl' || state.role === 'ik';
+
+/* Kontingent mit Vorab-Einbuchung (Kurs 26H-540) */
+function kRest() { const k = state.k; return k.n - k.besucht - k.verfallen - k.res.length; }
+function resCount(v, o) { const b = o === 'Online 3' ? 2 : (RES540[v.d] || 0); return b + (state.k.res.indexOf(v.d + '|' + o) >= 0 ? 1 : 0); }
+
+function viewVeranstaltungen(c) {
+  const vas = vasOf(c), team = c.team || [c.doz], kont = !!c.kontingent;
+  const past = vas.filter(v => v.d < HEUTE), fut = vas.filter(v => v.d >= HEUTE);
+  const shown = state.showPast ? vas : fut;
+  const umfang = c.umfang === 'unbefristet' ? '<span class="pill p-info">unbefristet regelmäßig</span> <span class="small muted">rollierend erzeugt bis ' + dDE(isoAdd(HEUTE, 84)) + ' (12 Wochen), Nachgenerierung jeden Montag</span>' : '<span class="pill p-mute">begrenzt: ' + vas.length + ' Veranstaltungen</span>';
+  let html = '<div class="row" style="justify-content:space-between"><div class="row">' + umfang + '</div><div class="row">' +
+    (canPlan() ? btn('Regelmäßige Veranstaltungen erzeugen', 'genToggle', { pri: !state.gen }) + btn('Einzelveranstaltung anlegen', 'singleToggle') : btn('Regelmäßige Veranstaltungen erzeugen', null, { why: roleWhy('Teilnehmerservice oder Fachbereichsleitung') }) + btn('Einzelveranstaltung anlegen', null, { why: roleWhy('Teilnehmerservice oder Fachbereichsleitung') })) + '</div></div>' +
+    '<p class="small">Dozierendenteam: ' + team.map(t => '<span class="pill p-mute">' + esc(PEOPLE[t].name) + '</span>').join(' ') + ' · Nutzungsart: <b>' + nutzung(c) + '</b>' + (kont ? ' · Belegung als <b>' + c.kontingent.n + 'er-Kontingent</b>, Vorab-Einbuchung erforderlich' : '') + '</p>';
+  if (state.gen) {
+    const g = state.gen, prev = genDates(g);
+    const team2 = team.map(t => '<option value="' + t + '"' + (t === g.doz ? ' selected' : '') + '>' + esc(PEOPLE[t].name) + '</option>').join('');
+    html += '<div class="card" style="background:var(--surface-2)"><h3>Schnellweg: regelmäßig, gleicher Ort, gleiche Dozentin</h3><div class="fields">' +
+      '<div class="field"><label for="g-start">Erste Veranstaltung</label><input id="g-start" type="date" value="' + g.start + '" data-in="gen-start"></div>' +
+      '<div class="field"><label for="g-zeit">Uhrzeit</label><input id="g-zeit" value="' + esc(g.zeit) + '" data-in="gen-zeit"></div>' +
+      '<div class="field"><label for="g-rh">Rhythmus</label><select id="g-rh" data-in="gen-rh"><option value="1"' + (g.rh == 1 ? ' selected' : '') + '>wöchentlich</option><option value="2"' + (g.rh == 2 ? ' selected' : '') + '>alle 2 Wochen</option></select></div>' +
+      '<div class="field"><label for="g-n">Anzahl</label><input id="g-n" type="number" min="1" max="40" value="' + g.n + '" data-in="gen-n"' + (g.unbef ? ' disabled' : '') + '><label class="row small"><input type="checkbox" data-in="gen-unbef"' + (g.unbef ? ' checked' : '') + '> unbefristet (rollierend)</label></div>' +
+      '<div class="field"><label for="g-ort">Ort</label>' + ortSelect('g-ort', c, g.start, g.ort, 'data-in="gen-ort"') + '</div>' +
+      '<div class="field"><label for="g-doz">Dozent/in</label><select id="g-doz" data-in="gen-doz">' + team2 + '</select></div></div>' +
+      '<div class="small"><b>Vorschau (' + wd(g.start) + ', ' + esc(g.zeit) + '):</b></div><div class="row" style="gap:6px">' + prev.map(x => {
+        const conf = !x.skip && conflictAt(c, { d: x.d, zeit: g.zeit }, g.ort);
+        return '<span class="pill ' + (x.skip ? 'p-mute' : conf ? 'p-crit' : 'p-info') + '" title="' + esc(x.skip ? 'entfällt: ' + x.skip : conf ? 'Raumkonflikt' : 'wird angelegt') + '">' + (x.skip ? '<s>' + dDE(x.d).slice(0, 6) + '</s> ' + x.skip : dDE(x.d).slice(0, 6) + (conf ? ' Konflikt' : '')) + '</span>';
+      }).join('') + '</div><p class="small muted">Feiertage und Ferien NRW (Beispieldaten) werden ausgelassen und angezeigt. Raumkonflikte prüft das System gegen alle anderen Veranstaltungen.</p>' +
+      '<div class="row">' + btn('Abbrechen', 'genToggle') + btn(prev.filter(x => !x.skip).length + ' Veranstaltungen erzeugen', 'genSave', { pri: true }) + '</div></div>';
+  }
+  if (state.single) {
+    const s = state.single;
+    html += '<div class="card" style="background:var(--surface-2)"><h3>Einzelveranstaltung</h3><div class="fields">' +
+      '<div class="field"><label for="s-d">Datum</label><input id="s-d" type="date" value="' + s.d + '" data-in="sg-d"></div>' +
+      '<div class="field"><label for="s-zeit">Uhrzeit</label><input id="s-zeit" value="' + esc(s.zeit) + '"></div>' +
+      '<div class="field"><label for="s-doz">Dozent/in</label><select id="s-doz" data-in="sg-doz">' + team.map(t => '<option value="' + t + '"' + (t === s.doz ? ' selected' : '') + '>' + esc(PEOPLE[t].name) + ' (Team)</option>').join('') + '<option value="p-hahn"' + (s.doz === 'p-hahn' ? ' selected' : '') + '>Markus Hahn (nicht im Team)</option></select></div>' +
+      '<div class="field"><label for="s-o1">Ort</label>' + ortSelect('s-o1', c, s.d, s.o1) + '</div>' +
+      '<div class="field"><label for="s-o2">Zusätzlicher Ort (hybrid)</label><select id="s-o2"><option value="">keiner</option>' + ortOptions(c, s.d).filter(o => !o[2]).map(o => '<option value="' + esc(o[0]) + '">' + esc(o[1]) + '</option>').join('') + '</select></div>' +
+      '<div class="field"><label for="s-kap">Höchstzahl</label><input id="s-kap" type="number" min="1" placeholder="aus dem Ort übernehmen"></div></div>' +
+      (s.doz && team.indexOf(s.doz) < 0 ? '<div class="alert warn"><div class="txt">Markus Hahn gehört nicht zum Dozierendenteam dieses Kurses. Speichern ist möglich, die Fachbereichsleitung bekommt einen Hinweis.</div></div>' : '') +
+      '<div class="row">' + btn('Abbrechen', 'singleToggle') + btn('Veranstaltung anlegen', 'singleSave', { pri: true }) + '</div></div>';
+  }
+  if (kont) {
+    const k = state.k, p = PEOPLE[k.p];
+    html += '<div class="alert warn" style="background:var(--accent-weak);border-color:var(--accent)"><div class="txt"><b>Einbuchen für ' + esc(p.name) + ':</b> Kontingent ' + k.n + ', besucht ' + k.besucht + ', verfallen ' + k.verfallen + ', eingebucht ' + k.res.length + ', <b>verbleibend ' + kRest() + '</b> · gültig bis ' + dDE(k.bis) + '</div>' + btn('QR-Check-in ohne Einbuchung testen', 'checkinNo', { sm: true }) + '</div>';
+  }
+  const rows = shown.map((v, i) => {
+    const isPast = v.d < HEUTE, hyb = v.orte.length > 1;
+    const orte = v.orte.map(x => {
+      const conf = !isPast && conflictAt(c, v, x.o);
+      const kapTxt = x.kap ? x.kap + ' (eigene Höchstzahl' + (kapOf(x.o, nutzung(c)) ? ', Ort: ' + kapOf(x.o, nutzung(c)) : '') + ')' : (kapOf(x.o, nutzung(c)) || '?') + ' (vom Ort)';
+      return '<div>' + (conf ? '<span class="pill p-crit">' + esc(ortName(x.o)) + ' doppelt belegt</span>' : '<a href="#orte" data-a="ortOpen" data-arg="' + esc(x.o) + '">' + esc(ortName(x.o)) + '</a>') + ' <span class="small muted">' + kapTxt + '</span></div>';
+    }).join('');
+    let bel = '', act = '';
+    if (kont) {
+      if (isPast) bel = '<span class="small mono">' + (10 + (vas.indexOf(v) % 5)) + ' eingecheckt</span>';
+      else {
+        bel = v.orte.map(x => { const r = resCount(v, x.o), kp = kapEff(c, x); return '<div class="small mono">' + r + '/' + kp + (r >= kp ? ' <span class="pill p-warn">voll</span>' : '') + '</div>'; }).join('');
+        act = v.orte.map(x => {
+          const key = v.d + '|' + x.o, r = resCount(v, x.o), kp = kapEff(c, x), lbl = hyb ? (ORTE[x.o].art === 'virtuell' ? 'online' : 'vor Ort') : 'Einbuchen';
+          if (state.k.res.indexOf(key) >= 0) return '<div class="row" style="gap:4px"><span class="pill p-good">eingebucht' + (hyb ? ' ' + lbl : '') + '</span>' + btn('Austragen', 'vaUnbook', { sm: true, arg: key }) + '</div>';
+          if (r >= kp) return '<div>' + btn(hyb ? lbl : 'Einbuchen', null, { sm: true, why: 'Ausgebucht: ' + r + ' von ' + kp + ' Plätzen in ' + ortName(x.o) + ' sind reserviert. Warteliste für genau diese Veranstaltung ist möglich.' }) + ' ' + btn('Warteliste', 'toast', { sm: true, arg: PEOPLE[state.k.p].name + ' steht auf der Warteliste für ' + wd(v.d) + ' ' + dDE(v.d) + '. Wird ein Platz frei, kommt eine Nachricht (Mock).' }) + '</div>';
+          if (kRest() <= 0) return '<div>' + btn(lbl, null, { sm: true, why: 'Kontingent aufgebraucht: alle ' + state.k.n + ' Einheiten sind besucht, verfallen oder eingebucht. Neues Kontingent buchen oder eine Einbuchung austragen.' }) + '</div>';
+          return '<div>' + btn(lbl, 'vaBook', { sm: true, arg: key }) + '</div>';
+        }).join('');
+      }
+    } else {
+      const kp = v.orte.reduce((s, x) => s + kapEff(c, x), 0);
+      bel = isPast ? '<span class="small mono">' + Math.max(0, c.belegt - (i % 3)) + ' / ' + c.belegt + ' anwesend</span>' : '<span class="small mono">' + c.belegt + ' / ' + kp + '</span>';
+      const conf = !isPast && v.orte.some(x => conflictAt(c, v, x.o));
+      act = conf ? btn('Lösen', 'goto', { sm: true, arg: 'raumplan' }) : (v.d === '2026-11-17' && c.id === 'c301' ? btn('QR-Check-in', 'goto', { sm: true, arg: 'anwesenheit' }) : (!isPast && !hyb && canPlan() && nutzung(c) !== 'Integrationskurs' ? btn('+ online', 'addOnline', { sm: true, arg: v.d }) : ''));
+    }
+    return '<tr' + (isPast ? ' class="muted"' : '') + '><td>' + (vas.indexOf(v) + 1) + '</td><td class="mono">' + wd(v.d) + ' ' + dDE(v.d) + '</td><td class="mono">' + v.zeit + '</td><td>' + orte + (hyb ? '<span class="pill p-info">hybrid</span>' : '') + '</td><td class="small">' + esc(PEOPLE[v.doz].name) + '</td><td class="small muted">' + v.herkunft + '</td><td>' + bel + '</td><td>' + act + '</td></tr>';
+  }).join('');
+  html += '<div class="tbl-wrap"><table><thead><tr><th>Nr.</th><th>Datum</th><th>Zeit</th><th>Ort(e) und Kapazität</th><th>Dozent/in</th><th>Herkunft</th><th>' + (kont ? 'Eingebucht' : 'Belegung') + '</th><th></th></tr></thead><tbody>' +
+    (past.length ? '<tr><td colspan="8">' + btn(state.showPast ? 'Vergangene ausblenden' : past.length + ' vergangene Veranstaltungen anzeigen', 'showPast', { sm: true }) + '</td></tr>' : '') + rows + '</tbody></table></div>' +
+    '<p class="small muted">Eine Veranstaltung kann an mehreren Orten gleichzeitig stattfinden (hybrid). Die Kapazität kommt aus dem Ort und seiner Nutzungsart oder wird je Veranstaltung begrenzt. Einzeln geänderte Veranstaltungen gelten als Ausnahme und bleiben bei Serienänderungen erhalten.</p>';
+  return html;
+}
+
+function kontingentTab(c) {
+  const k = state.k;
+  const rows = [[PEOPLE[k.p].name, k.p, k.n, dDE(k.bis), k.besucht, k.verfallen, k.res.length], ['Karin Fischer', null, 10, '28.02.2027', 7, 1, 1], ['Thomas Wagner', null, 10, '14.03.2027', 2, 0, 2], ['Ayşe Demir', 'p-demir', 10, '31.01.2027', 9, 1, 0], ['Elif Kaya', null, 10, '06.04.2027', 0, 0, 1]];
+  return '<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Kontingent</th><th>gültig bis</th><th>besucht</th><th>verfallen</th><th>eingebucht</th><th>verbleibend</th><th></th></tr></thead><tbody>' + rows.map(r => {
+    const rest = r[2] - r[4] - r[5] - r[6];
+    return '<tr><td>' + (r[1] ? '<a href="#personen" data-a="openPerson" data-arg="' + r[1] + '">' + esc(r[0]) + '</a>' : esc(r[0])) + '</td><td>' + r[2] + 'er</td><td class="mono">' + r[3] + '</td><td class="mono">' + r[4] + '</td><td class="mono">' + r[5] + '</td><td class="mono">' + r[6] + '</td><td>' + (rest > 0 ? '<b>' + rest + '</b>' : '<span class="pill p-warn">aufgebraucht</span>') + '</td><td>' + (rest > 0 ? btn('Einbuchen', 'kPerson', { sm: true, arg: r[1] || r[0] }) : btn('Neues Kontingent', 'toast', { sm: true, arg: 'Anmeldung für ein neues 10er-Kontingent vorbereitet (Mock).' })) + '</td></tr>';
+  }).join('') + '</tbody></table></div><p class="small muted">Regel dieses Kurses: Einbuchung bis 24 Stunden vorher, Austragen bis 24 Stunden vorher. Wer eingebucht ist und nicht erscheint, verbraucht die Einheit (Nichterscheinen zählt). Ohne Einbuchung lehnt der Check-in ab.</p>';
+}
+
+function viewOrte() {
+  const f = state.ortFilter, ids = Object.keys(ORTE);
+  const places = ids.filter(k => ['raum', 'allgemein', 'virtuell'].indexOf(ORTE[k].art) >= 0);
+  const test = { alle: () => true, bf: k => !!merkmale(k).bf, bamf: k => mOk(merkmale(k).bamf), online: k => ORTE[k].art === 'virtuell' };
+  const chipO = (val, label) => '<button class="pill ' + (f === val ? 'p-info' : 'p-mute') + '" style="border:0;cursor:pointer" data-a="ortFilter" data-arg="' + val + '">' + label + ' ' + places.filter(test[val]).length + '</button>';
+  const item = (k, lvl) => '<button data-a="ortSel" data-arg="' + esc(k) + '" class="' + (state.ort === k ? 'on' : '') + '" style="padding-left:' + (10 + lvl * 16) + 'px"><b>' + esc(ORTE[k].name) + '</b><small>' + ORTART[ORTE[k].art] + (ORTE[k].kap ? ' · ' + Object.keys(ORTE[k].kap).map(n => n + ' ' + ORTE[k].kap[n]).join(', ') : '') + (zugang(k) ? ' · ' + zugang(k)[1] : '') + '</small></button>';
+  let tree = '';
+  if (f === 'alle') {
+    ids.filter(k => !ORTE[k].parent && ORTE[k].art === 'liegenschaft').forEach(l => {
+      tree += item(l, 0); ids.filter(g => ORTE[g].parent === l).forEach(g => { tree += item(g, 1); ids.filter(r => ORTE[r].parent === g).forEach(r => { tree += item(r, 2); }); });
+    });
+    ids.filter(k => !ORTE[k].parent && ORTE[k].art === 'gebaeude').forEach(g => { tree += item(g, 0); ids.filter(r => ORTE[r].parent === g).forEach(r => { tree += item(r, 1); }); });
+    ids.filter(k => ORTE[k].art === 'allgemein' || ORTE[k].art === 'virtuell').forEach(k => { tree += item(k, 0); });
+  } else tree = places.filter(test[f]).map(k => item(k, 0)).join('');
+  const o = ORTE[state.ort], id = state.ort, mm = merkmale(id), z = zugang(id), adr = ortAdresse(id);
+  const path = chain(id).map(k => '<a href="#orte" data-a="ortSel" data-arg="' + esc(k) + '">' + esc(ORTE[k].name) + '</a>').join(' › ');
+  const mrows = Object.keys(mm).map(k => {
+    const x = mm[k], st = !x.bis ? '<span class="muted">–</span>' : x.bis < HEUTE ? '<span class="pill p-crit">abgelaufen ' + dDE(x.bis) + '</span>' : '<span class="pill p-good">gültig bis ' + dDE(x.bis) + '</span>';
+    return '<tr><td>' + MERKMALE[k].n + '<br><span class="small muted">' + MERKMALE[k].g + '</span></td><td>' + esc(x.wert || 'ja') + (x.nachweis ? '<br><span class="small muted">Nachweis: ' + esc(x.nachweis) + '</span>' : '') + '</td><td class="small">' + (x.von === id ? 'eigenes Merkmal' : 'geerbt von ' + esc(ORTE[x.von].name)) + '</td><td>' + st + '</td></tr>';
+  }).join('');
+  const bamf = mm.bamf;
+  const bamfAlert = bamf && bamf.bis < HEUTE && !state.bamfRenewed ? '<div class="alert crit"><div class="txt"><b>BAMF-Meldung abgelaufen am ' + dDE(bamf.bis) + '.</b> Integrationskurse lassen sich hier nicht mehr planen; die Raumauswahl zeigt den Grund im Tooltip. Das System hat am 01.09.2026 eine Aufgabe erzeugt.</div>' + (can.ik() ? btn('Meldung erneuert eintragen', 'bamfRenew', { pri: true }) : btn('Meldung erneuert eintragen', null, { why: roleWhy('Integrationskurs-Team') })) + '</div>' : '';
+  const kap = o.kap ? '<div class="tbl-wrap"><table><thead><tr><th>Nutzungsart</th><th class="num">Personen</th></tr></thead><tbody>' + Object.keys(o.kap).map(n => '<tr><td>' + n + '</td><td class="num">' + o.kap[n] + '</td></tr>').join('') + '</tbody></table></div>' : '<p class="small muted">Kapazitäten hängen an den Räumen.</p>';
+  const parts = chain(id).filter(k => ORTE[k].lage);
+  const weg = '<div class="paper" style="max-width:none;padding:20px 24px;gap:8px"><b>So finden Sie zu „' + esc(o.name) + '“</b>' + (adr[0] ? '<span>' + esc(adr[0]) + '</span>' : '') + parts.map(k => '<span>' + esc(ORTE[k].lage) + '</span>').join('') + (z ? '<span><b>Zugang:</b> ' + z[1] + (mm.lift ? ', Aufzug vorhanden' : '') + (mm.wc ? ', rollstuhlgerechtes WC' : '') + '.</span>' : '') + '</div>' +
+    '<p class="small muted">Automatisch zusammengesetzt aus ' + parts.length + ' Baustein' + (parts.length > 1 ? 'en' : '') + ' (' + parts.map(k => ORTART[ORTE[k].art]).join(' → ') + '). Jeder Baustein wird einmal gepflegt und erscheint in Bestätigungen, Aushängen und auf der Übersetzungsseite.</p>';
+  const top = chain(id).find(k => ORTE[k].km) || null;
+  const fk = o.art === 'virtuell' ? '<p class="small muted">Virtueller Raum: keine Fahrtkosten, keine Wegbeschreibung, Zugangslink statt Adresse.</p>' : top ? '<div class="list"><div><span class="grow">Markus Hahn (üblicher Aufenthaltsort: Neustadt) → ' + esc(ORTE[top].name) + '</span><span class="mono">' + ORTE[top].km.toLocaleString('de-DE') + ' km</span></div><div><span class="grow">Fahrtkosten je Veranstaltung (hin und zurück, 0,30 € je km laut Honorarvereinbarung)</span><b class="mono">' + eur(Math.round(ORTE[top].km * 2 * 30) / 100) + '</b></div></div><p class="small muted">Entfernung über den Routing-Adapter (in Stufe 1 ein Mock). Koordinaten: ' + esc(ORTE[top].geo) + '</p>' : '';
+  const uses = COURSES.filter(c => vasOf(c).some(v => v.orte.some(x => chain(x.o).indexOf(id) >= 0)));
+  const detail = '<section class="card"><div class="head"><div><p class="sub small">' + path + '</p><h2>' + esc(o.name) + '</h2><p class="sub">' + ORTART[o.art] + (o.plattform ? ' · ' + esc(o.plattform) : '') + '</p></div><div class="row">' + (z ? '<span class="pill ' + z[0] + '">' + z[1] + '</span>' : '') + (mOk(bamf) ? '<span class="pill p-good">BAMF-Kursort</span>' : '') + '</div></div>' + bamfAlert +
+    '<div class="fields">' + plain('Adresse', adr[0] ? esc(adr[0]) + (adr[1] !== id ? ' <span class="small muted">(von ' + esc(ORTE[adr[1]].name) + ')</span>' : '') : (o.art === 'virtuell' ? 'Zugangslink je Veranstaltung' : '–'), 'Anschrift') + plain('Lagebeschreibung', esc(o.lage), 'Lage') + '</div>' +
+    '<h3>Kapazitäten je Nutzungsart</h3>' + kap +
+    '<div class="head"><h3>Merkmale</h3>' + btn('Merkmal hinzufügen', 'toast', { sm: true, arg: 'Auswahl aus dem Merkmalskatalog (ja/nein, Zahl, Text, Auswahl), optional mit Nachweis und Gültigkeit. Neue Merkmale pflegt die Leitung ohne Programmänderung (Mock).' }) + '</div>' +
+    (mrows ? '<div class="tbl-wrap"><table><thead><tr><th>Merkmal</th><th>Wert</th><th>Herkunft</th><th>Status</th></tr></thead><tbody>' + mrows + '</tbody></table></div>' : '<p class="small muted">Keine Merkmale erfasst.</p>') +
+    '<p class="small muted">Gebäude- und Liegenschaftsmerkmale gelten für alle Räume darin, solange der Raum nichts anderes sagt (Beispiel: Atelier im Altbau ist „nicht barrierefrei“).</p></section>' +
+    (o.art !== 'liegenschaft' && o.art !== 'gebaeude' ? '<section class="card"><h3>Wegbeschreibung</h3>' + weg + '</section>' : '') +
+    (fk ? '<section class="card"><h3>Fahrtkosten (Beispiel)</h3>' + fk + '</section>' : '') +
+    '<section class="card"><h3>Genutzt von</h3><div class="list">' + (uses.length ? uses.map(c => '<div><span class="mono small">' + c.nr + '</span><a class="grow" href="#kurse" data-a="openCourse" data-arg="' + c.id + '">' + esc(c.titel) + '</a><span class="small muted">' + c.tag + ' ' + c.zeit + '</span></div>').join('') : '<div class="small muted">Derzeit keine Veranstaltungen.</div>') + '</div></section>';
+  return '<div class="head"><div><h1>Orte</h1><p class="sub">Liegenschaft → Gebäude → Raum, dazu allgemeine Orte und virtuelle Räume</p></div>' + btn('Ort anlegen', 'toast', { arg: 'Neuer Ort: Art wählen (Raum, allgemeiner Ort, virtueller Raum). Ein Raum braucht ein Gebäude (Mock).' }) + '</div>' +
+    '<div class="split"><section class="card"><div class="row" style="gap:6px">' + chipO('alle', 'Alle') + chipO('bf', 'barrierefrei') + chipO('bamf', 'BAMF-Kursort') + chipO('online', 'online') + '</div><div class="pick">' + tree + '</div></section><div style="display:flex;flex-direction:column;gap:16px;min-width:0">' + detail + '</div></div>';
+}
+
+/* Kontaktdaten: Postadressen mit Aufenthaltsort und Korrespondenzadresse, Rufnummern, E-Mail */
+const KONTAKT = {
+  'p-becker': { adr: [{ art: 'Wohnung', txt: 'Lindenweg 7, 40000 Musterstadt', auf: true, korr: true, seit: '01.08.2025', alt: 'bis 31.07.2025: Kirchstraße 22, 40000 Musterstadt' }], tel: [['Mobil', '0170 1234567', 'SMS und Signal erlaubt', true], ['Festnetz', '0211 998877', '', false]], mail: [['privat', 'anna.becker@example.org', true], ['dienstlich, für Honorarverträge', 'a.becker@example.net', false]] },
+  'p-yilmaz': { adr: [{ art: 'Wohnung', txt: 'Nordring 14, 40010 Musterstadt-Nord', auf: true, korr: false, seit: '01.03.2024' }, { art: 'Postanschrift', txt: 'c/o Hasan Yılmaz, Marktstraße 3, 40000 Musterstadt', auf: false, korr: true, seit: '15.01.2025', note: 'Briefkasten am Wohnort unzuverlässig' }], tel: [['Mobil', '0176 5550123', 'SMS und WhatsApp erlaubt, Werbung nein', true]], mail: [['privat', 'm.yilmaz@example.org', true]] }
+};
+function contactCard(pid) {
+  const p = PEOPLE[pid];
+  const k = KONTAKT[pid] || { adr: [{ art: 'Wohnung', txt: 'Hauptstraße ' + (3 + pid.length * 7 % 90) + ', ' + p.ort, auf: true, korr: true, seit: '–' }], tel: [['Mobil', '01** *******', 'SMS erlaubt', true]], mail: [['privat', norm(p.name).replace(/[^a-z]+/g, '.') + '@example.org', true]] };
+  const a = k.adr.map(x => '<div><span class="grow"><b>' + esc(x.txt) + '</b><br><span class="small muted">' + x.art + ', seit ' + x.seit + (x.note ? ' · ' + esc(x.note) : '') + (x.alt ? ' · ' + esc(x.alt) : '') + '</span></span><span class="row" style="gap:4px">' + (x.auf ? '<span class="pill p-info">üblicher Aufenthaltsort</span>' : '') + (x.korr ? '<span class="pill p-good">Korrespondenz</span>' : '') + '</span><button class="histbtn" data-a="hist" data-arg="Anschrift" title="Historie anzeigen: Wert ist zeitlich versioniert">' + ICON.clock + '</button></div>').join('');
+  const t = k.tel.map(x => '<div><span class="grow">' + x[0] + ': <span class="mono">' + x[1] + '</span>' + (x[2] ? '<br><span class="small muted">' + esc(x[2]) + '</span>' : '') + '</span>' + (x[3] ? '<span class="pill p-mute">bevorzugt</span>' : '') + '</div>').join('');
+  const m = k.mail.map(x => '<div><span class="grow"><span class="mono small">' + esc(x[1]) + '</span><br><span class="small muted">' + esc(x[0]) + '</span></span>' + (x[2] ? '<span class="pill p-mute">bevorzugt</span>' : '') + '</div>').join('');
+  const diff = k.adr.some(x => x.korr && !x.auf);
+  return '<section class="card"><div class="head"><h2>Kontaktdaten</h2><div class="row">' + btn('Adresse hinzufügen', 'toast', { sm: true, arg: 'Neue Adresse mit „gültig ab“. Kennzeichen Aufenthaltsort und Korrespondenz lassen sich je Adresse setzen (Mock).' }) + (diff ? '' : btn('Korrespondenz abweichend', 'toast', { sm: true, arg: 'Ausnahme: Briefe gehen ab Datum an eine andere Adresse, z. B. c/o. Der Aufenthaltsort bleibt (Mock).' })) + '</div></div>' +
+    '<h3>Postadressen</h3><div class="list">' + a + '</div>' +
+    (diff ? '<p class="small muted">Briefe gehen an die Korrespondenzadresse. Statistik, Förderung und Fahrtkosten nutzen den üblichen Aufenthaltsort.</p>' : '<p class="small muted">Standardfall: Aufenthaltsort und Korrespondenzadresse sind dieselbe Adresse.</p>') +
+    '<div class="grid"><div><h3>Telefon und Messaging</h3><div class="list">' + t + '</div></div><div><h3>E-Mail</h3><div class="list">' + m + '</div></div></div></section>';
+}
+
+/* ---------- Rendern ---------- */
+function render() {
+  const v = current();
+  renderNav();
+  const map = { start: viewStart, kurse: viewKurse, raumplan: viewRaumplan, orte: viewOrte, anmeldung: viewAnmeldung, personen: viewPersonen, anwesenheit: viewAnwesenheit, integration: viewIntegration, finanzen: viewFinanzen, postausgang: viewPostausgang };
+  document.getElementById('view').innerHTML = map[v]();
+  initVList();
+  drawQR('roomqr', 'https://vhs-musterstadt.example/c/26H-301/7?k=Hq4mZ8tR2pXw', 180);
+  drawQR('certqr', 'https://vhs-musterstadt.example/t/Lw3nB8sQ5kYt', 76);
+  drawQR('letterqr', 'https://vhs-musterstadt.example/t/Rm2cV7hJ4xZp', 76);
+}
+function drawQR(id, text, size) {
+  const el = document.getElementById(id); if (!el) return;
+  try { new QRCode(el, { text: text, width: size, height: size, colorDark: '#111111', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M }); }
+  catch (e) { el.innerHTML = '<span style="display:inline-block;width:' + size + 'px;height:' + size + 'px;border:1px dashed #999;color:#555;font-size:11px;text-align:center;padding-top:' + (size / 2 - 8) + 'px">QR-Code</span>'; }
+}
+
+const ACTIONS = {
+  goto: a => go(a),
+  toast: a => toast(a),
+  openCourse: a => { state.course = a; state.tab = 'ueberblick'; state.gen = null; state.single = null; state.showPast = false; go('kurse'); },
+  back: () => { state.course = null; render(); },
+  tab: a => { state.tab = a; render(); },
+  decide: a => { state.decided[a] = true; addLog('Kurs ' + course(a).nr + ' wird trotz Unterschreitung durchgeführt'); toast('Entscheidung protokolliert: Kurs findet statt.'); render(); },
+  cancel: a => { state.cancelled[a] = true; const c = course(a); addLog('Kurs ' + c.nr + ' abgesagt; ' + c.belegt + ' Teilnehmende und Kursleitung informiert, Raum freigegeben'); addOut({ typ: 'E-Mail', an: c.belegt + ' Teilnehmende', betreff: 'Absage: ' + c.titel, body: 'Betreff: Absage Ihres Kurses „' + c.titel + '“ (' + c.nr + ')\n\nGuten Tag,\n\nleider muss der Kurs wegen zu geringer Anmeldezahl entfallen.\nBereits gezahlte Entgelte erstatten wir automatisch.\nPassende Alternativen: 26H-301 Englisch A2, 27F-305 Spanisch A1 (Frühjahr).\n\n➜ Diese Nachricht in Ihrer Sprache lesen: https://vhs-musterstadt.example/t/Pz8rT1vN6qLs\n\nIhre VHS Musterstadt' }); toast('Kurs abgesagt. Benachrichtigungen liegen im Postausgang.'); render(); },
+  enroll: a => { state.wiz = { step: 1, person: null, course: a, pay: 'sepa', q: '', done: false }; go('anmeldung'); },
+  enrollPerson: a => { state.wiz = { step: 2, person: a, course: null, pay: 'sepa', q: '', done: false }; go('anmeldung'); },
+  wizPerson: a => { state.wiz.person = a; state.wiz.step = state.wiz.course && bookingCheck(course(state.wiz.course), PEOPLE[a]).ok ? 3 : 2; render(); },
+  wizCourse: a => { state.wiz.course = a; state.wiz.step = 3; render(); },
+  wizBack: () => { state.wiz.step = Math.max(1, state.wiz.step - 1); render(); },
+  wizSave: () => { const w = state.wiz, c = course(w.course), chk = bookingCheck(c, PEOPLE[w.person]); w.done = true; if (chk.warte) c.warte++; else c.belegt++; addLog((chk.warte ? 'Warteliste: ' : 'Anmeldung: ') + PEOPLE[w.person].name + ' für ' + c.nr + ' (Tresen)'); toast('Gespeichert und protokolliert.'); render(); },
+  wizAgain: () => { state.wiz = { step: 2, person: state.wiz.person, course: null, pay: 'sepa', q: '', done: false }; render(); },
+  sendConfirm: () => { const w = state.wiz, p = PEOPLE[w.person], c = course(w.course); addOut({ typ: 'E-Mail', an: p.name, betreff: 'Anmeldebestätigung ' + c.nr + ' ' + c.titel, body: 'Betreff: Ihre Anmeldung: ' + c.titel + ' (' + c.nr + ')\n\nGuten Tag ' + p.name + ',\n\nvielen Dank für Ihre Anmeldung. Der Kurs beginnt am ' + c.beginn + ', ' + c.tag + ' ' + c.zeit + ', Raum ' + c.raum + '.\nEntgelt: ' + (c.entgelt ? eur(c.entgelt) : 'entgeltfrei') + '\n\n➜ Diese Nachricht in Ihrer Sprache lesen (' + p.sprache + '):\n  https://vhs-musterstadt.example/t/Kd4wM9pX2rVb\n\nAnhang: Termine.ics, QR-Teilnehmerausweis.pdf\nIhre VHS Musterstadt' }); toast('Bestätigung im Postausgang (mit Übersetzungslink).'); state.outSel = 0; go('postausgang'); },
+  openPerson: a => { state.person = a; state.cert = false; state.personEdit = false; state.naive = false; go('personen'); },
+  personEdit: () => { state.personEdit = !state.personEdit; render(); },
+  saveName: () => { const nn = (document.getElementById('nn').value || '').trim() || 'Becker'; const art = document.querySelector('input[name=art]:checked').value; const ab = document.getElementById('ab').value || '2026-11-14'; const vs = PEOPLE['p-becker'].versions; const cur = vs[vs.length - 1];
+    if (art === 'korr') { cur.ers = '2026-11-14'; vs.push({ n: nn, von: cur.von, bis: cur.bis, erf: '2026-11-14', ers: '', grund: 'Korrektur (gilt rückwirkend)' }); }
+    else { cur.ers = '2026-11-14'; vs.push({ n: cur.n, von: cur.von, bis: ab, erf: '2026-11-14', ers: '', grund: 'Ende der Gültigkeit' }); vs.push({ n: nn, von: ab, bis: 'offen', erf: '2026-11-14', ers: '', grund: 'Änderung ab ' + ab + ', Nachweis: ' + document.getElementById('nw').value }); }
+    PEOPLE['p-becker'].name = 'Anna ' + nn; state.personEdit = false; addLog('Nachname Anna ' + cur.n + ' → ' + nn + ' (' + (art === 'korr' ? 'Korrektur' : 'Änderung ab ' + ab) + ')'); toast('Gespeichert. Alte Dokumente behalten den bisherigen Namen.'); render(); },
+  hist: a => { if (a === 'p-becker' || a === 'name') { state.person = 'p-becker'; go('personen'); } else toast('Historie „' + a + '“: im Prototyp nur für den Namen von Anna Becker ausgearbeitet.'); },
+  cert: () => { state.cert = !state.cert; state.naive = false; render(); },
+  naive: () => { state.naive = !state.naive; render(); },
+  sendCert: () => { addOut({ typ: 'E-Mail', an: 'Mehmet Yılmaz', betreff: 'Ihre Teilnahmebescheinigung 24H-305 (Nachdruck)', body: 'Betreff: Ihre Teilnahmebescheinigung\n\nGuten Tag Herr Yılmaz,\n\nanbei der Nachdruck Ihrer Teilnahmebescheinigung für „Englisch A1 – Einstieg“ (2024).\n\n➜ Bu mesajı Türkçe okuyun: https://vhs-musterstadt.example/t/Lw3nB8sQ5kYt\n\nAnhang: Teilnahmebescheinigung_24H-305.pdf (Archiv-Original)\nIhre VHS Musterstadt' }); toast('Mail im Postausgang.'); },
+  scan: () => { const left = ENGLISCH_TN.filter(x => !state.att.scanned.find(s => s[0] === x[0])); if (!left.length) { toast('Alle eingecheckt.'); return; } const m = 47 + state.att.scanned.length; state.att.scanned.push([left[0][0], '17:' + (m > 59 ? '59' : m)]); render(); },
+  checkManual: a => { state.att.scanned.push([a, 'manuell']); render(); },
+  termin17: () => { state.att.termin = '17.11.2026'; render(); },
+  solveConflict: () => { state.conflictSolved = true; const v120 = vasOf(course('c120')).find(x => x.d === '2026-11-17'); if (v120) v120.orte = [{ o: 'R 2.15', kap: null }]; addLog('Raumkonflikt gelöst: 26H-120 am 17.11.2026 nach R 2.15 (gültig nur für diesen Termin)'); toast('Verlegt. Der Konflikt ist aufgelöst.'); render(); },
+  notifyRoom: () => { addOut({ typ: 'E-Mail', an: '5 Teilnehmende 26H-120', betreff: 'Raumänderung am 17.11.: R 2.15', body: 'Betreff: Raumänderung am 17.11.2026\n\nIhr Kurs „Rhetorik für Ehrenamtliche“ findet am 17.11. in Raum R 2.15 statt (statt R 2.14).\n\n➜ Diese Nachricht in Ihrer Sprache lesen: https://vhs-musterstadt.example/t/Fa6yU3kD8mNe\n\nIhre VHS Musterstadt' }); toast('Benachrichtigung im Postausgang.'); },
+  mahn: () => { state.mahnFrei = true; state.log.forEach(e => { if (e.what.indexOf('Mahnvorschlag') === 0) e.ok = true; }); addLog('4 Mahnungen freigegeben und versendet (389,00 €)'); addOut({ typ: 'Brief', an: 'Peter Krause', betreff: '2. Mahnung 26H-301', body: 'Volkshochschule Musterstadt · Am Markt 1 · 40000 Musterstadt\n\nHerrn Peter Krause\n\n2. Mahnung\n\nFür den Kurs 26H-301 „Englisch A2 – Konversation“ ist das Entgelt von 98,00 € seit dem 15.10.2026 offen.\nBitte überweisen Sie den Betrag zuzüglich 5,00 € Mahngebühr bis zum 28.11.2026.\n\n[QR-Code: Translate this letter in your language]' }); toast('Mahnungen versendet und protokolliert.'); render(); },
+  sepa: () => { state.sepaDone = true; addLog('Lastschriftdatei pain.008 erzeugt: 23 Mandate, 2.346,00 €'); addOut({ typ: 'Bank (pain.008)', an: 'Sparkasse (Mock)', betreff: 'Lastschrift 01.12.2026, 23 Posten', body: '<?xml version="1.0" encoding="UTF-8"?>\n<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.008.001.08">\n  <CstmrDrctDbtInitn>\n    <GrpHdr>\n      <MsgId>VHS-2026-11-14-001</MsgId>\n      <NbOfTxs>23</NbOfTxs>\n      <CtrlSum>2346.00</CtrlSum>\n    </GrpHdr>\n    <PmtInf>\n      <ReqdColltnDt>2026-12-01</ReqdColltnDt>\n      …\n' }); toast('Lastschriftdatei im Postausgang.'); render(); },
+  fibu: () => { state.fibuDone = true; addLog('Übergabe an Finanzsoftware: 12 Buchungen, 1.104,00 €'); addOut({ typ: 'Finanzsoftware (CSV)', an: 'Kämmerei', betreff: 'Buchungsübergabe 14.11.2026, 12 Buchungen', body: 'Belegdatum;Personenkonto;Sachkonto;Kostenstelle;Betrag;Text\n14.11.2026;40011284;431100;VHS-SPR;98,00;26H-302 Entgelt\n…' }); toast('Übergabe im Postausgang.'); render(); },
+  ikBill: () => { state.ikDone = true; addLog('Integrationskurs 26H-701: Abrechnung Okt./Nov. erstellt und gemeldet (Mock)'); addOut({ typ: 'BAMF (Mock)', an: 'BAMF', betreff: 'Abrechnung 26H-701 Modul 3, Zeitraum 02.–13.11.2026', body: 'Abrechnung Integrationskurs 26H-701, Modul 3\nZeitraum: 02.11.–13.11.2026 · 44 UE\nTeilnehmende: 19 · abrechenbare Teilnahmen nach Anwesenheit je UE\nAnlagen: Anwesenheitsliste (PDF), Abrechnungsbogen (PDF)\nAntwort (simuliert): eingegangen, Vorgang 2026-ABC-0912' }); toast('Abrechnung erstellt.'); render(); },
+  ortSel: a => { state.ort = a; render(); },
+  ortOpen: a => { state.ort = a; state.ortFilter = 'alle'; state.course = null; go('orte'); },
+  ortFilter: a => { state.ortFilter = a; const t = { alle: null, bf: 'bf', bamf: 'bamf' }; render(); },
+  bamfRenew: () => { state.bamfRenewed = true; ORTE['B 1.10'].m.forEach(m => { if (m[0] === 'bamf') { m[2] = '2028-09-30'; m[3] = 'InGe-Online, Meldung 2026-1115'; } }); addLog('Kursort B 1.10: BAMF-Meldung erneuert, gültig bis 30.09.2028'); toast('Eingetragen. B 1.10 ist wieder für Integrationskurse planbar.'); render(); },
+  genToggle: () => { const c = course(state.course), vs = vasOf(c); state.single = null; state.gen = state.gen ? null : { start: vs.length ? isoAdd(vs[vs.length - 1].d, 7) : toIso(c.beginn), zeit: c.zeit, rh: 1, n: 6, unbef: c.umfang === 'unbefristet', ort: (c.orte || [c.raum])[0], doz: c.doz }; render(); },
+  singleToggle: () => { const c = course(state.course); state.gen = null; state.single = state.single ? null : { d: '2026-12-19', zeit: c.zeit, doz: (c.team || [c.doz])[c.team ? 1 : 0], o1: 'Stadtwald' }; if (state.single && !kapOf('Stadtwald', nutzung(c))) state.single.o1 = (c.orte || [c.raum])[0]; render(); },
+  genSave: () => { const c = course(state.course), g = state.gen, vs = vasOf(c); const nr = 1 + vs.reduce((m, v) => Math.max(m, Number((v.herkunft.match(/Serie (\d+)/) || [0, 0])[1])), 0); const add = genDates(g).filter(x => !x.skip && !vs.some(v => v.d === x.d)).map(x => ({ d: x.d, zeit: g.zeit, doz: g.doz, orte: [{ o: g.ort, kap: c.kapEigen || null }], herkunft: 'Serie ' + nr })); add.forEach(v => vs.push(v)); vs.sort((a, b) => a.d < b.d ? -1 : 1); state.gen = null; addLog(c.nr + ': ' + add.length + ' Veranstaltungen erzeugt (Serie ' + nr + ', ' + ortName(g.ort) + ', ' + PEOPLE[g.doz].name + ')'); toast(add.length + ' Veranstaltungen angelegt. Ausgelassene Ferientage sind protokolliert.'); render(); },
+  singleSave: () => { const c = course(state.course), vs = vasOf(c); const d = document.getElementById('s-d').value || state.single.d, o1 = document.getElementById('s-o1').value, o2 = document.getElementById('s-o2').value, kap = Number(document.getElementById('s-kap').value) || null, doz = document.getElementById('s-doz').value; const orte = [{ o: o1, kap: kap }]; if (o2 && o2 !== o1) orte.push({ o: o2, kap: null }); vs.push({ d: d, zeit: document.getElementById('s-zeit').value || c.zeit, doz: doz, orte: orte, herkunft: 'einzeln' }); vs.sort((a, b) => a.d < b.d ? -1 : 1); state.single = null; addLog(c.nr + ': Einzelveranstaltung ' + dDE(d) + ' in ' + orte.map(x => ortName(x.o)).join(' + ') + ' (' + PEOPLE[doz].name + ')'); toast('Einzelveranstaltung am ' + dDE(d) + ' angelegt' + (orte.length > 1 ? ', hybrid.' : '.')); render(); },
+  addOnline: a => { const c = course(state.course), v = vasOf(c).find(x => x.d === a); v.orte.push({ o: nutzung(c) === 'Vortrag' ? 'Online Vortrag' : 'Online 3', kap: null }); v.herkunft = v.herkunft.indexOf('Ausnahme') >= 0 || v.herkunft === 'einzeln' ? v.herkunft : v.herkunft + ', Ausnahme'; addLog(c.nr + ': Veranstaltung ' + dDE(a) + ' zusätzlich online (hybrid)'); toast('Veranstaltung am ' + dDE(a) + ' ist jetzt hybrid. Online-Teilnehmende bekommen den Link 24 Stunden vorher.'); render(); },
+  vaBook: a => { state.k.res.push(a); const p = a.split('|'); addLog('Vorab-Einbuchung: ' + PEOPLE[state.k.p].name + ' für ' + dDE(p[0]) + ' (' + ortName(p[1]) + ')'); toast('Eingebucht. Verbleibend im Kontingent: ' + kRest() + '.'); render(); },
+  vaUnbook: a => { state.k.res = state.k.res.filter(x => x !== a); addLog('Einbuchung ausgetragen: ' + PEOPLE[state.k.p].name + ', ' + dDE(a.split('|')[0])); toast('Ausgetragen. Der Platz ist wieder frei, die Einheit zurück im Kontingent.'); render(); },
+  checkinNo: () => toast('Check-in abgelehnt: Thomas Wagner ist für Mo 16.11.2026 nicht eingebucht, und die Veranstaltung ist voll (14 von 14). Hinweis: bitte am Tresen melden.'),
+  kPerson: a => { if (PEOPLE[a]) { if (a !== state.k.p) state.k = { p: a, n: 10, besucht: a === 'p-weber' ? 4 : (a === 'p-demir' ? 9 : 0), verfallen: a === 'p-demir' ? 1 : (a === 'p-weber' ? 1 : 0), res: [], bis: '2027-05-14' }; } else toast('Beispielperson ohne Detaildaten; eingebucht wird hier für ' + PEOPLE[state.k.p].name + '.'); state.course = 'c540'; state.tab = 'termine'; go('kurse'); },
+  showPast: () => { state.showPast = !state.showPast; render(); },
+  outSel: a => { state.outSel = Number(a); render(); },
+  claim: a => { const t = TASKS.find(x => x.id === a); t.who = 'me'; addLog('Aufgabe übernommen: ' + t.txt); toast('Übernommen. Die Gruppe sieht, dass Sie daran arbeiten.'); render(); },
+  assign: a => { const t = TASKS.find(x => x.id === a); t.who = 'M. Öztürk'; addLog('Aufgabe an M. Öztürk zugewiesen: ' + t.txt); toast('An M. Öztürk zugewiesen. Sie wird benachrichtigt.'); render(); },
+  pfilter: a => { const i = a.indexOf(':'); state.pf[a.slice(0, i)] = a.slice(i + 1); render(); },
+  allHits: a => { state.pf = { q: a, rolle: 'alle', status: 'alle' }; go('personen'); }
+};
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-a]');
+  if (!el || el.disabled) return;
+  const a = el.getAttribute('data-a');
+  if (!ACTIONS[a]) return;
+  if (el.tagName === 'A') e.preventDefault();
+  ACTIONS[a](el.getAttribute('data-arg'));
+});
+document.addEventListener('change', e => {
+  const k = e.target.getAttribute && e.target.getAttribute('data-in');
+  if (k === 'pay') { state.wiz.pay = e.target.value; render(); }
+  if (k && k.indexOf('gen-') === 0 && state.gen) { const f = k.slice(4); state.gen[f] = f === 'unbef' ? e.target.checked : (f === 'n' || f === 'rh' ? Number(e.target.value) || 1 : e.target.value); render(); }
+  if (k && k.indexOf('sg-') === 0 && state.single) { state.single[k.slice(3)] = e.target.value; render(); }
+  if (k === 'termin') { state.att.termin = e.target.value.slice(0, 10); render(); }
+});
+document.addEventListener('input', e => {
+  if (e.target.getAttribute && e.target.getAttribute('data-in') === 'pq') {
+    state.pf.q = e.target.value; const pos = e.target.selectionStart; render();
+    const i = document.getElementById('pq'); if (i) { i.focus(); try { i.setSelectionRange(pos, pos); } catch (err) {} }
+    return;
+  }
+  if (e.target.getAttribute && e.target.getAttribute('data-in') === 'wq') {
+    state.wiz.q = e.target.value; const pos = e.target.selectionStart; render();
+    const i = document.getElementById('wq'); if (i) { i.focus(); try { i.setSelectionRange(pos, pos); } catch (err) {} }
+  }
+});
+
+/* Globale Suche */
+const q = document.getElementById('q'), res = document.getElementById('results');
+q.addEventListener('input', () => {
+  const s = q.value.trim().toLowerCase();
+  if (s.length < 2) { res.hidden = true; return; }
+  const ns = norm(s);
+  const ph = PEOPLE_IDS.filter(k => PEOPLE[k].key.indexOf(ns) >= 0);
+  const ch = COURSES.filter(c => norm(c.titel + ' ' + c.nr).indexOf(ns) >= 0);
+  const hits = ch.slice(0, 3).map(c => '<button data-a="openCourse" data-arg="' + c.id + '">' + c.nr + ' ' + esc(c.titel) + '<small>Kurs</small></button>')
+    .concat(ph.slice(0, 8 - Math.min(3, ch.length)).map(k => '<button data-a="openPerson" data-arg="' + k + '">' + esc(PEOPLE[k].name) + '<small>' + esc(PEOPLE[k].ort) + ' · Person</small></button>'));
+  res.innerHTML = (hits.length ? hits.join('') : '<div style="padding:10px 12px" class="muted">Keine Treffer</div>') + (ph.length > 8 - Math.min(3, ch.length) ? '<button data-a="allHits" data-arg="' + esc(s) + '"><b>Alle ' + ph.length.toLocaleString('de-DE') + ' Personen-Treffer anzeigen</b><small>in der Personenliste</small></button>' : '');
+  res.hidden = false;
+});
+document.getElementById('nav').addEventListener('click', e => { const l = e.target.closest('a'); if (!l) return; state.course = null; if (l.getAttribute('href') === location.hash) { e.preventDefault(); render(); } });
+document.addEventListener('click', e => { if (!e.target.closest('.search')) res.hidden = true; else if (e.target.closest('#results [data-a]')) { res.hidden = true; q.value = ''; } });
+const roleSel = document.getElementById('role');
+roleSel.addEventListener('change', () => { state.role = roleSel.value; toast('Rolle gewechselt: ' + ROLES[state.role] + '. Buttons und Hinweise passen sich an.'); render(); });
+window.addEventListener('hashchange', () => { if (current() !== 'kurse') state.course = null; render(); });
+render();
+})();
+</script>
+
+</body></html>
