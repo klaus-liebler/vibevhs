@@ -169,7 +169,8 @@ internal static class ProgrammDemodaten
             ["Sprache"] = new("Sprachkurs", Nutzungsart.Seminar, [], Buchungsrichtlinie.Oeffentlich, ferienAuslassen: true),
             ["Seminar"] = new("Seminar", Nutzungsart.Seminar, [], Buchungsrichtlinie.Oeffentlich, ferienAuslassen: true),
             ["Vortrag"] = new("Vortrag", Nutzungsart.Vortrag, [], Buchungsrichtlinie.Oeffentlich),
-            ["Integration"] = new("Integrationskurs", Nutzungsart.Integrationskurs, ["bamf"], Buchungsrichtlinie.Integrationskurs, Sichtbarkeit.Intern, ferienAuslassen: true),
+            ["Integration"] = new Kursart("Integrationskurs", Nutzungsart.Integrationskurs, ["bamf"], Buchungsrichtlinie.Integrationskurs, Sichtbarkeit.Intern, ferienAuslassen: true)
+                .MitDozierendenmerkmalen(["bamf-lk"]),
             ["EDV"] = new("EDV-Kurs", Nutzungsart.PcKurs, ["pc"], Buchungsrichtlinie.Oeffentlich),
             ["Bewegung"] = new("Bewegungskurs", Nutzungsart.Bewegung, [], Buchungsrichtlinie.Oeffentlich),
             ["Kochen"] = new("Kochkurs", Nutzungsart.Kueche, ["kueche"], Buchungsrichtlinie.Oeffentlich),
@@ -274,6 +275,11 @@ internal static class ProgrammDemodaten
                 FerienAuslassen = arten[p.Art].FerienAuslassen,
             }, kalender, id => orte.First(o => o.Id == id).Anzeige, horizont);
             kurs.StatusSetzen(p.Status);
+            if (p.Titel.Contains("Alphabetisierung", StringComparison.Ordinal))
+            {
+                kurs.MitDozierendenmerkmalen(["bamf-lk", "alpha"]);
+            }
+
             db.Kurse.Add(kurs);
         }
 

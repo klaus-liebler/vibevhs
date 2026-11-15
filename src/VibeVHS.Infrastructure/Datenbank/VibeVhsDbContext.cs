@@ -103,6 +103,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             Unterliste(b, p => p.Organisationen, "_organisationen");
             Unterliste(b, p => p.Vollmachten, "_vollmachten");
             Unterliste(b, p => p.Einwilligungen, "_einwilligungen");
+            Unterliste(b, p => p.Qualifikationen, "_qualifikationen");
         });
 
         Version<PersonName>(modelBuilder, "PersonNamen", b =>
@@ -141,6 +142,14 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.HasIndex(v => v.BevollmaechtigterId);
         });
         Version<Einwilligung>(modelBuilder, "PersonEinwilligungen", _ => { });
+        Version<PersonQualifikation>(modelBuilder, "PersonQualifikationen", b =>
+        {
+            b.Property(q => q.Schluessel).HasMaxLength(40);
+            b.Property(q => q.Bezeichnung).HasMaxLength(200);
+            b.Property(q => q.WertText).HasMaxLength(200);
+            b.Property(q => q.Nachweis).HasMaxLength(500);
+            b.Property(q => q.AusstellendeStelle).HasMaxLength(200);
+        });
 
         modelBuilder.Entity<Organisation>(b =>
         {

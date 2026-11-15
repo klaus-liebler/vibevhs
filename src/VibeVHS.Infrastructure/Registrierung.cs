@@ -45,6 +45,7 @@ public static class Registrierung
         dienste.AddScoped<IOrganisationen, OrganisationenSpeicher>();
         dienste.AddScoped<Application.Programm.IProgrammSpeicher, Programm.ProgrammSpeicher>();
         dienste.AddScoped<Application.Programm.IGlobaleSuche, Programm.GlobaleSuche>();
+        dienste.AddScoped<Application.Programm.IQualifikationsSpeicher, Programm.QualifikationsSpeicher>();
         dienste.AddScoped<Application.Datenschutz.IDatenschutzSpeicher, Datenschutz.DatenschutzSpeicher>();
         dienste.AddSingleton<Application.Datenschutz.IAuskunftPdf, Datenschutz.AuskunftPdf>();
         dienste.AddScoped<Anmeldung.AnmeldungSpeicher>();
@@ -68,7 +69,8 @@ public static class Registrierung
             q.AddTrigger(t => t.ForJob(LoeschlaufJob.Schluessel).WithIdentity("loeschlauf-monatlich", "automatik").WithCronSchedule("0 0 3 1 * ?"));
             q.AddJob<AnmeldungJob>(j => j.WithIdentity(AnmeldungJob.Schluessel));
             q.AddTrigger(t => t.ForJob(AnmeldungJob.Schluessel).WithIdentity("anmeldung-stuendlich", "automatik").WithCronSchedule("0 5 * * * ?"));
-            foreach (var schluessel in new[] { TermineFortschreibenJob.Schluessel, MerkmalAblaufJob.Schluessel })
+            q.AddJob<QualifikationJob>(j => j.WithIdentity(QualifikationJob.Schluessel));
+            foreach (var schluessel in new[] { TermineFortschreibenJob.Schluessel, MerkmalAblaufJob.Schluessel, QualifikationJob.Schluessel })
             {
                 q.AddTrigger(t => t.ForJob(schluessel).WithIdentity(schluessel.Name + "-nacht", "automatik").WithCronSchedule("0 15 2 * * ?"));
                 q.AddTrigger(t => t.ForJob(schluessel).WithIdentity(schluessel.Name + "-start", "automatik").StartAt(DateTimeOffset.UtcNow.AddSeconds(20)));

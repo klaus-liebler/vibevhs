@@ -30,7 +30,7 @@ public sealed record HistorienEintrag(
 public static class Datenhistorie
 {
     /// <summary>Reihenfolge der Filter-Chips.</summary>
-    public static IReadOnlyList<string> Datenarten { get; } = ["Name", "Geburtsdatum", "Adressen", "Telefon", "E-Mail", "Rollen", "Sprache", "Organisationen", "Vollmachten", "Einwilligungen"];
+    public static IReadOnlyList<string> Datenarten { get; } = ["Name", "Geburtsdatum", "Adressen", "Telefon", "E-Mail", "Rollen", "Sprache", "Organisationen", "Vollmachten", "Einwilligungen", "Beschäftigung", "Qualifikationen"];
 
     public static IReadOnlyList<HistorienEintrag> Erstellen(Person person)
     {

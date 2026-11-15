@@ -64,6 +64,10 @@
             {
                 <dt>Ort braucht</dt><dd>@string.Join(", ", kurs.BenoetigteMerkmale.Select(s => verzeichnis.Katalog.GetValueOrDefault(s)?.Name ?? s))</dd><dd></dd>
             }
+            @if (kurs.BenoetigteDozierendenmerkmale.Count > 0)
+            {
+                <dt>Dozierende brauchen</dt><dd>@string.Join(", ", kurs.BenoetigteDozierendenmerkmale.Select(s => verzeichnis.Katalog.GetValueOrDefault(s)?.Name ?? s))</dd><dd></dd>
+            }
         </dl>
     </section>
 
@@ -88,6 +92,24 @@
             </RadzenFormField>
             <RadzenFormField Text="Bemerkung" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="aBemerkung" /></RadzenFormField>
         </div>
+        @if (kurs.Team.Count > 0)
+        {
+            <div class="vhs-row">
+                <span class="vhs-small vhs-muted">Dozent/in:</span>
+                @foreach (var t in kurs.Team)
+                {
+                    var e = EignungAm(t.PersonId, AenderungsTag);
+                    if (e is null || e.Geeignet)
+                    {
+                        <button class="vhs-chip @(aDozent == t.PersonId ? "on" : "")" title="@(e?.Code == Eignungscode.Ausnahme ? "mit Ausnahme" : "geeignet")" @onclick="@(() => aDozent = t.PersonId)">@t.Name</button>
+                    }
+                    else
+                    {
+                        <span class="vhs-why" tabindex="0" data-why="@($"{t.Name} am {AenderungsTag:dd.MM.yyyy}: {e.Begruendung}")"><button class="vhs-chip" disabled>@t.Name</button></span>
+                    }
+                }
+            </div>
+        }
         <div class="vhs-row">
             <BegruendeterButton Text="Übernehmen" Icon="save" Click="AendernAsync" Freigabe="@AendernFreigabe" />
             <BegruendeterButton Text="Gewählten Termin ausfallen lassen" Icon="event_busy" ButtonStyle="ButtonStyle.Light"
@@ -95,6 +117,67 @@
         </div>
     </section>
 </div>
+
+<section class="vhs-card">
+    <div class="vhs-head">
+        <h2>Dozierendenteam</h2>
+        <span class="vhs-small vhs-muted">Geprüft für alle künftigen Veranstaltungstage@(kurs.BenoetigteDozierendenmerkmale.Count == 0 ? " · diese Kursart verlangt keine Qualifikationen" : "")</span>
+    </div>
+    @if (betroffen.Values.Any(b => !b.Geeignet))
+    {
+        <div class="vhs-alert vhs-crit">@betroffen.Values.Count(b => !b.Geeignet) künftige Veranstaltung(en) mit fehlender Qualifikation – unten in der Tabelle markiert. Eine Aufgabe für die Fachbereichsleitung ist angelegt.</div>
+    }
+    <div class="vhs-list">
+        @foreach (var t in kurs.Team)
+        {
+            var e = teamEignung.FirstOrDefault(x => x.PersonId == t.PersonId);
+            <div>
+                <span class="vhs-grow"><a href="@($"personen/{t.PersonId}")">@t.Name</a> @if (t.Leitung) { <StatusPille Stil="neutral">Leitung</StatusPille> }</span>
+                @if (e is null || kurs.BenoetigteDozierendenmerkmale.Count == 0) { }
+                else if (e.Geeignet)
+                {
+                    <StatusPille Stil="@(e.MitAusnahme ? "info" : "gut")">@(e.MitAusnahme ? "mit Ausnahme" : "geeignet")</StatusPille>
+                }
+                else
+                {
+                    <span class="vhs-why" tabindex="0" data-why="@e.Begruendung"><StatusPille Stil="krit">nicht geeignet ab @e.ErsterFehltag?.Tag.ToString("dd.MM.yyyy")</StatusPille></span>
+                    <BegruendeterButton Text="Ausnahme erteilen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => AusnahmeAsync(t.PersonId, e))"
+                                        Freigabe="@(Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Leitung).Und(() => !e.AusnahmeMoeglich ? Freigabe.Nein("Gesetzlich vorgeschrieben (z. B. BAMF-Zulassung): keine Ausnahme möglich. Nachweis eintragen oder andere Person einplanen.") : string.IsNullOrWhiteSpace(ausnahmeText) ? Freigabe.Nein("Bitte unten eine Begründung eingeben.") : Freigabe.Ja))" />
+                }
+                <BegruendeterButton Text="Entfernen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => TeamEntfernenAsync(t.PersonId))"
+                                    Freigabe="@(Planen.Und(() => kurs.Veranstaltungen.Any(v => v.DozentId == t.PersonId && !v.Ausgefallen && v.Ende >= Uhr.GetLocalNow().LocalDateTime) ? Freigabe.Nein("Leitet noch künftige Veranstaltungen; diese zuerst einer anderen Person zuordnen.") : Freigabe.Ja))" />
+            </div>
+        }
+    </div>
+    <div class="vhs-row">
+        <RadzenTextBox @bind-Value="teamSuche" @bind-Value:after="TeamSuchenAsync" Placeholder="Dozierende suchen und hinzufügen" Style="min-width:260px" Disabled="@(!Planen.Erlaubt)" />
+        @foreach (var o in teamTreffer.Where(o => kurs.Team.All(t => t.PersonId != o.Person.Id)))
+        {
+            if (o.Eignung.Geeignet)
+            {
+                <button class="vhs-chip" @onclick="@(() => TeamHinzufuegenAsync(o, null))">+ @o.Person.Anzeigename</button>
+            }
+            else if (o.Eignung.AusnahmeMoeglich && rolle is Rolle.Fachbereichsleitung or Rolle.Leitung)
+            {
+                <span class="vhs-why" tabindex="0" data-why="@($"{o.Eignung.Begruendung} Hinzufügen nur mit Begründung im Feld unten.")">
+                    <button class="vhs-chip" style="border-color:var(--vhs-warn)" disabled="@string.IsNullOrWhiteSpace(ausnahmeText)" @onclick="@(() => TeamHinzufuegenAsync(o, ausnahmeText))">⚠ + @o.Person.Anzeigename</button>
+                </span>
+            }
+            else
+            {
+                <span class="vhs-why" tabindex="0" data-why="@o.Eignung.Begruendung"><button class="vhs-chip" disabled>@o.Person.Anzeigename</button></span>
+            }
+        }
+    </div>
+    @if (kurs.BenoetigteDozierendenmerkmale.Count > 0)
+    {
+        <RadzenFormField Text="Begründung für eine Ausnahme (nur Fachbereichsleitung, wird protokolliert)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="ausnahmeText" /></RadzenFormField>
+    }
+    @foreach (var a in ausnahmen)
+    {
+        <p class="vhs-small vhs-muted" style="margin:0">Ausnahme: @(kurs.Team.FirstOrDefault(t => t.PersonId == a.PersonId)?.Name ?? "?") · „@(verzeichnis.Katalog.GetValueOrDefault(a.Schluessel)?.Name ?? a.Schluessel)“ · @a.Begruendung · @a.ErteiltVon, @a.ErteiltAm.ToLocalTime().ToString("dd.MM.yyyy")</p>
+    }
+</section>
 
 <section class="vhs-card">
     <h2>@kurs.Veranstaltungen.Count Veranstaltungen @(konflikte.Count > 0 ? $"· {konflikte.Count} Konflikte" : "")</h2>
@@ -110,7 +193,13 @@
                         <td>@v.Beginn.ToString("ddd dd.MM.yyyy")</td>
                         <td class="vhs-mono">@v.Beginn.ToString("HH:mm")–@v.Ende.ToString("HH:mm")</td>
                         <td>@string.Join(" + ", v.Orte.Select(o => o.OrtName))</td>
-                        <td class="vhs-small">@v.DozentName</td>
+                        <td class="vhs-small">
+                            @v.DozentName
+                            @if (betroffen.TryGetValue(v.Id, out var be))
+                            {
+                                <span class="vhs-why" tabindex="0" data-why="@be.Begruendung"><StatusPille Stil="@(be.Geeignet ? "info" : "krit")">@(be.Geeignet ? "Ausnahme" : "Qualifikation fehlt")</StatusPille></span>
+                            }
+                        </td>
                         <td class="vhs-mono">
                             @if (kurs.Richtlinie.VorabEinbuchung && v.Ende < Uhr.GetLocalNow().LocalDateTime)
                             {
@@ -205,6 +294,64 @@
     [Inject]
     private NavigationManager Navigation { get; set; } = default!;
 
+    // Dozierendenteam und Qualifikationen
+    private IReadOnlyDictionary<Guid, Tageseignung> betroffen = new Dictionary<Guid, Tageseignung>();
+    private IReadOnlyList<Dozenteneignung> teamEignung = [];
+    private Dictionary<Guid, VibeVHS.Domain.Personen.Person> teamPersonen = [];
+    private IReadOnlyList<Qualifikationsausnahme> ausnahmen = [];
+    private IReadOnlyList<DozentOption> teamTreffer = [];
+    private string? teamSuche, ausnahmeText;
+    private Guid? aDozent;
+
+    private DateOnly AenderungsTag => modus == "folgende" ? gewaehlt?.Datum ?? aDatum : aDatum;
+
+    private Tageseignung? EignungAm(Guid personId, DateOnly tag)
+        => kurs is null || kurs.BenoetigteDozierendenmerkmale.Count == 0 || !teamPersonen.TryGetValue(personId, out var p)
+            ? null
+            : Dozentenpruefung.AmTag(p, kurs.BenoetigteDozierendenmerkmale, verzeichnis!.Katalog, tag, Uhr.GetLocalNow(), ausnahmen);
+
+    private async Task QualifikationenLadenAsync(IServiceProvider d)
+    {
+        var q = d.GetRequiredService<QualifikationsDienst>();
+        betroffen = await q.BetroffeneVeranstaltungenAsync(kurs!);
+        teamEignung = await q.TeamEignungAsync(kurs!);
+        ausnahmen = await q.AusnahmenAsync(kurs!.Id);
+        teamPersonen = (await d.GetRequiredService<VibeVHS.Application.Personen.IPersonenSpeicher>().LadenAsync(kurs.Team.Select(t => t.PersonId)))
+            .ToDictionary(p => p.Id);
+    }
+
+    private async Task TeamSuchenAsync()
+    {
+        var tage = kurs!.Veranstaltungen.Where(v => !v.Ausgefallen && v.Ende >= Uhr.GetLocalNow().LocalDateTime).Select(v => v.Datum).Distinct().ToList();
+        teamTreffer = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<QualifikationsDienst>().DozentenauswahlAsync(teamSuche, kurs.BenoetigteDozierendenmerkmale, tage, Id));
+    }
+
+    private async Task QualiAktionAsync(Func<QualifikationsDienst, Task> aktion, string meldung)
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => aktion(d.GetRequiredService<QualifikationsDienst>()));
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", meldung);
+            await LadenAsync();
+            if (!string.IsNullOrWhiteSpace(teamSuche))
+            {
+                await TeamSuchenAsync();
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private Task AusnahmeAsync(Guid personId, Dozenteneignung e)
+        => QualiAktionAsync(q => q.AusnahmeErteilenAsync(Id, personId, e.Tage.SelectMany(t => t.Fehlend), ausnahmeText!), "Ausnahme erteilt und protokolliert.");
+
+    private Task TeamHinzufuegenAsync(DozentOption o, string? begruendung)
+        => QualiAktionAsync(q => q.TeamHinzufuegenAsync(Id, o.Person.Id, kurs!.Team.Count == 0, begruendung), $"{o.Person.Anzeigename} ist im Dozierendenteam.");
+
+    private Task TeamEntfernenAsync(Guid personId) => QualiAktionAsync(q => q.TeamEntfernenAsync(Id, personId), "Aus dem Team entfernt.");
+
     private IReadOnlyList<VibeVHS.Application.Anmeldung.TeilnehmerZeile> teilnehmende = [];
     private VibeVHS.Application.Anmeldung.Einbuchungslage lage = new(new Dictionary<(Guid, Guid?), int>(), new Dictionary<Guid, int>());
     private bool alleBelegungen;
@@ -256,6 +403,7 @@
         !TimeOnly.TryParse(aBeginn, out _) ? Freigabe.Nein("Beginn bitte als hh:mm eingeben.")
         : modus != "zusatz" && gewaehlt is null ? Freigabe.Nein("Bitte unten den Termin anklicken, der geändert werden soll.")
         : aOrt == Guid.Empty ? Freigabe.Nein("Bitte einen Ort wählen.")
+        : aDozent is { } dz && EignungAm(dz, AenderungsTag) is { Geeignet: false } e ? Freigabe.Nein($"Die gewählte Person darf am {AenderungsTag:dd.MM.yyyy} nicht eingesetzt werden: {e.Begruendung}")
         : Freigabe.Ja);
 
     private string SerieText => kurs?.Serie is not { } s ? "keine (nur Einzeltermine)"
@@ -287,6 +435,10 @@
             verzeichnis = await p.OrtsverzeichnisAsync();
             teilnehmende = await d.GetRequiredService<VibeVHS.Application.Anmeldung.AnmeldungDienst>().TeilnehmendeAsync(Id);
             lage = VibeVHS.Application.Anmeldung.Einbuchungslage.Berechnen(teilnehmende.Select(t => t.Belegung));
+            if (kurs is not null)
+            {
+                await QualifikationenLadenAsync(d);
+            }
             if (kurs is { Veranstaltungen.Count: > 0 })
             {
                 var von = kurs.Veranstaltungen.Min(v => v.Beginn);
@@ -311,6 +463,7 @@
         aDauer = (int)(v.Ende - v.Beginn).TotalMinutes;
         aOrt = v.Orte.FirstOrDefault()?.OrtId ?? aOrt;
         aBemerkung = v.Bemerkung;
+        aDozent = v.DozentId;
     }
 
     private async Task AendernAsync()
@@ -323,15 +476,15 @@
             {
                 case "einzeln":
                     var beginn = aDatum.ToDateTime(b);
-                    await Vorgang.AusfuehrenAsync(d => dienst(d).NurDieseAendernAsync(Id, gewaehlt!.Id, beginn, beginn.AddMinutes(aDauer), [aOrt], aBemerkung));
+                    await Vorgang.AusfuehrenAsync(d => dienst(d).NurDieseAendernAsync(Id, gewaehlt!.Id, beginn, beginn.AddMinutes(aDauer), [aOrt], aBemerkung, dozentId: aDozent));
                     break;
                 case "folgende":
-                    var regel = kurs!.Serie! with { Beginn = b, DauerMinuten = aDauer, OrtIds = [aOrt] };
+                    var regel = kurs!.Serie! with { Beginn = b, DauerMinuten = aDauer, OrtIds = [aOrt], DozentId = aDozent ?? kurs.Serie.DozentId };
                     await Vorgang.AusfuehrenAsync(d => dienst(d).SerieAendernAbAsync(Id, gewaehlt!.Datum, regel));
                     break;
                 default:
                     var zusatz = aDatum.ToDateTime(b);
-                    await Vorgang.AusfuehrenAsync(d => dienst(d).EinzelveranstaltungAsync(Id, zusatz, zusatz.AddMinutes(aDauer), [aOrt]));
+                    await Vorgang.AusfuehrenAsync(d => dienst(d).EinzelveranstaltungAsync(Id, zusatz, zusatz.AddMinutes(aDauer), [aOrt], dozentId: aDozent));
                     break;
             }
 

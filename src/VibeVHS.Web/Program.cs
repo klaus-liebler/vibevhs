@@ -96,6 +96,7 @@ await using (var bereich = app.Services.CreateAsyncScope())
 {
     await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Datenschutz.DatenschutzDienst>().GrundeinstellungenAsync();
     await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Anmeldung.VorlagenDienst>().GrundeinstellungenAsync();
+    await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Programm.QualifikationsDienst>().GrundeinstellungenAsync();
 }
 
 if (app.Configuration.GetValue("Demodaten:Anlegen", false))
@@ -103,7 +104,22 @@ if (app.Configuration.GetValue("Demodaten:Anlegen", false))
     await Demodaten.AnlegenAsync(app.Services);
     await Demodaten.MassendatenAnlegenAsync(app.Services, app.Configuration.GetValue("Demodaten:Massendaten", 0));
     await ProgrammDemodaten.AnlegenAsync(app.Services);
-    await AnmeldungDemodaten.AnlegenAsync(app.Services);
+    // Nachgereichte Demodaten dürfen den Start einer bestehenden Instanz nie verhindern.
+    foreach (var (name, anlegen) in new (string, Func<IServiceProvider, Task>)[]
+             {
+                 ("Anmeldungen", AnmeldungDemodaten.AnlegenAsync),
+                 ("Qualifikationen", QualifikationsDemodaten.AnlegenAsync),
+             })
+    {
+        try
+        {
+            await anlegen(app.Services);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or Microsoft.EntityFrameworkCore.DbUpdateException)
+        {
+            app.Logger.LogWarning(ex, "Demodaten {Name} konnten nicht angelegt werden", name);
+        }
+    }
 }
 
 if (hinterProxy)

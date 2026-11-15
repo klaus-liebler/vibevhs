@@ -201,6 +201,15 @@ public sealed class Kursart
 
     /// <summary>Vorgabe für neue Serien: in den Schulferien pausieren (z. B. Sprachkurse) oder weiterlaufen (z. B. Bewegung).</summary>
     public bool FerienAuslassen { get; private set; }
+
+    /// <summary>Qualifikationen, die Dozierende am Veranstaltungstag haben müssen (z. B. "bamf-lk" für Integrationskurse).</summary>
+    public List<string> BenoetigteDozierendenmerkmale { get; private set; } = [];
+
+    public Kursart MitDozierendenmerkmalen(IEnumerable<string> schluessel)
+    {
+        BenoetigteDozierendenmerkmale = schluessel.Distinct().ToList();
+        return this;
+    }
 }
 
 public sealed record KursDozent(Guid PersonId, string Name, bool Leitung);
@@ -364,6 +373,7 @@ public sealed class Kurs
         KursartId = kursart.Id;
         Nutzungsart = kursart.Nutzungsart;
         BenoetigteMerkmale = [.. kursart.BenoetigteMerkmale];
+        BenoetigteDozierendenmerkmale = [.. kursart.BenoetigteDozierendenmerkmale];
         Richtlinie = kursart.Richtlinie;
         Sichtbarkeit = kursart.Sichtbarkeit;
         MinTeilnehmende = minTeilnehmende;
@@ -389,6 +399,15 @@ public sealed class Kurs
     public Nutzungsart Nutzungsart { get; private set; }
 
     public List<string> BenoetigteMerkmale { get; private set; } = [];
+
+    /// <summary>Qualifikationen der Dozierenden (aus der Kursart, je Kurs ergänzbar, z. B. Alpha-Zusatzqualifikation).</summary>
+    public List<string> BenoetigteDozierendenmerkmale { get; private set; } = [];
+
+    public Kurs MitDozierendenmerkmalen(IEnumerable<string> schluessel)
+    {
+        BenoetigteDozierendenmerkmale = schluessel.Distinct().ToList();
+        return this;
+    }
 
     public Sichtbarkeit Sichtbarkeit { get; private set; }
 
@@ -609,6 +628,7 @@ public sealed class Kurs
             KursartId = KursartId,
             Nutzungsart = Nutzungsart,
             BenoetigteMerkmale = [.. BenoetigteMerkmale],
+            BenoetigteDozierendenmerkmale = [.. BenoetigteDozierendenmerkmale],
             Sichtbarkeit = Sichtbarkeit,
             AuftraggeberId = AuftraggeberId,
             AuftraggeberName = AuftraggeberName,

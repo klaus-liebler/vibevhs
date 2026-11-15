@@ -1,0 +1,138 @@
+using Microsoft.EntityFrameworkCore;
+using VibeVHS.Application.Protokoll;
+using VibeVHS.Domain.Gemeinsam;
+using VibeVHS.Domain.Personen;
+using VibeVHS.Infrastructure.Datenbank;
+
+namespace VibeVHS.Web.Entwicklung;
+
+/// <summary>
+/// Beschäftigungsart und Qualifikationen der Demo-Dozierenden: wenige festangestellt, die meisten freiberuflich;
+/// die Integrationskurs-Lehrkräfte haben eine BAMF-Zulassung (eine läuft in 6 Wochen ab), eine Deutsch-Lehrkraft hat keine.
+/// Läuft auch für bestehende Datenbanken einmal nach (Protokolleintrag "Demodaten.Qualifikationen").
+/// </summary>
+internal static class QualifikationsDemodaten
+{
+    private const string Von = "Demodaten";
+
+    public static async Task AnlegenAsync(IServiceProvider dienste)
+    {
+        await using var bereich = dienste.CreateAsyncScope();
+        var db = bereich.ServiceProvider.GetRequiredService<VibeVhsDbContext>();
+        if (await db.Protokoll.AnyAsync(e => e.Aktion == "Demodaten.Qualifikationen") || !await db.Kurse.AnyAsync())
+        {
+            return;
+        }
+
+        var uhr = bereich.ServiceProvider.GetRequiredService<TimeProvider>();
+        var jetzt = uhr.GetLocalNow();
+        var heute = DateOnly.FromDateTime(jetzt.Date);
+        var e = Erfassung.Erst(jetzt, Von);
+        var katalog = await db.Merkmale.AsNoTracking().ToDictionaryAsync(m => m.Schluessel);
+        if (!katalog.ContainsKey("bamf-lk"))
+        {
+            return;
+        }
+
+        var dozierende = await db.Personen
+            .Where(p => (p.Rollen & Personenrolle.Dozierende) == Personenrolle.Dozierende && p.Status != Personenstatus.Zusammengefuehrt
+                        && p.Datenschutz == VibeVHS.Domain.Datenschutz.Datenschutzstatus.Aktiv)
+            .OrderBy(p => p.Sortierschluessel).ToListAsync();
+        var zufall = new Random(815);
+
+        // Beschäftigungsart: etwa jede fünfte Person festangestellt, Anna Becker wechselt 2026 in die Festanstellung.
+        foreach (var p in dozierende)
+        {
+            var ab = DateOnly.FromDateTime(p.AngelegtAm.Date);
+            var erfasst = Erfassung.Erst(p.AngelegtAm, Von); // bei der Ersterfassung der Person bekannt
+            if (p.Anzeigename == "Anna Becker")
+            {
+                p.BeschaeftigungAendernAb(Beschaeftigungsart.Freiberuflich, ab, erfasst);
+                p.BeschaeftigungAendernAb(Beschaeftigungsart.Festangestellt, new DateOnly(2026, 1, 1),
+                    Erfassung.Aenderung(new DateTimeOffset(2025, 12, 10, 10, 0, 0, TimeSpan.FromHours(1)), "Arbeitsvertrag vom 08.12.2025", Von));
+                continue;
+            }
+
+            p.BeschaeftigungAendernAb(zufall.Next(5) == 0 ? Beschaeftigungsart.Festangestellt : Beschaeftigungsart.Freiberuflich, ab, erfasst);
+        }
+
+        // Integrationskurs-Lehrkräfte
+        var ikKurse = (await db.Kurse.AsNoTracking().Where(k => k.ArchiviertAm == null).ToListAsync())
+            .Where(k => k.BenoetigteDozierendenmerkmale.Contains("bamf-lk")).OrderBy(k => k.Kursnummer).ToList();
+        var mitZulassung = new HashSet<Guid>();
+        var notizen = new List<string>();
+        foreach (var kurs in ikKurse)
+        {
+            if (kurs.Leitung is not { } leitung || dozierende.FirstOrDefault(d => d.Id == leitung.PersonId) is not { } p || !mitZulassung.Add(p.Id))
+            {
+                continue;
+            }
+
+            var alpha = kurs.BenoetigteDozierendenmerkmale.Contains("alpha");
+            var bis = alpha ? heute.AddDays(42) : new DateOnly(2028, 12, 31);
+            p.QualifikationSetzenAb(katalog["bamf-lk"], alpha ? "mit Auflagen" : "direkt", $"Zulassungsbescheid BAMF Az. 81-{4711 + mitZulassung.Count}/{2023 + mitZulassung.Count}",
+                "Bundesamt für Migration und Flüchtlinge", new DateOnly(2023, 1, 1), bis, e);
+            if (alpha)
+            {
+                p.QualifikationSetzenAb(katalog["alpha"], null, "Zertifikat Zusatzqualifizierung Alphabetisierung (fiktiv)", "Goethe-Institut", new DateOnly(2022, 6, 1), null, e);
+            }
+
+            notizen.Add($"{p.Anzeigename} ({kurs.Kursnummer}, BAMF bis {bis:dd.MM.yyyy})");
+        }
+
+        // Anschlusskurs, der über den Ablauf der Zulassung hinausläuft: Ablauf mitten in der Serie wird sichtbar markiert.
+        var ablaufend = ikKurse.FirstOrDefault(k => k.BenoetigteDozierendenmerkmale.Contains("alpha"))?.Leitung;
+        var art = await db.Kursarten.FirstOrDefaultAsync(k => k.Nutzungsart == VibeVHS.Domain.Programm.Nutzungsart.Integrationskurs);
+        var raum = await db.Orte.FirstOrDefaultAsync(o => o.Kurzname == "A 1.10");
+        var semester = (await db.Semester.ToListAsync()).Where(s => s.Beginn <= heute && heute <= s.Ende).FirstOrDefault();
+        if (ablaufend is not null && art is not null && raum is not null && semester is not null && !await db.Kurse.AnyAsync(k => k.Kursnummer == semester.Kuerzel + "-405"))
+        {
+            var kalender = new VibeVHS.Domain.Programm.Kalender(await db.Ferien.AsNoTracking().ToListAsync());
+            var start = heute.AddDays(28);
+            while (start.DayOfWeek != DayOfWeek.Monday)
+            {
+                start = start.AddDays(1);
+            }
+
+            var modul4 = new VibeVHS.Domain.Programm.Kurs($"{semester.Kuerzel}-405", "Integrationskurs allgemein, Modul 4", semester, 4, art, 10, 20)
+                .MitTeam([ablaufend with { Leitung = true }])
+                .MitBeschreibung("Anschlusskurs an Modul 3 (Demodaten: Die BAMF-Zulassung der Lehrkraft läuft mitten in der Serie ab).");
+            modul4.EntgeltSetzenAb(new Geld(0), null, semester.Beginn, e);
+            modul4.SerieFestlegen(new VibeVHS.Domain.Programm.Serienregel
+            {
+                Start = start, Anzahl = 24, Wochentage = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday],
+                Beginn = new TimeOnly(8, 30), DauerMinuten = 240, OrtIds = [raum.Id], FerienAuslassen = true,
+            }, kalender, _ => raum.Anzeige, heute.AddDays(12 * 7));
+            modul4.StatusSetzen(VibeVHS.Domain.Programm.Kursstatus.Veroeffentlicht);
+            db.Kurse.Add(modul4);
+            notizen.Add($"{modul4.Kursnummer} mit {ablaufend.Name} ab {start:dd.MM.yyyy}");
+        }
+
+        // Deutsch-Lehrkraft ohne BAMF-Zulassung (Sperre sichtbar), aber mit telc-Prüferlizenz
+        var ohne = dozierende.FirstOrDefault(d => d.Fachbereiche.Contains(4) && !mitZulassung.Contains(d.Id));
+        if (ohne is not null)
+        {
+            ohne.QualifikationSetzenAb(katalog["telc-pruefer"], null, "Lizenz-Nr. T-2024-0815 (fiktiv)", "telc gGmbH", new DateOnly(2024, 3, 1), new DateOnly(2027, 2, 28), e);
+            notizen.Add($"{ohne.Anzeigename} ohne BAMF-Zulassung");
+        }
+
+        // Weitere Beispiele: Übungsleiterlizenz und Erste Hilfe für Bewegung, Führungszeugnis
+        foreach (var p in dozierende.Where(d => d.Fachbereiche.Contains(7) || d.Fachbereiche.Contains(8)).Take(6))
+        {
+            p.QualifikationSetzenAb(katalog["uebungsleiter"], null, $"Lizenz Nr. {zufall.Next(10000, 99999)} (fiktiv)", "LandesSportBund NRW", new DateOnly(2023, 1, 1),
+                new DateOnly(2026 + zufall.Next(1, 3), 12, 31), e);
+            p.QualifikationSetzenAb(katalog["erste-hilfe"], null, "Bescheinigung Erste-Hilfe-Kurs (fiktiv)", "DRK Kreisverband Steinfurt", new DateOnly(2025, 2, 1),
+                new DateOnly(2027, 1, 31), e);
+        }
+
+        if (dozierende.FirstOrDefault(d => d.Fachbereiche.Contains(3) && !mitZulassung.Contains(d.Id)) is { } fz)
+        {
+            fz.QualifikationSetzenAb(katalog["fuehrungszeugnis"], null, "Erweitertes Führungszeugnis vom 15.01.2026 (Einsicht vermerkt)", "Stadt Emsdetten, Bürgerbüro",
+                new DateOnly(2026, 1, 15), new DateOnly(2031, 1, 14), e);
+        }
+
+        db.Protokoll.Add(new AuditEintrag(uhr.GetUtcNow(), "automatik", "Automatik", null, "Demodaten.Qualifikationen", null, null,
+            $"Demo-Qualifikationen und Beschäftigungsarten für {dozierende.Count} Dozierende angelegt: {string.Join("; ", notizen)}"));
+        await db.SaveChangesAsync();
+    }
+}

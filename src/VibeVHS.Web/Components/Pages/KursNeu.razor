@@ -44,14 +44,40 @@
     <h3>Dozentin / Dozent</h3>
     <div class="vhs-row">
         <RadzenTextBox @bind-Value="dozentSuche" @bind-Value:after="DozentSuchenAsync" Placeholder="Dozierende suchen (Name)" Style="min-width:260px" />
-        @foreach (var d in dozentTreffer)
+        @foreach (var o in dozentTreffer)
         {
-            <button class="vhs-chip @(dozent?.PersonId == d.Id ? "on" : "")" @onclick="@(() => dozent = new KursDozent(d.Id, d.Anzeigename, true))">@d.Anzeigename @(d.Fachbereiche.Count > 0 ? $"(FB {string.Join(",", d.Fachbereiche)})" : "")</button>
+            var d = o.Person;
+            var text = $"{d.Anzeigename}{(d.Fachbereiche.Count > 0 ? $" (FB {string.Join(",", d.Fachbereiche)})" : "")}";
+            if (o.Eignung.Geeignet)
+            {
+                <button class="vhs-chip @(dozent?.PersonId == d.Id ? "on" : "")" title="geeignet" @onclick="@(() => DozentWaehlen(o))">@text</button>
+            }
+            else if (o.Eignung.AusnahmeMoeglich && AusnahmeErlaubt)
+            {
+                <span class="vhs-why" tabindex="0" data-why="@o.Eignung.Begruendung">
+                    <button class="vhs-chip @(dozent?.PersonId == d.Id ? "on" : "")" style="border-color:var(--vhs-warn)" @onclick="@(() => DozentWaehlen(o))">⚠ @text</button>
+                </span>
+            }
+            else
+            {
+                <span class="vhs-why" tabindex="0" data-why="@o.Eignung.Begruendung"><button class="vhs-chip" disabled>@text</button></span>
+            }
         }
     </div>
+    @if (Kursart is { BenoetigteDozierendenmerkmale.Count: > 0 } kq)
+    {
+        <p class="vhs-small vhs-muted" style="margin:0">Die Kursart verlangt von Dozierenden: @string.Join(", ", kq.BenoetigteDozierendenmerkmale.Select(s => katalog.GetValueOrDefault(s)?.Name ?? s)). Geprüft wird an jedem Veranstaltungstag; ungeeignete Personen sind gesperrt.</p>
+    }
     @if (dozent is not null)
     {
         <p class="vhs-small" style="margin:0">Gewählt: <b>@dozent.Name</b></p>
+    }
+    @if (ausnahmeNoetig)
+    {
+        <div class="vhs-alert vhs-warn">
+            @dozentEignung?.Begruendung
+            <RadzenFormField Text="Begründung der Ausnahme (wird protokolliert)" Variant="Variant.Outlined" Style="width:100%"><RadzenTextBox @bind-Value="ausnahmebegruendung" /></RadzenFormField>
+        </div>
     }
 </section>
 
@@ -117,6 +143,10 @@
         {
             <div class="vhs-alert vhs-warn">@k</div>
         }
+        @if (v.Dozent is { Geeignet: false } de)
+        {
+            <div class="vhs-alert @(ausnahmeNoetig && !string.IsNullOrWhiteSpace(ausnahmebegruendung) ? "vhs-warn" : "vhs-crit")">@de.Begruendung</div>
+        }
         @foreach (var o in v.Orte.Where(o => !o.Geeignet))
         {
             <div class="vhs-alert vhs-crit">@o.Ort.Anzeige: @o.Begruendung</div>
@@ -145,8 +175,22 @@
     private IReadOnlyList<Fachbereich> fachbereiche = [];
     private IReadOnlyList<Kursart> kursarten = [];
     private IReadOnlyList<Ortseignung> ortswahl = [];
-    private IReadOnlyList<PersonZeile> dozentTreffer = [];
+    private IReadOnlyList<DozentOption> dozentTreffer = [];
+    private IReadOnlyDictionary<string, Merkmal> katalog = new Dictionary<string, Merkmal>();
+    private Dozenteneignung? dozentEignung;
+    private bool ausnahmeNoetig;
+    private string? ausnahmebegruendung;
     private Rolle? rolle;
+
+    private bool AusnahmeErlaubt => rolle is Rolle.Fachbereichsleitung or Rolle.Leitung;
+
+    private void DozentWaehlen(DozentOption o)
+    {
+        dozent = new KursDozent(o.Person.Id, o.Person.Anzeigename, true);
+        dozentEignung = o.Eignung;
+        ausnahmeNoetig = !o.Eignung.Geeignet;
+        vorschau = null;
+    }
 
     private string? titel, dozentSuche, fehler;
     private Guid semesterId, kursartId;
@@ -171,6 +215,7 @@
         : !TimeOnly.TryParse(beginnText, out _) ? Freigabe.Nein("Beginn bitte als hh:mm eingeben, z. B. 18:00.")
         : ortIds.Count == 0 ? Freigabe.Nein("Bitte mindestens einen Ort wählen. Ausgegraute Orte sind ungeeignet – der Tooltip nennt den Grund.")
         : dozent is null ? Freigabe.Nein("Bitte eine Dozentin oder einen Dozenten auswählen.")
+        : ausnahmeNoetig && string.IsNullOrWhiteSpace(ausnahmebegruendung) ? Freigabe.Nein("Für die gewählte Person fehlt eine Qualifikation. Bitte die Ausnahme begründen oder eine geeignete Person wählen.")
         : Freigabe.Ja;
 
     protected override async Task OnInitializedAsync()
@@ -182,6 +227,7 @@
             alleSemester = await p.SemesterAsync();
             kursarten = await p.KursartenAsync();
             fachbereiche = await d.GetRequiredService<IStammdaten>().FachbereicheAsync();
+            katalog = await d.GetRequiredService<QualifikationsDienst>().KatalogAsync();
         });
         var heute = DateOnly.FromDateTime(DateTime.Today);
         semesterId = (alleSemester.FirstOrDefault(s => s.Beginn > heute) ?? alleSemester.LastOrDefault())?.Id ?? Guid.Empty;
@@ -226,17 +272,36 @@
 
         ortswahl = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().OrtsauswahlAsync(kursartId, Regel()));
         ortIds.RemoveAll(id => ortswahl.Any(o => o.Ort.Id == id && !o.Geeignet));
+        await DozentSuchenAsync();
     }
 
     private async Task DozentSuchenAsync()
     {
-        dozentTreffer = string.IsNullOrWhiteSpace(dozentSuche)
-            ? []
-            : await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenAbfrage>().SeiteAsync(new PersonenFilter(dozentSuche, Personenrolle.Dozierende), null, 8));
+        var benoetigt = Kursart?.BenoetigteDozierendenmerkmale ?? [];
+        dozentTreffer = await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var tage = Regel() is { } r && r.Wochentage.Count > 0 ? await d.GetRequiredService<ProgrammDienst>().SerientageAsync(r) : [];
+            return await d.GetRequiredService<QualifikationsDienst>().DozentenauswahlAsync(dozentSuche, benoetigt, tage, null);
+        });
+        if (dozent is not null)
+        {
+            var aktuell = dozentTreffer.FirstOrDefault(o => o.Person.Id == dozent.PersonId);
+            if (aktuell is not null)
+            {
+                dozentEignung = aktuell.Eignung;
+                ausnahmeNoetig = !aktuell.Eignung.Geeignet;
+                if (!aktuell.Eignung.Geeignet && !(aktuell.Eignung.AusnahmeMoeglich && AusnahmeErlaubt))
+                {
+                    dozent = null;
+                    ausnahmeNoetig = false;
+                }
+            }
+        }
     }
 
     private KursEntwurf Entwurf() => new(titel!, semesterId, fachbereich, kursartId, Regel()!, dozent is null ? [] : [dozent], min, max,
-        new Geld((long)Math.Round(entgelt * 100)), ermaessigt is { } e ? new Geld((long)Math.Round(e * 100)) : null);
+        new Geld((long)Math.Round(entgelt * 100)), ermaessigt is { } e ? new Geld((long)Math.Round(e * 100)) : null,
+        Ausnahmebegruendung: ausnahmeNoetig ? ausnahmebegruendung : null);
 
     private async Task VorschauAsync()
     {

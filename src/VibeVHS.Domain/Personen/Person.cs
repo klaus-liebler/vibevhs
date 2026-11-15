@@ -20,6 +20,7 @@ public sealed class Person
     private readonly List<Organisationszugehoerigkeit> _organisationen = [];
     private readonly List<Buchungsvollmacht> _vollmachten = [];
     private readonly List<Einwilligung> _einwilligungen = [];
+    private readonly List<PersonQualifikation> _qualifikationen = [];
 
     private Person()
     {
@@ -63,6 +64,8 @@ public sealed class Person
 
     public IReadOnlyCollection<Einwilligung> Einwilligungen => _einwilligungen;
 
+    public IReadOnlyCollection<PersonQualifikation> Qualifikationen => _qualifikationen;
+
     public Personenstatus Status { get; private set; }
 
     /// <summary>Fachbereiche, denen die Person zugeordnet ist (v. a. Dozierende).</summary>
@@ -86,7 +89,7 @@ public sealed class Person
     /// <summary>Alle Versionen aller Stammdaten für die Datenhistorie.</summary>
     public IEnumerable<IHistorienwert> AlleVersionen =>
         _namen.Cast<IHistorienwert>().Concat(_merkmale).Concat(_adressen).Concat(_kennzeichen).Concat(_rufnummern).Concat(_emails)
-            .Concat(_organisationen).Concat(_vollmachten).Concat(_einwilligungen);
+            .Concat(_organisationen).Concat(_vollmachten).Concat(_einwilligungen).Concat(_qualifikationen);
 
     public static Person Anlegen(string vorname, string nachname, DateOnly nameGueltigAb, DateTimeOffset jetzt,
         DateOnly? geburtsdatum = null, string? eMail = null, string sprache = "de", string? von = null)
@@ -132,8 +135,66 @@ public sealed class Person
             _emails.AlleAmStichtag(gueltigAm, bekanntAm),
             _organisationen.AlleAmStichtag(gueltigAm, bekanntAm),
             _vollmachten.AlleAmStichtag(gueltigAm, bekanntAm),
-            _einwilligungen.AlleAmStichtag(gueltigAm, bekanntAm));
+            _einwilligungen.AlleAmStichtag(gueltigAm, bekanntAm),
+            Merkmal(MerkmalArt.Beschaeftigung)?.AlsBeschaeftigung(),
+            _qualifikationen.AlleAmStichtag(gueltigAm, bekanntAm));
     }
+
+    // ---------- Dozierende: Beschäftigungsart und Qualifikationen ----------
+
+    /// <summary>Beschäftigungsart ab einem Datum (z. B. Wechsel von freiberuflich zu festangestellt). Ältere Einsätze behalten die damalige Art.</summary>
+    public void BeschaeftigungAendernAb(Beschaeftigungsart art, DateOnly ab, Erfassung erfassung)
+    {
+        var erste = !_merkmale.Any(m => m.Art == MerkmalArt.Beschaeftigung);
+        ZeitlicheHistorie.AendernAb(_merkmale, new PersonMerkmal(MerkmalArt.Beschaeftigung, art.ToString(), ab, null,
+            erste && erfassung.Art == Erfassungsart.AenderungAbDatum ? erfassung with { Art = Erfassungsart.Ersterfassung } : erfassung));
+    }
+
+    public Beschaeftigungsart? BeschaeftigungAm(DateOnly tag, DateTimeOffset bekanntAm)
+        => _merkmale.Where(m => m.Art == MerkmalArt.Beschaeftigung).AlsStichtag(tag, bekanntAm)?.AlsBeschaeftigung();
+
+    /// <summary>Qualifikation eintragen oder erneuern, gültig von <paramref name="ab"/> bis einschließlich <paramref name="bisEinschliesslich"/>.</summary>
+    public PersonQualifikation QualifikationSetzenAb(Programm.Merkmal merkmal, string? wert, string? nachweis, string? ausstellendeStelle,
+        DateOnly ab, DateOnly? bisEinschliesslich, Erfassung erfassung)
+    {
+        ArgumentNullException.ThrowIfNull(merkmal);
+        if (merkmal.Bezug != Programm.MerkmalBezug.Person)
+        {
+            throw new ArgumentException($"„{merkmal.Name}“ ist ein Merkmal für Orte, nicht für Personen.");
+        }
+
+        if (merkmal.NachweisPflicht && string.IsNullOrWhiteSpace(nachweis))
+        {
+            throw new ArgumentException($"Für „{merkmal.Name}“ ist ein Nachweis Pflicht (Dokument oder Aktenzeichen).");
+        }
+
+        if (merkmal.Werte.Count > 0 && (wert is null || !merkmal.Werte.Contains(wert)))
+        {
+            throw new ArgumentException($"Bitte für „{merkmal.Name}“ einen der Werte wählen: {string.Join(", ", merkmal.Werte)}.");
+        }
+
+        if (bisEinschliesslich is { } b && b < ab)
+        {
+            throw new ArgumentException("Das Ende der Gültigkeit liegt vor dem Beginn.");
+        }
+
+        var erste = !_qualifikationen.Any(q => q.Schluessel == merkmal.Schluessel);
+        var neu = new PersonQualifikation(merkmal.Schluessel, merkmal.Name, wert, nachweis, ausstellendeStelle, ab, bisEinschliesslich?.AddDays(1),
+            erste && erfassung.Art == Erfassungsart.AenderungAbDatum ? erfassung with { Art = Erfassungsart.Ersterfassung } : erfassung);
+        ZeitlicheHistorie.AendernAb(_qualifikationen, neu);
+        return neu;
+    }
+
+    /// <summary>Qualifikation ab einem Datum beenden (z. B. Zulassung widerrufen).</summary>
+    public void QualifikationBeendenAb(string schluessel, DateOnly ab, Erfassung erfassung)
+    {
+        var aktuell = _qualifikationen.Where(q => q.Schluessel == schluessel).AlsStichtag(ab, erfassung.Am)
+            ?? throw new InvalidOperationException("Diese Qualifikation gilt am angegebenen Tag nicht.");
+        ZeitlicheHistorie.BeendenAb(_qualifikationen, aktuell.KopieMit(ab, null, erfassung with { Art = Erfassungsart.Beendet }));
+    }
+
+    public PersonQualifikation? QualifikationAm(string schluessel, DateOnly tag, DateTimeOffset bekanntAm)
+        => _qualifikationen.Where(q => q.Schluessel == schluessel).AlsStichtag(tag, bekanntAm);
 
     /// <summary>Name, der am <paramref name="gueltigAm"/> galt, nach dem Wissensstand vom <paramref name="bekanntAm"/>.</summary>
     public PersonName? NameAm(DateOnly gueltigAm, DateTimeOffset bekanntAm) => _namen.AlsStichtag(gueltigAm, bekanntAm);
@@ -490,6 +551,12 @@ public sealed class Person
             o.Anonymisieren();
         }
 
+        foreach (var q in _qualifikationen)
+        {
+            q.Anonymisieren();
+            q.GrundAnonymisieren();
+        }
+
         KontaktdatenLoeschen(jetzt);
         foreach (var v in AlleVersionen.Cast<object>())
         {
@@ -687,7 +754,9 @@ public sealed record PersonenStand(
     IReadOnlyList<EMailAdresse> EMails,
     IReadOnlyList<Organisationszugehoerigkeit> Organisationen,
     IReadOnlyList<Buchungsvollmacht> Vollmachten,
-    IReadOnlyList<Einwilligung> Einwilligungen)
+    IReadOnlyList<Einwilligung> Einwilligungen,
+    Beschaeftigungsart? Beschaeftigung = null,
+    IReadOnlyList<PersonQualifikation>? Qualifikationen = null)
 {
     /// <summary>Liegt für Kanal und Zweck eine Einwilligung vor? Ohne Angabe: nein.</summary>
     public bool Erlaubt(Kontaktkanal kanal, Kontaktzweck zweck)

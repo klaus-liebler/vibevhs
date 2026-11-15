@@ -189,6 +189,25 @@ Einwilligung, bevorzugt) und E-Mail-Adressen (Art, bevorzugt). Die Kennzeichen �
   Teilnehmenden, Integrationskurse über das Integrationskurs-Team, Firmenkurs über die Stadtwerke, Pilates mit 23 Kontingenten.
 - Abnahme der Phase A: Klick-Drehbuch in [`abnahme-a.md`](abnahme-a.md).
 
+## Dozierendenmerkmale (FA-120 bis FA-124)
+
+- **Beschäftigungsart** je Dozent/in, zeitlich gültig: festangestellt (Arbeitszeit) oder freiberuflich (Honorar). Ein Wechsel gilt
+  ab Datum; frühere Einsätze behalten die damalige Art. Sichtbar auf der Personenseite und in der Datenhistorie.
+- **Qualifikationen** aus dem gemeinsamen Merkmalskatalog (Bezug „Person“) mit Wert (z. B. Zulassungsart), Nachweis, ausstellender
+  Stelle und Gültigkeit: BAMF-Lehrkraftzulassung, Zusatzqualifikation Alphabetisierung, Prüferlizenz telc/Goethe,
+  Übungsleiterlizenz, Erste-Hilfe-Nachweis, erweitertes Führungszeugnis (Vorschläge, unter `/qualifikationen` erweiterbar).
+- **Kursarten verlangen Merkmale** an Ort und Dozierenden (`/qualifikationen`); Kurse übernehmen sie und können ergänzen
+  (z. B. Alphabetisierung). Ein **Prüfdienst** liefert je Veranstaltungstag einen Begründungscode (geeignet, Ausnahme, fehlt,
+  abgelaufen am …, gilt erst ab …).
+- **Gesperrte Auswahl** beim Kurs anlegen, im Dozierendenteam und beim Ändern von Terminen: ungeeignete Personen sind
+  ausgegraut, der Tooltip nennt den Grund. Die Fachbereichsleitung kann mit Begründung eine protokollierte **Ausnahme**
+  erteilen – nicht bei als „gesetzlich“ markierten Merkmalen (BAMF-Zulassung, Alpha, Führungszeugnis).
+- **Aufgaben** (täglicher Job, Korb Fachbereichsleitung): Qualifikation läuft bald ab (Vorlauf je Merkmal), Nachweis fehlt,
+  künftige Veranstaltungen mit ungeeigneter Person. Betroffene Veranstaltungen sind im Kurs rot markiert.
+- Demodaten: rund jede fünfte Lehrkraft festangestellt, Anna Becker wechselt zum 01.01.2026 in die Festanstellung;
+  Integrationskurs-Lehrkräfte mit BAMF-Zulassung, eine läuft in 6 Wochen ab (Anschlusskurs 26H-405 ist ab Januar markiert),
+  eine Deutsch-Lehrkraft ohne Zulassung (bei Integrationskursen gesperrt).
+
 ## Testbenutzer der Pilot-VHS
 
 Die Startdaten liegen in [`tools/Testdaten/testbenutzer-vhs-egs.json`](../tools/Testdaten/testbenutzer-vhs-egs.json)

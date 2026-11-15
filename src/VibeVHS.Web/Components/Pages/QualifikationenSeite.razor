@@ -1,0 +1,148 @@
+@page "/qualifikationen"
+@using VibeVHS.Application.Programm
+@using VibeVHS.Domain.Programm
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+
+<PageTitle>Qualifikationen · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Qualifikationen von Dozierenden</h1>
+        <p class="vhs-sub">Gemeinsamer Merkmalskatalog (hier: Merkmale an Personen) und was jede Kursart von Dozierenden verlangt. Geprüft wird an jedem Veranstaltungstag.</p>
+    </div>
+</div>
+
+<div class="vhs-split">
+    <section class="vhs-card">
+        <h2>Kursarten verlangen</h2>
+        <p class="vhs-small vhs-muted" style="margin-top:-6px">Änderungen gelten auch für alle nicht archivierten Kurse dieser Art; kursbezogene Ergänzungen (z. B. Alpha) bleiben.</p>
+        <div class="vhs-tbl">
+            <table>
+                <thead><tr><th>Kursart</th><th>Qualifikationen</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var art in kursarten)
+                    {
+                        var auswahl = Auswahl(art);
+                        <tr>
+                            <td><b>@art.Name</b><br /><span class="vhs-small vhs-muted">@NutzungsartAnzeige.Text(art.Nutzungsart)</span></td>
+                            <td>
+                                <div class="vhs-chips">
+                                    @foreach (var m in merkmale)
+                                    {
+                                        <button class="vhs-chip @(auswahl.Contains(m.Schluessel) ? "on" : "")" disabled="@(!Pflegen.Erlaubt)" title="@(m.Gesetzlich ? "gesetzlich – keine Ausnahme möglich" : "Ausnahme durch Fachbereichsleitung möglich")"
+                                                @onclick="@(() => { if (!auswahl.Remove(m.Schluessel)) auswahl.Add(m.Schluessel); })">@m.Name</button>
+                                    }
+                                </div>
+                            </td>
+                            <td><BegruendeterButton Text="Übernehmen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@(Pflegen.Und(() => auswahl.SetEquals(art.BenoetigteDozierendenmerkmale) ? Freigabe.Nein("Keine Änderung.") : Freigabe.Ja))"
+                                                    Click="@(() => KursartAsync(art, auswahl))" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="vhs-card">
+        <h2>Katalog: Merkmale an Personen</h2>
+        <div class="vhs-list">
+            @foreach (var m in merkmale)
+            {
+                <div>
+                    <span class="vhs-grow"><b>@m.Name</b> <span class="vhs-small vhs-muted">@m.Schluessel · @m.Gruppe</span>
+                        @if (m.Werte.Count > 0) { <br /><span class="vhs-small">Werte: @string.Join(" / ", m.Werte)</span> }
+                    </span>
+                    @if (m.Gesetzlich) { <span class="vhs-why" tabindex="0" data-why="Gesetzlich vorgeschrieben: Die Fachbereichsleitung kann keine Ausnahme erteilen."><StatusPille Stil="krit">gesetzlich</StatusPille></span> }
+                    @if (m.NachweisPflicht) { <StatusPille Stil="neutral">Nachweis Pflicht</StatusPille> }
+                    <StatusPille Stil="info">Aufgabe @m.VorlaufTage Tage vor Ablauf</StatusPille>
+                </div>
+            }
+        </div>
+        <h3>Merkmal aufnehmen</h3>
+        <div class="vhs-fields">
+            <RadzenFormField Text="Schlüssel (z. B. pruefer-dsd)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nSchluessel" /></RadzenFormField>
+            <RadzenFormField Text="Name" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nName" /></RadzenFormField>
+            <RadzenFormField Text="Gruppe" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nGruppe" /></RadzenFormField>
+            <RadzenFormField Text="Werte (mit / getrennt, optional)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nWerte" /></RadzenFormField>
+        </div>
+        <div class="vhs-row">
+            <label><input type="checkbox" @bind="nNachweis" /> Nachweis Pflicht</label>
+            <label><input type="checkbox" @bind="nGesetzlich" /> gesetzlich vorgeschrieben (keine Ausnahme)</label>
+        </div>
+        <BegruendeterButton Text="Aufnehmen" Icon="add" Click="AufnehmenAsync"
+                            Freigabe="@(Freigabe.NurFuer(rolle, Rolle.Verwaltungsleitung, Rolle.Leitung, Rolle.Systemverwaltung).Und(() => string.IsNullOrWhiteSpace(nSchluessel) || string.IsNullOrWhiteSpace(nName) ? Freigabe.Nein("Schlüssel und Name sind Pflicht.") : Freigabe.Ja))" />
+    </section>
+</div>
+
+<NaechsteSchritte Schritte="@([new NaechsterSchritt("Zur Personenliste", "personen", "Qualifikationen je Person auf der Personenseite pflegen (Filter Rolle: Dozierende)"), new NaechsterSchritt("Kurse", "kurse")])" />
+
+@code {
+    private IReadOnlyList<Merkmal> merkmale = [];
+    private IReadOnlyList<Kursart> kursarten = [];
+    private readonly Dictionary<Guid, HashSet<string>> auswahlen = [];
+    private Rolle? rolle;
+    private string? nSchluessel, nName, nWerte;
+    private string nGruppe = "Qualifikation";
+    private bool nNachweis = true, nGesetzlich;
+
+    private Freigabe Pflegen => Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Verwaltungsleitung, Rolle.Leitung);
+
+    private HashSet<string> Auswahl(Kursart art)
+    {
+        if (!auswahlen.TryGetValue(art.Id, out var a))
+        {
+            a = [.. art.BenoetigteDozierendenmerkmale];
+            auswahlen[art.Id] = a;
+        }
+
+        return a;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync()
+    {
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            merkmale = await d.GetRequiredService<QualifikationsDienst>().PersonenmerkmaleAsync();
+            kursarten = await d.GetRequiredService<IProgrammSpeicher>().KursartenAsync();
+        });
+        auswahlen.Clear();
+    }
+
+    private async Task KursartAsync(Kursart art, HashSet<string> auswahl)
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<QualifikationsDienst>().KursartAnforderungenSetzenAsync(art.Id, auswahl.ToList()));
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", $"„{art.Name}“ aktualisiert, auch in den Kursen dieser Art.");
+            await LadenAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task AufnehmenAsync()
+    {
+        try
+        {
+            var werte = (nWerte ?? "").Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var m = new Merkmal(nSchluessel!, nName!, nGruppe, false, nNachweis, null, MerkmalBezug.Person, nGesetzlich, werte);
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<QualifikationsDienst>().MerkmalAufnehmenAsync(m));
+            Hinweise.Notify(NotificationSeverity.Success, "Aufgenommen", $"„{m.Name}“ steht jetzt im Katalog.");
+            nSchluessel = nName = nWerte = null;
+            await LadenAsync();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+}

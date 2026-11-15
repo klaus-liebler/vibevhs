@@ -15,6 +15,8 @@ public static class Registrierung
         dienste.AddScoped<PersonenDienst>();
         dienste.AddScoped<Rundschreiben>();
         dienste.AddScoped<Programm.ProgrammDienst>();
+        dienste.AddScoped<Programm.QualifikationsDienst>();
+        dienste.AddScoped<Programm.IDozenteneinsatz>(d => d.GetRequiredService<Programm.QualifikationsDienst>());
         dienste.AddScoped<Datenschutz.DatenschutzDienst>();
         dienste.AddScoped<Anmeldung.AnmeldungDienst>();
         dienste.AddScoped<Anmeldung.VorlagenDienst>();

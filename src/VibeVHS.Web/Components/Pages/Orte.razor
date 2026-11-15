@@ -86,7 +86,7 @@
                 <summary><b>Merkmal eintragen</b> <span class="vhs-small vhs-muted">– mit Nachweis und Gültigkeit, die bisherige Eintragung bleibt in der Historie</span></summary>
                 <div class="vhs-fields">
                     <RadzenFormField Text="Merkmal" Variant="Variant.Outlined">
-                        <RadzenDropDown TValue="string" @bind-Value="mSchluessel" Data="@verzeichnis.Katalog.Values.OrderBy(k => k.Gruppe).ThenBy(k => k.Name)" TextProperty="Name" ValueProperty="Schluessel" />
+                        <RadzenDropDown TValue="string" @bind-Value="mSchluessel" Data="@verzeichnis.Katalog.Values.Where(k => k.Bezug == MerkmalBezug.Ort).OrderBy(k => k.Gruppe).ThenBy(k => k.Name)" TextProperty="Name" ValueProperty="Schluessel" />
                     </RadzenFormField>
                     <RadzenFormField Text="Wert" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="mWert" Placeholder="z. B. 12 Plätze, gemeldet" /></RadzenFormField>
                     <RadzenFormField Text="Nachweis" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="mNachweis" Placeholder="z. B. BAMF-Schreiben vom …" /></RadzenFormField>
@@ -117,7 +117,7 @@
         <table>
             <thead><tr><th>Schlüssel</th><th>Name</th><th>Gruppe</th><th>vererbbar</th><th>Nachweis Pflicht</th><th>Ausschlussgruppe</th></tr></thead>
             <tbody>
-                @foreach (var k in verzeichnis?.Katalog.Values.OrderBy(k => k.Gruppe).ThenBy(k => k.Name) ?? Enumerable.Empty<Merkmal>())
+                @foreach (var k in verzeichnis?.Katalog.Values.Where(k => k.Bezug == MerkmalBezug.Ort).OrderBy(k => k.Gruppe).ThenBy(k => k.Name) ?? Enumerable.Empty<Merkmal>())
                 {
                     <tr><td class="vhs-mono">@k.Schluessel</td><td>@k.Name</td><td>@k.Gruppe</td><td>@(k.Vererbbar ? "ja" : "nein")</td><td>@(k.NachweisPflicht ? "ja" : "nein")</td><td>@k.Ausschlussgruppe</td></tr>
                 }

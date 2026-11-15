@@ -22,20 +22,23 @@ public sealed record KursEntwurf(
     Guid? AuftraggeberId = null,
     string? AuftraggeberName = null,
     string? Beschreibung = null,
-    string? Kursnummer = null);
+    string? Kursnummer = null,
+    string? Ausnahmebegruendung = null);
 
 /// <summary>Vorschau vor dem Speichern: Termine (mit ausgelassenen), Ortseignung und Konflikte.</summary>
 public sealed record KursVorschau(
     IReadOnlyList<Serientermin> Termine,
     IReadOnlyList<Ortseignung> Orte,
     IReadOnlyList<string> Konflikte,
-    string Kursnummer)
+    string Kursnummer,
+    Dozenteneignung? Dozent = null)
 {
     public bool Speicherbar => Orte.All(o => o.Geeignet) && Termine.Any(t => t.Findet);
 }
 
 /// <summary>Anwendungsfälle der Programmplanung. Jede Änderung wird protokolliert.</summary>
-public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll protokoll, IAktuellerBenutzer benutzer, TimeProvider uhr)
+public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll protokoll, IAktuellerBenutzer benutzer, TimeProvider uhr,
+    IDozenteneinsatz einsatz)
 {
     public const int HorizontWochen = 12;
 
@@ -69,7 +72,42 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
                 .ToList();
         }
 
-        return new KursVorschau(termine, orte, konflikte, entwurf.Kursnummer ?? await NaechsteNummerAsync(entwurf, abbruch));
+        Dozenteneignung? dozent = null;
+        if ((entwurf.Serie.DozentId ?? entwurf.Team.FirstOrDefault()?.PersonId) is { } dozentId)
+        {
+            dozent = await einsatz.PruefenAsync(dozentId, kursart.BenoetigteDozierendenmerkmale, tage.Count > 0 ? tage : [DateOnly.FromDateTime(jetzt.Date)], null, abbruch);
+        }
+
+        return new KursVorschau(termine, orte, konflikte, entwurf.Kursnummer ?? await NaechsteNummerAsync(entwurf, abbruch), dozent);
+    }
+
+    /// <summary>Wirft mit Begründung, wenn die Person an einem der Tage nicht eingesetzt werden darf (Ausnahmen des Kurses zählen).</summary>
+    private async Task EinsatzPruefenAsync(Kurs kurs, Guid? dozentId, IEnumerable<DateOnly> tage, CancellationToken abbruch)
+    {
+        var liste = tage.ToList();
+        if (dozentId is not { } id || kurs.BenoetigteDozierendenmerkmale.Count == 0 || liste.Count == 0)
+        {
+            return;
+        }
+
+        var eignung = await einsatz.PruefenAsync(id, kurs.BenoetigteDozierendenmerkmale, liste, kurs.Id, abbruch);
+        if (!eignung.Geeignet)
+        {
+            throw new InvalidOperationException(eignung.Begruendung);
+        }
+    }
+
+    /// <summary>Tage, an denen eine Serie stattfindet (für die Dozierendenprüfung in der Auswahl).</summary>
+    public async Task<IReadOnlyList<DateOnly>> SerientageAsync(Serienregel serie, CancellationToken abbruch = default)
+    {
+        ArgumentNullException.ThrowIfNull(serie);
+        if (serie.Wochentage.Count == 0 || serie.DauerMinuten < 5)
+        {
+            return [];
+        }
+
+        var kalender = await speicher.KalenderAsync(abbruch);
+        return Seriengenerator.Erzeugen(serie, kalender, serie.Unbefristet ? Horizont : null).Where(t => t.Findet).Select(t => t.Datum).ToList();
     }
 
     /// <summary>Eignung aller buchbaren Orte für Kursart und Termine der Serie (für die Ortsauswahl mit Begründung).</summary>
@@ -103,6 +141,22 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
 
         var (kursart, semester) = await GrundlagenAsync(entwurf, abbruch);
         var wer = await benutzer.ErmittelnAsync(abbruch);
+        var ausnahmeNoetig = false;
+        if (vorschau.Dozent is { Geeignet: false } d)
+        {
+            if (string.IsNullOrWhiteSpace(entwurf.Ausnahmebegruendung) || !d.AusnahmeMoeglich)
+            {
+                throw new InvalidOperationException(d.Begruendung);
+            }
+
+            if (wer.Rolle is not (Rolle.Fachbereichsleitung or Rolle.Leitung))
+            {
+                throw new InvalidOperationException("Ausnahmen erteilt nur die Fachbereichsleitung.");
+            }
+
+            ausnahmeNoetig = true;
+        }
+
         var verzeichnis = await speicher.OrtsverzeichnisAsync(abbruch);
         var kurs = new Kurs(vorschau.Kursnummer, entwurf.Titel, semester, entwurf.Fachbereich, kursart, entwurf.MinTeilnehmende, entwurf.MaxTeilnehmende)
             .MitTeam(entwurf.Team)
@@ -119,6 +173,11 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
             $"Kurs {kurs.Kursnummer} „{kurs.Titel}“ angelegt: {kurs.Veranstaltungen.Count} Veranstaltungen{(vorschau.Konflikte.Count > 0 ? $", {vorschau.Konflikte.Count} Konflikte" : "")}",
             nameof(Kurs), kurs.Id, erfolgreich: vorschau.Konflikte.Count == 0, abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
+        if (ausnahmeNoetig && vorschau.Dozent is { } dz)
+        {
+            await einsatz.AusnahmeErteilenAsync(kurs.Id, dz.PersonId, dz.Tage.SelectMany(t => t.Fehlend), entwurf.Ausnahmebegruendung!, abbruch);
+        }
+
         return kurs;
     }
 
@@ -126,7 +185,10 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
     {
         var kurs = await KursAsync(kursId, abbruch);
         var verzeichnis = await speicher.OrtsverzeichnisAsync(abbruch);
-        kurs.SerieAendernAb(ab, neueRegel, await speicher.KalenderAsync(abbruch), id => verzeichnis.Finden(id)?.Anzeige ?? "?", Horizont);
+        var kalender = await speicher.KalenderAsync(abbruch);
+        var neueTage = Seriengenerator.Erzeugen(neueRegel with { Start = ab }, kalender, neueRegel.Unbefristet ? Horizont : null).Where(t => t.Findet).Select(t => t.Datum);
+        await EinsatzPruefenAsync(kurs, neueRegel.DozentId ?? kurs.Leitung?.PersonId, neueTage, abbruch);
+        kurs.SerieAendernAb(ab, neueRegel, kalender, id => verzeichnis.Finden(id)?.Anzeige ?? "?", Horizont);
         await protokoll.ProtokollierenAsync("Kurs.SerieGeaendert",
             $"{kurs.Kursnummer}: alle Termine ab {ab:dd.MM.yyyy} geändert ({string.Join("/", neueRegel.Wochentage.Select(KursAnzeige.Wochentag))} {neueRegel.Beginn:HH\\:mm}, {neueRegel.DauerMinuten} Min.); einzeln geänderte Termine bleiben",
             nameof(Kurs), kursId, abbruch: abbruch);
@@ -134,12 +196,19 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
     }
 
     public async Task NurDieseAendernAsync(Guid kursId, Guid veranstaltungId, DateTime beginn, DateTime ende, IReadOnlyList<Guid> ortIds,
-        string? bemerkung, CancellationToken abbruch = default)
+        string? bemerkung, CancellationToken abbruch = default, Guid? dozentId = null)
     {
         var kurs = await KursAsync(kursId, abbruch);
         var verzeichnis = await speicher.OrtsverzeichnisAsync(abbruch);
         var v = kurs.Veranstaltungen.Single(x => x.Id == veranstaltungId);
-        var dozent = v.DozentId is { } d ? kurs.Team.FirstOrDefault(t => t.PersonId == d) : null;
+        var gewuenscht = dozentId ?? v.DozentId;
+        var dozent = gewuenscht is { } d ? kurs.Team.FirstOrDefault(t => t.PersonId == d) : null;
+        if (dozentId is not null && dozent is null)
+        {
+            throw new InvalidOperationException("Die Person gehört nicht zum Dozierendenteam des Kurses. Bitte zuerst ins Team aufnehmen.");
+        }
+
+        await EinsatzPruefenAsync(kurs, dozent?.PersonId, [DateOnly.FromDateTime(beginn)], abbruch);
         v.NurDieseAendern(beginn, ende, ortIds.Select(id => new VeranstaltungsOrt(id, verzeichnis.Finden(id)?.Anzeige ?? "?")), dozent, bemerkung);
         await protokoll.ProtokollierenAsync("Kurs.TerminGeaendert",
             $"{kurs.Kursnummer}: Termin {v.Nummer} geändert auf {beginn:dd.MM.yyyy HH:mm}–{ende:HH:mm} ({string.Join(", ", v.Orte.Select(o => o.OrtName))})",
@@ -157,11 +226,14 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
         await speicher.SpeichernAsync(abbruch);
     }
 
-    public async Task EinzelveranstaltungAsync(Guid kursId, DateTime beginn, DateTime ende, IReadOnlyList<Guid> ortIds, CancellationToken abbruch = default)
+    public async Task EinzelveranstaltungAsync(Guid kursId, DateTime beginn, DateTime ende, IReadOnlyList<Guid> ortIds, CancellationToken abbruch = default,
+        Guid? dozentId = null)
     {
         var kurs = await KursAsync(kursId, abbruch);
         var verzeichnis = await speicher.OrtsverzeichnisAsync(abbruch);
-        var v = kurs.EinzelveranstaltungHinzufuegen(beginn, ende, ortIds.Select(id => new VeranstaltungsOrt(id, verzeichnis.Finden(id)?.Anzeige ?? "?")), null);
+        var dozent = dozentId is { } d ? kurs.Team.FirstOrDefault(t => t.PersonId == d) : kurs.Leitung;
+        await EinsatzPruefenAsync(kurs, dozent?.PersonId, [DateOnly.FromDateTime(beginn)], abbruch);
+        var v = kurs.EinzelveranstaltungHinzufuegen(beginn, ende, ortIds.Select(id => new VeranstaltungsOrt(id, verzeichnis.Finden(id)?.Anzeige ?? "?")), dozent);
         speicher.Hinzufuegen(v);
         await protokoll.ProtokollierenAsync("Kurs.Einzeltermin", $"{kurs.Kursnummer}: Einzelveranstaltung am {beginn:dd.MM.yyyy HH:mm} hinzugefügt",
             nameof(Kurs), kursId, abbruch: abbruch);

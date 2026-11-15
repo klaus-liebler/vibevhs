@@ -85,6 +85,76 @@ else if (dubletten.Count > 0)
     <StammdatenKompakt Stand="@stand" PersonId="@Id" Widerrufen="@VollmachtWiderrufenAsync" />
 </section>
 
+@if (stand.Rollen.HasFlag(Personenrolle.Dozierende) || stand.Qualifikationen is { Count: > 0 } || stand.Beschaeftigung is not null)
+{
+    var heuteQ = DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+    <section class="vhs-card">
+        <div class="vhs-head">
+            <h2>Qualifikationen</h2>
+            <span class="vhs-small vhs-muted">Beschäftigung: <b>@(stand.Beschaeftigung is { } ba ? $"{BeschaeftigungAnzeige.Text(ba)} ({BeschaeftigungAnzeige.Erklaerung(ba)})" : "nicht erfasst")</b> · Verlauf in der <a href="@($"personen/{Id}/historie")">Datenhistorie</a></span>
+        </div>
+        @if (stand.Qualifikationen is not { Count: > 0 })
+        {
+            <p class="vhs-muted">Keine gültigen Qualifikationen erfasst.</p>
+        }
+        else
+        {
+            <div class="vhs-list">
+                @foreach (var q in stand.Qualifikationen.OrderBy(q => q.Bezeichnung))
+                {
+                    var merkmal = personenmerkmale.FirstOrDefault(m => m.Schluessel == q.Schluessel);
+                    var bald = q.GueltigBisEinschliesslich is { } b && b <= heuteQ.AddDays(merkmal?.VorlaufTage ?? 60);
+                    <div>
+                        <span class="vhs-grow"><b>@q.Bezeichnung</b>@(q.WertText is null ? "" : $" · {q.WertText}")@(merkmal?.Gesetzlich == true ? " · gesetzlich" : "")
+                            <br /><span class="vhs-small vhs-muted">@(q.Nachweis is null ? "Nachweis fehlt" : $"Nachweis: {q.Nachweis}")@(q.AusstellendeStelle is null ? "" : $" · {q.AusstellendeStelle}") · gültig ab @q.GueltigVon.ToString("dd.MM.yyyy")</span>
+                        </span>
+                        @if (q.GueltigBisEinschliesslich is { } bis)
+                        {
+                            <StatusPille Stil="@(bald ? "warn" : "neutral")">bis @bis.ToString("dd.MM.yyyy")@(bald ? $" · noch {bis.DayNumber - heuteQ.DayNumber} Tage" : "")</StatusPille>
+                        }
+                        else
+                        {
+                            <StatusPille Stil="gut">unbefristet</StatusPille>
+                        }
+                        @if (q.Nachweis is null && merkmal?.NachweisPflicht == true) { <StatusPille Stil="krit">Nachweis fehlt</StatusPille> }
+                    </div>
+                }
+            </div>
+        }
+        <details>
+            <summary class="vhs-small">Qualifikation eintragen oder erneuern</summary>
+            <div class="vhs-fields" style="margin-top:8px">
+                <RadzenFormField Text="Merkmal" Variant="Variant.Outlined"><RadzenDropDown TValue="string" @bind-Value="qSchluessel" Data="@personenmerkmale" TextProperty="Name" ValueProperty="Schluessel" /></RadzenFormField>
+                @if (personenmerkmale.FirstOrDefault(m => m.Schluessel == qSchluessel) is { Werte.Count: > 0 } mw)
+                {
+                    <RadzenFormField Text="Art / Wert" Variant="Variant.Outlined"><RadzenDropDown TValue="string" @bind-Value="qWert" Data="@mw.Werte" /></RadzenFormField>
+                }
+                <RadzenFormField Text="Nachweis (Dokument, Aktenzeichen)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="qNachweis" /></RadzenFormField>
+                <RadzenFormField Text="Ausstellende Stelle" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="qStelle" /></RadzenFormField>
+                <RadzenFormField Text="Gültig ab" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly?" @bind-Value="qAb" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+                <RadzenFormField Text="Gültig bis (leer = unbefristet)" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly?" @bind-Value="qBis" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+            </div>
+            <BegruendeterButton Text="Qualifikation speichern" Icon="verified" Size="ButtonSize.Small" Click="QualifikationAsync" Freigabe="@QualifikationFreigabe" />
+        </details>
+        <details>
+            <summary class="vhs-small">Beschäftigungsart ändern (ab Datum)</summary>
+            <div class="vhs-fields" style="margin-top:8px">
+                <RadzenFormField Text="Beschäftigungsart" Variant="Variant.Outlined">
+                    <RadzenDropDown TValue="Beschaeftigungsart" @bind-Value="bArt" Data="@(Enum.GetValues<Beschaeftigungsart>())">
+                        <Template Context="x">@BeschaeftigungAnzeige.Text((Beschaeftigungsart)x)</Template>
+                        <ValueTemplate Context="x">@BeschaeftigungAnzeige.Text((Beschaeftigungsart)x)</ValueTemplate>
+                    </RadzenDropDown>
+                </RadzenFormField>
+                <RadzenFormField Text="Gilt ab" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly?" @bind-Value="bAb" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+                <RadzenFormField Text="Grund (z. B. Arbeitsvertrag vom …)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="bGrund" /></RadzenFormField>
+            </div>
+            <p class="vhs-small vhs-muted">Frühere Einsätze und Abrechnungen behalten die damalige Beschäftigungsart.</p>
+            <BegruendeterButton Text="Beschäftigungsart speichern" Icon="work" Size="ButtonSize.Small" Click="BeschaeftigungAsync"
+                                Freigabe="@(Schreibschutz.Und(() => Freigabe.NurFuer(rolle, VibeVHS.Application.Programm.QualifikationsDienst.PflegeRollen)).Und(() => bAb is null || string.IsNullOrWhiteSpace(bGrund) ? Freigabe.Nein("Bitte Datum und Grund angeben.") : Freigabe.Ja))" />
+        </details>
+    </section>
+}
+
 <section class="vhs-card">
     <div class="vhs-head">
         <h2>Kurse und Anmeldungen</h2>
@@ -255,6 +325,51 @@ else if (dubletten.Count > 0)
     private bool sperrzugriff, dsOffen;
     private IReadOnlyList<VibeVHS.Application.Anmeldung.PersonBelegung> belegungen = [];
     private IReadOnlyList<VibeVHS.Domain.Anmeldung.Ermaessigung> ermaessigungen = [];
+    private IReadOnlyList<VibeVHS.Domain.Programm.Merkmal> personenmerkmale = [];
+    private string? qSchluessel, qWert, qNachweis, qStelle, bGrund;
+    private DateOnly? qAb, qBis, bAb;
+    private Beschaeftigungsart bArt = Beschaeftigungsart.Freiberuflich;
+
+    private Freigabe QualifikationFreigabe => Schreibschutz
+        .Und(() => Freigabe.NurFuer(rolle, VibeVHS.Application.Programm.QualifikationsDienst.PflegeRollen))
+        .Und(() => qSchluessel is null || qAb is null ? Freigabe.Nein("Bitte Merkmal und Beginn der Gültigkeit angeben.")
+            : personenmerkmale.FirstOrDefault(m => m.Schluessel == qSchluessel) is { NachweisPflicht: true } && string.IsNullOrWhiteSpace(qNachweis)
+                ? Freigabe.Nein("Für dieses Merkmal ist ein Nachweis Pflicht (Dokument oder Aktenzeichen).")
+                : personenmerkmale.FirstOrDefault(m => m.Schluessel == qSchluessel) is { Werte.Count: > 0 } && qWert is null
+                    ? Freigabe.Nein("Bitte die Art auswählen (z. B. Zulassungsart).") : Freigabe.Ja);
+
+    private async Task QualifikationAsync()
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Programm.QualifikationsDienst>()
+                .QualifikationSetzenAsync(Id, qSchluessel!, qWert, qNachweis, qStelle, qAb!.Value, qBis));
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", "Qualifikation eingetragen; der Verlauf steht in der Datenhistorie.");
+            qSchluessel = qWert = qNachweis = qStelle = null;
+            qBis = null;
+            await LadenAsync();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task BeschaeftigungAsync()
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Programm.QualifikationsDienst>()
+                .BeschaeftigungAendernAsync(Id, bArt, bAb!.Value, bGrund!));
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", $"Beschäftigungsart ab {bAb:dd.MM.yyyy}: {BeschaeftigungAnzeige.Text(bArt)}.");
+            bGrund = null;
+            await LadenAsync();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
     private Rolle? rolle;
     private Loeschpruefung? pruefung;
 
@@ -362,6 +477,8 @@ else if (dubletten.Count > 0)
         aenderungsdatum ??= DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
         ewAb ??= DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
         vmVon ??= DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+        qAb ??= DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+        bAb ??= DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
         organisationen = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IOrganisationen>().AlleAsync());
         folgeschritte = [new("Datenhistorie ansehen", $"personen/{Id}/historie"), new("Zur Personenliste", "personen")];
     }
@@ -383,6 +500,7 @@ else if (dubletten.Count > 0)
                 var anmeldung = d.GetRequiredService<VibeVHS.Application.Anmeldung.AnmeldungDienst>();
                 belegungen = await anmeldung.BelegungenDerPersonAsync(Id);
                 ermaessigungen = await anmeldung.ErmaessigungenAsync(Id);
+                personenmerkmale = await d.GetRequiredService<VibeVHS.Application.Programm.QualifikationsDienst>().PersonenmerkmaleAsync();
             });
         }
         if (stand?.Name is { } name)

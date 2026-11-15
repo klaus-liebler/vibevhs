@@ -38,7 +38,14 @@ public static class NutzungsartAnzeige
     };
 }
 
-/// <summary>Eintrag im pflegbaren Merkmalskatalog (z. B. "barrierefrei", "BAMF-Kursort").</summary>
+/// <summary>Woran ein Merkmal hängt: an Orten (Ausstattung, Zulassung) oder an Personen (Qualifikationen von Dozierenden).</summary>
+public enum MerkmalBezug
+{
+    Ort,
+    Person,
+}
+
+/// <summary>Eintrag im gemeinsamen, pflegbaren Merkmalskatalog (z. B. "barrierefrei", "BAMF-Kursort", "BAMF-Lehrkraftzulassung").</summary>
 public sealed class Merkmal
 {
     private Merkmal()
@@ -48,17 +55,33 @@ public sealed class Merkmal
         Gruppe = string.Empty;
     }
 
-    public Merkmal(string schluessel, string name, string gruppe, bool vererbbar = true, bool nachweisPflicht = false, string? ausschlussgruppe = null)
+    public Merkmal(string schluessel, string name, string gruppe, bool vererbbar = true, bool nachweisPflicht = false, string? ausschlussgruppe = null,
+        MerkmalBezug bezug = MerkmalBezug.Ort, bool gesetzlich = false, IEnumerable<string>? werte = null, int vorlaufTage = 60)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(schluessel);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         Schluessel = schluessel.Trim().ToLowerInvariant();
         Name = name.Trim();
         Gruppe = gruppe;
-        Vererbbar = vererbbar;
+        Vererbbar = bezug == MerkmalBezug.Ort && vererbbar;
         NachweisPflicht = nachweisPflicht;
         Ausschlussgruppe = ausschlussgruppe;
+        Bezug = bezug;
+        Gesetzlich = gesetzlich;
+        Werte = werte?.ToList() ?? [];
+        VorlaufTage = vorlaufTage;
     }
+
+    public MerkmalBezug Bezug { get; private set; }
+
+    /// <summary>Gesetzlich gefordert (z. B. BAMF-Lehrkraftzulassung): keine Ausnahme durch die Fachbereichsleitung möglich.</summary>
+    public bool Gesetzlich { get; private set; }
+
+    /// <summary>Erlaubte Werte (z. B. Zulassungsart: direkt / mit Auflagen / nach Zusatzqualifizierung); leer = freier oder kein Wert.</summary>
+    public List<string> Werte { get; private set; } = [];
+
+    /// <summary>So viele Tage vor Ablauf entsteht eine Aufgabe.</summary>
+    public int VorlaufTage { get; private set; } = 60;
 
     public string Schluessel { get; private set; }
 

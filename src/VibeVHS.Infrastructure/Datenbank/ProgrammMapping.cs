@@ -44,7 +44,19 @@ internal static class ProgrammMapping
             b.Property(k => k.Id).ValueGeneratedNever();
             b.Property(k => k.Name).HasMaxLength(200);
             b.PrimitiveCollection(k => k.BenoetigteMerkmale);
+            b.PrimitiveCollection(k => k.BenoetigteDozierendenmerkmale);
             b.Property(k => k.Richtlinie).AlsJson();
+        });
+
+        mb.Entity<Qualifikationsausnahme>(b =>
+        {
+            b.ToTable("Qualifikationsausnahmen");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.Id).ValueGeneratedNever();
+            b.Property(a => a.Schluessel).HasMaxLength(40);
+            b.Property(a => a.Begruendung).HasMaxLength(1000);
+            b.Property(a => a.ErteiltVon).HasMaxLength(200);
+            b.HasIndex(a => a.KursId);
         });
 
         mb.Entity<Kurs>(b =>
@@ -59,6 +71,7 @@ internal static class ProgrammMapping
             b.Property(k => k.Suchtext).HasMaxLength(400);
             b.HasIndex(k => k.SemesterId);
             b.PrimitiveCollection(k => k.BenoetigteMerkmale);
+            b.PrimitiveCollection(k => k.BenoetigteDozierendenmerkmale);
             b.Property(k => k.Richtlinie).AlsJson();
             b.Property(k => k.Serie).AlsJson();
             b.Property(k => k.Team).AlsJson();
@@ -88,6 +101,8 @@ internal static class ProgrammMapping
             b.Property(m => m.Name).HasMaxLength(200);
             b.Property(m => m.Gruppe).HasMaxLength(60);
             b.Property(m => m.Ausschlussgruppe).HasMaxLength(60);
+            b.Property(m => m.Bezug).HasMaxLength(20);
+            b.PrimitiveCollection(m => m.Werte);
         });
 
         mb.Entity<Ort>(b =>

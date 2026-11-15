@@ -82,6 +82,7 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
         Max(await Letzte<Organisationszugehoerigkeit>(abbruch));
         Max(await Letzte<Buchungsvollmacht>(abbruch));
         Max(await Letzte<Einwilligung>(abbruch));
+        Max(await Letzte<PersonQualifikation>(abbruch));
         Max((await db.Veranstaltungen.AsNoTracking().Where(v => v.DozentId != null)
                 .GroupBy(v => v.DozentId!.Value).Select(g => new { g.Key, Ende = g.Max(v => v.Ende) }).ToListAsync(abbruch))
             .Select(x => (x.Key, new DateTimeOffset(x.Ende))));
