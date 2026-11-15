@@ -1,216 +1,199 @@
-# Abnahme Phase A – Klick-Drehbuch für die vhs Emsdetten Greven Saerbeck
+# Abnahme – Klick-Drehbuch für die vhs Emsdetten Greven Saerbeck (Stand nach Iteration 8)
 
-**Dauer:** 30–45 Minuten · **Umfang:** Iterationen 0–3 (Fundament, Personen, Programm, Datenschutz, Anmeldung)
-**Adresse:** die lokale Testinstanz (z. B. `http://localhost:5189`) · **Daten:** ausschließlich fiktive Demodaten
+**Teilnehmende:** 2–3 Verwaltungsmitarbeitende der vhs EGS (z. B. Teilnehmerservice, Fachbereichsleitung, Buchhaltung/Integrationskurs-Team)
+**Dauer:** 60–90 Minuten · **Adresse:** die lokale Testinstanz (z. B. `http://localhost:5189`) · **Daten:** ausschließlich fiktive Demodaten
 
-So geht's:
+## Ablauf
 
-- Auf der Seite **Anmelden** das genannte Testkonto anklicken. Ein Passwort gibt es nicht.
-- Mit **Konto wechseln** (oben rechts) wechseln Sie zum Testkonto der nächsten Aufgabe.
-- Alle Mails werden nur simuliert und landen im **Postausgang**. Nichts verlässt das System.
-- Bitte tragen Sie zu jeder Aufgabe ein, ob sie geklappt hat und was Ihnen auffällt: unklare Begriffe, fehlende Schritte, Wünsche.
-- Ausgegraute Schaltflächen erklären beim Darüberfahren mit der Maus (oder beim Ansteuern mit der Tab-Taste), warum sie gesperrt sind.
-  Bitte prüfen Sie, ob diese Erklärungen verständlich sind.
+1. **Begrüßung (5 min):** Ziel erklären: Wir testen die Software, nicht Sie. Fehler sind wertvolle Hinweise.
+   Alles ist Testbetrieb: Mails landen nur im **Postausgang**, Zahlungen und BAMF-Meldungen sind simuliert.
+2. **Lautes Denken (Think-aloud):** Bitte sagen Sie beim Klicken laut, was Sie suchen, erwarten und wundern.
+   Die Moderation hilft nur, wenn jemand länger als zwei Minuten festsitzt, und notiert, wo das war.
+3. **Aufgaben (45–70 min):** Reihenfolge wie unten. Jede Person übernimmt die Aufgaben „ihrer“ Rolle; Testkonten
+   wechseln Sie oben rechts mit **Konto wechseln** (kein Passwort). Ausgegraute Schaltflächen erklären beim
+   Darüberfahren (oder mit der Tab-Taste), warum sie gesperrt sind – bitte sagen Sie, ob die Erklärung verständlich ist.
+4. **Nachgespräch (10–15 min)** mit den fünf Fragen am Ende.
 
-| Nr. | Rolle / Testkonto | Zeit |
-|---|---|---|
-| 1 | Teilnehmerservice · Katja Friesen | 3 min |
-| 2 | Teilnehmerservice · Katja Friesen | 4 min |
-| 3 | Teilnehmerservice · Katja Friesen | 5 min |
-| 4 | Teilnehmerservice · Katja Friesen | 5 min |
-| 5 | Teilnehmerservice · Katja Friesen | 4 min |
-| 6 | Teilnehmerservice · Katja Friesen | 5 min |
-| 7 | Integrationskurs-Team · Sylvia Beckmann | 3 min |
-| 8 | Fachbereichsleitung · Varvara Schatz | 6 min |
-| 9 | Verwaltungsleitung · Sonja Eickelkamp | 4 min |
-| 10 | Verwaltungsleitung · Sonja Eickelkamp | 4 min |
+Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beobachtungen eintragen. Abbruch nach 8 Minuten.
+
+| Nr. | Aufgabe | Testkonto (Rolle) | Richtzeit |
+|---|---|---|---|
+| 1 | Person anlegen und Namensänderung | Katja Friesen (Teilnehmerservice) | 6 min |
+| 2 | Kurs per Schnellweg anlegen | Varvara Schatz (Fachbereichsleitung) | 7 min |
+| 3 | Tresenanmeldung mit Lastschrift | Katja Friesen (Teilnehmerservice) | 6 min |
+| 4 | Voller Kurs: Warteliste | Katja Friesen (Teilnehmerservice) | 5 min |
+| 5 | Anwesenheit erfassen (Check-in) | Katja Friesen (Teilnehmerservice) | 5 min |
+| 6 | Bescheinigung nachdrucken | Katja Friesen (Teilnehmerservice) | 3 min |
+| 7 | Aufgabenkorb: übernehmen und zuweisen | Varvara Schatz (Fachbereichsleitung) | 4 min |
+| 8 | Mindestteilnehmerzahl: Kurs absagen | Varvara Schatz (Fachbereichsleitung) | 5 min |
+| 9 | Rechnung stornieren | Linda Lüke (Buchhaltung) | 4 min |
+| 10 | Lastschriftlauf freigeben | Linda Lüke (Buchhaltung) | 6 min |
+| 11 | Integrationskurs: Ausweisprüfung und Kursbeginn | Sylvia Beckmann (Integrationskurs-Team) | 6 min |
+| 12 | Auswertung exportieren | Sonja Eickelkamp (Verwaltungsleitung) | 3 min |
 
 ---
 
-## 1. Person finden und Datenhistorie lesen
+## 1. Person anlegen und Namensänderung
 
-- **Rolle / Testkonto:** Teilnehmerservice · *Katja Friesen*
-- **Ziel:** Eine Person schnell finden und nachvollziehen, wie sich ihre Daten verändert haben.
-- **Schritte:**
-  1. Links **Personen** öffnen.
-  2. Im Suchfeld „kovalenko“ eingeben.
-  3. *Olena Kovalenko* öffnen.
-  4. Oben **Datenhistorie** anklicken.
-- **Erwartetes Ergebnis:**
-  - Die Person erscheint sofort beim Tippen.
-  - Die Personenseite zeigt die aktuellen Stammdaten kompakt: Wohnadresse, abweichende Korrespondenzadresse (c/o), Mobilnummer.
-  - Die Datenhistorie zeigt Umzug, c/o-Adresse und die Signal-Einwilligung, jeweils mit Datum, Grund und Bearbeiter.
-- **Anmerkungen:**
+- **Testkonto:** Katja Friesen · **Startpunkt:** Startseite → **Person anlegen**
+- **Aufgabe:** Legen Sie *Mira Albers*, geboren 12.03.1992, mit E-Mail und Anschrift in Emsdetten an. Frau Albers hat
+  geheiratet und heißt ab dem 1. des Monats *Mira Albers-Kühn* – tragen Sie die Namensänderung ein.
+- **Erwartung:**
+  - Beim Anlegen erscheinen mögliche Dubletten, falls es ähnliche Personen gibt.
+  - Die Namensänderung fragt: „Änderung ab einem Datum“ oder „Korrektur“; gewählt wird „Änderung ab“ mit Grund.
+  - Unter **Datenhistorie** stehen beide Namen mit Gültigkeit; ältere Dokumente behalten den alten Namen.
+- **Zeit:** ____ min · **Beobachtungen:**
 
   &nbsp;
 
-## 2. Neue Anmeldung am Tresen (3 Schritte)
+## 2. Kurs per Schnellweg anlegen
 
-- **Rolle / Testkonto:** Teilnehmerservice · *Katja Friesen*
-- **Ziel:** Eine Person in drei Schritten zu einem Kurs anmelden.
-- **Schritte:**
-  1. Links **Anmeldung** öffnen.
-  2. „Weber Sabine“ suchen und die Person wählen.
-  3. **Weiter zur Kursauswahl**.
-  4. Den Kurs *26H-301 Rhetorik für Ehrenamtliche* wählen.
-  5. **Weiter zur Zahlung**, Zahlart *Überweisung*, **Anmeldung speichern**.
-- **Erwartetes Ergebnis:**
-  - In der Kursauswahl sind nicht buchbare Kurse ausgegraut. Der Tooltip nennt den Grund und den Weg, zum Beispiel:
-    - „Interner Kurs: Buchung nur über das Integrationskurs-Team“
-    - „Der Kurs ist abgesagt“
-    - „Geschlossener Kurs für Stadtwerke …“
-  - Nach dem Speichern erscheint „Anmeldung gespeichert“ mit eingefrorenem Entgelt (49,00 €) und Hinweisen, wie es weitergeht:
-    - Bestätigung im Postausgang
-    - Kalenderdatei
-    - Weitere Anmeldung
-- **Anmerkungen:**
+- **Testkonto:** Varvara Schatz · **Startpunkt:** **Kurse** → **Kurs anlegen**
+- **Aufgabe:** Legen Sie für Fachbereich 7 den Kurs „Rückenfit am Abend“ an: mittwochs 18:00–19:30, 10 Termine,
+  Ort *A 1.12*, 98 €, mindestens 6, höchstens 14 Personen. Prüfen Sie die Vorschau und veröffentlichen Sie den Kurs.
+- **Erwartung:**
+  - Die Vorschau zeigt ausgelassene Ferien und Feiertage mit Grund sowie Raumkonflikte.
+  - Ungeeignete Orte und Kursleitungen sind gesperrt, mit Begründung (Tooltip).
+  - Nach dem Veröffentlichen ist der Kurs am Tresen buchbar; der Raumplan zeigt ihn.
+- **Zeit:** ____ min · **Beobachtungen:**
 
   &nbsp;
 
-## 3. Bestätigung im Postausgang prüfen
+## 3. Tresenanmeldung mit Lastschrift
 
-- **Rolle / Testkonto:** Teilnehmerservice · *Katja Friesen*
-- **Ziel:** Die Anmeldebestätigung prüfen: Inhalt, Übersetzungslink, Kalenderdatei.
-- **Schritte:**
-  1. Unter „Wie geht es weiter?“ **Bestätigung im Postausgang ansehen** wählen (oder links **Postausgang** öffnen).
-  2. Die Mail „Anmeldebestätigung: 26H-301 …“ anklicken.
-  3. Den Anhang `26H-301-termine.ics` öffnen.
-  4. Den Übersetzungslink anklicken.
-- **Erwartetes Ergebnis:**
-  - Die Mail enthält Kurs, nächsten Termin, Ort, Entgelt, Zahlart und die Abmeldefrist.
-  - Am Ende steht der Link „Diese Nachricht in Ihrer Sprache lesen“.
-  - Die Kalenderdatei lässt sich in Outlook bzw. im Kalender öffnen und enthält alle Termine.
-- **Anmerkungen:**
+- **Testkonto:** Katja Friesen · **Startpunkt:** Personenseite von *Mira Albers-Kühn* (Aufgabe 1)
+- **Aufgabe:** Erfassen Sie für Frau Albers-Kühn ein SEPA-Lastschriftmandat (Bereich „SEPA-Lastschriftmandat“, IBAN
+  `DE89 3704 0044 0532 0130 00`, heute unterschrieben). Melden Sie sie dann über **Anmeldung** im Kurs aus Aufgabe 2
+  an, Zahlart **Lastschrift**.
+- **Erwartung:**
+  - Eine falsch abgetippte IBAN wird sofort mit Begründung abgelehnt.
+  - Die Anmeldebestätigung liegt im **Postausgang**, mit Übersetzungslink, Kalenderdatei und persönlichem Check-in-Link.
+  - Die Personenseite zeigt die Belegung und das Mandat mit Referenz (z. B. VHS-2026-…).
+- **Zeit:** ____ min · **Beobachtungen:**
 
   &nbsp;
 
-## 4. Voller Kurs: Warteliste und Nachrückangebot
+## 4. Voller Kurs: Warteliste
 
-- **Rolle / Testkonto:** Teilnehmerservice · *Katja Friesen*
-- **Ziel:** Verstehen, wie Warteliste und Nachrücken funktionieren.
-- **Schritte:**
-  1. **Kurse** öffnen, dann *26H-801 Yoga am Abend* öffnen.
-  2. Im Abschnitt „Teilnehmende“ die Warteliste ansehen (Sabine Weber auf Platz 1).
-  3. Eine angemeldete Person anklicken.
-  4. Auf ihrer Belegung einen Grund eingeben und **Abmelden (stornieren)**.
-  5. Zurück zum Kurs.
-- **Erwartetes Ergebnis:**
-  - Vor dem Abmelden zeigt die Belegung die Storno-Regel, z. B. „Nach der Abmeldefrist …: das Entgelt bleibt fällig (AGB)“.
-  - Nach dem Abmelden hat Sabine Weber ein **Nachrückangebot** mit Annahmefrist.
-  - Im Postausgang liegt die Mail „Ein Platz ist frei …“.
-  - Im Kurs *26H-702 Progressive Muskelentspannung* ist ein solches Angebot schon offen. Es lässt sich auf der Belegung annehmen oder ablehnen.
-- **Anmerkungen:**
+- **Testkonto:** Katja Friesen · **Startpunkt:** **Anmeldung**
+- **Aufgabe:** Melden Sie *Sabine Weber* in *26H-801 Yoga am Abend* an (der Kurs ist ausgebucht). Melden Sie danach
+  eine angemeldete Person des Kurses ab und sehen Sie nach, was mit der Warteliste passiert.
+- **Erwartung:**
+  - Die Anmeldung landet auf der Warteliste mit Platznummer; die Mail nennt den Wartelistenplatz.
+  - Nach der Abmeldung bekommt Platz 1 ein Nachrückangebot mit Frist (Mail im Postausgang).
+- **Zeit:** ____ min · **Beobachtungen:**
 
   &nbsp;
 
-## 5. Umbuchen bei abgesagtem Kurs
+## 5. Anwesenheit erfassen (Check-in)
 
-- **Rolle / Testkonto:** Teilnehmerservice · *Katja Friesen*
-- **Ziel:** Teilnehmende eines abgesagten Kurses auf einen anderen Kurs umbuchen.
-- **Schritte:**
-  1. **Kurse** öffnen, dann *26H-504 Französisch B1* (abgesagt) öffnen.
-  2. Eine Person aus „Teilnehmende“ anklicken.
-  3. Bei „Umbuchen“ einen Vorschlag wählen.
-- **Erwartetes Ergebnis:**
-  - Es erscheinen nur buchbare, ähnliche Kurse (Fachbereich Sprachen).
-  - Die Abmeldung vom abgesagten Kurs wäre kostenlos.
-  - Nach dem Umbuchen öffnet sich die neue Belegung mit dem Entgelt des neuen Kurses. Die alte Belegung steht auf „umgebucht“.
-- **Anmerkungen:**
+- **Testkonto:** Katja Friesen · **Startpunkt:** **Anwesenheit**
+- **Aufgabe:** Öffnen Sie eine Veranstaltung von heute (falls heute keine stattfindet: im Kurs aus Aufgabe 2 unter
+  „Ändern“ eine zusätzliche Einzelveranstaltung in 10 Minuten anlegen). Erfassen Sie zwei Personen als anwesend, eine
+  davon 30 Minuten verspätet, und schließen Sie die Liste ab. Optional: **Termin-QR** anzeigen (Check-in mit dem Handy,
+  siehe `docs/handy-test.md`).
+- **Erwartung:**
+  - Minuten und Unterrichtseinheiten werden je Person angezeigt.
+  - Nach dem Abschließen gelten Nicht-Erfasste als „nicht anwesend“; Änderungen danach sind Nacherfassungen mit Grund.
+- **Zeit:** ____ min · **Beobachtungen:**
 
   &nbsp;
 
-## 6. Pilates mit 10er-Karte: in einen Termin einbuchen
+## 6. Bescheinigung nachdrucken
 
-- **Rolle / Testkonto:** Teilnehmerservice · *Katja Friesen*
-- **Ziel:** Eine Person mit Kontingent in einzelne Veranstaltungen einbuchen.
-- **Schritte:**
-  1. Kurs *26H-704 Pilates fortlaufend (10er-Karte)* öffnen.
-  2. Unter „Kontingente“ *Nadia Haddad* anklicken.
-  3. Bei der übernächsten Veranstaltung **Einbuchen**.
-  4. Danach die Zeile der nächsten Veranstaltung ansehen.
-  5. Eine andere Person mit Kontingent öffnen und versuchen, sie bei einer schon vollen Veranstaltung einzubuchen.
-- **Erwartetes Ergebnis:**
-  - Oben stehen Kontingent, besucht, verfallen, eingebucht und verbleibend.
-  - Nach dem Einbuchen sinkt „verbleibend“ um 1.
-  - Die nächste Veranstaltung ist voll (14/14), Nadia steht dort auf der Warteliste. Trägt sich jemand aus, rückt sie automatisch nach und bekommt eine Mail.
-  - Bei voller Veranstaltung heißt die Schaltfläche „Warteliste“.
-  - Einbuchen und Austragen gehen bis 24 Stunden vor Beginn; danach sind die Schaltflächen gesperrt, der Tooltip nennt die Regel.
-- **Anmerkungen:**
+- **Testkonto:** Katja Friesen · **Startpunkt:** **Personen** → *Olena Kovalenko*
+- **Aufgabe:** Olena braucht ihre Teilnahmebescheinigung für *25F-501* noch einmal. Drucken Sie sie nach.
+- **Erwartung:**
+  - Der Nachdruck ist das archivierte Original (Prüfsumme wird geprüft), mit dem QR-Code „Translate this letter in your language“.
+  - Das Protokoll vermerkt den Nachdruck.
+- **Zeit:** ____ min · **Beobachtungen:**
 
   &nbsp;
 
-## 7. Integrationskurs: Buchung nur über das Integrationskurs-Team
+## 7. Aufgabenkorb: übernehmen und zuweisen
 
-- **Rolle / Testkonto:** Integrationskurs-Team · *Sylvia Beckmann*
-- **Ziel:** Prüfen, dass interne Kurse nur über das zuständige Team buchbar sind.
-- **Schritte:**
-  1. **Anmeldung** öffnen und *Olena Kovalenko* wählen.
-  2. Den Kurs *26H-401 Integrationskurs allgemein, Modul 3* suchen.
-- **Erwartetes Ergebnis:**
-  - Für das Integrationskurs-Team ist der Kurs buchbar (Zahlart z. B. Kostenträger).
-  - Mit dem Konto Katja Friesen (Teilnehmerservice) ist derselbe Kurs gesperrt, mit dem Grund „nur über das Integrationskurs-Team“.
-- **Anmerkungen:**
-
-  &nbsp;
-
-## 8. Kurs anlegen im Schnellweg und Raumplan prüfen
-
-- **Rolle / Testkonto:** Fachbereichsleitung · *Varvara Schatz*
-- **Ziel:** Einen regelmäßigen Kurs mit Ferien- und Feiertagsprüfung anlegen.
-- **Schritte:**
-  1. **Kurse** öffnen, dann **Kurs anlegen**.
-  2. Einen Kurs anlegen: wöchentlich mittwochs 18:00, 10 Termine, Ort *A 1.12*, Entgelt 98 €.
-  3. Die Vorschau ansehen und speichern.
-  4. Den Kurs **veröffentlichen**.
-  5. **Raumplan** öffnen.
-- **Erwartetes Ergebnis:**
-  - Die Vorschau zeigt ausgelassene Feiertage und Ferien mit Grund.
-  - Ungeeignete Orte sind gesperrt, mit Begründung, z. B. fehlende Kapazität.
-  - Konflikte werden rot angezeigt und erklärt.
-  - Nach dem Veröffentlichen ist der Kurs am Tresen buchbar.
-- **Anmerkungen:**
+- **Testkonto:** Varvara Schatz · **Startpunkt:** Startseite „Was steht an?“
+- **Aufgabe:** Übernehmen Sie eine Aufgabe aus Ihrem Gruppenkorb. Weisen Sie eine zweite Aufgabe einer Kollegin zu.
+  Prüfen Sie, warum „Erledigt“ bei einer nicht übernommenen Aufgabe gesperrt ist.
+- **Erwartung:**
+  - Übernommene Aufgaben wandern nach „Meine Aufgaben“, zugewiesene nach „Bei Kolleg:innen“.
+  - Der Tooltip erklärt: „Bitte zuerst übernehmen …“.
+  - Ein Klick auf den Titel öffnet die passende Seite.
+- **Zeit:** ____ min · **Beobachtungen:**
 
   &nbsp;
 
-## 9. Vorlage einer Bestätigungsmail anpassen
+## 8. Mindestteilnehmerzahl: Kurs absagen
 
-- **Rolle / Testkonto:** Verwaltungsleitung · *Sonja Eickelkamp*
-- **Ziel:** Eine Mailvorlage zentral ändern und die Vorschau prüfen.
-- **Schritte:**
-  1. Links **Vorlagen** öffnen und „Anmeldebestätigung“ wählen.
-  2. Einen Satz ergänzen, z. B. Hinweis auf Hausschuhe.
-  3. **Vorschau aktualisieren**, dann **Speichern**.
-- **Erwartetes Ergebnis:**
-  - Die Vorschau zeigt den Text mit Beispielwerten.
-  - Unbekannte Platzhalter wie `{Foo}` werden beim Speichern mit einer Erklärung abgelehnt.
-  - Mit dem Konto Katja Friesen ist **Speichern** gesperrt, mit Begründung.
-- **Anmerkungen:**
+- **Testkonto:** Varvara Schatz · **Startpunkt:** Startseite, Aufgabe „26H-703 Gesund kochen mit wenig Geld: … absagen oder durchführen?“
+- **Aufgabe:** Entscheiden Sie: Der Kurs wird abgesagt. Prüfen Sie anschließend den Postausgang.
+- **Erwartung:**
+  - Absagen ist erst nach „Übernehmen“ möglich (Tooltip).
+  - Alle Teilnehmenden bekommen eine Absage mit Übersetzungslink; künftige Termine fallen aus; die Aufgabe ist erledigt.
+  - Im Rechnungslauf werden bereits gestellte Rechnungen storniert.
+- **Zeit:** ____ min · **Beobachtungen:**
 
   &nbsp;
 
-## 10. Datenschutz: Auskunft und Protokoll
+## 9. Rechnung stornieren
 
-- **Rolle / Testkonto:** Verwaltungsleitung · *Sonja Eickelkamp*
-- **Ziel:** Eine Auskunft nach Art. 15 DSGVO erstellen und das Protokoll prüfen.
-- **Schritte:**
-  1. Person *Mehmet Yılmaz* öffnen.
-  2. Unten im Bereich „Datenschutz“ **Auskunft als PDF** wählen.
-  3. Danach links **Protokoll** öffnen.
-- **Erwartetes Ergebnis:**
-  - Das PDF enthält Stammdaten, Historie, Kursbelegungen, Nachrichten und Aufbewahrungsfristen.
-  - Im Protokoll stehen die Einträge zur Anmeldung und zur Auskunft. Gespeichert sind dort nur Pseudonyme („Person #…“), der Name erscheint nur in der Anzeige („Bezug: …“).
-- **Anmerkungen:**
+- **Testkonto:** Linda Lüke · **Startpunkt:** **Finanzen** → **Belege**
+- **Aufgabe:** Eine Teilnehmerin hat aus Kulanz das Entgelt erlassen bekommen. Stornieren Sie ihre Rechnung (beliebige
+  offene Rechnung wählen) mit Begründung.
+- **Erwartung:**
+  - Ohne Begründung ist „Stornieren“ gesperrt (Tooltip); die Rechnung selbst lässt sich nicht ändern oder löschen.
+  - Es entsteht ein Stornobeleg mit eigener Nummer (ST-2026-…) und Verweis; das Personenkonto ist ausgeglichen.
+- **Zeit:** ____ min · **Beobachtungen:**
+
+  &nbsp;
+
+## 10. Lastschriftlauf freigeben
+
+- **Testkonto:** Linda Lüke · **Startpunkt:** **Finanzen** → **Übersicht**
+- **Aufgabe:** Führen Sie die Finanzroutinen aus (die Rechnung aus Aufgabe 3 entsteht), öffnen Sie dann
+  **Lastschrift & Überweisung**, prüfen Sie den Vorschlag, geben Sie ihn frei und erzeugen Sie die SEPA-Datei.
+- **Erwartung:**
+  - Der Vorschlag enthält die Rechnung von Frau Albers-Kühn mit Mandatsreferenz und Sequenz FRST.
+  - Mit der Freigabe gehen Vorabankündigungen raus (Postausgang); erst danach lässt sich die Datei erzeugen.
+  - Die Datei (pain.008) lässt sich herunterladen.
+- **Zeit:** ____ min · **Beobachtungen:**
+
+  &nbsp;
+
+## 11. Integrationskurs: Ausweisprüfung und Kursbeginn
+
+- **Testkonto:** Sylvia Beckmann · **Startpunkt:** **Integrationskurse** → *26H-401*
+- **Aufgabe:** Der Kursstart ist gesperrt. Finden Sie heraus warum, prüfen Sie die fehlenden Ausweise (Original
+  vorgelegt, stimmt mit der Berechtigung überein) und melden Sie den Kursbeginn an das BAMF.
+- **Erwartung:**
+  - Der Tooltip an „Kursbeginn melden“ nennt die Personen ohne Ausweisprüfung.
+  - Gespeichert werden nur Datum, prüfende Person, Dokumentart und Ergebnis – keine Kopie.
+  - Nach der Meldung steht eine Kursbeginnmeldung „BAMF (Mock)“ im Postausgang (nur Teilnehmernummern).
+- **Zeit:** ____ min · **Beobachtungen:**
+
+  &nbsp;
+
+## 12. Auswertung exportieren
+
+- **Testkonto:** Sonja Eickelkamp · **Startpunkt:** **Auswertungen**
+- **Aufgabe:** Exportieren Sie die Auslastung je Fachbereich für das laufende Semester als Excel-Datei und öffnen Sie sie.
+- **Erwartung:**
+  - Die Tabelle erscheint sofort; der Export enthält echte Zahlen (Prozent, Euro) mit Autofilter.
+  - Das Protokoll vermerkt den Export.
+- **Zeit:** ____ min · **Beobachtungen:**
 
   &nbsp;
 
 ---
 
-## Gesamteindruck
+## Nachgespräch (5 Fragen)
 
-| Frage | Antwort |
-|---|---|
-| Was hat besonders gut funktioniert? | |
-| Wo haben Sie gezögert oder gesucht? | |
-| Welche Begriffe passen nicht zu Ihrem Arbeitsalltag? | |
-| Was fehlt für den täglichen Einsatz am Tresen am dringendsten? | |
-| Datum, Name, Funktion | |
+1. Welche Aufgabe ging am leichtesten, welche war am schwersten – und warum?
+2. Wo haben Sie etwas anders erwartet als es kam (Begriffe, Reihenfolge, Ort einer Schaltfläche)?
+3. Waren die Erklärungen an gesperrten Schaltflächen und die vorgeschlagenen nächsten Schritte hilfreich?
+4. Was fehlt Ihnen im Vergleich zu Ihrer bisherigen Arbeit (z. B. mit KuferSQL), damit Sie umsteigen würden?
+5. Wenn Sie eine Sache sofort ändern dürften: welche?
+
+**Notizen der Moderation:**
+
+&nbsp;
