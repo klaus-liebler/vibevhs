@@ -240,6 +240,15 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
         await speicher.SpeichernAsync(abbruch);
     }
 
+    /// <summary>Selbst-Check-in je Kurs: erlaubt, mit Bestätigung durch die Kursleitung oder aus (abrechnungsrelevante Anwesenheit).</summary>
+    public async Task SelbstCheckinSetzenAsync(Guid kursId, SelbstCheckin wert, CancellationToken abbruch = default)
+    {
+        var kurs = await KursAsync(kursId, abbruch);
+        kurs.MitRichtlinie(kurs.Richtlinie with { SelbstCheckin = wert });
+        await protokoll.ProtokollierenAsync("Kurs.SelbstCheckin", $"{kurs.Kursnummer}: Selbst-Check-in {SelbstCheckinAnzeige.Text(wert)}", nameof(Kurs), kursId, abbruch: abbruch);
+        await speicher.SpeichernAsync(abbruch);
+    }
+
     public async Task StatusSetzenAsync(Guid kursId, Kursstatus status, CancellationToken abbruch = default)
     {
         var kurs = await KursAsync(kursId, abbruch);

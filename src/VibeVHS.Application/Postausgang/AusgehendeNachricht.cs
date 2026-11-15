@@ -8,6 +8,8 @@ public enum Kanal
     Schnittstelle,
 }
 
+public sealed record Mailanhang(string Name, string Typ, string Inhalt);
+
 public enum NachrichtenStatus
 {
     Wartend,
@@ -94,6 +96,15 @@ public sealed class AusgehendeNachricht
 
     public string? AnhangInhalt { get; private set; }
 
+    /// <summary>Weitere Textanhänge (z. B. QR-Code des Teilnehmerausweises als SVG).</summary>
+    public List<Mailanhang> WeitereAnhaenge { get; private set; } = [];
+
+    public AusgehendeNachricht MitWeiteremAnhang(Mailanhang anhang)
+    {
+        WeitereAnhaenge = [.. WeitereAnhaenge, anhang];
+        return this;
+    }
+
     public AusgehendeNachricht MitAnhang(string name, string typ, string inhalt)
     {
         AnhangName = name;
@@ -131,6 +142,7 @@ public sealed class AusgehendeNachricht
         Uebersetzungslink = null;
         AnhangName = AnhangName is null ? null : "anonymisiert";
         AnhangInhalt = AnhangInhalt is null ? null : string.Empty;
+        WeitereAnhaenge = [];
         if (Status == NachrichtenStatus.Wartend)
         {
             Status = NachrichtenStatus.Fehlgeschlagen;

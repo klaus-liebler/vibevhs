@@ -28,7 +28,10 @@ public class AnmeldungTests
         var protokoll = new AuditProtokoll(db, benutzer, t.Uhr);
         var post = new PostausgangDienst(new NachrichtenSpeicher(db), protokoll, benutzer, new Uebersetzungslinks(new Uri("https://vhs.example/")), t.Uhr);
         var speicher = new AnmeldungSpeicher(db);
-        return new AnmeldungDienst(speicher, new ProgrammSpeicher(db), new PersonenSpeicher(db), speicher, new StammdatenSpeicher(db), post, protokoll, benutzer, t.Uhr);
+        var zugang = new VibeVHS.Application.Durchfuehrung.CheckinZugang(new VibeVHS.Infrastructure.Durchfuehrung.ZugangstokenSpeicher(db),
+            new VibeVHS.Application.Durchfuehrung.OeffentlicheAdresse(new Uri("https://vhs.example/")), protokoll, benutzer, t.Uhr);
+        return new AnmeldungDienst(speicher, new ProgrammSpeicher(db), new PersonenSpeicher(db), speicher, new StammdatenSpeicher(db), post, protokoll, benutzer, t.Uhr,
+            zugang, new VibeVHS.Infrastructure.Durchfuehrung.QrCodeErzeuger());
     }
 
     private static async Task<(Kurs Kurs, List<Person> Personen)> KursMitPersonenAsync(TestDatenbank t, int max, int personen, Buchungsrichtlinie? richtlinie = null)

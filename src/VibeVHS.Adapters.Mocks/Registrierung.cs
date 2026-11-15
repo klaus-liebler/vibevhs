@@ -13,6 +13,7 @@ public static class Registrierung
         dienste.AddSingleton<Zugangsschutz>();
         dienste.AddSingleton<IZustellKanal, MockMailKanal>();
         dienste.AddSingleton<IZustellKanal, MockSchnittstellenKanal>();
+        dienste.AddSingleton<VibeVHS.Application.Dokumente.IUebersetzer, MockUebersetzer>();
         return dienste;
     }
 }

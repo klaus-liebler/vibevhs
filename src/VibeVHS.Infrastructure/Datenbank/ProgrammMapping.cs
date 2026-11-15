@@ -68,6 +68,7 @@ internal static class ProgrammMapping
             b.HasIndex(k => k.Kursnummer).IsUnique();
             b.Property(k => k.Titel).HasMaxLength(300);
             b.Property(k => k.AuftraggeberName).HasMaxLength(300);
+            b.Property(k => k.Bildungsurlaub).HasMaxLength(100);
             b.Property(k => k.Suchtext).HasMaxLength(400);
             b.HasIndex(k => k.SemesterId);
             b.PrimitiveCollection(k => k.BenoetigteMerkmale);

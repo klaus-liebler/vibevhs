@@ -48,6 +48,15 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
             gruende.Add(new Aufbewahrungsgrund("buchhaltung", $"Kursentgelt, Kurs {b.Kursnummer}", bezug));
         }
 
+        // Ausgestellte Bescheinigungen (Nachweis für Teilnehmende, Arbeitgeber, Kostenträger)
+        foreach (var d in await db.Set<Domain.Dokumente.Dokument>().AsNoTracking()
+                     .Where(d => d.PersonId == personId && d.AnonymisiertAm == null
+                                 && (d.Art == Domain.Dokumente.Dokumentart.Teilnahmebescheinigung || d.Art == Domain.Dokumente.Dokumentart.Bildungsurlaub))
+                     .Select(d => new { d.Titel, d.ErstelltAm }).ToListAsync(abbruch))
+        {
+            gruende.Add(new Aufbewahrungsgrund("bescheinigungen", d.Titel, DateOnly.FromDateTime(d.ErstelltAm.Date)));
+        }
+
         return gruende;
     }
 
@@ -89,6 +98,8 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
         Max((await db.Postausgang.AsNoTracking().Where(n => n.PersonId != null)
                 .Select(n => new { Id = n.PersonId!.Value, n.ErstelltAm }).ToListAsync(abbruch))
             .GroupBy(x => x.Id).Select(g => (g.Key, g.Max(x => x.ErstelltAm))));
+        Max((await db.Set<Domain.Durchfuehrung.Anwesenheit>().AsNoTracking().Select(a => new { a.PersonId, a.ErfasstAm }).ToListAsync(abbruch))
+            .GroupBy(x => x.PersonId).Select(g => (g.Key, g.Max(x => x.ErfasstAm))));
         Max((await db.Belegungen.IgnoreAutoIncludes().AsNoTracking().Select(b => new { b.PersonId, b.GebuchtAm }).ToListAsync(abbruch))
             .GroupBy(x => x.PersonId).Select(g => (g.Key, g.Max(x => x.GebuchtAm))));
         Max((await db.KontingentEreignisse.AsNoTracking()
@@ -163,6 +174,12 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
 
     public async Task<IReadOnlyList<Domain.Anmeldung.Ermaessigung>> ErmaessigungenAsync(Guid personId, CancellationToken abbruch = default)
         => await db.Ermaessigungen.Where(e => e.PersonId == personId).ToListAsync(abbruch);
+
+    public async Task<IReadOnlyList<Domain.Durchfuehrung.Zugangstoken>> ZugangstokensAsync(Guid personId, CancellationToken abbruch = default)
+        => await db.Set<Domain.Durchfuehrung.Zugangstoken>().Where(t => t.PersonId == personId).ToListAsync(abbruch);
+
+    public async Task<IReadOnlyList<Domain.Dokumente.Dokument>> DokumenteAsync(Guid personId, CancellationToken abbruch = default)
+        => await db.Set<Domain.Dokumente.Dokument>().Where(d => d.PersonId == personId).ToListAsync(abbruch);
 
     public async Task<IReadOnlyDictionary<Guid, string>> KurstitelAsync(IEnumerable<Guid> kursIds, CancellationToken abbruch = default)
     {

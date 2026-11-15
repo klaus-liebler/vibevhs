@@ -65,7 +65,9 @@ public sealed class AnmeldungDienst(
     PostausgangDienst post,
     IAuditProtokoll protokoll,
     IAktuellerBenutzer benutzer,
-    TimeProvider uhr)
+    TimeProvider uhr,
+    Durchfuehrung.CheckinZugang zugang,
+    Dokumente.IQrCode qr)
 {
     /// <summary>Rollen, die am Tresen buchen, stornieren und umbuchen dürfen.</summary>
     public static readonly Rolle[] BuchungsRollen = [Rolle.Teilnehmerservice, Rolle.IntegrationskursTeam, Rolle.Verwaltungsleitung, Rolle.Leitung];
@@ -456,25 +458,6 @@ public sealed class AnmeldungDienst(
         }
     }
 
-    /// <summary>Anwesenheit von Hand festhalten (die QR-Anwesenheit folgt in I4).</summary>
-    public async Task AnwesenheitAsync(Guid belegungId, Guid veranstaltungId, bool erschienen, CancellationToken abbruch = default)
-    {
-        var wer = await BuchendeRolleAsync(abbruch);
-        var b = await BelegungAsync(belegungId, abbruch);
-        var kurs = await KursAsync(b.KursId, abbruch);
-        var v = kurs.Veranstaltungen.SingleOrDefault(x => x.Id == veranstaltungId) ?? throw new InvalidOperationException("Veranstaltung nicht gefunden.");
-        if (v.Beginn > uhr.GetLocalNow().LocalDateTime)
-        {
-            throw new InvalidOperationException("Die Anwesenheit kann erst ab Beginn der Veranstaltung festgehalten werden.");
-        }
-
-        b.AnwesenheitFesthalten(veranstaltungId, erschienen, kurs.Richtlinie, uhr.GetLocalNow(), wer.Anzeige);
-        await protokoll.ProtokollierenAsync("Kontingent.Anwesenheit",
-            $"{Pseudonym.Person(b.PersonId)} am {v.Beginn:dd.MM.yyyy} in {kurs.Kursnummer}: {(erschienen ? "besucht" : kurs.Richtlinie.NichterscheinenZaehlt ? "nicht erschienen (Einheit verbraucht)" : "nicht erschienen (nicht angerechnet)")}",
-            nameof(Person), b.PersonId, abbruch: abbruch);
-        await speicher.SpeichernAsync(abbruch);
-    }
-
     /// <summary>Automatik: Kontingente nach Ablauf der Gültigkeit schließen; der Rest verfällt.</summary>
     public async Task<int> KontingenteAblaufenAsync(CancellationToken abbruch = default)
     {
@@ -548,11 +531,24 @@ public sealed class AnmeldungDienst(
         return liste.Count == 0 ? null : ($"{kurs.Kursnummer}-termine.ics", "text/calendar", Kalenderdatei.Erzeugen(kurs, liste, "Volkshochschule", uhr.GetUtcNow()));
     }
 
+    /// <summary>Bestätigung mit Kalenderdatei, persönlichem Check-in-Link (Gerät merken) und QR-Ausweis als Bild.</summary>
     private Task<Guid?> BestaetigungAsync(Person person, Kurs kurs, Belegung b, CancellationToken abbruch)
-        => MailAsync(person, Textvorlagen.Anmeldebestaetigung, Werte(person, kurs, b), Anhang(kurs, b), abbruch);
+    {
+        var werte = Werte(person, kurs, b);
+        List<Postausgang.Mailanhang> weitere = [];
+        if (MailMoeglich(person))
+        {
+            werte["Checkinlink"] = zugang.LinkErzeugen(person.Id).ToString();
+            weitere.Add(new Postausgang.Mailanhang("checkin-ausweis.svg", "image/svg+xml", qr.Svg(zugang.AusweisErzeugen(person.Id))));
+        }
+
+        return MailAsync(person, Textvorlagen.Anmeldebestaetigung, werte, Anhang(kurs, b), abbruch, weitere);
+    }
+
+    private static bool MailMoeglich(Person person) => person.EMail is { Length: > 0 } m && m != "–" && !person.IstAnonymisiert;
 
     private async Task<Guid?> MailAsync(Person person, string vorlageSchluessel, Dictionary<string, string> werte, (string, string, string)? anhang,
-        CancellationToken abbruch)
+        CancellationToken abbruch, IEnumerable<Postausgang.Mailanhang>? weitere = null)
     {
         if (person.EMail is not { Length: > 0 } mail || person.IstAnonymisiert || mail == "–")
         {
@@ -564,7 +560,12 @@ public sealed class AnmeldungDienst(
         vorlage ??= new Textvorlage(vorschlag.Schluessel, vorschlag.Bezeichnung, vorschlag.Betreff, vorschlag.Text, uhr.GetUtcNow(), "Vorschlag");
         werte["Einrichtung"] = await EinrichtungAsync(abbruch);
         var (betreff, text) = vorlage.Fuellen(werte);
-        var n = await post.KundenmailEinreihenAsync(mail, person.Anzeigename, betreff, ZeilenOhneLeere(text), person.Sprache, person.Id, abbruch, anhang);
+        if (werte.TryGetValue("Checkinlink", out var checkin) && !text.Contains(checkin, StringComparison.Ordinal))
+        {
+            text += $"\n\nPersönlicher Check-in: Öffnen Sie diesen Link einmal auf Ihrem Handy – danach genügt ein Scan des QR-Codes im Kursraum.\n{checkin}\nIm Anhang finden Sie außerdem Ihren QR-Ausweis zum Vorzeigen bei der Kursleitung.";
+        }
+
+        var n = await post.KundenmailEinreihenAsync(mail, person.Anzeigename, betreff, ZeilenOhneLeere(text), person.Sprache, person.Id, abbruch, anhang, weitere);
         return n.Id;
     }
 

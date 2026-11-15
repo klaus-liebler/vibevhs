@@ -81,13 +81,13 @@ public static class Textvorlagen
     public static IReadOnlyList<string> BekanntePlatzhalter { get; } =
     [
         "Name", "Kursnummer", "Kurstitel", "Beginn", "Ort", "Termine", "Entgelt", "Zahlart", "Abmeldefrist", "Warteplatz", "Frist",
-        "Gebuehr", "Regel", "NeuerKurs", "Veranstaltung", "Kontingent", "Einrichtung",
+        "Gebuehr", "Regel", "NeuerKurs", "Veranstaltung", "Kontingent", "Einrichtung", "Checkinlink",
     ];
 
     public static IReadOnlyList<(string Schluessel, string Bezeichnung, string Betreff, string Text)> Vorschlaege { get; } =
     [
         (Anmeldebestaetigung, "Anmeldebestätigung", "Anmeldebestätigung: {Kursnummer} {Kurstitel}",
-            "Guten Tag {Name},\n\nvielen Dank für Ihre Anmeldung zum Kurs „{Kurstitel}“ ({Kursnummer}).\n\nBeginn: {Beginn}\nOrt: {Ort}\nTermine: {Termine}\nEntgelt: {Entgelt} ({Zahlart})\n{Kontingent}\n\nAlle Termine finden Sie als Kalenderdatei im Anhang. Eine kostenlose Abmeldung ist bis {Abmeldefrist} möglich.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
+            "Guten Tag {Name},\n\nvielen Dank für Ihre Anmeldung zum Kurs „{Kurstitel}“ ({Kursnummer}).\n\nBeginn: {Beginn}\nOrt: {Ort}\nTermine: {Termine}\nEntgelt: {Entgelt} ({Zahlart})\n{Kontingent}\n\nAlle Termine finden Sie als Kalenderdatei im Anhang. Eine kostenlose Abmeldung ist bis {Abmeldefrist} möglich.\n\nPersönlicher Check-in: Öffnen Sie diesen Link einmal auf Ihrem Handy – danach genügt ein Scan des QR-Codes im Kursraum.\n{Checkinlink}\nIm Anhang finden Sie außerdem Ihren QR-Ausweis zum Vorzeigen bei der Kursleitung.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
         (Wartelisteneintrag, "Eintrag auf die Warteliste", "Warteliste: {Kursnummer} {Kurstitel}",
             "Guten Tag {Name},\n\nder Kurs „{Kurstitel}“ ({Kursnummer}) ist leider ausgebucht. Wir haben Sie auf die Warteliste gesetzt (Platz {Warteplatz}).\n\nSobald ein Platz frei wird, erhalten Sie ein Angebot mit einer Frist zur Annahme.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
         (Nachrueckangebot, "Nachrückangebot von der Warteliste", "Ein Platz ist frei: {Kursnummer} {Kurstitel}",
@@ -120,5 +120,6 @@ public static class Textvorlagen
         ["Veranstaltung"] = "Mo 23.11.2026, 18:00 Uhr",
         ["Kontingent"] = "10er-Kontingent: 3 besucht, 1 eingebucht, 6 verbleibend",
         ["Einrichtung"] = "Volkshochschule Emsdetten Greven Saerbeck",
+        ["Checkinlink"] = "https://vhs.example/checkin/geraet/…",
     };
 }

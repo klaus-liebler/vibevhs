@@ -12,6 +12,14 @@ public sealed class Uebersetzungslinks(Uri basisAdresse) : IUebersetzungslinks
         var sp = Uri.EscapeDataString(string.IsNullOrWhiteSpace(sprache) ? "de" : sprache);
         return new Uri($"{basis}/uebersetzen/{nachrichtId:N}?sprache={sp}");
     }
+
+    public Uri FuerBrief(string token, string? sprache)
+    {
+        var basis = basisAdresse.ToString().TrimEnd('/');
+        return new Uri(string.IsNullOrWhiteSpace(sprache) || sprache == "de"
+            ? $"{basis}/brief/{Uri.EscapeDataString(token)}"
+            : $"{basis}/brief/{Uri.EscapeDataString(token)}?sprache={Uri.EscapeDataString(sprache)}");
+    }
 }
 
 /// <summary>Textbausteine, die jede Kundenmail bekommt.</summary>

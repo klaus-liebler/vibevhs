@@ -12,6 +12,9 @@ public enum Rolle
     Buchhaltung,
     IntegrationskursTeam,
     Systemverwaltung,
+
+    /// <summary>Kursleitung: sieht und erfasst die Anwesenheit eigener Veranstaltungen.</summary>
+    Dozierende,
 }
 
 public static class RollenExtensions
@@ -25,6 +28,7 @@ public static class RollenExtensions
         Rolle.Buchhaltung => "Buchhaltung",
         Rolle.IntegrationskursTeam => "Integrationskurs-Team",
         Rolle.Systemverwaltung => "Systemverwaltung",
+        Rolle.Dozierende => "Dozierende",
         _ => rolle.ToString(),
     };
 

@@ -169,6 +169,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
 
         ProgrammMapping.Anwenden(modelBuilder);
         AnmeldungMapping.Anwenden(modelBuilder);
+        Durchfuehrung.DurchfuehrungMapping.Anwenden(modelBuilder);
 
         modelBuilder.Entity<VibeVHS.Domain.Datenschutz.Aufbewahrungsfrist>(b =>
         {
@@ -235,6 +236,13 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(n => n.AusgeloestVon).HasMaxLength(200);
             b.Property(n => n.AnhangName).HasMaxLength(200);
             b.Property(n => n.AnhangTyp).HasMaxLength(100);
+            b.Property(n => n.WeitereAnhaenge).HasConversion(
+                    v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                    s => System.Text.Json.JsonSerializer.Deserialize<List<Mailanhang>>(s, (System.Text.Json.JsonSerializerOptions?)null) ?? new List<Mailanhang>(),
+                    new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<Mailanhang>>(
+                        (a, c) => System.Text.Json.JsonSerializer.Serialize(a, (System.Text.Json.JsonSerializerOptions?)null) == System.Text.Json.JsonSerializer.Serialize(c, (System.Text.Json.JsonSerializerOptions?)null),
+                        v => v.Count,
+                        v => v.ToList()));
             b.HasIndex(n => new { n.Status, n.ErstelltAm });
             b.HasIndex(n => n.PersonId);
         });

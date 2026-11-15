@@ -22,7 +22,7 @@ public sealed class PostausgangDienst(
     /// </summary>
     public async Task<AusgehendeNachricht> KundenmailEinreihenAsync(string eMail, string? anzeigename, string betreff,
         string text, string sprache, Guid? personId = null, CancellationToken abbruch = default,
-        (string Name, string Typ, string Inhalt)? anhang = null)
+        (string Name, string Typ, string Inhalt)? anhang = null, IEnumerable<Mailanhang>? weitere = null)
     {
         var wer = await benutzer.ErmittelnAsync(abbruch);
         var id = Ids.Neu();
@@ -34,6 +34,11 @@ public sealed class PostausgangDienst(
         if (anhang is { } a)
         {
             nachricht.MitAnhang(a.Name, a.Typ, a.Inhalt);
+        }
+
+        foreach (var w in weitere ?? [])
+        {
+            nachricht.MitWeiteremAnhang(w);
         }
         speicher.Hinzufuegen(nachricht);
         await protokoll.ProtokollierenAsync("Postausgang.MailEingereiht",

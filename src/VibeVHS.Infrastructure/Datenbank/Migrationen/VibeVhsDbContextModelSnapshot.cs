@@ -15,7 +15,7 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261115080227_Dozierendenmerkmale";
+    public override string LastMigrationId => "20261115084305_Durchfuehrung";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -114,6 +114,10 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
 
                 b.Property<int>("Versuche")
                     .HasColumnType("INTEGER");
+
+                b.Property<string>("WeitereAnhaenge")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
 
                 b.Property<long?>("ZugestelltAm")
                     .HasColumnType("INTEGER");
@@ -570,6 +574,246 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.HasKey("Id");
 
                 b.ToTable("Loeschlaeufe");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Dokumente.Dokument", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("AnonymisiertAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Art")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("BelegungId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("DatenJson")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("ErsetztDurch")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErstelltAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("ErstelltVon")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Klartext")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("KursId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("NeuausstellungGrund")
+                    .HasMaxLength(500)
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("NeuausstellungVon")
+                    .HasColumnType("TEXT");
+
+                b.Property<byte[]>("Pdf")
+                    .IsRequired()
+                    .HasColumnType("BLOB");
+
+                b.Property<Guid>("PersonId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Sha256")
+                    .IsRequired()
+                    .HasMaxLength(64)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Titel")
+                    .IsRequired()
+                    .HasMaxLength(300)
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("UebersetzbarBis")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("UebersetzungsToken")
+                    .IsRequired()
+                    .HasMaxLength(64)
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("BelegungId");
+
+                b.HasIndex("KursId");
+
+                b.HasIndex("PersonId");
+
+                b.HasIndex("UebersetzungsToken")
+                    .IsUnique();
+
+                b.ToTable("Dokumente");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Durchfuehrung.Anwesenheit", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("BelegungId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Bemerkung")
+                    .HasMaxLength(500)
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly>("Datum")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErfasstAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("ErfasstVon")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErstErfasstAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<Guid>("KursId")
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("Minuten")
+                    .HasColumnType("INTEGER");
+
+                b.Property<Guid?>("OrtId")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("PersonId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("VeranstaltungId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Weg")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("KursId");
+
+                b.HasIndex("PersonId");
+
+                b.HasIndex("VeranstaltungId", "BelegungId")
+                    .IsUnique();
+
+                b.ToTable("Anwesenheiten");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Durchfuehrung.Listenabschluss", b =>
+            {
+                b.Property<Guid>("VeranstaltungId")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("Am")
+                    .HasColumnType("INTEGER");
+
+                b.Property<Guid>("KursId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Von")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.HasKey("VeranstaltungId");
+
+                b.ToTable("Listenabschluesse");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Durchfuehrung.Termincode", b =>
+            {
+                b.Property<string>("Code")
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErstelltAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("GueltigBis")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("GueltigVon")
+                    .HasColumnType("INTEGER");
+
+                b.Property<Guid>("OrtId")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("VeranstaltungId")
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Code");
+
+                b.HasIndex("VeranstaltungId", "OrtId");
+
+                b.ToTable("Termincodes");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Durchfuehrung.Zugangstoken", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Art")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErstelltAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Hash")
+                    .IsRequired()
+                    .HasMaxLength(64)
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("PersonId")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("Ursprung")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("WiderrufGrund")
+                    .HasMaxLength(300)
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("WiderrufenAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long?>("ZuletztGenutzt")
+                    .HasColumnType("INTEGER");
+
+                b.HasKey("Id");
+
+                b.HasIndex("Hash")
+                    .IsUnique();
+
+                b.HasIndex("PersonId");
+
+                b.ToTable("Zugangstokens");
             });
 
         modelBuilder.Entity("VibeVHS.Domain.Personen.AdressKennzeichen", b =>
@@ -1362,6 +1606,10 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("TEXT");
 
                 b.Property<string>("Beschreibung")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Bildungsurlaub")
+                    .HasMaxLength(100)
                     .HasColumnType("TEXT");
 
                 b.Property<DateOnly?>("ErzeugtBis")

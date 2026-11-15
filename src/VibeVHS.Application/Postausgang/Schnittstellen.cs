@@ -32,4 +32,7 @@ public interface IZustellKanal
 public interface IUebersetzungslinks
 {
     Uri FuerNachricht(Guid nachrichtId, string sprache);
+
+    /// <summary>Link der Übersetzungsseite eines Briefs (QR-Code „Translate this letter in your language“).</summary>
+    Uri FuerBrief(string token, string? sprache);
 }

@@ -46,6 +46,11 @@ public static class Registrierung
         dienste.AddScoped<Application.Programm.IProgrammSpeicher, Programm.ProgrammSpeicher>();
         dienste.AddScoped<Application.Programm.IGlobaleSuche, Programm.GlobaleSuche>();
         dienste.AddScoped<Application.Programm.IQualifikationsSpeicher, Programm.QualifikationsSpeicher>();
+        dienste.AddScoped<Application.Durchfuehrung.IDurchfuehrungSpeicher, Durchfuehrung.DurchfuehrungSpeicher>();
+        dienste.AddScoped<Application.Dokumente.IDokumentSpeicher, Durchfuehrung.DokumentSpeicher>();
+        dienste.AddScoped<Application.Durchfuehrung.IZugangstokenSpeicher, Durchfuehrung.ZugangstokenSpeicher>();
+        dienste.AddSingleton<Application.Dokumente.IQrCode, Durchfuehrung.QrCodeErzeuger>();
+        dienste.AddSingleton<Application.Dokumente.IBriefPdf, Durchfuehrung.BriefPdf>();
         dienste.AddScoped<Application.Datenschutz.IDatenschutzSpeicher, Datenschutz.DatenschutzSpeicher>();
         dienste.AddSingleton<Application.Datenschutz.IAuskunftPdf, Datenschutz.AuskunftPdf>();
         dienste.AddScoped<Anmeldung.AnmeldungSpeicher>();
@@ -70,7 +75,8 @@ public static class Registrierung
             q.AddJob<AnmeldungJob>(j => j.WithIdentity(AnmeldungJob.Schluessel));
             q.AddTrigger(t => t.ForJob(AnmeldungJob.Schluessel).WithIdentity("anmeldung-stuendlich", "automatik").WithCronSchedule("0 5 * * * ?"));
             q.AddJob<QualifikationJob>(j => j.WithIdentity(QualifikationJob.Schluessel));
-            foreach (var schluessel in new[] { TermineFortschreibenJob.Schluessel, MerkmalAblaufJob.Schluessel, QualifikationJob.Schluessel })
+            q.AddJob<AnwesenheitJob>(j => j.WithIdentity(AnwesenheitJob.Schluessel));
+            foreach (var schluessel in new[] { TermineFortschreibenJob.Schluessel, MerkmalAblaufJob.Schluessel, QualifikationJob.Schluessel, AnwesenheitJob.Schluessel })
             {
                 q.AddTrigger(t => t.ForJob(schluessel).WithIdentity(schluessel.Name + "-nacht", "automatik").WithCronSchedule("0 15 2 * * ?"));
                 q.AddTrigger(t => t.ForJob(schluessel).WithIdentity(schluessel.Name + "-start", "automatik").StartAt(DateTimeOffset.UtcNow.AddSeconds(20)));

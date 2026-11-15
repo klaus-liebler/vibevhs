@@ -84,6 +84,27 @@ public enum Buchungsweg
     Auftraggeber,
 }
 
+public enum SelbstCheckin
+{
+    Erlaubt,
+
+    /// <summary>Selbst-Check-in wird vorgemerkt und von der Kursleitung bestätigt (z. B. Integrationskurse).</summary>
+    MitBestaetigung,
+
+    /// <summary>Nur die Kursleitung erfasst die Anwesenheit (Ausweis-Scan oder Liste).</summary>
+    Aus,
+}
+
+public static class SelbstCheckinAnzeige
+{
+    public static string Text(SelbstCheckin s) => s switch
+    {
+        SelbstCheckin.Erlaubt => "erlaubt",
+        SelbstCheckin.MitBestaetigung => "mit Bestätigung durch die Kursleitung",
+        _ => "aus (nur Kursleitung)",
+    };
+}
+
 /// <summary>Regel je Buchungsweg (Rolle): darf buchen, darf über die Höchstzahl hinaus buchen.</summary>
 public sealed record Buchungsrecht(Buchungsweg Weg, bool DarfBuchen, bool DarfUeberbuchen = false);
 
@@ -124,6 +145,9 @@ public sealed record Buchungsrichtlinie
     /// <summary>Wer eingebucht ist und nicht erscheint, verbraucht die Einheit des Kontingents.</summary>
     public bool NichterscheinenZaehlt { get; init; } = true;
 
+    /// <summary>Selbst-Check-in der Teilnehmenden per Termin-QR (bei abrechnungsrelevanter Anwesenheit abschaltbar oder mit Bestätigung).</summary>
+    public SelbstCheckin SelbstCheckin { get; init; } = SelbstCheckin.Erlaubt;
+
     public bool Darf(Buchungsweg weg) => Rechte.Any(r => r.Weg == weg && r.DarfBuchen);
 
     public bool DarfUeberbuchen(Buchungsweg weg) => Rechte.Any(r => r.Weg == weg && r.DarfBuchen && r.DarfUeberbuchen);
@@ -144,6 +168,7 @@ public sealed record Buchungsrichtlinie
     public static Buchungsrichtlinie Integrationskurs { get; } = new()
     {
         Rechte = [new(Buchungsweg.IntegrationskursTeam, true, true)],
+        SelbstCheckin = SelbstCheckin.MitBestaetigung,
         Warteliste = false,
         StornofristTage = 0,
     };
@@ -406,6 +431,15 @@ public sealed class Kurs
     public Kurs MitDozierendenmerkmalen(IEnumerable<string> schluessel)
     {
         BenoetigteDozierendenmerkmale = schluessel.Distinct().ToList();
+        return this;
+    }
+
+    /// <summary>Als Bildungsurlaub nach AWbG NRW anerkannt (Anerkennungsnummer); dann gibt es die Bildungsurlaubsbescheinigung.</summary>
+    public string? Bildungsurlaub { get; private set; }
+
+    public Kurs AlsBildungsurlaub(string? anerkennung)
+    {
+        Bildungsurlaub = string.IsNullOrWhiteSpace(anerkennung) ? null : anerkennung.Trim();
         return this;
     }
 

@@ -329,6 +329,21 @@ public sealed class DatenschutzDienst(
             erm.Anonymisieren();
         }
 
+        // Check-in-Zugänge (Link, Geräte, Ausweise) werden entwertet.
+        foreach (var token in await speicher.ZugangstokensAsync(person.Id, abbruch))
+        {
+            token.Widerrufen(jetzt, "Anonymisierung");
+        }
+
+        // Dokumente: Inhalt (PDF, Datenstand, Text) wird gelöscht; Art, Datum und Prüfsumme bleiben als Nachweis.
+        foreach (var dok in await speicher.DokumenteAsync(person.Id, abbruch))
+        {
+            if (!dok.IstAnonymisiert)
+            {
+                dok.Anonymisieren(jetzt);
+            }
+        }
+
         if (protokollieren)
         {
             await protokoll.ProtokollierenAsync("Datenschutz.Anonymisiert", $"{Pseudonym.Person(person.Id)} anonymisiert ({anlass})", nameof(Person), person.Id,
@@ -351,6 +366,7 @@ public sealed class DatenschutzDienst(
         var belegungen = (await speicher.BelegungenAsync(personId, abbruch)).Where(b => b.PersonId == personId).ToList();
         var titel = await speicher.KurstitelAsync(belegungen.Select(b => b.KursId).Distinct(), abbruch);
         var ermaessigungen = await speicher.ErmaessigungenAsync(personId, abbruch);
+        var dokumente = await speicher.DokumenteAsync(personId, abbruch);
 
         var auskunft = new Auskunft(
             (await stammdaten.EinrichtungAsync(abbruch))?.Name ?? "Volkshochschule",
@@ -388,7 +404,10 @@ public sealed class DatenschutzDienst(
             pruefung.Gruende.Select(g => new AuskunftFrist(g.Frist?.Bezeichnung ?? g.Grund.FristSchluessel, g.Grund.Beschreibung,
                 g.Fristende?.ToString("dd.MM.yyyy") ?? "–", g.Frist?.Rechtsgrundlage ?? "–")).ToList(),
             verlauf.OrderBy(v => v.Zeitpunkt).Select(v => new AuskunftProtokoll(v.Zeitpunkt, v.Aktion, v.Benutzer)).ToList(),
-            ["Es sind keine Dokumente zu dieser Person gespeichert."],
+            dokumente.Count == 0
+                ? ["Es sind keine Dokumente zu dieser Person gespeichert."]
+                : dokumente.OrderBy(d => d.ErstelltAm).Select(d => $"{d.Titel}, erstellt am {d.ErstelltAm.ToLocalTime():dd.MM.yyyy} von {d.ErstelltVon}"
+                                                                    + (d.IstAnonymisiert ? " (Inhalt gelöscht)" : $" · SHA-256 {d.Sha256}")).ToList(),
             [
                 "Ohne Aufbewahrungspflicht werden Daten nach drei Jahren ohne Aktivität anonymisiert (Vorschlag, mit dem Datenschutzbeauftragten abgestimmt).",
                 "Sie können Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung (Art. 18) und Widerspruch (Art. 21) verlangen.",

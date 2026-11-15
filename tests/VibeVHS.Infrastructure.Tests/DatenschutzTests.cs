@@ -251,7 +251,7 @@ public class DatenschutzTests
 
         var json = JsonSerializer.Serialize(auskunft);
         json.ShouldContain("Becker-Lang");
-        var pdf = new AuskunftPdf().Erzeugen(auskunft);
+        var pdf = new AuskunftPdf(new VibeVHS.Infrastructure.Durchfuehrung.QrCodeErzeuger()).Erzeugen(auskunft);
         System.Text.Encoding.ASCII.GetString(pdf, 0, 4).ShouldBe("%PDF");
         (await db.Protokoll.CountAsync(e => e.Aktion == "Datenschutz.Auskunft" && e.ObjektId == anna.Id, ct)).ShouldBe(1);
     }

@@ -19,6 +19,11 @@ public static class Registrierung
         dienste.AddScoped<Programm.IDozenteneinsatz>(d => d.GetRequiredService<Programm.QualifikationsDienst>());
         dienste.AddScoped<Datenschutz.DatenschutzDienst>();
         dienste.AddScoped<Anmeldung.AnmeldungDienst>();
+        dienste.AddScoped<Durchfuehrung.Termincodes>();
+        dienste.AddSingleton(new Durchfuehrung.OeffentlicheAdresse(oeffentlicheAdresse));
+        dienste.AddScoped<Durchfuehrung.CheckinZugang>();
+        dienste.AddScoped<Durchfuehrung.AnwesenheitDienst>();
+        dienste.AddScoped<Dokumente.DokumentDienst>();
         dienste.AddScoped<Anmeldung.VorlagenDienst>();
         return dienste;
     }

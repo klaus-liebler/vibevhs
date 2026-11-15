@@ -43,6 +43,12 @@ public interface IDatenschutzSpeicher
 
     Task<IReadOnlyList<Domain.Anmeldung.Ermaessigung>> ErmaessigungenAsync(Guid personId, CancellationToken abbruch = default);
 
+    /// <summary>Check-in-Zugänge (Link, Geräte, Ausweise) der Person, verfolgt.</summary>
+    Task<IReadOnlyList<Domain.Durchfuehrung.Zugangstoken>> ZugangstokensAsync(Guid personId, CancellationToken abbruch = default);
+
+    /// <summary>Archivierte Dokumente der Person, verfolgt.</summary>
+    Task<IReadOnlyList<Domain.Dokumente.Dokument>> DokumenteAsync(Guid personId, CancellationToken abbruch = default);
+
     /// <summary>Kursnummer und Titel je Kurs-ID (für die Auskunft).</summary>
     Task<IReadOnlyDictionary<Guid, string>> KurstitelAsync(IEnumerable<Guid> kursIds, CancellationToken abbruch = default);
 
@@ -93,5 +99,6 @@ public sealed record AuskunftProtokoll(DateTimeOffset Zeitpunkt, string Aktion, 
 
 public interface IAuskunftPdf
 {
-    byte[] Erzeugen(Auskunft auskunft);
+    /// <param name="uebersetzungslink">Link für den QR-Code „Translate this letter in your language“.</param>
+    byte[] Erzeugen(Auskunft auskunft, Uri? uebersetzungslink = null);
 }

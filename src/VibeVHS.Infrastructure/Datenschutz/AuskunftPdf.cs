@@ -6,7 +6,7 @@ using VibeVHS.Application.Datenschutz;
 namespace VibeVHS.Infrastructure.Datenschutz;
 
 /// <summary>Auskunft nach Art. 15 DSGVO als PDF (MigraDoc).</summary>
-internal sealed class AuskunftPdf : IAuskunftPdf
+internal sealed class AuskunftPdf(Application.Dokumente.IQrCode qr) : IAuskunftPdf
 {
     static AuskunftPdf()
     {
@@ -16,7 +16,7 @@ internal sealed class AuskunftPdf : IAuskunftPdf
         }
     }
 
-    public byte[] Erzeugen(Auskunft a)
+    public byte[] Erzeugen(Auskunft a, Uri? uebersetzungslink = null)
     {
         var dok = new Document();
         dok.Info.Title = "Auskunft nach Art. 15 DSGVO";
@@ -27,6 +27,22 @@ internal sealed class AuskunftPdf : IAuskunftPdf
         s.PageSetup.TopMargin = Unit.FromCentimeter(2);
         s.PageSetup.LeftMargin = Unit.FromCentimeter(2.2);
         s.PageSetup.RightMargin = Unit.FromCentimeter(2);
+        if (uebersetzungslink is not null)
+        {
+            s.PageSetup.BottomMargin = Unit.FromCentimeter(3.6);
+            var fuss = s.Footers.Primary.AddTable();
+            fuss.AddColumn(Unit.FromCentimeter(2.4));
+            fuss.AddColumn(Unit.FromCentimeter(14));
+            var z = fuss.AddRow();
+            var bild = z.Cells[0].AddImage("base64:" + Convert.ToBase64String(qr.Png(uebersetzungslink.ToString())));
+            bild.Width = Unit.FromCentimeter(2.1);
+            bild.LockAspectRatio = true;
+            var p = z.Cells[1].AddParagraph();
+            p.AddFormattedText("Translate this letter in your language", TextFormat.Bold);
+            p.AddLineBreak();
+            p.AddFormattedText(uebersetzungslink.ToString(), new Font { Size = 7, Color = Colors.Gray });
+            p.Format.Font.Size = 8;
+        }
 
         var kopf = s.AddParagraph(a.Einrichtung);
         kopf.Format.Font.Size = 9;
