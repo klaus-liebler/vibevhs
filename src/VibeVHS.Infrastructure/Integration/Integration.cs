@@ -125,6 +125,16 @@ internal sealed class IntegrationSpeicher(VibeVhsDbContext db) : IIntegrationSpe
 
     public Task<Pruefungsanmeldung?> PruefungsanmeldungAsync(Guid id, CancellationToken abbruch = default) => db.Set<Pruefungsanmeldung>().FirstOrDefaultAsync(a => a.Id == id, abbruch);
 
+    public async Task<IReadOnlyList<IkKurszeile>> IntegrationskurseAsync(CancellationToken abbruch = default)
+    {
+        var kurse = await db.Kurse.AsNoTracking().Include(k => k.Veranstaltungen)
+            .Where(k => k.Nutzungsart == Domain.Programm.Nutzungsart.Integrationskurs && k.ArchiviertAm == null).ToListAsync(abbruch);
+        var daten = await db.Set<Integrationskursdaten>().AsNoTracking().ToDictionaryAsync(d => d.KursId, abbruch);
+        return kurse.Select(k => new IkKurszeile(k.Id, k.Kursnummer, k.Titel, k.Status, k.ErsterTermin, daten.GetValueOrDefault(k.Id)?.BamfKursnummer,
+                daten.GetValueOrDefault(k.Id)?.KursbeginnGemeldetAm))
+            .OrderByDescending(k => k.Beginn).ToList();
+    }
+
     public void Hinzufuegen(object eintrag) => db.Add(eintrag);
 
     public Task SpeichernAsync(CancellationToken abbruch = default) => db.SaveChangesAsync(abbruch);

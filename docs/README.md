@@ -311,6 +311,38 @@ bei Kursleitungen die Honorarverträge.
   braucht Klaus' Zustimmung; bis dahin prüfen die Tests Struktur, Summen und Pflichtfelder), Kassenbuch (FA-36, Soll),
   automatische Erstattung von Guthaben, Entfernung je Ort für km-Fahrtkosten.
 
+## Integrationskurse (I7, FA-40 bis FA-44, FA-134 bis FA-137)
+
+Seite `/integration` (Integrationskurs-Team, Verwaltungsleitung, Leitung bearbeiten; Teilnehmerservice,
+Fachbereichsleitung und Prüfung lesen).
+
+- **Kursdaten**: BAMF-Kursnummer, Kursart, Abschnitte (Module zu 100 UE plus Orientierungskurs, je Kursart vorbelegt),
+  Kostenerstattungssatz und Kostenbeitrag je UE (**Platzhalter 4,71 € / 2,29 €** – mit der aktuellen Festsetzung des BAMF
+  abgleichen). Termine werden nach ihrem Beginn dem Abschnitt zugeordnet (ein Termin wird nicht geteilt).
+- **Teilnahmeberechtigung** (Berechtigungsschein, Verpflichtung, Zulassung) mit Teilnehmernummer, Stelle, Gültigkeit,
+  UE-Umfang, Kostenbefreiung und Fahrtkostenanspruch – nur Daten, keine Kopie des Bescheids.
+- **Identitätsprüfung (FA-134)** am Original: gespeichert werden nur Datum, prüfende Person, Dokumentart und Ergebnis.
+  Ohne Berechtigung und Prüfung ist die **Kursbeginnmeldung gesperrt** (Tooltip nennt die Personen).
+- **Lichtbild (FA-135)** nur nach bestätigter Information nach Art. 13 DSGVO; wird beim Check-in als data:-URI angezeigt
+  (kein abrufbarer Link, keine Datei auf dem Gerät), nie technisch abgeglichen und nach Kursende plus
+  `Integration:LichtbildFristTage` (Standard 14) vom täglichen Job gelöscht.
+- **Check-in Weg B (FA-136/137)**: Im Integrationskurs zeigt der Ausweis-Scan zuerst Name und Lichtbild; „Stimmt überein“
+  checkt ein, „Zweifel“ checkt **vorläufig** ein und erzeugt die Aufgabe „Ausweiskontrolle“. Vorläufige Anwesenheiten
+  zählen nicht für die BAMF-Abrechnung; nach der Kontrolle werden sie anerkannt oder verworfen.
+- **UE-genau** je Teilnehmenden und Abschnitt: anwesend (abrechenbar), vorläufig, entschuldigt, Quote.
+- **Kostenbeitrag**: Rechnung je nicht befreiter Person und Abschnitt (über die Finanzen, festgeschrieben).
+- **BAMF-Abrechnung je beendetem Abschnitt**: anwesende UE × (Erstattung − ggf. Kostenbeitrag) plus bewilligte Fahrtkosten,
+  als Beleg an das BAMF (mit XRechnung) und Abrechnungsliste mit Teilnehmernummern (ohne Namen) über den
+  **BAMF-Mock-Adapter** (`IBamfSchnittstelle`; Meldungen im Postausgang, simulierte Vorgangsnummer).
+- **Fahrtkosten (FA-42)** für kostenbefreite Teilnehmende ab 3 km: Entfernung aus dem **Geokodierer-Mock**
+  (Postleitzahl → Koordinaten der Region, Luftlinie × 1,3 zum Kursort); Bewilligung erzeugt eine Gutschrift, Auszahlung
+  über den Überweisungslauf. Dieselbe Entfernung (hin und zurück) nutzen jetzt die km-Fahrtkosten der Honorarmodelle.
+- **Prüfungen (FA-44)**: DTZ und „Leben in Deutschland“ mit Anmeldung über den Mock und Ergebnisprüfung (LiD ab 15/33).
+- **Aufgaben**: „Ausweiskontrolle“ und „Kursbeginn vorbereiten“ für das Integrationskurs-Team.
+- **Datenschutz**: Anonymisierung löscht Lichtbilder und entfernt Aktenzeichen/Bemerkungen; Berechtigungen sind
+  Aufbewahrungsgrund (Frist „integrationskurs“).
+- Noch offen: echte InGe-Online-Anbindung, BAMF-Formulare als PDF, NFC-Auslesen (FA-138, Ausbaustufe).
+
 ## Testbenutzer der Pilot-VHS
 
 Die Startdaten liegen in [`tools/Testdaten/testbenutzer-vhs-egs.json`](../tools/Testdaten/testbenutzer-vhs-egs.json)

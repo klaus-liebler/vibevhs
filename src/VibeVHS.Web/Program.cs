@@ -63,6 +63,8 @@ builder.Services
     .AddVibeVhsInfrastruktur(builder.Configuration, builder.Environment.ContentRootPath)
     .AddVibeVhsMocks(builder.Configuration);
 
+builder.Services.AddSingleton(new VibeVHS.Application.Integration.IntegrationOptionen(builder.Configuration.GetValue("Integration:LichtbildFristTage", 14)));
+
 // Zusätzliche Honorarmodelle (Plugins): je DLL im Ordner „plugins/honorare“ (Erweiterungspunkt, I6).
 var honorarPlugins = VibeVHS.Application.Finanzen.Honorare.HonorarPlugins.Laden(builder.Services,
     Path.Combine(builder.Environment.ContentRootPath, builder.Configuration["Finanzen:HonorarPlugins"] ?? "plugins/honorare"));
@@ -121,6 +123,7 @@ if (app.Configuration.GetValue("Demodaten:Anlegen", false))
                  ("Anmeldungen", AnmeldungDemodaten.AnlegenAsync),
                  ("Qualifikationen", QualifikationsDemodaten.AnlegenAsync),
                  ("Durchführung", DurchfuehrungDemodaten.AnlegenAsync),
+                 ("Integration", IntegrationDemodaten.AnlegenAsync),
                  ("Finanzen", FinanzDemodaten.AnlegenAsync),
              })
     {

@@ -78,6 +78,7 @@
                         @if (a is not null)
                         {
                             <StatusPille Stil="@(a.Status == Anwesenheitsstatus.Anwesend ? "gut" : a.Status == Anwesenheitsstatus.Unbestaetigt ? "warn" : a.Status == Anwesenheitsstatus.Entschuldigt ? "info" : "neutral")">@AnwesenheitAnzeige.Status(a.Status)@(a.Status == Anwesenheitsstatus.Anwesend ? $" · {a.Minuten} Min. ({a.Ue:0.##} UE)" : "")</StatusPille>
+                            @if (a.Vorlaeufig) { <StatusPille Stil="krit"><span class="vhs-why" tabindex="0" data-why="@a.VorlaeufigGrund">vorläufig</span></StatusPille> }
                             <br /><span class="vhs-small vhs-muted">@AnwesenheitAnzeige.Weg(a.Weg) · @a.ErfasstVon · @a.ErfasstAm.ToLocalTime().ToString("dd.MM. HH:mm")@(a.Bemerkung is null ? "" : $" · {a.Bemerkung}")</span>
                         }
                         else if (z.Belegung.IstKontingent)
@@ -117,6 +118,27 @@
         {
             <p class="vhs-small vhs-muted">Kamera aktiv: Teilnehmerausweis vor die Kamera halten. Jeder erkannte Ausweis wird sofort eingecheckt.</p>
         }
+        @if (sichtvergleich is { } sv)
+        {
+            <div class="vhs-alert vhs-info vhs-sichtvergleich" role="dialog" aria-label="Sichtvergleich">
+                <div class="vhs-row">
+                    @if (sv.LichtbildDatenUri is not null)
+                    {
+                        <img src="@sv.LichtbildDatenUri" alt="Lichtbild für den Sichtvergleich" style="width:120px;height:150px;object-fit:cover;border-radius:6px" />
+                    }
+                    <div class="vhs-grow">
+                        <b style="font-size:1.2em">@sv.Name</b><br />
+                        <span class="vhs-small">Integrationskurs: Bitte Person und Lichtbild vergleichen. Das Bild wird nur angezeigt, nicht gespeichert und nicht automatisch abgeglichen.</span>
+                        @if (sv.Hinweis is not null) { <br /><span class="vhs-small"><b>@sv.Hinweis</b></span> }
+                    </div>
+                </div>
+                <div class="vhs-row">
+                    <BegruendeterButton Text="Stimmt überein" Icon="check" ButtonStyle="ButtonStyle.Success" Click="@(() => SichtvergleichAsync(sv, true))" />
+                    <BegruendeterButton Text="Zweifel" Icon="help" ButtonStyle="ButtonStyle.Warning" Click="@(() => SichtvergleichAsync(sv, false))" />
+                    <span class="vhs-small vhs-muted">Bei Zweifel: vorläufig eingecheckt, die Verwaltung kontrolliert den Ausweis; bis dahin keine BAMF-Abrechnung.</span>
+                </div>
+            </div>
+        }
         @if (letzterScan is { } s)
         {
             <div class="vhs-alert @(s.Ergebnis.Ok ? "vhs-info" : "vhs-warn")"><b>@(s.Name ?? "Unbekannt")</b>: @s.Ergebnis.Text</div>
@@ -139,6 +161,22 @@
     private string? zugriff, grund, raumQr, raumOrt, raumLink, handeingabe;
     private bool scannt;
     private CheckinAntwort? letzterScan;
+    private VibeVHS.Application.Integration.Sichtvergleich? sichtvergleich;
+
+    private async Task SichtvergleichAsync(VibeVHS.Application.Integration.Sichtvergleich sv, bool stimmt)
+    {
+        try
+        {
+            letzterScan = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Integration.IntegrationDienst>().SichtvergleichAsync(Id, sv.PersonId, stimmt));
+        }
+        catch (InvalidOperationException ex)
+        {
+            letzterScan = new CheckinAntwort(new Checkinergebnis(Checkincode.NichtAngemeldet, ex.Message), null, sv.Name);
+        }
+
+        sichtvergleich = null;
+        await LadenAsync();
+    }
     private readonly Dictionary<Guid, int> minutenJe = [];
     private DotNetObjectReference<AnwesenheitListe>? selbst;
     private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
@@ -266,7 +304,9 @@
     {
         try
         {
-            letzterScan = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AnwesenheitDienst>().AusweisCheckinAsync(Id, text.Trim()));
+            // Integrationskurs: erst Sichtvergleich (Name und Lichtbild), dann Check-in (FA-136).
+            sichtvergleich = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Integration.IntegrationDienst>().AusweisScannenAsync(Id, text.Trim()));
+            letzterScan = sichtvergleich is null ? await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AnwesenheitDienst>().AusweisCheckinAsync(Id, text.Trim())) : null;
             await LadenAsync();
         }
         catch (InvalidOperationException ex)

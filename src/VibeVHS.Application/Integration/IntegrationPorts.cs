@@ -41,10 +41,15 @@ public interface IIntegrationSpeicher
 
     Task<Pruefungsanmeldung?> PruefungsanmeldungAsync(Guid id, CancellationToken abbruch = default);
 
+    /// <summary>Alle Kurse der Nutzungsart Integrationskurs (nicht archiviert).</summary>
+    Task<IReadOnlyList<IkKurszeile>> IntegrationskurseAsync(CancellationToken abbruch = default);
+
     void Hinzufuegen(object eintrag);
 
     Task SpeichernAsync(CancellationToken abbruch = default);
 }
+
+public sealed record IkKurszeile(Guid KursId, string Kursnummer, string Titel, Kursstatus Status, DateTime? Beginn, string? BamfKursnummer, DateTimeOffset? Gemeldet);
 
 /// <summary>Kursbeginnmeldung an das BAMF (InGe-Online, Mock).</summary>
 public sealed record BamfKursmeldung(string BamfKursnummer, string Kursnummer, string Kursart, DateOnly Beginn, string Ort, IReadOnlyList<string> Teilnehmernummern);

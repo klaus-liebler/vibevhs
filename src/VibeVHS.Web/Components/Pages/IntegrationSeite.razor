@@ -1,0 +1,334 @@
+@page "/integration"
+@using VibeVHS.Application.Integration
+@using VibeVHS.Domain.Integration
+@using VibeVHS.Domain.Gemeinsam
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+@inject NavigationManager Navigation
+@inject TimeProvider Uhr
+
+<PageTitle>Integrationskurse · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Integrationskurse</h1>
+        <p class="vhs-sub">Berechtigungen, Ausweisprüfung ohne Kopie, Lichtbild nur zum Sichtvergleich, UE je Abschnitt, Kostenbeitrag, BAMF-Abrechnung (Mock), Fahrtkosten und Prüfungen.</p>
+    </div>
+</div>
+
+@if (!lesen.Erlaubt)
+{
+    <div class="vhs-alert vhs-info">@lesen.Begruendung</div>
+    return;
+}
+
+<div class="vhs-split">
+    <section class="vhs-card">
+        <h2>Kurse</h2>
+        <div class="vhs-list">
+            @if (kurse.Count == 0) { <div class="vhs-small vhs-muted">Keine Kurse der Kursart Integrationskurs.</div> }
+            @foreach (var k in kurse)
+            {
+                <div @onclick="@(() => Navigation.NavigateTo($"integration?kurs={k.KursId}"))" style="cursor:pointer" class="@(k.KursId == Kurs ? "vhs-auswahl" : "")">
+                    <StatusPille Stil="@(k.BamfKursnummer is null ? "warn" : k.Gemeldet is null ? "info" : "gut")">@(k.BamfKursnummer is null ? "einrichten" : k.Gemeldet is null ? "nicht gemeldet" : "gemeldet")</StatusPille>
+                    <span class="vhs-grow"><b class="vhs-mono">@k.Kursnummer</b> @k.Titel<br /><span class="vhs-small vhs-muted">@(k.BamfKursnummer is null ? "ohne BAMF-Kursnummer" : $"BAMF {k.BamfKursnummer}") · Beginn @(k.Beginn?.ToString("dd.MM.yyyy") ?? "–")</span></span>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="vhs-card">
+        @if (Kurs is not { } kursId)
+        {
+            <p class="vhs-muted">Kurs auswählen.</p>
+        }
+        else if (u is null)
+        {
+            <h2>Als Integrationskurs einrichten</h2>
+            <div class="vhs-form">
+                <RadzenFormField Text="BAMF-Kursnummer"><RadzenTextBox @bind-Value="bamfNr" /></RadzenFormField>
+                <RadzenFormField Text="Kursart"><RadzenDropDown TValue="Integrationskursart" Data="@(Enum.GetValues<Integrationskursart>())" @bind-Value="art" /></RadzenFormField>
+            </div>
+            <BegruendeterButton Text="Einrichten" Freigabe="@(Bearbeiten.Und(() => string.IsNullOrWhiteSpace(bamfNr) ? Freigabe.Nein("Bitte die BAMF-Kursnummer eintragen.") : Freigabe.Ja))"
+                                Click="@(() => AusfuehrenAsync(d => d.GetRequiredService<IntegrationDienst>().KursEinrichtenAsync(kursId, bamfNr!, art), "Integrationskurs eingerichtet – Abschnitte nach Kursart vorbelegt."))" />
+        }
+        else
+        {
+            <div class="vhs-head">
+                <h2>@u.Kurs.Kursnummer · BAMF @u.Daten.BamfKursnummer</h2>
+                <BegruendeterButton Text="Kursbeginn an das BAMF melden" Icon="send" Size="ButtonSize.Small" Freigabe="@(Bearbeiten.Und(() => IntegrationDienst.KursbeginnFreigabe(u)))"
+                                    Click="@(() => AusfuehrenAsync(async d => $"Gemeldet, Vorgang {await d.GetRequiredService<IntegrationDienst>().KursbeginnMeldenAsync(kursId)}.", null))" />
+            </div>
+            <div class="vhs-small vhs-muted">@IntegrationskursVorlagen.Name(u.Daten.Art) · @u.Daten.GesamtUe UE · Erstattung @(new Geld(u.Daten.KostenerstattungCentJeUe))/UE · Kostenbeitrag @(new Geld(u.Daten.KostenbeitragCentJeUe))/UE (Platzhalter – mit der aktuellen BAMF-Festsetzung abgleichen)</div>
+            @if (u.Kursbeginnhindernisse.Count > 0 && u.Daten.KursbeginnGemeldetAm is null)
+            {
+                <div class="vhs-alert vhs-warn"><b>Kursstart gesperrt:</b> @string.Join("; ", u.Kursbeginnhindernisse)</div>
+            }
+
+            <h3>Abschnitte</h3>
+            <div class="vhs-tbl">
+                <table>
+                    <thead><tr><th>Abschnitt</th><th>UE geplant</th><th>im Kurs</th><th>gehalten</th><th>Zeitraum</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var s in u.Abschnitte)
+                        {
+                            <tr>
+                                <td>@s.Abschnitt.Bezeichnung</td><td>@s.Abschnitt.Ue</td><td>@s.GeplantImKurs.ToString("0.##")</td><td>@s.Gehalten.ToString("0.##")</td>
+                                <td class="vhs-small">@(s.Von is null ? "noch keine Termine" : $"{s.Von:dd.MM.}–{s.Bis:dd.MM.yyyy}")</td>
+                                <td>
+                                    <BegruendeterButton Text="Kostenbeitrag" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Light" Freigabe="@Bearbeiten"
+                                                        Click="@(() => AusfuehrenAsync(async d => $"{await d.GetRequiredService<IntegrationDienst>().KostenbeitragAbrechnenAsync(kursId, s.Abschnitt.Nr)} Kostenbeitragsrechnung(en) erstellt.", null))" />
+                                    @if (s.AbrechnungBelegId is { } bid)
+                                    {
+                                        <a class="vhs-small" href="@($"finanzen?tab=belege&beleg={bid}")">BAMF-Abrechnung</a>
+                                    }
+                                    else
+                                    {
+                                        <BegruendeterButton Text="BAMF abrechnen" Size="ButtonSize.ExtraSmall" Freigabe="@(Bearbeiten.Und(() => IntegrationDienst.AbrechnungFreigabe(s)))"
+                                                            Click="@(() => AusfuehrenAsync(async d => $"Abrechnung {(await d.GetRequiredService<IntegrationDienst>().BamfAbrechnenAsync(kursId, s.Abschnitt.Nr)).Nummer} erstellt und übermittelt.", null))" />
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Teilnehmende</h3>
+            <div class="vhs-aufgaben">
+                @foreach (var t in u.Teilnehmende)
+                {
+                    var pid = t.Belegung.PersonId;
+                    <details class="vhs-aufgabe" open="@(offen == pid)">
+                        <summary @onclick="@(() => offen = offen == pid ? null : pid)">
+                            <b>@t.Name</b>
+                            @if (t.Berechtigung is { } b) { <StatusPille Stil="gut">@b.Art @b.Aktenzeichen</StatusPille> @if (b.Kostenbefreit) { <StatusPille Stil="info">befreit</StatusPille> } }
+                            else { <StatusPille Stil="krit">keine Berechtigung</StatusPille> }
+                            <StatusPille Stil="@(t.AusweisOk ? "gut" : t.Ausweis is null ? "warn" : "krit")">@(t.AusweisOk ? "Ausweis geprüft" : t.Ausweis is null ? "Ausweis offen" : "Abweichung")</StatusPille>
+                            <StatusPille Stil="@(t.Lichtbild ? "gut" : "neutral")">@(t.Lichtbild ? "Lichtbild" : "kein Lichtbild")</StatusPille>
+                            <span class="vhs-small"> · @t.AnwesendUe.ToString("0.##") von @t.GehaltenUe.ToString("0.##") UE (@t.Quote %)@(t.Abschnitte.Sum(a => a.Vorlaeufig) is > 0 and var vl ? $" · {vl:0.##} UE vorläufig" : "")</span>
+                        </summary>
+                        <div class="vhs-small">@string.Join(" · ", t.Abschnitte.Where(a => a.Gehalten > 0).Select(a => $"{u.Daten.Abschnitte.First(x => x.Nr == a.Nr).Bezeichnung}: {a.Anwesend:0.##} UE anwesend{(a.Vorlaeufig > 0 ? $", {a.Vorlaeufig:0.##} vorläufig" : "")}{(a.Entschuldigt > 0 ? $", {a.Entschuldigt:0.##} entschuldigt" : "")}"))</div>
+                        @if (offen == pid)
+                        {
+                            <div class="vhs-wsa">
+                                <div>
+                                    <h4>Berechtigung</h4>
+                                    <div class="vhs-form">
+                                        <RadzenFormField Text="Art"><RadzenDropDown TValue="Berechtigungsart" Data="@(Enum.GetValues<Berechtigungsart>())" @bind-Value="bArt" /></RadzenFormField>
+                                        <RadzenFormField Text="Teilnehmernummer / Aktenzeichen"><RadzenTextBox @bind-Value="bAz" /></RadzenFormField>
+                                        <RadzenFormField Text="Ausstellende Stelle"><RadzenTextBox @bind-Value="bStelle" /></RadzenFormField>
+                                        <RadzenFormField Text="ausgestellt am"><RadzenDatePicker TValue="DateOnly" @bind-Value="bAm" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+                                        <RadzenFormField Text="Kursbeginn spätestens"><RadzenDatePicker TValue="DateOnly?" @bind-Value="bBis" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+                                        <RadzenFormField Text="UE-Umfang"><RadzenNumeric TValue="int" @bind-Value="bUe" Min="1" /></RadzenFormField>
+                                        <RadzenFormField Text="Befreiungsgrund (leer = Kostenbeitrag)"><RadzenTextBox @bind-Value="bGrund" /></RadzenFormField>
+                                    </div>
+                                    <RadzenCheckBox @bind-Value="bFahrt" Name="fahrt" /><RadzenLabel Text=" Fahrtkostenanspruch (nur bei Befreiung)" Component="fahrt" />
+                                    <BegruendeterButton Text="Berechtigung speichern" Size="ButtonSize.Small" Freigabe="@Bearbeiten"
+                                                        Click="@(() => AusfuehrenAsync(d => d.GetRequiredService<IntegrationDienst>().BerechtigungErfassenAsync(pid, bArt, bAz ?? "", bStelle ?? "", bAm, bBis, bUe, !string.IsNullOrWhiteSpace(bGrund), bGrund, bFahrt), "Berechtigung erfasst (nur Daten, keine Kopie des Bescheids)."))" />
+                                </div>
+                                <div>
+                                    <h4>Ausweis (Original, keine Kopie)</h4>
+                                    <div class="vhs-form">
+                                        <RadzenFormField Text="Dokument"><RadzenDropDown TValue="Ausweisart" Data="@(Enum.GetValues<Ausweisart>())" @bind-Value="aArt" /></RadzenFormField>
+                                        <RadzenFormField Text="Bemerkung (ohne Ausweisnummer)"><RadzenTextBox @bind-Value="aNotiz" /></RadzenFormField>
+                                    </div>
+                                    <div class="vhs-row">
+                                        @if (t.Abschnitte.Sum(a => a.Vorlaeufig) > 0)
+                                        {
+                                            <BegruendeterButton Text="Ausweiskontrolle: bestätigt" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Success" Freigabe="@Bearbeiten"
+                                                                Click="@(() => AusfuehrenAsync(d => d.GetRequiredService<IntegrationDienst>().AusweiskontrolleAbschliessenAsync(pid, aArt, true, aNotiz), "Kontrolle bestätigt – vorläufige Anwesenheiten zählen."))" />
+                                            <BegruendeterButton Text="nicht bestätigt" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Freigabe="@Bearbeiten"
+                                                                Click="@(() => AusfuehrenAsync(d => d.GetRequiredService<IntegrationDienst>().AusweiskontrolleAbschliessenAsync(pid, aArt, false, aNotiz), "Vorläufige Anwesenheiten verworfen."))" />
+                                        }
+                                        else
+                                        {
+                                            <BegruendeterButton Text="Stimmt mit Berechtigung überein" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Success" Freigabe="@Bearbeiten"
+                                                                Click="@(() => AusfuehrenAsync(d => d.GetRequiredService<IntegrationDienst>().IdentitaetPruefenAsync(pid, aArt, true, aNotiz), "Ausweisprüfung erfasst."))" />
+                                            <BegruendeterButton Text="Abweichung" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@Bearbeiten"
+                                                                Click="@(() => AusfuehrenAsync(d => d.GetRequiredService<IntegrationDienst>().IdentitaetPruefenAsync(pid, aArt, false, aNotiz), "Abweichung erfasst."))" />
+                                        }
+                                    </div>
+                                    <h4>Lichtbild für den Sichtvergleich</h4>
+                                    <p class="vhs-small vhs-muted">Nur zum Anzeigen beim Check-in, kein automatischer Abgleich; Löschung @optionenTage Tage nach Kursende.</p>
+                                    <RadzenCheckBox @bind-Value="informiert" Name="art13" /><RadzenLabel Text=" Person nach Art. 13 DSGVO informiert (Zweck, Dauer, Löschung)" Component="art13" />
+                                    @if (Bearbeiten.Erlaubt && informiert)
+                                    {
+                                        <InputFile OnChange="@(e => LichtbildAsync(e, pid, kursId))" accept="image/*" capture="user" aria-label="Lichtbild aufnehmen" />
+                                    }
+                                    else
+                                    {
+                                        <span class="vhs-why vhs-small" tabindex="0" data-why="@(Bearbeiten.Erlaubt ? "Erst die Information nach Art. 13 DSGVO bestätigen." : Bearbeiten.Begruendung)">Aufnahme nicht möglich</span>
+                                    }
+                                    @if (t.Lichtbild)
+                                    {
+                                        <BegruendeterButton Text="Lichtbild löschen" Size="ButtonSize.ExtraSmall" Variant="Variant.Text" Freigabe="@Bearbeiten"
+                                                            Click="@(() => AusfuehrenAsync(d => d.GetRequiredService<IntegrationDienst>().LichtbildLoeschenAsync(pid, kursId), "Lichtbild gelöscht."))" />
+                                    }
+                                </div>
+                                <div>
+                                    <h4>Fahrtkosten</h4>
+                                    <div class="vhs-form">
+                                        <RadzenFormField Text="Monat (MM/JJJJ)"><RadzenDatePicker TValue="DateOnly" @bind-Value="fMonat" DateFormat="MM/yyyy" /></RadzenFormField>
+                                        <RadzenFormField Text="Ticketkosten (€)"><RadzenNumeric TValue="decimal" @bind-Value="fBetrag" Min="0" Format="0.00" /></RadzenFormField>
+                                        <RadzenFormField Text="Entfernung laut Antrag (km, optional)"><RadzenNumeric TValue="decimal?" @bind-Value="fKm" Min="0" /></RadzenFormField>
+                                    </div>
+                                    <BegruendeterButton Text="Antrag erfassen" Size="ButtonSize.Small"
+                                                        Freigabe="@(Bearbeiten.Und(() => t.Berechtigung is { Kostenbefreit: true, Fahrtkosten: true } ? Freigabe.Ja : Freigabe.Nein("Nur kostenbefreite Teilnehmende mit Fahrtkostenanspruch (laut Berechtigung).")))"
+                                                        Click="@(() => AusfuehrenAsync(d => d.GetRequiredService<IntegrationDienst>().FahrtkostenBeantragenAsync(kursId, pid, fMonat.Year, fMonat.Month, (long)Math.Round(fBetrag * 100), fKm), "Antrag erfasst."))" />
+                                    @foreach (var f in fahrtkosten.Where(f => f.PersonId == pid))
+                                    {
+                                        <div class="vhs-row vhs-small">
+                                            <span class="vhs-grow">@f.Monat.ToString("00")/@f.Jahr · @(new Geld(f.BetragCent)) · @f.EntfernungKm.ToString("0.#") km · @f.Status</span>
+                                            @if (f.Status == Fahrtkostenstatus.Beantragt)
+                                            {
+                                                <BegruendeterButton Text="bewilligen" Size="ButtonSize.ExtraSmall" Freigabe="@Bearbeiten"
+                                                                    Click="@(() => AusfuehrenAsync(d => d.GetRequiredService<IntegrationDienst>().FahrtkostenEntscheidenAsync(f.Id, true, null), "Bewilligt – Gutschrift erstellt, Auszahlung über den Überweisungslauf."))" />
+                                                <BegruendeterButton Text="ablehnen" Size="ButtonSize.ExtraSmall" Variant="Variant.Text" Freigabe="@Bearbeiten"
+                                                                    Click="@(() => AusfuehrenAsync(d => d.GetRequiredService<IntegrationDienst>().FahrtkostenEntscheidenAsync(f.Id, false, "Voraussetzungen nicht erfüllt"), "Abgelehnt."))" />
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </details>
+                }
+            </div>
+
+            <h3>Prüfungen</h3>
+            <div class="vhs-row">
+                <RadzenDropDown TValue="Pruefungsart" Data="@(Enum.GetValues<Pruefungsart>())" @bind-Value="pArt" Style="width:110px" />
+                <RadzenDatePicker TValue="DateTime" @bind-Value="pBeginn" ShowTime="true" DateFormat="dd.MM.yyyy HH:mm" />
+                <RadzenTextBox @bind-Value="pOrt" Placeholder="Ort" />
+                <BegruendeterButton Text="Termin anlegen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@Bearbeiten"
+                                    Click="@(() => AusfuehrenAsync(d => d.GetRequiredService<IntegrationDienst>().PruefungAnlegenAsync(pArt, pBeginn, pOrt ?? "", kursId), "Prüfungstermin angelegt."))" />
+            </div>
+            @foreach (var p in pruefungen.Where(x => x.KursId == kursId))
+            {
+                var angemeldet = pruefungsanmeldungen.Where(a => a.PruefungId == p.Id).ToList();
+                <div class="vhs-aufgabe">
+                    <div class="vhs-row">
+                        <b>@(p.Art == Pruefungsart.Dtz ? "DTZ" : "Leben in Deutschland")</b> <span>@p.Beginn.ToString("dd.MM.yyyy HH:mm") · @p.Ort · @angemeldet.Count angemeldet@(p.GemeldetAm is { } g ? $" · gemeldet {g.ToLocalTime():dd.MM.}" : "")</span>
+                        <BegruendeterButton Text="Alle mit Berechtigung anmelden" Size="ButtonSize.ExtraSmall" Freigabe="@Bearbeiten"
+                                            Click="@(() => AusfuehrenAsync(async d => $"Gemeldet, Vorgang {await d.GetRequiredService<IntegrationDienst>().PruefungAnmeldenAsync(p.Id, u.Teilnehmende.Where(t => t.Berechtigung is not null).Select(t => t.Belegung.PersonId).ToList())}.", null))" />
+                    </div>
+                    @foreach (var a in angemeldet)
+                    {
+                        var name = u.Teilnehmende.FirstOrDefault(t => t.Belegung.PersonId == a.PersonId)?.Name ?? "?";
+                        <div class="vhs-row vhs-small">
+                            <span class="vhs-grow">@name · @a.Ergebnis@(a.Punkte is { } x ? $" ({x} Punkte)" : "")</span>
+                            @foreach (var e in Ergebnisse(p.Art))
+                            {
+                                <BegruendeterButton Text="@e.ToString()" Size="ButtonSize.ExtraSmall" Variant="Variant.Text" Freigabe="@Bearbeiten"
+                                                    Click="@(() => AusfuehrenAsync(d => d.GetRequiredService<IntegrationDienst>().ErgebnisSetzenAsync(a.Id, e, p.Art == Pruefungsart.Lid && e != Pruefungsergebnis.NichtErschienen ? (e == Pruefungsergebnis.Bestanden ? 20 : 10) : null), "Ergebnis gespeichert."))" />
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </section>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "kurs")]
+    private Guid? Kurs { get; set; }
+
+    private Freigabe lesen = Freigabe.Ja;
+    private Freigabe Bearbeiten = Freigabe.Ja;
+    private IReadOnlyList<IkKurszeile> kurse = [];
+    private IkUebersicht? u;
+    private IReadOnlyList<IkFahrtkosten> fahrtkosten = [];
+    private IReadOnlyList<Pruefungstermin> pruefungen = [];
+    private IReadOnlyList<Pruefungsanmeldung> pruefungsanmeldungen = [];
+    private Guid? offen;
+    private int optionenTage;
+    private string? bamfNr;
+    private Integrationskursart art;
+    private Berechtigungsart bArt;
+    private string? bAz, bStelle = "BAMF", bGrund;
+    private DateOnly bAm;
+    private DateOnly? bBis;
+    private int bUe = 700;
+    private bool bFahrt, informiert;
+    private Ausweisart aArt = Ausweisart.Aufenthaltstitel;
+    private string? aNotiz;
+    private DateOnly fMonat;
+    private decimal fBetrag;
+    private decimal? fKm;
+    private Pruefungsart pArt;
+    private DateTime pBeginn;
+    private string? pOrt;
+
+    private static IEnumerable<Pruefungsergebnis> Ergebnisse(Pruefungsart a) => a == Pruefungsart.Dtz
+        ? [Pruefungsergebnis.B1, Pruefungsergebnis.A2, Pruefungsergebnis.UnterA2, Pruefungsergebnis.NichtErschienen]
+        : [Pruefungsergebnis.Bestanden, Pruefungsergebnis.NichtBestanden, Pruefungsergebnis.NichtErschienen];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var wer = await Vorgang.BenutzerAsync();
+        lesen = Freigabe.NurFuer(wer.Rolle, [.. Integrationsrollen.Bearbeiten, Rolle.Fachbereichsleitung, Rolle.Teilnehmerservice, Rolle.Pruefung]);
+        Bearbeiten = Freigabe.NurFuer(wer.Rolle, Integrationsrollen.Bearbeiten);
+        var heute = DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+        if (bAm == default)
+        {
+            (bAm, fMonat, pBeginn) = (heute, new DateOnly(heute.Year, heute.Month, 1), heute.AddDays(30).ToDateTime(new TimeOnly(9, 0)));
+        }
+
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync()
+    {
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var s = d.GetRequiredService<IIntegrationSpeicher>();
+            kurse = await s.IntegrationskurseAsync();
+            optionenTage = d.GetRequiredService<IntegrationOptionen>().LichtbildFristTage;
+            u = Kurs is { } k ? await d.GetRequiredService<IntegrationDienst>().UebersichtAsync(k) : null;
+            fahrtkosten = Kurs is { } k2 ? await s.FahrtkostenAsync(k2) : [];
+            pruefungen = await s.PruefungenAsync();
+            pruefungsanmeldungen = await s.PruefungsanmeldungenAsync();
+        });
+    }
+
+    private async Task AusfuehrenAsync(Func<IServiceProvider, Task> arbeit, string? erfolg)
+        => await AusfuehrenAsync(async d => { await arbeit(d); return erfolg; }, erfolg);
+
+    private async Task AusfuehrenAsync(Func<IServiceProvider, Task<string?>> arbeit, string? _)
+    {
+        try
+        {
+            var meldung = await Vorgang.AusfuehrenAsync(async d =>
+            {
+                var m = await arbeit(d);
+                await d.GetRequiredService<IntegrationRoutinen>().AufgabenAbgleichenAsync();
+                return m;
+            });
+            Hinweise.Notify(NotificationSeverity.Success, "Integrationskurs", meldung ?? "Erledigt.");
+            await LadenAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Warning, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task LichtbildAsync(InputFileChangeEventArgs e, Guid personId, Guid kursId)
+    {
+        try
+        {
+            var bild = await e.File.RequestImageFileAsync("image/jpeg", 480, 600);
+            using var ms = new MemoryStream();
+            await bild.OpenReadStream(400_000).CopyToAsync(ms);
+            var inhalt = ms.ToArray();
+            await AusfuehrenAsync(d => d.GetRequiredService<IntegrationDienst>().LichtbildSpeichernAsync(personId, kursId, inhalt, "image/jpeg", informiert), "Lichtbild gespeichert.");
+            informiert = false;
+        }
+        catch (IOException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Warning, "Lichtbild", $"Das Bild ist zu groß oder nicht lesbar ({ex.Message}).");
+        }
+    }
+}
