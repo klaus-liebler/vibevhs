@@ -143,6 +143,9 @@ export class VhsKurse extends HTMLElement {
       const aus = new URLSearchParams(location.hash.slice(1)).get('korb');
       if (aus) this.korbId = aus;
       await this.kasse();
+    } else if (new URLSearchParams(location.hash.slice(1)).get('kurs')) {
+      // Einstieg über den Kurs-QR (Programmheft): direkt die Kursbeschreibung mit „In den Warenkorb“.
+      await this.detail(new URLSearchParams(location.hash.slice(1)).get('kurs'));
     } else {
       await this.liste(false);
     }

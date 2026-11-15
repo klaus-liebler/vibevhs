@@ -15,7 +15,7 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261115111416_Sprachfreigabe";
+    public override string LastMigrationId => "20261115113526_Schnellanmeldung";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -3085,6 +3085,52 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.HasKey("KursId");
 
                 b.ToTable("Kursstaende");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Shop.Schnellanmeldung", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("BelegungId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Einwilligungen")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("KostenfreiBis")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Kursnummer")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("PersonId")
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("StorniertAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("StornoHash")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Weg")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("Zeitpunkt")
+                    .HasColumnType("INTEGER");
+
+                b.HasKey("Id");
+
+                b.HasIndex("PersonId");
+
+                b.HasIndex("StornoHash")
+                    .IsUnique();
+
+                b.ToTable("Schnellanmeldungen");
             });
 
         modelBuilder.Entity("VibeVHS.Domain.Shop.Shopbuchung", b =>

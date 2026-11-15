@@ -19,6 +19,15 @@
         <p>Guten Tag <b>@name</b>! Tippen Sie im Kursraum auf <b>Einchecken</b> und halten Sie die Kamera auf den QR-Code am Aushang.<br />
             <span class="vhs-small vhs-muted">Tap “Check in” in your course room and point the camera at the QR code.</span></p>
 
+        @if (kursnummer is not null)
+        {
+            <form method="post" @formname="schnell" @onsubmit="SchnellAsync">
+                <AntiforgeryToken />
+                <input type="hidden" name="Kurs" value="@kursnummer" />
+                <SchnellanmeldungKarte Vorschau="schnellVorschau" Ergebnis="schnellErgebnis" Fehler="@schnellFehler" />
+            </form>
+        }
+
         @if (antwort is { } a)
         {
             <div class="vhs-alert @(a.Ergebnis.Ok || a.Ergebnis.Code == VibeVHS.Domain.Durchfuehrung.Checkincode.BereitsEingecheckt ? "vhs-info" : "vhs-warn")" role="status">
@@ -46,6 +55,7 @@
                 <button type="submit" class="vhs-linkbutton">Dieses Gerät merken (dann genügt auch die normale Kamera-App) / remember this device</button>
             </form>
         }
+        <p class="vhs-small vhs-muted">📖 Kurs im Programmheft gefunden? Scannen Sie seinen QR-Code hier mit „Einchecken“ – dann können Sie sich direkt anmelden.</p>
         <p class="vhs-small vhs-muted">Dieser Link ist persönlich – bitte nicht weitergeben. Bei Verlust sperrt der Teilnehmerservice ihn sofort.</p>
     }
 </div>
@@ -61,6 +71,25 @@
 
     [SupplyParameterFromForm]
     private string? Termin { get; set; }
+
+    [SupplyParameterFromForm(FormName = "schnell")]
+    private string? Kurs { get; set; }
+
+    [SupplyParameterFromForm(FormName = "schnell")]
+    private string? Agb { get; set; }
+
+    [SupplyParameterFromForm(FormName = "schnell")]
+    private string? Datenschutz { get; set; }
+
+    [SupplyParameterFromForm(FormName = "schnell")]
+    private string? AgbVersion { get; set; }
+
+    [SupplyParameterFromForm(FormName = "schnell")]
+    private string? DatenschutzVersion { get; set; }
+
+    private string? kursnummer, schnellFehler;
+    private VibeVHS.Application.Shop.SchnellVorschau? schnellVorschau;
+    private VibeVHS.Application.Shop.SchnellErgebnis? schnellErgebnis;
 
     private string? name;
     private bool ungueltig, gemerkt;
@@ -83,13 +112,63 @@
 
         name = (await bereich.ServiceProvider.GetRequiredService<IPersonenSpeicher>().AnzeigenamenAsync([person.Value])).GetValueOrDefault(person.Value);
         gemerkt = (await zugang.GemerktePersonenAsync(Geraete(HttpContext))).Any(p => p.PersonId == person);
+        if (Kurs is not null)
+        {
+            // POST der Schnellanmeldung: das Formular muss beim Rendern vorhanden sein.
+            kursnummer = Kurs;
+        }
     }
 
     /// <summary>Ein Scan: persönliches Token + Termin-Code gehen gemeinsam an den Server.</summary>
     private async Task EincheckenAsync()
     {
         await using var bereich = Bereiche.CreateAsyncScope();
+        if (VibeVHS.Web.Shop.KursQrAblauf.KursnummerAusQr(Termin) is { } nr)
+        {
+            // Kurs-QR statt Termin-QR: Schnellanmeldung mit dem persönlichen Link (Person aus dem Link, Kurs aus dem QR).
+            await VorschauAsync(bereich.ServiceProvider, nr);
+            return;
+        }
+
         antwort = await bereich.ServiceProvider.GetRequiredService<AnwesenheitDienst>().LinkCheckinAsync(Token, Termin ?? string.Empty);
+    }
+
+    private async Task VorschauAsync(IServiceProvider dienste, string nr)
+    {
+        kursnummer = nr;
+        if (await dienste.GetRequiredService<CheckinZugang>().PersonZumLinkAsync(Token) is not { } person)
+        {
+            ungueltig = true;
+            return;
+        }
+
+        try
+        {
+            schnellVorschau = await dienste.GetRequiredService<VibeVHS.Application.Shop.Schnellanmeldedienst>().VorschauAsync(person, nr);
+        }
+        catch (VibeVHS.Application.Shop.ShopFehler f)
+        {
+            schnellFehler = f.Message;
+        }
+    }
+
+    private async Task SchnellAsync()
+    {
+        await using var bereich = Bereiche.CreateAsyncScope();
+        if (Kurs is null || await bereich.ServiceProvider.GetRequiredService<CheckinZugang>().PersonZumLinkAsync(Token) is not { } person)
+        {
+            ungueltig = Kurs is not null;
+            return;
+        }
+
+        (schnellErgebnis, schnellFehler) = await VibeVHS.Web.Shop.KursQrAblauf.AusfuehrenAsync(Bereiche, person, Kurs, Agb, Datenschutz, AgbVersion, DatenschutzVersion, "Link");
+        if (schnellErgebnis is null)
+        {
+            await VorschauAsync(bereich.ServiceProvider, Kurs);
+            schnellFehler ??= "Die Anmeldung war nicht möglich.";
+        }
+
+        kursnummer = Kurs;
     }
 
     private async Task MerkenAsync()

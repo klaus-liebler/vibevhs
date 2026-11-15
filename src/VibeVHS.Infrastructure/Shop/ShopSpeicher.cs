@@ -39,6 +39,15 @@ internal static class ShopMapping
             b.HasIndex(x => x.EMail).IsUnique();
             b.HasIndex(x => x.TokenHash);
         });
+        mb.Entity<Schnellanmeldung>(b =>
+        {
+            b.ToTable("Schnellanmeldungen");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.HasIndex(x => x.StornoHash).IsUnique();
+            b.HasIndex(x => x.PersonId);
+            b.Property(x => x.Einwilligungen).AlsJson();
+        });
         mb.Entity<Kursstand>(b =>
         {
             b.ToTable("Kursstaende");
@@ -75,6 +84,9 @@ internal sealed class ShopSpeicher(VibeVhsDbContext db, TimeProvider uhr) : ISho
 
     public async Task<IReadOnlyList<Shopkonto>> UnbestaetigteKontenAsync(CancellationToken abbruch = default)
         => await db.Set<Shopkonto>().Where(k => k.Status == Kontostatus.Unbestaetigt).ToListAsync(abbruch);
+
+    public Task<Schnellanmeldung?> SchnellanmeldungAsync(string stornoHash, CancellationToken abbruch = default)
+        => db.Set<Schnellanmeldung>().FirstOrDefaultAsync(s => s.StornoHash == stornoHash, abbruch);
 
     public void Hinzufuegen(object eintrag) => db.Add(eintrag);
 

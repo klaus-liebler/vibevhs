@@ -185,3 +185,12 @@ public static class ShopText
             : string.Join(", ", gruppen.Select(g => $"{KursAnzeige.Wochentag(g.Key.DayOfWeek)} {g.Key.Von.ToString("HH:mm", De)}–{g.Key.Bis.ToString("HH:mm", De)}"));
     }
 }
+
+/// <summary>Ein Kurs auf dem QR-Bogen fürs Programmheft.</summary>
+public sealed record KursQrEintrag(string Nummer, string Titel, string? Zusatz, string Inhalt);
+
+/// <summary>Sammel-PDF der Kurs-QR-Codes (Programmheft, Aushang).</summary>
+public interface IKursQrBogen
+{
+    byte[] Erzeugen(string ueberschrift, IReadOnlyList<KursQrEintrag> kurse);
+}

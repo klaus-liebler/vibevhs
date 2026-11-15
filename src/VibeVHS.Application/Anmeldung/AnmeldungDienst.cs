@@ -390,7 +390,9 @@ public sealed class AnmeldungDienst(
     }
 
     /// <summary>Abmeldung durch die Person selbst (Kundenkonto im Webshop): nur eigene Belegungen, Regeln wie am Tresen (AGB).</summary>
-    public async Task<Stornoregel> SelbstStornierenAsync(Guid belegungId, Guid personId, string grund, CancellationToken abbruch = default)
+    /// <param name="kostenfrei">Storno-Link der Schnellanmeldung innerhalb der kostenfreien Frist: keine Gebühr.</param>
+    public async Task<Stornoregel> SelbstStornierenAsync(Guid belegungId, Guid personId, string grund, CancellationToken abbruch = default,
+        bool kostenfrei = false, string von = "Webshop (Kundenkonto)")
     {
         var b = await BelegungAsync(belegungId, abbruch);
         if (b.PersonId != personId)
@@ -403,15 +405,18 @@ public sealed class AnmeldungDienst(
             throw new InvalidOperationException("Diese Belegung ist bereits beendet oder storniert.");
         }
 
-        return await StornoAusfuehrenAsync(b, grund, "Webshop (Kundenkonto)", abbruch);
+        return await StornoAusfuehrenAsync(b, grund, von, abbruch,
+            kostenfrei ? new Stornoregel(0, "Abmeldung über den Storno-Link der Schnellanmeldung innerhalb der kostenfreien Frist: kostenlos.") : null);
     }
 
-    private async Task<Stornoregel> StornoAusfuehrenAsync(Belegung b, string grund, string von, CancellationToken abbruch)
+    public Stornoregel StornoregelFuer(Belegung b, Kurs kurs) => Buchungspruefung.Storno(b, kurs, uhr.GetLocalNow());
+
+    private async Task<Stornoregel> StornoAusfuehrenAsync(Belegung b, string grund, string von, CancellationToken abbruch, Stornoregel? vorgegeben = null)
     {
         var kurs = await KursAsync(b.KursId, abbruch);
         var belegungen = await speicher.BelegungenDesKursesAsync(kurs.Id, abbruch);
         var jetzt = uhr.GetLocalNow();
-        var regel = Buchungspruefung.Storno(b, kurs, jetzt);
+        var regel = vorgegeben ?? Buchungspruefung.Storno(b, kurs, jetzt);
         var hielt = b.HaeltPlatz;
         b.Stornieren(regel.GebuehrCent, string.IsNullOrWhiteSpace(grund) ? "ohne Angabe" : grund.Trim(), von, jetzt);
         await protokoll.ProtokollierenAsync("Anmeldung.Storniert",

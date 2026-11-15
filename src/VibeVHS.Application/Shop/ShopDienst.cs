@@ -40,6 +40,8 @@ public interface IShopSpeicher
 
     Task<IReadOnlyList<Shopkonto>> UnbestaetigteKontenAsync(CancellationToken abbruch = default);
 
+    Task<Schnellanmeldung?> SchnellanmeldungAsync(string stornoHash, CancellationToken abbruch = default);
+
     void Hinzufuegen(object eintrag);
 
     void Entfernen(object eintrag);

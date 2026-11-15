@@ -1,0 +1,45 @@
+@* Inhalt der Schnellanmeldung (Kurs, Preis, Zahlart, Einwilligungen, Knopf). Das umgebende Formular stellt die Seite. *@
+@using VibeVHS.Application.Shop
+
+@if (Ergebnis is { } e)
+{
+    <div class="vhs-alert vhs-info" role="status"><b style="font-size:18px">✔ @e.Kursnummer: @(e.Status == "warteliste" ? "Warteliste" : "angemeldet")</b><br />@e.Text</div>
+}
+else if (Vorschau is { } v)
+{
+    <h2 style="margin:8px 0 4px">@v.Titel</h2>
+    <p class="vhs-small vhs-muted" style="margin:0 0 8px">Kurs @v.Kursnummer</p>
+    <dl class="vhs-dl">
+        <dt>Beginn</dt><dd>@(v.Beginn?.ToString("ddd dd.MM.yyyy, HH:mm 'Uhr'") ?? "–")@(v.Zeiten is null ? "" : $" · {v.Zeiten}") · @v.Termine Termine</dd>
+        @if (v.Ort is not null) { <dt>Ort</dt><dd>@v.Ort</dd> }
+        <dt>Entgelt</dt><dd>@(v.EntgeltCent is { } c ? new VibeVHS.Domain.Gemeinsam.Geld(c).ToString() : "auf Anfrage")@(v.Ermaessigt ? " (ermäßigt)" : "")</dd>
+        <dt>Zahlung</dt><dd>@v.ZahlartText</dd>
+    </dl>
+    <div class="vhs-alert @(v.Buchbar ? (v.Warteliste ? "vhs-warn" : "vhs-info") : "vhs-warn")" role="status">@v.Status</div>
+    @if (Fehler is not null)
+    {
+        <div class="vhs-alert vhs-crit" role="alert">@Fehler</div>
+    }
+    @if (v.Buchbar)
+    {
+        <input type="hidden" name="AgbVersion" value="@v.AgbVersion" />
+        <input type="hidden" name="DatenschutzVersion" value="@v.DatenschutzVersion" />
+        <label style="display:flex;gap:8px;align-items:flex-start;margin:8px 0"><input type="checkbox" name="Agb" value="ja" style="width:22px;height:22px" />
+            <span>Ich akzeptiere die <a href="@v.AgbUrl" target="_blank" rel="noopener">AGB (Fassung @v.AgbVersion)</a>.</span></label>
+        <label style="display:flex;gap:8px;align-items:flex-start;margin:8px 0"><input type="checkbox" name="Datenschutz" value="ja" style="width:22px;height:22px" />
+            <span>Ich habe die <a href="@v.DatenschutzUrl" target="_blank" rel="noopener">Datenschutzhinweise (Fassung @v.DatenschutzVersion)</a> gelesen.</span></label>
+        <button type="submit" class="vhs-btn" style="justify-content:center;font-size:18px;padding:14px;width:100%">@(v.Warteliste ? "Verbindlich auf die Warteliste" : "Verbindlich anmelden")</button>
+        <p class="vhs-small vhs-muted">Gebucht wird für @v.Vorname. Bei kostenpflichtigen Kursen schicken wir sofort eine Mail mit Storno-Link: 24 Stunden kostenlos abmelden, danach nach den AGB.</p>
+    }
+}
+
+@code {
+    [Parameter]
+    public SchnellVorschau? Vorschau { get; set; }
+
+    [Parameter]
+    public SchnellErgebnis? Ergebnis { get; set; }
+
+    [Parameter]
+    public string? Fehler { get; set; }
+}

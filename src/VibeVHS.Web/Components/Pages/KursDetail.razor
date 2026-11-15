@@ -24,6 +24,11 @@
         </p>
     </div>
     <div class="vhs-row">
+        @if (kurs.Sichtbarkeit == Sichtbarkeit.Oeffentlich)
+        {
+            <a class="vhs-btn vhs-btn-light" href="@($"kurse/qr/{Uri.EscapeDataString(kurs.Kursnummer)}.png")" download title="QR-Code für Programmheft und Aushang: führt zur Kursseite mit Online-Anmeldung, mit gemerktem Gerät zur Schnellanmeldung">Kurs-QR (PNG)</a>
+            <a class="vhs-btn vhs-btn-light" href="@($"kurse/qr/{Uri.EscapeDataString(kurs.Kursnummer)}.svg")" download title="Vektorgrafik für den Druck">SVG</a>
+        }
         <BegruendeterButton Text="Veröffentlichen" Icon="public" Freigabe="@VeroeffentlichenFreigabe" Click="@(() => StatusAsync(Kursstatus.Veroeffentlicht))" />
         <BegruendeterButton Text="Absagen" Icon="cancel" ButtonStyle="ButtonStyle.Light" Freigabe="@AbsagenFreigabe" Click="@(() => StatusAsync(Kursstatus.Abgesagt))" />
     </div>

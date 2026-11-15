@@ -164,6 +164,28 @@ public static class ShopApi
         schreiben.MapPost("/konto/buchungen/{belegungId:guid}/storno", async (Guid belegungId, StornoEingabe? e, ShopDienst shop, KontoAnmeldung konto, HttpContext http) =>
             konto.KontoId(http) is { } id ? Results.Ok(await shop.KontoStornierenAsync(id, belegungId, e?.Grund, http.RequestAborted)) : NichtAngemeldet());
 
+        // Kurs-QR (Verwaltung): einzeln als PNG/SVG und als Sammel-PDF fürs Programmheft. Inhalt immer …/k/{nummer}.
+        app.MapGet("/kurse/qr/{nummer}.{format}", (string nummer, string format, Application.Durchfuehrung.OeffentlicheAdresse adresse,
+            Application.Dokumente.IQrCode qr) => format switch
+        {
+            "png" => Results.File(qr.Png(KursQrAblauf.QrInhalt(adresse, nummer)), "image/png", $"kurs-qr-{nummer}.png"),
+            "svg" => Results.File(Encoding.UTF8.GetBytes(qr.Svg(KursQrAblauf.QrInhalt(adresse, nummer))), "image/svg+xml", $"kurs-qr-{nummer}.svg"),
+            _ => Results.NotFound(),
+        }).RequireAuthorization();
+        app.MapGet("/kurse/qr-bogen.pdf", async (Guid? semester, int? fb, Application.Programm.IProgrammSpeicher programm,
+            Application.Durchfuehrung.OeffentlicheAdresse adresse, IKursQrBogen bogen) =>
+        {
+            var semesterName = semester is { } sid ? (await programm.SemesterAsync()).FirstOrDefault(x => x.Id == sid)?.Name : null;
+            var kurse = (await programm.KurseAsync(new Application.Programm.KursFilter(semester, fb)))
+                .Where(k => k.Sichtbarkeit == Domain.Programm.Sichtbarkeit.Oeffentlich && k.Status != Domain.Programm.Kursstatus.Abgesagt)
+                .OrderBy(k => k.Kursnummer, StringComparer.Ordinal)
+                .Select(k => new KursQrEintrag(k.Kursnummer, k.Titel, k.ErsterTermin is { } b ? $"ab {b:dd.MM.yyyy}{(k.Ort is null ? "" : $" · {k.Ort}")}" : k.Ort,
+                    KursQrAblauf.QrInhalt(adresse, k.Kursnummer)))
+                .ToList();
+            var titel = $"Kurs-QR-Codes{(semesterName is null ? "" : $" {semesterName}")}{(fb is { } f ? $" · Fachbereich {f}" : "")}";
+            return Results.File(bogen.Erzeugen(titel, kurse), "application/pdf", $"kurs-qr{(fb is { } g ? $"-fb{g}" : "")}.pdf");
+        }).RequireAuthorization();
+
         // Bestätigungslink aus der Mail: erst eine Seite mit Knopf (Mail-Scanner öffnen Links, bestätigen aber nicht), dann POST.
         app.MapGet("/shop/konto/bestaetigen", (string? token) => Seite("Kundenkonto bestätigen",
             $"""<p>Bitte bestätigen Sie Ihre E-Mail-Adresse, um Ihr Kundenkonto anzulegen.</p><form method="post"><input type="hidden" name="token" value="{WebUtility.HtmlEncode(token)}"><button type="submit">Konto bestätigen</button></form>"""));

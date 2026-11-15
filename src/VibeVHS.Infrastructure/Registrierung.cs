@@ -51,6 +51,7 @@ public static class Registrierung
         dienste.AddScoped<Application.Durchfuehrung.IZugangstokenSpeicher, Durchfuehrung.ZugangstokenSpeicher>();
         dienste.AddSingleton<Application.Dokumente.IQrCode, Durchfuehrung.QrCodeErzeuger>();
         dienste.AddSingleton<Application.Dokumente.IBriefPdf, Durchfuehrung.BriefPdf>();
+        dienste.AddSingleton<Application.Shop.IKursQrBogen, Durchfuehrung.KursQrBogen>();
         dienste.AddScoped<Application.Datenschutz.IDatenschutzSpeicher, Datenschutz.DatenschutzSpeicher>();
         dienste.AddSingleton<Application.Datenschutz.IAuskunftPdf, Datenschutz.AuskunftPdf>();
         dienste.AddScoped<Application.Aufgaben.IAufgabenSpeicher, Aufgaben.AufgabenSpeicher>();

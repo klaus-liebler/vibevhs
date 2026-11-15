@@ -288,3 +288,57 @@ public sealed class Kursstand
         return true;
     }
 }
+
+/// <summary>
+/// Schnellanmeldung über den persönlichen Link bzw. ein gemerktes Gerät und den Kurs-QR. Der Storno-Link aus der Bestätigungsmail
+/// (nur als Hash gespeichert) erlaubt die Abmeldung – innerhalb von <see cref="KostenfreiBis"/> kostenlos, danach nach den AGB –,
+/// damit ein weitergegebener persönlicher Link keinen Schaden anrichtet.
+/// </summary>
+public sealed class Schnellanmeldung
+{
+    private Schnellanmeldung()
+    {
+        Kursnummer = string.Empty;
+        StornoHash = string.Empty;
+        Weg = string.Empty;
+    }
+
+    public Schnellanmeldung(Guid personId, Guid belegungId, string kursnummer, string weg, string stornoToken, IEnumerable<Einwilligungsnachweis> einwilligungen,
+        DateTimeOffset jetzt, TimeSpan kostenfrei)
+    {
+        Id = Ids.Neu();
+        PersonId = personId;
+        BelegungId = belegungId;
+        Kursnummer = kursnummer;
+        Weg = weg;
+        StornoHash = Shopkonto.Hash(stornoToken);
+        Einwilligungen = einwilligungen.ToList();
+        Zeitpunkt = jetzt;
+        KostenfreiBis = jetzt + kostenfrei;
+    }
+
+    public Guid Id { get; private set; }
+
+    public Guid PersonId { get; private set; }
+
+    public Guid BelegungId { get; private set; }
+
+    public string Kursnummer { get; private set; }
+
+    /// <summary>„Link“ (persönlicher Link geöffnet) oder „Gerät“ (gemerktes Gerät).</summary>
+    public string Weg { get; private set; }
+
+    public string StornoHash { get; private set; }
+
+    public List<Einwilligungsnachweis> Einwilligungen { get; private set; } = [];
+
+    public DateTimeOffset Zeitpunkt { get; private set; }
+
+    public DateTimeOffset KostenfreiBis { get; private set; }
+
+    public DateTimeOffset? StorniertAm { get; private set; }
+
+    public bool Kostenfrei(DateTimeOffset jetzt) => jetzt <= KostenfreiBis;
+
+    public void Storniert(DateTimeOffset jetzt) => StorniertAm ??= jetzt;
+}

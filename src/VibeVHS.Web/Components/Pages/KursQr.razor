@@ -1,0 +1,108 @@
+@page "/k/{Nummer}"
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@layout LeeresLayout
+@using VibeVHS.Application.Durchfuehrung
+@using VibeVHS.Application.Personen
+@using VibeVHS.Application.Shop
+@using VibeVHS.Web.Shop
+@inject IServiceScopeFactory Bereiche
+@inject NavigationManager Navigation
+@inject IConfiguration Konfiguration
+
+@* Ziel jedes Kurs-QR-Codes. Ohne gemerktes Gerät: Weiterleitung auf die Kursseite (VibeVHS-Shop oder TYPO3, Shop:KursSeite).
+   Mit gemerktem Gerät: Schnellanmeldung mit einem Klick. *@
+
+<PageTitle>Kurs @Nummer · Schnellanmeldung</PageTitle>
+
+<div class="vhs-login" style="max-width:520px">
+    <div class="vhs-brand"><b>Schnellanmeldung</b><span>Volkshochschule</span></div>
+    @if (personen.Count > 1 && auswahl is null)
+    {
+        <p><b>Wen möchten Sie anmelden?</b></p>
+        <div style="display:flex;flex-direction:column;gap:8px">
+            @for (var i = 0; i < personen.Count; i++)
+            {
+                <a class="vhs-btn" style="justify-content:center" href="@($"k/{Uri.EscapeDataString(Nummer)}?wer={i}")">@namen.GetValueOrDefault(personen[i].PersonId)</a>
+            }
+        </div>
+    }
+    else
+    {
+        <form method="post" @formname="schnell" @onsubmit="AnmeldenAsync">
+            <AntiforgeryToken />
+            <input type="hidden" name="Wer" value="@(auswahl ?? 0)" />
+            <SchnellanmeldungKarte Vorschau="vorschau" Ergebnis="ergebnis" Fehler="@fehler" />
+        </form>
+        <p class="vhs-small vhs-muted"><a href="@KursQrAblauf.Kursseite(Konfiguration, Nummer)">Kursbeschreibung ansehen</a> · Nicht Sie? Dann bitte mit dem eigenen persönlichen Link anmelden.</p>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Nummer { get; set; } = string.Empty;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromQuery(Name = "wer")]
+    private int? WerAusLink { get; set; }
+
+    [SupplyParameterFromForm(FormName = "schnell")]
+    private int? Wer { get; set; }
+
+    [SupplyParameterFromForm(FormName = "schnell")]
+    private string? Agb { get; set; }
+
+    [SupplyParameterFromForm(FormName = "schnell")]
+    private string? Datenschutz { get; set; }
+
+    [SupplyParameterFromForm(FormName = "schnell")]
+    private string? AgbVersion { get; set; }
+
+    [SupplyParameterFromForm(FormName = "schnell")]
+    private string? DatenschutzVersion { get; set; }
+
+    private IReadOnlyList<GemerktePerson> personen = [];
+    private IReadOnlyDictionary<Guid, string> namen = new Dictionary<Guid, string>();
+    private int? auswahl;
+    private SchnellVorschau? vorschau;
+    private SchnellErgebnis? ergebnis;
+    private string? fehler;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var bereich = Bereiche.CreateAsyncScope();
+        personen = await bereich.ServiceProvider.GetRequiredService<CheckinZugang>().GemerktePersonenAsync(CheckinGeraet.Geraete(HttpContext));
+        if (personen.Count == 0)
+        {
+            // Kein gemerktes Gerät: zur Kursbeschreibung mit „In den Warenkorb“.
+            Navigation.NavigateTo(KursQrAblauf.Kursseite(Konfiguration, Nummer), forceLoad: true);
+            return;
+        }
+
+        namen = await bereich.ServiceProvider.GetRequiredService<IPersonenSpeicher>().AnzeigenamenAsync(personen.Select(p => p.PersonId));
+        auswahl = Wer ?? WerAusLink ?? (personen.Count == 1 ? 0 : null);
+        if (auswahl is { } w && w >= 0 && w < personen.Count)
+        {
+            try
+            {
+                vorschau = await bereich.ServiceProvider.GetRequiredService<Schnellanmeldedienst>().VorschauAsync(personen[w].PersonId, Nummer);
+            }
+            catch (ShopFehler f)
+            {
+                fehler = f.Message;
+            }
+        }
+    }
+
+    private async Task AnmeldenAsync()
+    {
+        if (Wer is not { } w || w < 0 || w >= personen.Count)
+        {
+            return;
+        }
+
+        (ergebnis, fehler) = await KursQrAblauf.AusfuehrenAsync(Bereiche, personen[w].PersonId, Nummer, Agb, Datenschutz, AgbVersion, DatenschutzVersion, "Gerät");
+    }
+}

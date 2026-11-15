@@ -243,3 +243,8 @@ details.vhs-card > summary { cursor: pointer; }
 .vhs-saeule { display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; }
 .vhs-saeule-spur { flex: 1; width: 70%; display: flex; align-items: flex-end; }
 .vhs-saeule-wert { display: block; width: 100%; background: var(--vhs-accent); border-radius: 4px 4px 0 0; min-height: 1px; }
+
+/* Schnellanmeldung (Kurs-QR) */
+.vhs-dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0 0 8px; }
+.vhs-dl dt { color: var(--vhs-muted, #555); }
+.vhs-dl dd { margin: 0; }

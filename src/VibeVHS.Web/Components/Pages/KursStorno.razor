@@ -1,0 +1,74 @@
+@page "/k/storno/{Token}"
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@layout LeeresLayout
+@using VibeVHS.Application.Shop
+@inject IServiceScopeFactory Bereiche
+
+<PageTitle>Anmeldung zurücknehmen · Volkshochschule</PageTitle>
+
+<div class="vhs-login" style="max-width:520px">
+    <div class="vhs-brand"><b>Anmeldung zurücknehmen</b><span>Volkshochschule</span></div>
+    @if (fehler is not null)
+    {
+        <div class="vhs-alert vhs-warn" role="alert">@fehler</div>
+    }
+    else if (ergebnis is { } r)
+    {
+        <div class="vhs-alert vhs-info" role="status"><b>✔ Sie sind abgemeldet.</b><br />@r.Erklaerung@(r.GebuehrCent > 0 ? $" Gebühr: {r.Gebuehr}." : "") Eine Bestätigung kommt per E-Mail.</div>
+    }
+    else if (vorschau is { } v)
+    {
+        <h2 style="margin:0">@v.Titel</h2>
+        <p class="vhs-small vhs-muted" style="margin:0">Kurs @v.Kursnummer</p>
+        @if (v.Moeglich)
+        {
+            <div class="vhs-alert @(v.GebuehrCent == 0 ? "vhs-info" : "vhs-warn")">@v.Erklaerung@(v.GebuehrCent > 0 ? $" Es fallen {new VibeVHS.Domain.Gemeinsam.Geld(v.GebuehrCent)} an." : "")</div>
+            <form method="post" @formname="storno" @onsubmit="StornierenAsync">
+                <AntiforgeryToken />
+                <button type="submit" class="vhs-btn" style="justify-content:center;width:100%;padding:14px">Verbindlich abmelden</button>
+            </form>
+        }
+        else
+        {
+            <div class="vhs-alert vhs-info">@v.Erklaerung</div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Token { get; set; } = string.Empty;
+
+    private StornoVorschau? vorschau;
+    private VibeVHS.Domain.Anmeldung.Stornoregel? ergebnis;
+    private string? fehler;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var bereich = Bereiche.CreateAsyncScope();
+        try
+        {
+            vorschau = await bereich.ServiceProvider.GetRequiredService<Schnellanmeldedienst>().StornoVorschauAsync(Token);
+        }
+        catch (ShopFehler f)
+        {
+            fehler = f.Message;
+        }
+    }
+
+    private async Task StornierenAsync()
+    {
+        await using var bereich = Bereiche.CreateAsyncScope();
+        bereich.ServiceProvider.GetRequiredService<VibeVHS.Web.Sicherheit.BenutzerKontext>().Gesetzt = VibeVHS.Web.Shop.KursQrAblauf.Selbst;
+        try
+        {
+            ergebnis = await bereich.ServiceProvider.GetRequiredService<Schnellanmeldedienst>().StornierenAsync(Token);
+            fehler = null;
+        }
+        catch (ShopFehler f)
+        {
+            fehler = f.Message;
+        }
+    }
+}
