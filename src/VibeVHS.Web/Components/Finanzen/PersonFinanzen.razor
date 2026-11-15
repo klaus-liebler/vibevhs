@@ -1,0 +1,256 @@
+@*
+    Finanzen an der Person: Teilnehmer- bzw. Honorarkonto, SEPA-Mandate, Auszahlungskonto und – bei Kursleitungen –
+    Honorarverträge mit Modellauswahl, aus der Parameterbeschreibung erzeugtem Formular und Vorschau.
+*@
+@using VibeVHS.Application.Finanzen
+@using VibeVHS.Application.Finanzen.Honorare
+@using VibeVHS.Domain.Finanzen
+@inherits FinanzBaustein
+@inject HonorarModelle Modelle
+
+@if (lesen.Erlaubt)
+{
+    <section class="vhs-card" aria-labelledby="h-konto">
+        <div class="vhs-head">
+            <h2 id="h-konto">Konto</h2>
+            @if (konto is { } k)
+            {
+                <span class="vhs-small">Soll @Euro(k.SollCent) · Haben @Euro(k.HabenCent) ·
+                    <b>@(k.SaldoCent > 0 ? $"offen {Euro(k.SaldoCent)}" : k.SaldoCent < 0 ? $"Guthaben/Verbindlichkeit {Euro(-k.SaldoCent)}" : "ausgeglichen")</b></span>
+            }
+        </div>
+        @if (konto is { Zeilen.Count: 0, Entwuerfe.Count: 0 })
+        {
+            <div class="vhs-small vhs-muted">Keine Belege.</div>
+        }
+        else if (konto is { } kk)
+        {
+            <div class="vhs-tbl">
+                <table>
+                    <thead><tr><th>Beleg</th><th>Datum</th><th>Text</th><th>Soll</th><th>Haben</th><th>offen</th></tr></thead>
+                    <tbody>
+                        @foreach (var z in kk.Zeilen)
+                        {
+                            <tr class="@(z.Beleg.Storniert ? "vhs-ersetzt" : "")">
+                                <td class="vhs-mono"><a href="@($"finanzen?tab=belege&beleg={z.Beleg.Id}")">@z.Beleg.Nummer</a></td>
+                                <td>@z.Beleg.Belegdatum.ToString("dd.MM.yyyy")</td>
+                                <td class="vhs-small">@z.Beleg.Positionen[0].Text@(z.BezugNummer is null ? "" : $" (zu {z.BezugNummer})")</td>
+                                <td>@(z.WirkungCent > 0 ? Euro(z.WirkungCent) : "")</td><td>@(z.WirkungCent < 0 ? Euro(-z.WirkungCent) : "")</td>
+                                <td>@(z.OffenCent is > 0 and var o ? Euro(o) : "")</td>
+                            </tr>
+                        }
+                        @foreach (var e in kk.Entwuerfe)
+                        {
+                            <tr><td><StatusPille Stil="info">Entwurf</StatusPille></td><td>@e.Belegdatum.ToString("dd.MM.yyyy")</td><td class="vhs-small">@BelegartInfo.Name(e.Art) – noch nicht festgeschrieben</td><td></td><td>@Euro(e.BetragCent)</td><td></td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="vhs-card" aria-labelledby="h-sepa">
+        <div class="vhs-head"><h2 id="h-sepa">SEPA-Lastschriftmandat und Auszahlungskonto</h2></div>
+        <div class="vhs-list">
+            @if (mandate.Count == 0) { <div class="vhs-small vhs-muted">Kein Mandat.</div> }
+            @foreach (var m in mandate)
+            {
+                <div>
+                    <StatusPille Stil="@(m.NutzbarAm(Heute) ? "gut" : "neutral")">@(m.Status == Mandatsstatus.Aktiv ? (m.NutzbarAm(Heute) ? "aktiv" : "verfallen") : "widerrufen")</StatusPille>
+                    <span class="vhs-grow"><b class="vhs-mono">@m.Referenz</b> · @m.Kontoinhaber · @Iban.Maskiert(m.Iban) · unterschrieben @m.UnterschriebenAm.ToString("dd.MM.yyyy") · nächster Einzug @m.Sequenz</span>
+                    <BegruendeterButton Text="Widerrufen" Size="ButtonSize.ExtraSmall" Variant="Variant.Text"
+                                        Freigabe="@(Mandate.Und(() => m.Status == Mandatsstatus.Aktiv ? Freigabe.Ja : Freigabe.Nein("Das Mandat ist bereits widerrufen.")))"
+                                        Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<FinanzDienst>().MandatWiderrufenAsync(m.Id); return "Mandat widerrufen."; }, m.Referenz))" />
+                </div>
+            }
+            @if (konto2 is { } bv)
+            {
+                <div><StatusPille Stil="info">Auszahlung</StatusPille><span class="vhs-grow">@bv.Kontoinhaber · @Iban.Maskiert(bv.Iban)</span></div>
+            }
+        </div>
+        <details>
+            <summary class="vhs-small">Mandat erfassen oder Auszahlungskonto setzen</summary>
+            <div class="vhs-form">
+                <RadzenFormField Text="Kontoinhaber"><RadzenTextBox @bind-Value="inhaber" /></RadzenFormField>
+                <RadzenFormField Text="IBAN"><RadzenTextBox @bind-Value="iban" /></RadzenFormField>
+                <RadzenFormField Text="BIC (optional)"><RadzenTextBox @bind-Value="bic" /></RadzenFormField>
+                <RadzenFormField Text="Mandat unterschrieben am"><RadzenDatePicker TValue="DateOnly" @bind-Value="unterschrieben" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(iban) && Iban.Fehler(iban) is { } fehler) { <div class="vhs-small" style="color:var(--vhs-crit)">@fehler</div> }
+            <div class="vhs-row">
+                <BegruendeterButton Text="Lastschriftmandat speichern" Size="ButtonSize.Small" IsBusy="@Beschaeftigt" Freigabe="@Eingabe(mandat: true)"
+                                    Click="@(() => AusfuehrenAsync(async d => $"Mandat {(await d.GetRequiredService<FinanzDienst>().MandatAnlegenAsync(PersonId, inhaber!, iban!, bic, unterschrieben)).Referenz} erfasst.", "SEPA-Mandat"))" />
+                <BegruendeterButton Text="Als Auszahlungskonto setzen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" IsBusy="@Beschaeftigt" Freigabe="@Eingabe(mandat: false)"
+                                    Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<FinanzDienst>().BankverbindungSetzenAsync(PersonId, inhaber!, iban!, bic); return "Auszahlungskonto gespeichert."; }, "Bankverbindung"))" />
+            </div>
+        </details>
+    </section>
+
+    @if (Dozierend)
+    {
+        <section class="vhs-card" aria-labelledby="h-honorar">
+            <div class="vhs-head"><h2 id="h-honorar">Honorarverträge</h2><span class="vhs-small vhs-muted">Honorarmodell als Plugin; Änderungen erzeugen eine neue Vertragsversion</span></div>
+            <div class="vhs-list">
+                @if (vertraege.Count == 0) { <div class="vhs-small vhs-muted">Kein Honorarvertrag – Termine werden nicht abgerechnet.</div> }
+                @foreach (var v in vertraege)
+                {
+                    var m = Modelle.Finden(v.Modell);
+                    var aktiv = v.GiltAm(Heute, v.KursId ?? Guid.Empty) || v.GueltigAb > Heute;
+                    <div>
+                        <StatusPille Stil="@(aktiv ? "gut" : "neutral")">@(v.GueltigAb > Heute ? "künftig" : aktiv ? "gültig" : "beendet")</StatusPille>
+                        <span class="vhs-grow"><b>@v.Bezeichnung</b> · @(m?.Anzeigename ?? $"{v.Modell} (nicht installiert)") · @v.GueltigAb.ToString("dd.MM.yyyy") – @(v.GueltigBis?.ToString("dd.MM.yyyy") ?? "offen")@(v.KursId is null ? " · alle Kurse" : " · nur ein Kurs")<br />
+                            <span class="vhs-small vhs-muted">@string.Join(" · ", (m?.Parameter ?? []).Where(p => v.Parameter.ContainsKey(p.Name)).Select(p => $"{p.Anzeige}: {Parameterpruefung.Anzeige(p, v.Parameter[p.Name])}"))</span></span>
+                    </div>
+                }
+            </div>
+            <details>
+                <summary class="vhs-small">Neuer Vertrag bzw. neue Version</summary>
+                <div class="vhs-form">
+                    <RadzenFormField Text="Bezeichnung"><RadzenTextBox @bind-Value="bezeichnung" /></RadzenFormField>
+                    <RadzenFormField Text="Honorarmodell">
+                        <RadzenDropDown TValue="string" Data="@Modelle.Alle" TextProperty="Anzeigename" ValueProperty="Kennung" @bind-Value="modell" @bind-Value:after="ModellGewechselt" />
+                    </RadzenFormField>
+                    <RadzenFormField Text="gültig ab"><RadzenDatePicker TValue="DateOnly" @bind-Value="ab" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+                    <RadzenFormField Text="Kurs (optional)">
+                        <RadzenDropDown TValue="Guid?" Data="@kurse" TextProperty="Text" ValueProperty="Id" @bind-Value="kursId" AllowClear="true" Placeholder="alle Kurse" />
+                    </RadzenFormField>
+                </div>
+                @if (Modelle.Finden(modell ?? "") is { } gewaehlt)
+                {
+                    <p class="vhs-small vhs-muted">@gewaehlt.Beschreibung (Version @gewaehlt.Version)</p>
+                    <div class="vhs-form">
+                        @foreach (var p in gewaehlt.Parameter)
+                        {
+                            <RadzenFormField Text="@(p.Anzeige + (p.Pflicht ? " *" : "") + (p.Einheit is null ? "" : $" ({p.Einheit})"))">
+                                @switch (p.Typ)
+                                {
+                                    case Parametertyp.Auswahl:
+                                        <RadzenDropDown TValue="string" Data="@p.Optionen" Value="@Wert(p)" ValueChanged="@(w => werte[p.Name] = w)" />
+                                        break;
+                                    case Parametertyp.JaNein:
+                                        <RadzenCheckBox TValue="bool" Value="@(Wert(p) == "true")" ValueChanged="@(w => werte[p.Name] = w ? "true" : "false")" />
+                                        break;
+                                    default:
+                                        <RadzenTextBox Value="@Wert(p)" ValueChanged="@(w => werte[p.Name] = w)" title="@p.Hilfe" />
+                                        break;
+                                }
+                            </RadzenFormField>
+                        }
+                    </div>
+                    @foreach (var f in Fehler(gewaehlt)) { <div class="vhs-small" style="color:var(--vhs-crit)">@f</div> }
+                    <div class="vhs-row">
+                        <BegruendeterButton Text="Vertrag speichern" Size="ButtonSize.Small" IsBusy="@Beschaeftigt"
+                                            Freigabe="@(Freigabe.NurFuer(Benutzer.Rolle, HonorarDienst.VertragsRollen).Und(() => Fehler(gewaehlt).Any() ? Freigabe.Nein("Bitte zuerst die markierten Angaben korrigieren.") : Freigabe.Ja))"
+                                            Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<HonorarDienst>().VertragSpeichernAsync(PersonId, kursId, bezeichnung, gewaehlt.Kennung, werte, ab, null); return "Vertrag gespeichert; ein laufender Vertrag gleichen Umfangs endet am Vortag."; }, "Honorarvertrag"))" />
+                    </div>
+                }
+            </details>
+            <div class="vhs-row">
+                <RadzenLabel Text="Vorschau von" /><RadzenDatePicker TValue="DateOnly" @bind-Value="vonVorschau" DateFormat="dd.MM.yyyy" />
+                <RadzenLabel Text="bis" /><RadzenDatePicker TValue="DateOnly" @bind-Value="bisVorschau" DateFormat="dd.MM.yyyy" />
+                <BegruendeterButton Text="Honorar berechnen" Icon="calculate" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="VorschauAsync" />
+            </div>
+            @if (vorschau is { } vs)
+            {
+                <div class="vhs-alert vhs-info"><b>Vorschau @vs.Von.ToString("dd.MM.yyyy")–@vs.Bis.ToString("dd.MM.yyyy"): @HonorarDienst.Betrag(vs.Summe)</b> (nichts gespeichert)</div>
+                @foreach (var b in vs.Berechnungen)
+                {
+                    <div class="vhs-small"><b>@b.Modell.Anzeigename @b.Modell.Version</b> · @b.Vertrag.Bezeichnung</div>
+                    <div class="vhs-tbl"><table><tbody>
+                        @foreach (var p in b.Ergebnis.Positionen) { <tr><td class="vhs-small">@p.Text</td><td>@HonorarDienst.Betrag(p.Betrag)</td></tr> }
+                    </tbody></table></div>
+                    @foreach (var h in b.Ergebnis.Hinweise) { <div class="vhs-small vhs-muted">• @h</div> }
+                }
+                @foreach (var h in vs.Hinweise) { <div class="vhs-small vhs-muted">• @h</div> }
+            }
+        </section>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid PersonId { get; set; }
+
+    [Parameter]
+    public bool Dozierend { get; set; }
+
+    [Parameter]
+    public string? Name { get; set; }
+
+    private Freigabe lesen = Freigabe.Ja;
+    private Personenkonto? konto;
+    private IReadOnlyList<SepaMandat> mandate = [];
+    private Bankverbindung? konto2;
+    private IReadOnlyList<Honorarvertrag> vertraege = [];
+    private sealed record KursAuswahl(Guid? Id, string Text);
+
+    private List<KursAuswahl> kurse = [];
+    private string? inhaber, iban, bic;
+    private DateOnly unterschrieben;
+    private string bezeichnung = "Honorarvertrag";
+    private string? modell;
+    private DateOnly ab;
+    private Guid? kursId;
+    private Dictionary<string, string?> werte = [];
+    private DateOnly vonVorschau, bisVorschau;
+    private Honorarvorschau? vorschau;
+
+    private Freigabe Mandate => Benutzer.Rolle == Rolle.Pruefung ? Freigabe.Nein("Die Rolle „Prüfung“ hat nur lesenden Zugriff.") : Freigabe.NurFuer(Benutzer.Rolle, Finanzrollen.Mandate);
+
+    private Freigabe Eingabe(bool mandat) => Mandate.Und(() =>
+        string.IsNullOrWhiteSpace(inhaber) ? Freigabe.Nein("Bitte den Kontoinhaber eintragen.")
+        : Iban.Fehler(iban) is { } f ? Freigabe.Nein(f)
+        : mandat && unterschrieben > Heute ? Freigabe.Nein("Das Unterschriftsdatum liegt in der Zukunft.")
+        : Freigabe.Ja);
+
+    private string? Wert(HonorarParameter p) => werte.TryGetValue(p.Name, out var w) ? w : p.Standard;
+
+    private IEnumerable<string> Fehler(IHonorarModell m) => Parameterpruefung.Pruefen(m, werte).Fehler.Values;
+
+    private void ModellGewechselt() => werte = [];
+
+    protected override async Task LadenAsync()
+    {
+        lesen = Freigabe.NurFuer(Benutzer.Rolle, Finanzrollen.Lesen);
+        if (!lesen.Erlaubt)
+        {
+            return;
+        }
+
+        if (unterschrieben == default)
+        {
+            unterschrieben = Heute;
+            ab = new DateOnly(Heute.Year, Heute.Month, 1);
+            var erster = new DateOnly(Heute.Year, Heute.Month, 1);
+            (vonVorschau, bisVorschau) = (erster.AddMonths(-1), erster.AddDays(-1));
+            inhaber = Name;
+            modell = Modelle.Alle.FirstOrDefault()?.Kennung;
+        }
+
+        await LesenAsync(async d =>
+        {
+            konto = await d.GetRequiredService<FinanzDienst>().KontoAsync(PersonId);
+            var s = d.GetRequiredService<IFinanzSpeicher>();
+            mandate = await s.MandateAsync(PersonId);
+            konto2 = await s.BankverbindungAsync(PersonId);
+            vertraege = await s.HonorarvertraegeAsync(PersonId);
+            if (Dozierend && kurse.Count == 0)
+            {
+                var termine = await s.DozententermineAsync(Heute.AddYears(-1).ToDateTime(TimeOnly.MinValue), Heute.AddYears(1).ToDateTime(TimeOnly.MinValue), PersonId);
+                kurse = termine.DistinctBy(t => t.KursId).Select(t => new KursAuswahl(t.KursId, $"{t.Kursnummer} ({t.Kursart})")).ToList();
+            }
+        });
+    }
+
+    private async Task VorschauAsync()
+    {
+        try
+        {
+            vorschau = await LesenAsync(d => d.GetRequiredService<HonorarDienst>().VorschauAsync(PersonId, vonVorschau, bisVorschau));
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(Radzen.NotificationSeverity.Warning, "Vorschau", ex.Message);
+        }
+    }
+}

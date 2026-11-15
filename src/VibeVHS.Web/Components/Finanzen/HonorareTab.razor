@@ -1,0 +1,99 @@
+@using VibeVHS.Application.Finanzen
+@using VibeVHS.Application.Finanzen.Honorare
+@using VibeVHS.Domain.Finanzen
+@inherits FinanzBaustein
+@inject HonorarModelle Modelle
+
+<section class="vhs-card">
+    <div class="vhs-head"><h2>Honorarabrechnung erstellen</h2></div>
+    <div class="vhs-row">
+        <RadzenLabel Text="von" Component="hvon" /><RadzenDatePicker TValue="DateOnly" @bind-Value="von" DateFormat="dd.MM.yyyy" Name="hvon" />
+        <RadzenLabel Text="bis" Component="hbis" /><RadzenDatePicker TValue="DateOnly" @bind-Value="bis" DateFormat="dd.MM.yyyy" Name="hbis" />
+        <BegruendeterButton Text="Entwürfe erstellen" Icon="calculate" IsBusy="@Beschaeftigt"
+                            Freigabe="@(Buchen.Und(() => bis < von ? Freigabe.Nein("„bis“ liegt vor „von“.") : Freigabe.Ja))"
+                            Click="@(() => AusfuehrenAsync(async d => await d.GetRequiredService<HonorarDienst>().AbrechnungenErstellenAsync(von, bis) is var l
+                                ? $"{l.Entwuerfe} Entwürfe ({l.Summe:N2} €)." + (l.OhneVertrag.Count > 0 ? $" Ohne Vertrag: {string.Join("; ", l.OhneVertrag)}." : "") : null, "Honorare"))" />
+    </div>
+    <p class="vhs-small vhs-muted">Je freiberuflicher Kursleitung ein Entwurf aus den Terminen im Zeitraum, berechnet vom Honorarmodell des Vertrags. Bereits abgerechnete Termine werden nie doppelt berechnet.
+        Zum Monatsanfang erstellt die Automatik die Entwürfe für den Vormonat.</p>
+</section>
+
+<section class="vhs-card">
+    <h2>Entwürfe zur Freigabe <span class="vhs-zahl">@entwuerfe.Count</span></h2>
+    @if (entwuerfe.Count == 0) { <div class="vhs-small vhs-muted">Keine Entwürfe.</div> }
+    @foreach (var b in entwuerfe)
+    {
+        <details class="vhs-aufgabe">
+            <summary><b>@b.EmpfaengerName</b> · @Euro(b.BetragCent) · @b.Positionen.Count Position(en) · @b.Text</summary>
+            <div class="vhs-tbl">
+                <table>
+                    <tbody>
+                        @foreach (var p in b.Positionen) { <tr><td>@p.Text</td><td>@Euro(p.BetragCent)</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+            @foreach (var h in Grundlagenhinweise(b)) { <div class="vhs-small vhs-muted">• @h</div> }
+            <div class="vhs-row">
+                <BegruendeterButton Text="Freigeben (festschreiben, Brief und Mail)" Size="ButtonSize.Small" Freigabe="@Buchen" IsBusy="@Beschaeftigt"
+                                    Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<HonorarDienst>().FreigebenAsync(b.Id); return "Festgeschrieben."; }, b.EmpfaengerName))" />
+                <BegruendeterButton Text="Verwerfen" Size="ButtonSize.Small" Variant="Variant.Text" Freigabe="@Buchen"
+                                    Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<FinanzDienst>().EntwurfVerwerfenAsync(b.Id); return "Entwurf verworfen."; }, b.EmpfaengerName))" />
+            </div>
+        </details>
+    }
+</section>
+
+<section class="vhs-card">
+    <h2>Installierte Honorarmodelle</h2>
+    <div class="vhs-list">
+        @foreach (var m in Modelle.Alle)
+        {
+            <div><span class="vhs-grow"><b>@m.Anzeigename</b> <span class="vhs-mono vhs-small">@m.Kennung @m.Version</span><br /><span class="vhs-small vhs-muted">@m.Beschreibung</span><br />
+                <span class="vhs-small">Parameter: @string.Join(", ", m.Parameter.Select(p => p.Anzeige + (p.Pflicht ? "*" : "")))</span></span></div>
+        }
+    </div>
+    <p class="vhs-small vhs-muted">Weitere Modelle als Plugin: eine DLL mit einer Klasse, die <code>IHonorarModell</code> umsetzt, in den Ordner <code>plugins/honorare</code> legen und neu starten. Verträge pflegen Sie an der Person (Kursleitung).</p>
+</section>
+
+@code {
+    private DateOnly von, bis;
+    private IReadOnlyList<Beleg> entwuerfe = [];
+
+    protected override Task OnParametersSetAsync()
+    {
+        if (von == default)
+        {
+            var erster = new DateOnly(Heute.Year, Heute.Month, 1);
+            (von, bis) = (erster.AddMonths(-1), erster.AddDays(-1));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    protected override async Task LadenAsync()
+        => entwuerfe = (await LesenAsync(d => d.GetRequiredService<IFinanzSpeicher>().BelegeAsync()))
+            .Where(b => b.Art == Belegart.Honorarabrechnung && !b.Festgeschrieben).OrderBy(b => b.EmpfaengerName).ToList();
+
+    private static IEnumerable<string> Grundlagenhinweise(Beleg b)
+    {
+        if (b.Grundlage is null)
+        {
+            yield break;
+        }
+
+        using var doc = System.Text.Json.JsonDocument.Parse(b.Grundlage);
+        foreach (var v in doc.RootElement.GetProperty("Vertraege").EnumerateArray())
+        {
+            yield return $"Modell {v.GetProperty("Modell").GetString()} {v.GetProperty("Version").GetString()} ({v.GetProperty("Bezeichnung").GetString()})";
+            foreach (var h in v.GetProperty("Hinweise").EnumerateArray())
+            {
+                yield return h.GetString() ?? "";
+            }
+        }
+
+        foreach (var h in doc.RootElement.GetProperty("Hinweise").EnumerateArray())
+        {
+            yield return h.GetString() ?? "";
+        }
+    }
+}

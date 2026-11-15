@@ -1,0 +1,93 @@
+@using VibeVHS.Application.Finanzen
+@using VibeVHS.Domain.Finanzen
+@inherits FinanzBaustein
+
+<div class="vhs-row">
+    <BegruendeterButton Text="Lastschriftvorschlag erstellen" Icon="playlist_add" Freigabe="@Buchen" IsBusy="@Beschaeftigt"
+                        Click="@(() => AusfuehrenAsync(async d => await d.GetRequiredService<ZahlungsDienst>().LastschriftVorschlagAsync() is { } l ? $"Vorschlag mit {l.Aktiv.Count()} Posten ({Euro(l.SummeCent)})." : "Keine offenen Rechnungen mit gültigem Mandat.", "Lastschrift"))" />
+    <BegruendeterButton Text="Überweisungsvorschlag (Honorare)" Icon="payments" ButtonStyle="ButtonStyle.Light" Freigabe="@Buchen" IsBusy="@Beschaeftigt"
+                        Click="@(() => AusfuehrenAsync(async d => await d.GetRequiredService<ZahlungsDienst>().UeberweisungVorschlagAsync() is var (l, ohne) ? (l is null ? "Keine offenen Honorare mit Bankverbindung." : $"Vorschlag mit {l.Aktiv.Count()} Posten.") + (ohne > 0 ? $" {ohne} Honorar(e) ohne Bankverbindung – bitte an der Person hinterlegen." : "") : null, "Überweisung"))" />
+</div>
+
+<div class="vhs-split">
+    <section class="vhs-card">
+        <h2>Zahlungsläufe</h2>
+        <div class="vhs-list">
+            @if (laeufe.Count == 0) { <div class="vhs-small vhs-muted">Noch keine Läufe.</div> }
+            @foreach (var l in laeufe)
+            {
+                <div class="vhs-klickbar" @onclick="@(() => ausgewaehlt = l)" style="cursor:pointer">
+                    <StatusPille Stil="@Stil(l.Status)">@l.Status</StatusPille>
+                    <span class="vhs-grow"><b>@(l.Art == Zahlungslaufart.Lastschrift ? "Lastschrift" : "Überweisung")</b> · @l.Aktiv.Count() Posten · @Euro(l.SummeCent)<br />
+                        <span class="vhs-small vhs-muted vhs-mono">@l.NachrichtId · Ausführung @l.Ausfuehrung.ToString("dd.MM.yyyy")</span></span>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="vhs-card">
+        @if (ausgewaehlt is not { } lauf)
+        {
+            <p class="vhs-muted">Lauf auswählen. Ablauf: <b>Vorschlag</b> (Automatik) → <b>Freigabe</b> (Vorabankündigung an alle Zahlungspflichtigen) → <b>SEPA-Datei</b> zur Bank → Buchung über den Kontoauszug.</p>
+        }
+        else
+        {
+            <h2>@(lauf.Art == Zahlungslaufart.Lastschrift ? "Lastschriftlauf" : "Überweisungslauf") <span class="vhs-mono vhs-small">@lauf.NachrichtId</span></h2>
+            <div class="vhs-small vhs-muted">erstellt @lauf.ErstelltAm.ToLocalTime().ToString("dd.MM.yyyy HH:mm") von @lauf.ErstelltVon@(lauf.FreigegebenVon is null ? "" : $" · freigegeben von {lauf.FreigegebenVon}")</div>
+            <div class="vhs-tbl">
+                <table>
+                    <thead><tr><th>Beleg</th><th>Name</th><th>IBAN</th><th>@(lauf.Art == Zahlungslaufart.Lastschrift ? "Mandat" : "")</th><th>Betrag</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var p in lauf.Posten)
+                        {
+                            <tr class="@(p.Ausgeschlossen ? "vhs-ersetzt" : "")">
+                                <td class="vhs-mono">@p.BelegNummer</td><td>@p.Name</td><td class="vhs-mono">@Iban.Maskiert(p.Iban)</td>
+                                <td class="vhs-small">@(p.MandatReferenz is null ? "" : $"{p.MandatReferenz} ({p.Sequenz})")</td><td>@Euro(p.BetragCent)</td>
+                                <td>
+                                    <BegruendeterButton Text="@(p.Ausgeschlossen ? "aufnehmen" : "ausschließen")" Size="ButtonSize.ExtraSmall" Variant="Variant.Text"
+                                                        Freigabe="@(Buchen.Und(() => lauf.Status == Zahlungslaufstatus.Vorschlag ? Freigabe.Ja : Freigabe.Nein("Nach der Freigabe ändert sich der Lauf nicht mehr.")))"
+                                                        Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<ZahlungsDienst>().PostenAusschliessenAsync(lauf.Id, p.BelegId, !p.Ausgeschlossen); return null; }, p.BelegNummer))" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="vhs-row">
+                <BegruendeterButton Text="@(lauf.Art == Zahlungslaufart.Lastschrift ? "Freigeben und Vorabankündigungen senden" : "Freigeben")" Icon="verified" IsBusy="@Beschaeftigt"
+                                    Freigabe="@(Buchen.Und(() => lauf.Status == Zahlungslaufstatus.Vorschlag ? Freigabe.Ja : Freigabe.Nein($"Der Lauf ist {lauf.Status}.")))"
+                                    Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<ZahlungsDienst>().FreigebenAsync(lauf.Id); return "Freigegeben."; }, "Freigabe"))" />
+                <BegruendeterButton Text="SEPA-Datei erzeugen" Icon="file_download" ButtonStyle="ButtonStyle.Light" IsBusy="@Beschaeftigt"
+                                    Freigabe="@(Buchen.Und(() => lauf.Status == Zahlungslaufstatus.Freigegeben ? Freigabe.Ja : lauf.Status == Zahlungslaufstatus.Vorschlag ? Freigabe.Nein("Erst freigeben – vorher gehen keine Vorabankündigungen raus.") : Freigabe.Nein("Die Datei wurde bereits erzeugt (Link unten).")))"
+                                    Click="@(() => AusfuehrenAsync(async d => $"Datei {(await d.GetRequiredService<ZahlungsDienst>().ExportierenAsync(lauf.Id)).Datei} erzeugt – unten herunterladen.", "SEPA-Datei"))" />
+                <BegruendeterButton Text="Verwerfen" Icon="delete" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text"
+                                    Freigabe="@(Buchen.Und(() => lauf.Status is Zahlungslaufstatus.Vorschlag or Zahlungslaufstatus.Freigegeben ? Freigabe.Ja : Freigabe.Nein("Ein exportierter Lauf ist bei der Bank; Korrekturen über Rückbuchung.")))"
+                                    Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<ZahlungsDienst>().VerwerfenAsync(lauf.Id); return "Verworfen."; }, "Lauf"))" />
+            </div>
+            @if (lauf.Xml is not null)
+            {
+                <a href="@($"finanzen/laeufe/{lauf.Id}/sepa.xml")" data-enhance-nav="false" download>@ZahlungsDienst.Dateiname(lauf) herunterladen</a>
+                <details><summary class="vhs-small">XML ansehen</summary><pre class="vhs-code">@lauf.Xml</pre></details>
+            }
+        }
+    </section>
+</div>
+
+@code {
+    private IReadOnlyList<Zahlungslauf> laeufe = [];
+    private Zahlungslauf? ausgewaehlt;
+
+    protected override async Task LadenAsync()
+    {
+        laeufe = (await LesenAsync(d => d.GetRequiredService<IFinanzSpeicher>().ZahlungslaeufeAsync())).Where(l => l.Status != Zahlungslaufstatus.Verworfen || l.Id == ausgewaehlt?.Id).ToList();
+        ausgewaehlt = laeufe.FirstOrDefault(l => l.Id == ausgewaehlt?.Id) ?? laeufe.FirstOrDefault(l => l.Status is Zahlungslaufstatus.Vorschlag or Zahlungslaufstatus.Freigegeben);
+    }
+
+    private static string Stil(Zahlungslaufstatus s) => s switch
+    {
+        Zahlungslaufstatus.Vorschlag => "warn",
+        Zahlungslaufstatus.Freigegeben => "info",
+        Zahlungslaufstatus.Exportiert => "gut",
+        _ => "neutral",
+    };
+}

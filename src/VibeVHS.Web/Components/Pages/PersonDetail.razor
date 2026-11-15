@@ -187,6 +187,8 @@ else if (dubletten.Count > 0)
     }
 </section>
 
+<VibeVHS.Web.Components.Finanzen.PersonFinanzen @key="@Id" PersonId="@Id" Dozierend="@(stand.Rollen.HasFlag(Personenrolle.Dozierende) || stand.Beschaeftigung is not null)" Name="@stand.NameMitTitel" />
+
 <section class="vhs-card">
     <div class="vhs-head">
         <h2>Dokumente</h2>

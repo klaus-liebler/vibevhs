@@ -1,0 +1,125 @@
+@using VibeVHS.Application.Finanzen
+@using VibeVHS.Domain.Finanzen
+@inherits FinanzBaustein
+
+<div class="vhs-wsa">
+    <section class="vhs-card">
+        <h2>Änderungsprotokoll (Hash-Kette)</h2>
+        <p class="vhs-small">Jede Änderung an Finanzdaten steht mit Zeitpunkt, Person, vorherigem und neuem Wert im Finanzprotokoll. Jeder Eintrag enthält die Prüfsumme seines Vorgängers.</p>
+        <div class="vhs-row">
+            <BegruendeterButton Text="Kette prüfen" Icon="verified_user" IsBusy="@Beschaeftigt" Freigabe="@Pruefen" Click="KettePruefenAsync" />
+            @if (kette is { } k)
+            {
+                <StatusPille Stil="@(k.Unversehrt ? "gut" : "krit")">@(k.Unversehrt ? $"{k.Eintraege} Einträge unversehrt" : $"gebrochen bei Nr. {k.FehlerNr}: {k.Grund}")</StatusPille>
+            }
+        </div>
+        <details>
+            <summary class="vhs-small">Letzte Einträge</summary>
+            <div class="vhs-tbl">
+                <table>
+                    <thead><tr><th>Nr.</th><th>Zeit</th><th>Wer</th><th>Aktion</th><th>vorher → nachher</th><th>Hash</th></tr></thead>
+                    <tbody>
+                        @foreach (var e in letzte)
+                        {
+                            <tr><td>@e.Nr</td><td class="vhs-small">@e.Zeitpunkt.ToLocalTime().ToString("dd.MM. HH:mm:ss")</td><td class="vhs-small">@e.BenutzerKennung</td><td class="vhs-small">@e.Aktion</td>
+                                <td class="vhs-small">@(e.Vorher is null ? "" : e.Vorher + " → ")@e.Nachher</td><td class="vhs-mono vhs-small">@e.Hash[..10]…</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </details>
+    </section>
+
+    <section class="vhs-card">
+        <h2>Datenzugriff für Prüfungen</h2>
+        <p class="vhs-small">ZIP mit Belegen, Positionen und Finanzprotokoll als CSV und <code>index.xml</code> nach dem Beschreibungsstandard (GDPdU), dazu die Verfahrensdoku-Bausteine.</p>
+        <div class="vhs-row">
+            <RadzenDatePicker TValue="DateOnly" @bind-Value="von" DateFormat="dd.MM.yyyy" aria-label="von" />
+            <RadzenDatePicker TValue="DateOnly" @bind-Value="bis" DateFormat="dd.MM.yyyy" aria-label="bis" />
+            @if (Pruefen.Erlaubt)
+            {
+                <a class="rz-button rz-button-md rz-variant-filled rz-primary" href="@($"finanzen/pruefexport?von={von:yyyy-MM-dd}&bis={bis:yyyy-MM-dd}")" data-enhance-nav="false" download>Prüfexport herunterladen</a>
+            }
+            else
+            {
+                <span class="vhs-why vhs-small" tabindex="0" data-why="@Pruefen.Begruendung">Export nicht möglich</span>
+            }
+        </div>
+        <div class="vhs-row">
+            <a href="finanzen/verfahrensdokumentation.md" data-enhance-nav="false" download>Verfahrensdokumentation (Bausteine, Markdown)</a>
+        </div>
+        <details><summary class="vhs-small">Verfahrensdoku ansehen</summary><pre class="vhs-code">@doku</pre></details>
+    </section>
+
+    <section class="vhs-card">
+        <h2>Übergabe an die Finanzsoftware</h2>
+        <p class="vhs-small">Festgeschriebene, noch nicht übergebene Belege als Buchungsstapel (CSV, Mock). Jede Übergabe steht im Postausgang und im Finanzprotokoll.</p>
+        <div class="vhs-row">
+            <BegruendeterButton Text="@($"{offen} Belege übergeben")" Icon="upload" IsBusy="@Beschaeftigt"
+                                Freigabe="@(Buchen.Und(() => offen > 0 ? Freigabe.Ja : Freigabe.Nein("Alle festgeschriebenen Belege sind übergeben.")))"
+                                Click="@(() => AusfuehrenAsync(async d => (await d.GetRequiredService<GobdDienst>().UebergebenAsync()) is { } u ? $"{u.Anzahl} Belege übergeben ({u.Datei})." : "Nichts zu übergeben.", "Übergabe"))" />
+        </div>
+        <div class="vhs-list">
+            @foreach (var u in uebergaben)
+            {
+                <div><span class="vhs-grow">@u.Am.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @u.Anzahl Belege · @Euro(u.SummeCent) · @u.Von</span>
+                    <a href="@($"finanzen/uebergaben/{u.Id}.csv")" data-enhance-nav="false" download>@u.Datei</a></div>
+            }
+        </div>
+    </section>
+
+    <section class="vhs-card">
+        <h2>Nummernkreise</h2>
+        <div class="vhs-tbl">
+            <table>
+                <thead><tr><th>Belegart</th><th>Jahr</th><th>zuletzt vergeben</th></tr></thead>
+                <tbody>
+                    @foreach (var kr in kreise) { <tr><td>@BelegartInfo.Name(kr.Art)</td><td>@kr.Jahr</td><td class="vhs-mono">@BelegartInfo.Kuerzel(kr.Art)-@kr.Jahr-@kr.Letzte.ToString("00000")</td></tr> }
+                </tbody>
+            </table>
+        </div>
+        <p class="vhs-small vhs-muted">Lückenlos: Die Nummer wird erst bei der Festschreibung gezogen; verworfene Entwürfe verbrauchen keine.</p>
+    </section>
+</div>
+
+@code {
+    private Kettenpruefung? kette;
+    private IReadOnlyList<Finanzprotokolleintrag> letzte = [];
+    private IReadOnlyList<Uebergabe> uebergaben = [];
+    private IReadOnlyList<Nummernkreis> kreise = [];
+    private int offen;
+    private string doku = "";
+    private DateOnly von, bis;
+
+    private Freigabe Pruefen => Freigabe.NurFuer(Benutzer.Rolle, GobdDienst.PruefRollen);
+
+    protected override async Task LadenAsync()
+    {
+        if (von == default)
+        {
+            (von, bis) = (new DateOnly(Heute.Year, 1, 1), new DateOnly(Heute.Year, 12, 31));
+        }
+
+        await LesenAsync(async d =>
+        {
+            var s = d.GetRequiredService<IFinanzSpeicher>();
+            letzte = (await d.GetRequiredService<IFinanzprotokoll>().AlleAsync()).OrderByDescending(e => e.Nr).Take(30).ToList();
+            uebergaben = await s.UebergabenAsync();
+            kreise = (await s.NummernkreiseAsync()).OrderBy(k => k.Jahr).ThenBy(k => k.Art).ToList();
+            offen = (await s.BelegeAsync()).Count(b => b.Festgeschrieben && b.UebergabeId is null);
+            doku = await d.GetRequiredService<GobdDienst>().VerfahrensdokuAsync();
+        });
+    }
+
+    private async Task KettePruefenAsync()
+    {
+        try
+        {
+            kette = await LesenAsync(d => d.GetRequiredService<GobdDienst>().KettePruefenAsync());
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(Radzen.NotificationSeverity.Warning, "Nicht möglich", ex.Message);
+        }
+    }
+}

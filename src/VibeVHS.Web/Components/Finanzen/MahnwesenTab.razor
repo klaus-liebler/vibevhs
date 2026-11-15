@@ -1,0 +1,75 @@
+@using VibeVHS.Application.Finanzen
+@using VibeVHS.Domain.Finanzen
+@inherits FinanzBaustein
+
+<div class="vhs-row">
+    <BegruendeterButton Text="Mahnvorschlag erstellen" Icon="playlist_add" Freigabe="@Buchen" IsBusy="@Beschaeftigt"
+                        Click="@(() => AusfuehrenAsync(async d => await d.GetRequiredService<MahnDienst>().VorschlagAsync() is { } l ? $"Vorschlag mit {l.Posten.Count} Posten." : "Nichts fällig.", "Mahnwesen"))" />
+    <span class="vhs-small vhs-muted">Stufen: @string.Join(" → ", stufen.Select(s => $"{s.Bezeichnung} (+{s.TageNachVorstufe} Tage, {Euro(s.GebuehrCent)})")). Rechnungen im laufenden Lastschrifteinzug werden nicht gemahnt.</span>
+</div>
+
+<section class="vhs-card">
+    @if (vorschlag is null)
+    {
+        <h2>Kein offener Mahnvorschlag</h2>
+        <p class="vhs-small vhs-muted">Die Automatik erstellt täglich einen Vorschlag, wenn etwas fällig ist. Mahnungen entstehen erst mit Ihrer Freigabe.</p>
+    }
+    else
+    {
+        <div class="vhs-head"><h2>Mahnvorschlag vom @vorschlag.ErstelltAm.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</h2><span class="vhs-small vhs-muted">@vorschlag.Aktiv.Count() von @vorschlag.Posten.Count Posten aktiv</span></div>
+        <div class="vhs-tbl">
+            <table>
+                <thead><tr><th>Rechnung</th><th>Name</th><th>fällig seit</th><th>offen</th><th>Stufe</th><th>Gebühr</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var p in vorschlag.Posten)
+                    {
+                        <tr class="@(p.Ausgeschlossen ? "vhs-ersetzt" : "")">
+                            <td class="vhs-mono"><a href="@($"finanzen?tab=belege&beleg={p.RechnungId}")">@p.RechnungNummer</a></td><td>@p.Name</td><td>@p.Faellig.ToString("dd.MM.yyyy")</td>
+                            <td>@Euro(p.OffenCent)</td><td>@p.Stufenname</td><td>@Euro(p.GebuehrCent)</td>
+                            <td>
+                                <BegruendeterButton Text="@(p.Ausgeschlossen ? "aufnehmen" : "ausschließen")" Size="ButtonSize.ExtraSmall" Variant="Variant.Text" Freigabe="@Buchen"
+                                                    Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<MahnDienst>().AusschliessenAsync(vorschlag.Id, p.RechnungId, !p.Ausgeschlossen); return null; }, p.RechnungNummer))" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="vhs-row">
+            <BegruendeterButton Text="Freigeben und Mahnungen versenden" Icon="send" IsBusy="@Beschaeftigt"
+                                Freigabe="@(Buchen.Und(() => vorschlag.Aktiv.Any() ? Freigabe.Ja : Freigabe.Nein("Alle Posten sind ausgeschlossen – dann bitte verwerfen.")))"
+                                Click="@(() => AusfuehrenAsync(async d => $"{await d.GetRequiredService<MahnDienst>().FreigebenAsync(vorschlag.Id)} Mahnungen festgeschrieben und verschickt (Brief mit Übersetzungs-QR, Mail mit Übersetzungslink).", "Mahnlauf"))" />
+            <BegruendeterButton Text="Verwerfen" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" Freigabe="@Buchen"
+                                Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<MahnDienst>().VerwerfenAsync(vorschlag.Id); return "Verworfen."; }, "Mahnlauf"))" />
+        </div>
+    }
+</section>
+
+<section class="vhs-card">
+    <h2>Frühere Mahnläufe</h2>
+    <div class="vhs-list">
+        @if (frueher.Count == 0) { <div class="vhs-small vhs-muted">Keine.</div> }
+        @foreach (var l in frueher)
+        {
+            <div><StatusPille Stil="@(l.Status == Mahnlaufstatus.Freigegeben ? "gut" : "neutral")">@l.Status</StatusPille>
+                <span class="vhs-grow">@l.ErstelltAm.ToLocalTime().ToString("dd.MM.yyyy") · @l.Aktiv.Count() Posten@(l.FreigegebenVon is null ? "" : $" · freigegeben von {l.FreigegebenVon}")</span></div>
+        }
+    </div>
+</section>
+
+@code {
+    private Mahnlauf? vorschlag;
+    private List<Mahnlauf> frueher = [];
+    private IReadOnlyList<Mahnstufe> stufen = [];
+
+    protected override async Task LadenAsync()
+    {
+        await LesenAsync(async d =>
+        {
+            var laeufe = await d.GetRequiredService<IFinanzSpeicher>().MahnlaeufeAsync();
+            vorschlag = laeufe.FirstOrDefault(l => l.Status == Mahnlaufstatus.Vorschlag);
+            frueher = laeufe.Where(l => l.Status != Mahnlaufstatus.Vorschlag).ToList();
+            stufen = (await d.GetRequiredService<FinanzDienst>().EinstellungenAsync()).Mahnstufen;
+        });
+    }
+}

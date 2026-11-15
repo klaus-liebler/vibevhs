@@ -1,0 +1,166 @@
+@using VibeVHS.Application.Finanzen
+@using VibeVHS.Domain.Finanzen
+@inherits FinanzBaustein
+
+<section class="vhs-card">
+    <div class="vhs-head"><h2>Kontoauszug einlesen (camt.053)</h2></div>
+    <div class="vhs-row">
+        @if (Buchen.Erlaubt)
+        {
+            <InputFile OnChange="EinlesenAsync" accept=".xml" aria-label="camt.053-Datei auswählen" />
+        }
+        else
+        {
+            <span class="vhs-why vhs-small" tabindex="0" data-why="@Buchen.Begruendung">Einlesen nicht möglich</span>
+        }
+        <BegruendeterButton Text="Test: Kontoauszug simulieren" Icon="science" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Freigabe="@Buchen" IsBusy="@Beschaeftigt"
+                            Click="SimulierenAsync" />
+        <span class="vhs-small vhs-muted">Doppelt eingelesene Auszüge werden erkannt (Prüfsumme und Auszugs-ID). Gebucht wird erst, wenn Sie bestätigen.</span>
+    </div>
+</section>
+
+<div class="vhs-split">
+    <section class="vhs-card">
+        <h2>Auszüge</h2>
+        <div class="vhs-list">
+            @if (auszuege.Count == 0) { <div class="vhs-small vhs-muted">Noch keine Kontoauszüge eingelesen.</div> }
+            @foreach (var k in auszuege)
+            {
+                var offenAnzahl = offeneJeAuszug.GetValueOrDefault(k.Id);
+                <div @onclick="@(() => AuswaehlenAsync(k.Id))" style="cursor:pointer">
+                    <StatusPille Stil="@(offenAnzahl > 0 ? "warn" : "gut")">@(offenAnzahl > 0 ? $"{offenAnzahl} offen" : "fertig")</StatusPille>
+                    <span class="vhs-grow"><b class="vhs-mono">@k.AuszugId</b><br /><span class="vhs-small vhs-muted">@k.Datei · eingelesen @k.EingelesenAm.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span></span>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="vhs-card">
+        @if (auszugId is null)
+        {
+            <p class="vhs-muted">Auszug auswählen.</p>
+        }
+        else
+        {
+            <div class="vhs-head">
+                <h2>Umsätze</h2>
+                <BegruendeterButton Text="Alle sicheren buchen" Icon="done_all" Size="ButtonSize.Small" IsBusy="@Beschaeftigt"
+                                    Freigabe="@(Buchen.Und(() => umsaetze.Any(u => u.Status == Umsatzstatus.Offen && u.Sicherheit == Zuordnungssicherheit.Sicher) ? Freigabe.Ja : Freigabe.Nein("Keine offenen Umsätze mit sicherem Vorschlag.")))"
+                                    Click="@(() => AusfuehrenAsync(async d => $"{await d.GetRequiredService<ZahlungsDienst>().SichereZuordnenAsync(auszugId)} Umsätze gebucht.", "Zuordnung"))" />
+            </div>
+            <div class="vhs-aufgaben">
+                @foreach (var u in umsaetze)
+                {
+                    <div class="vhs-aufgabe">
+                        <div class="vhs-row">
+                            <StatusPille Stil="@(u.BetragCent >= 0 ? "gut" : "krit")">@Euro(u.BetragCent)</StatusPille>
+                            <span class="vhs-grow"><b>@(u.GegenName ?? "–")</b> · @u.Buchungstag.ToString("dd.MM.yyyy")<br /><span class="vhs-small">@u.Verwendungszweck</span></span>
+                            @switch (u.Status)
+                            {
+                                case Umsatzstatus.Zugeordnet: <StatusPille Stil="gut">gebucht</StatusPille> break;
+                                case Umsatzstatus.Ignoriert: <StatusPille Stil="neutral">ignoriert</StatusPille> break;
+                                default: <StatusPille Stil="@SicherheitStil(u.Sicherheit)">@SicherheitText(u.Sicherheit)</StatusPille> break;
+                            }
+                        </div>
+                        <div class="vhs-small vhs-muted">@u.VorschlagText@(u.Rueckgabegrund is null ? "" : $" · Rückgabegrund {u.Rueckgabegrund}")</div>
+                        @if (u.Status == Umsatzstatus.Offen)
+                        {
+                            <div class="vhs-row">
+                                <BegruendeterButton Text="@(u.VorschlagBelegId is null ? "Zuordnen" : "Vorschlag buchen")" Size="ButtonSize.Small" IsBusy="@Beschaeftigt"
+                                                    Freigabe="@(Buchen.Und(() => u.VorschlagBelegId is null && string.IsNullOrWhiteSpace(Eingabe(u.Id)) ? Freigabe.Nein("Kein Vorschlag – bitte rechts eine Belegnummer eintragen.") : Freigabe.Ja))"
+                                                    Click="@(() => ZuordnenAsync(u))" />
+                                <RadzenTextBox Value="@Eingabe(u.Id)" ValueChanged="@(v => eingaben[u.Id] = v)" Placeholder="andere Belegnummer, z. B. RE-2026-00012" Style="width:230px" aria-label="Belegnummer" />
+                                <BegruendeterButton Text="Ignorieren" Size="ButtonSize.Small" Variant="Variant.Text"
+                                                    Freigabe="@(Buchen.Und(() => string.IsNullOrWhiteSpace(Eingabe(u.Id)) ? Freigabe.Nein("Bitte im Feld kurz begründen, warum der Umsatz nicht gebucht wird.") : Freigabe.Ja))"
+                                                    Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<ZahlungsDienst>().IgnorierenAsync(u.Id, Eingabe(u.Id)!); return "Als nicht zu buchen markiert."; }, "Umsatz"))" />
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    [Parameter]
+    public Guid? AuszugId { get; set; }
+
+    private IReadOnlyList<Kontoauszug> auszuege = [];
+    private Dictionary<Guid, int> offeneJeAuszug = [];
+    private IReadOnlyList<Umsatz> umsaetze = [];
+    private Guid? auszugId;
+    private readonly Dictionary<Guid, string?> eingaben = [];
+
+    private string? Eingabe(Guid id) => eingaben.GetValueOrDefault(id);
+
+    protected override async Task LadenAsync()
+    {
+        auszugId ??= AuszugId;
+        await LesenAsync(async d =>
+        {
+            var s = d.GetRequiredService<IFinanzSpeicher>();
+            auszuege = await s.KontoauszuegeAsync();
+            offeneJeAuszug = (await s.UmsaetzeAsync(nurOffene: true)).GroupBy(u => u.KontoauszugId).ToDictionary(g => g.Key, g => g.Count());
+            auszugId ??= auszuege.FirstOrDefault()?.Id;
+            umsaetze = auszugId is { } id ? await s.UmsaetzeAsync(id) : [];
+        });
+    }
+
+    private async Task AuswaehlenAsync(Guid id)
+    {
+        auszugId = id;
+        await LadenAsync();
+    }
+
+    private async Task EinlesenAsync(InputFileChangeEventArgs e)
+    {
+        using var ms = new MemoryStream();
+        await e.File.OpenReadStream(5_000_000).CopyToAsync(ms);
+        var name = e.File.Name;
+        await AusfuehrenAsync(async d =>
+        {
+            var r = await d.GetRequiredService<ZahlungsDienst>().EinlesenAsync(name, ms.ToArray());
+            auszugId = r.Auszug.Id;
+            return $"{r.Umsaetze} Umsätze eingelesen, {r.Sicher} sicher zuordenbar, {r.Vorschlaege} mit Vorschlag.";
+        }, "Kontoauszug");
+    }
+
+    private Task SimulierenAsync() => AusfuehrenAsync(async d =>
+    {
+        var zahlungen = d.GetRequiredService<ZahlungsDienst>();
+        var (datei, inhalt) = await zahlungen.DemoAuszugAsync();
+        var r = await zahlungen.EinlesenAsync(datei, inhalt);
+        auszugId = r.Auszug.Id;
+        return $"Simulierter Auszug: {r.Umsaetze} Umsätze, {r.Sicher} sicher zuordenbar.";
+    }, "Kontoauszug (Test)");
+
+    private Task ZuordnenAsync(Umsatz u) => AusfuehrenAsync(async d =>
+    {
+        Guid? ziel = null;
+        if (Eingabe(u.Id) is { Length: > 0 } nummer)
+        {
+            ziel = (await d.GetRequiredService<IFinanzSpeicher>().BelegNachNummerAsync(nummer.Trim().ToUpperInvariant()))?.Id
+                   ?? throw new InvalidOperationException($"Beleg {nummer} nicht gefunden.");
+        }
+
+        await d.GetRequiredService<ZahlungsDienst>().ZuordnenAsync(u.Id, ziel);
+        return "Gebucht – Beleg festgeschrieben.";
+    }, "Zuordnung");
+
+    private static string SicherheitStil(Zuordnungssicherheit s) => s switch
+    {
+        Zuordnungssicherheit.Sicher => "gut",
+        Zuordnungssicherheit.Mittel => "info",
+        Zuordnungssicherheit.Niedrig => "warn",
+        _ => "krit",
+    };
+
+    private static string SicherheitText(Zuordnungssicherheit s) => s switch
+    {
+        Zuordnungssicherheit.Sicher => "sicher",
+        Zuordnungssicherheit.Mittel => "wahrscheinlich",
+        Zuordnungssicherheit.Niedrig => "unsicher",
+        _ => "kein Vorschlag",
+    };
+}

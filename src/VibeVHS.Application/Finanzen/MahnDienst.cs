@@ -54,18 +54,36 @@ public sealed class MahnDienst(
         return ergebnis;
     }
 
-    /// <summary>Automatik: Vorschlag anlegen, wenn etwas fällig ist und kein Vorschlag offen ist.</summary>
-    public async Task<Mahnlauf?> VorschlagAsync(CancellationToken abbruch = default)
+    /// <summary>
+    /// Automatik: Vorschlag anlegen, wenn etwas fällig ist. Ein offener Vorschlag wird an den aktuellen Stand angepasst
+    /// (inzwischen Bezahltes fällt heraus, neu Fälliges kommt hinzu, Ausschlüsse bleiben erhalten).
+    /// </summary>
+    public async Task<Mahnlauf?> VorschlagAsync(bool nurAktualisieren = false, CancellationToken abbruch = default)
     {
         await finanzen.PruefenAsync(Finanzrollen.Buchen, abbruch);
-        if ((await speicher.MahnlaeufeAsync(abbruch)).FirstOrDefault(l => l.Status == Mahnlaufstatus.Vorschlag) is { } offen)
+        var offen = (await speicher.MahnlaeufeAsync(abbruch)).FirstOrDefault(l => l.Status == Mahnlaufstatus.Vorschlag);
+        if (offen is null && nurAktualisieren)
         {
-            return offen;
+            return null;
         }
 
-        var faellig = await FaelligeAsync(abbruch);
+        var faellig = (await FaelligeAsync(abbruch)).ToList();
+        if (offen is not null)
+        {
+            var ausgeschlossen = offen.Posten.Where(p => p.Ausgeschlossen).Select(p => p.RechnungId).ToHashSet();
+            faellig = faellig.Select(p => ausgeschlossen.Contains(p.RechnungId) ? p with { Ausgeschlossen = true } : p).ToList();
+            if (faellig.Select(p => (p.RechnungId, p.Stufe, p.OffenCent)).SequenceEqual(offen.Posten.Select(p => (p.RechnungId, p.Stufe, p.OffenCent))))
+            {
+                return offen;
+            }
+
+            (await speicher.MahnlaufAsync(offen.Id, abbruch))!.Verwerfen();
+            await finanzprotokoll.SchreibenAsync("Mahnlauf.Aktualisiert", "Mahnlauf", offen.Id, $"{offen.Posten.Count} Posten", $"ersetzt durch aktuellen Stand mit {faellig.Count} Posten", abbruch);
+        }
+
         if (faellig.Count == 0)
         {
+            await speicher.SpeichernAsync(abbruch);
             return null;
         }
 

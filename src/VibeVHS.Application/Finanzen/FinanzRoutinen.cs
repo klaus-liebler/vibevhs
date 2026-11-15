@@ -37,7 +37,7 @@ public sealed class FinanzRoutinen(
             await zahlungen.FreigebenAsync(lastschrift.Id, abbruch);
         }
 
-        var mahnlauf = await mahnungen.VorschlagAsync(abbruch);
+        var mahnlauf = await mahnungen.VorschlagAsync(abbruch: abbruch);
         if (mahnlauf is { Status: Mahnlaufstatus.Vorschlag } && (await aufgaben.TypAsync(Aufgabentypen.MahnlaufFreigabe, abbruch)).MenschGibtFrei == false)
         {
             await mahnungen.FreigebenAsync(mahnlauf.Id, mailen, abbruch);
@@ -57,6 +57,14 @@ public sealed class FinanzRoutinen(
     public async Task<Abgleichergebnis> AufgabenAbgleichenAsync(CancellationToken abbruch = default)
     {
         var heute = Heute;
+        try
+        {
+            await mahnungen.VorschlagAsync(nurAktualisieren: true, abbruch);
+        }
+        catch (InvalidOperationException)
+        {
+            // Rollen ohne Buchungsrecht (z. B. Teilnehmerservice beim Mandat) passen den Mahnvorschlag nicht an.
+        }
         var laeufe = await speicher.ZahlungslaeufeAsync(abbruch);
         var lastschrift = laeufe.Where(l => l.Art == Zahlungslaufart.Lastschrift && l.Status is Zahlungslaufstatus.Vorschlag or Zahlungslaufstatus.Freigegeben)
             .Select(l => new AufgabenAnlass($"{Aufgabentypen.LastschriftFreigabe}:{l.Id:N}",

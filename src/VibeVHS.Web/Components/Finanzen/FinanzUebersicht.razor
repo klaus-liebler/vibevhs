@@ -1,0 +1,67 @@
+@using VibeVHS.Application.Finanzen
+@using VibeVHS.Domain.Finanzen
+@inherits FinanzBaustein
+
+<div class="vhs-kpis">
+    <div class="vhs-kpi"><div class="vhs-kpi-lbl">Offene Forderungen</div><div class="vhs-kpi-val">@Euro(offen)</div><div class="vhs-kpi-note">@anzahlOffen Rechnungen/Mahnungen</div></div>
+    <div class="vhs-kpi"><div class="vhs-kpi-lbl">Davon überfällig</div><div class="vhs-kpi-val">@Euro(ueberfaellig)</div><div class="vhs-kpi-note">nach Fälligkeit</div></div>
+    <div class="vhs-kpi"><div class="vhs-kpi-lbl">Honorare offen</div><div class="vhs-kpi-val">@Euro(honorare)</div><div class="vhs-kpi-note">@entwuerfe Entwurf/Entwürfe zur Freigabe</div></div>
+    <div class="vhs-kpi"><div class="vhs-kpi-lbl">Belege @Heute.Year</div><div class="vhs-kpi-val">@belegeJahr</div><div class="vhs-kpi-note">festgeschrieben, @nichtUebergeben nicht übergeben</div></div>
+</div>
+
+<section class="vhs-card">
+    <div class="vhs-head"><h2>Was ist zu tun?</h2></div>
+    <div class="vhs-list">
+        @foreach (var (text, ziel, stil) in todo)
+        {
+            <div><StatusPille Stil="@stil">@(stil == "gut" ? "ok" : "offen")</StatusPille><span class="vhs-grow">@text</span>@if (ziel is not null) { <a href="@ziel">öffnen</a> }</div>
+        }
+    </div>
+    <div class="vhs-row">
+        <BegruendeterButton Text="Finanzroutinen jetzt ausführen" Icon="autorenew" ButtonStyle="ButtonStyle.Light" IsBusy="@Beschaeftigt" Freigabe="@Buchen"
+                            Click="@(() => AusfuehrenAsync(async d => (await d.GetRequiredService<FinanzRoutinen>().TaeglichAsync()).ToString(), "Finanzroutinen"))" />
+        <span class="vhs-small vhs-muted">Läuft sonst täglich um 6:30 Uhr: Rechnungslauf, Lastschrift- und Mahnvorschlag, Honorarentwürfe zum Monatsanfang.</span>
+    </div>
+</section>
+
+@code {
+    private long offen, ueberfaellig, honorare;
+    private int anzahlOffen, entwuerfe, belegeJahr, nichtUebergeben;
+    private List<(string Text, string? Ziel, string Stil)> todo = [];
+
+    protected override async Task LadenAsync()
+    {
+        await LesenAsync(async d =>
+        {
+            var speicher = d.GetRequiredService<IFinanzSpeicher>();
+            var belege = await speicher.BelegeAsync();
+            var rest = Offenposten.Berechnen(belege);
+            var nachId = belege.ToDictionary(b => b.Id);
+            var forderungen = rest.Where(x => x.Value > 0 && nachId[x.Key].Art is Belegart.Rechnung or Belegart.Mahnung).ToList();
+            offen = forderungen.Sum(x => x.Value);
+            anzahlOffen = forderungen.Count;
+            ueberfaellig = forderungen.Where(x => nachId[x.Key].Faellig < Heute).Sum(x => x.Value);
+            honorare = rest.Where(x => x.Value > 0 && nachId[x.Key].Art == Belegart.Honorarabrechnung).Sum(x => x.Value);
+            entwuerfe = belege.Count(b => !b.Festgeschrieben);
+            belegeJahr = belege.Count(b => b.Jahr == Heute.Year);
+            nichtUebergeben = belege.Count(b => b.Festgeschrieben && b.UebergabeId is null);
+            var laeufe = await speicher.ZahlungslaeufeAsync();
+            var umsaetze = await speicher.UmsaetzeAsync(nurOffene: true);
+            var mahn = (await speicher.MahnlaeufeAsync()).FirstOrDefault(l => l.Status == Mahnlaufstatus.Vorschlag);
+            todo =
+            [
+                laeufe.FirstOrDefault(l => l.Status == Zahlungslaufstatus.Vorschlag) is { } v
+                    ? ($"{(v.Art == Zahlungslaufart.Lastschrift ? "Lastschrift" : "Überweisung")}svorschlag: {v.Aktiv.Count()} Posten, {Euro(v.SummeCent)} – freigeben", "finanzen?tab=zahlungen", "warn")
+                    : ("Kein Zahlungsvorschlag wartet", null, "gut"),
+                laeufe.FirstOrDefault(l => l.Status == Zahlungslaufstatus.Freigegeben) is { } f
+                    ? ($"SEPA-Datei für {f.NachrichtId} erzeugen und zur Bank geben (Ausführung {f.Ausfuehrung:dd.MM.yyyy})", "finanzen?tab=zahlungen", "warn")
+                    : ("Keine freigegebenen Läufe ohne Export", null, "gut"),
+                umsaetze.Count > 0 ? ($"{umsaetze.Count} Umsätze aus Kontoauszügen zuordnen ({umsaetze.Count(u => u.Sicherheit == Zuordnungssicherheit.Sicher)} sicher)", "finanzen?tab=konto", "warn")
+                    : ("Alle Umsätze zugeordnet", null, "gut"),
+                mahn is not null ? ($"Mahnvorschlag mit {mahn.Aktiv.Count()} Posten freigeben", "finanzen?tab=mahnwesen", "warn") : ("Kein Mahnvorschlag offen", null, "gut"),
+                entwuerfe > 0 ? ($"{entwuerfe} Honorarentwurf/-entwürfe prüfen und freigeben", "finanzen?tab=honorare", "warn") : ("Keine Honorarentwürfe offen", null, "gut"),
+                nichtUebergeben > 0 ? ($"{nichtUebergeben} festgeschriebene Belege an die Finanzsoftware übergeben", "finanzen?tab=pruefung", "info") : ("Alles an die Finanzsoftware übergeben", null, "gut"),
+            ];
+        });
+    }
+}

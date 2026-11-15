@@ -230,3 +230,4 @@ details.vhs-card > summary { cursor: pointer; }
 .vhs-wsa { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
 .vhs-wsa h2 .vhs-zahl { font-weight: 500; color: var(--vhs-muted); margin-left: 6px; }
 @media (max-width: 600px) { .vhs-wsa { grid-template-columns: 1fr; } }
+.vhs-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 12px; }

@@ -1,0 +1,92 @@
+@page "/finanzen"
+@using VibeVHS.Web.Components.Finanzen
+@inject Vorgang Vorgang
+@inject NavigationManager Navigation
+
+<PageTitle>Finanzen · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Finanzen</h1>
+        <p class="vhs-sub">Belege nach GoBD (festgeschrieben, lückenlos nummeriert, Storno statt Änderung), SEPA, Kontoauszüge, Mahnwesen und Honorare.</p>
+    </div>
+</div>
+
+@if (!lesen.Erlaubt)
+{
+    <div class="vhs-alert vhs-info">@lesen.Begruendung</div>
+}
+else
+{
+    @if (rolle == Rolle.Pruefung)
+    {
+        <div class="vhs-alert vhs-info"><b>Prüfung:</b> Sie sehen alle Finanzdaten und das Finanzprotokoll und können exportieren. Ändern ist in dieser Rolle nicht möglich.</div>
+    }
+
+    <div class="vhs-row">
+        <RadzenSelectBar TValue="string" Value="@tab" ValueChanged="@Wechseln" Size="ButtonSize.Small" aria-label="Bereich">
+            <Items>
+                <RadzenSelectBarItem Text="Übersicht" Value="@("uebersicht")" />
+                <RadzenSelectBarItem Text="Belege" Value="@("belege")" />
+                <RadzenSelectBarItem Text="Lastschrift & Überweisung" Value="@("zahlungen")" />
+                <RadzenSelectBarItem Text="Kontoauszüge" Value="@("konto")" />
+                <RadzenSelectBarItem Text="Mahnwesen" Value="@("mahnwesen")" />
+                <RadzenSelectBarItem Text="Honorare" Value="@("honorare")" />
+                <RadzenSelectBarItem Text="Prüfung & Export" Value="@("pruefung")" />
+                <RadzenSelectBarItem Text="Einstellungen" Value="@("einstellungen")" />
+            </Items>
+        </RadzenSelectBar>
+    </div>
+
+    @switch (tab)
+    {
+        case "belege":
+            <BelegeTab @key="@("belege")" BelegId="@BelegId" />
+            break;
+        case "zahlungen":
+            <ZahlungslaeufeTab @key="@("zahlungen")" />
+            break;
+        case "konto":
+            <KontoauszuegeTab @key="@("konto")" AuszugId="@AuszugId" />
+            break;
+        case "mahnwesen":
+            <MahnwesenTab @key="@("mahnwesen")" />
+            break;
+        case "honorare":
+            <HonorareTab @key="@("honorare")" />
+            break;
+        case "pruefung":
+            <PruefungTab @key="@("pruefung")" />
+            break;
+        case "einstellungen":
+            <EinstellungenTab @key="@("einstellungen")" />
+            break;
+        default:
+            <FinanzUebersicht @key="@("uebersicht")" />
+            break;
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "tab")]
+    private string? Tab { get; set; }
+
+    [SupplyParameterFromQuery(Name = "beleg")]
+    private Guid? BelegId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "auszug")]
+    private Guid? AuszugId { get; set; }
+
+    private string tab = "uebersicht";
+    private Rolle? rolle;
+    private Freigabe lesen = Freigabe.Ja;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        tab = Tab ?? "uebersicht";
+        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        lesen = Freigabe.NurFuer(rolle, VibeVHS.Application.Finanzen.Finanzrollen.Lesen);
+    }
+
+    private void Wechseln(string neu) => Navigation.NavigateTo($"finanzen?tab={neu}");
+}

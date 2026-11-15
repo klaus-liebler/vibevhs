@@ -266,16 +266,50 @@ Einwilligung, bevorzugt) und E-Mail-Adressen (Art, bevorzugt). Die Kennzeichen �
   Aufgaben neutralisiert und geschlossen.
 - Noch offen: Abwesenheit mit Vertretung (QA-44, Soll), Lastschrift- und Mahnvorschläge (kommen mit I6).
 
-## Vermerk für I6 Finanzen: GoBD (FA-126 bis FA-133)
+## Finanzen (I6) und GoBD (FA-30 bis FA-35, FA-126 bis FA-133)
 
-- Festgeschriebene Belege nur per Storno/Neubeleg korrigierbar; lückenlose Nummernkreise je Belegart; Hash-Kette im
-  Änderungsprotokoll für Finanzdaten; Rolle „Prüfung“ nur lesend mit CSV-Export plus `index.xml`; generierte
-  Bausteine der Verfahrensdokumentation.
-- Aufbewahrung: Buchungsbelege 8 Jahre, Geschäftsbriefe 6 Jahre, jeweils ab Jahresende (einstellbar).
-- **Löschlauf (FA-131)**: Personen mit Belegen in laufender Frist werden nur gesperrt, nicht anonymisiert; der Lauf nennt
-  die längste Frist und anonymisiert nach deren Ende. Andockpunkt existiert bereits: `Aufbewahrungsgrund` und
-  `Loeschentscheidung.Entscheiden` (Domain/Datenschutz) mit einstellbaren `Aufbewahrungsfrist`en (auch „ab Jahresende“) –
-  in I6 Belege als weitere Gründe einspeisen.
+Seite `/finanzen` (Buchhaltung, Verwaltungsleitung, Leitung buchen; Teilnehmerservice liest und erfasst Mandate; Rolle
+**Prüfung** liest nur und exportiert – Testkonto `pruefung`). An jeder Person: Konto, SEPA-Mandat, Auszahlungskonto und
+bei Kursleitungen die Honorarverträge.
+
+- **Belege nach GoBD**: Rechnung, Gutschrift, Zahlungseingang/-ausgang, Mahnung, Honorarabrechnung, Storno. Die Nummer
+  (`RE-2026-00042`) wird erst bei der Festschreibung gezogen, je Belegart und Jahr lückenlos (optimistische Sperre).
+  Festgeschriebene Belege tragen Belegdatum, Erfassungszeitpunkt und SHA-256; sie werden nie geändert oder gelöscht –
+  Korrektur nur per Storno mit Begründung und Verweis. Druckstücke liegen im Dokumentarchiv (Prüfsumme, Übersetzungs-QR).
+- **Finanzprotokoll als Hash-Kette**: jede Änderung an Finanzdaten mit Zeitpunkt, Person, vorher/nachher (nur Pseudonyme);
+  „Kette prüfen“ findet nachträgliche Änderungen.
+- **Rechnungslauf** (täglich 6:30 und auf Knopfdruck): Rechnungen aus Belegungen, bei Abmeldung/Umbuchung Storno und ggf.
+  Gebührenrechnung, Firmenkurse als Rechnung an den Auftraggeber mit **XRechnung 3.0 (UBL)**. Kostenträger-Belegungen
+  (z. B. BAMF) rechnen andere Wege ab. Mails mit PDF-Anhang und Übersetzungslink.
+- **Teilnehmerkonto**: Soll/Haben/Saldo, offene Posten je Rechnung, Teilzahlungen, Guthaben.
+- **SEPA**: Mandate (IBAN-Prüfung, FRST/RCUR, Verfall nach 36 Monaten), Lastschriftvorschlag → Freigabe mit
+  Vorabankündigung → **pain.008.001.08**; Überweisungen für Honorare **pain.001.001.09**. Gläubiger-ID und Konto sind
+  Testwerte (Einstellungen).
+- **Kontoauszug camt.053**: Einlesen mit Dublettenschutz, Zuordnungsvorschlag (eigene Referenz, Belegnummer + Betrag,
+  Betrag + Name), Buchung erst nach Bestätigung („Alle sicheren buchen“), Rücklastschrift → Storno der Zahlung,
+  Bankgebühr, Aufgabe „Rücklastschrift klären“, bei AC04/AC06/MD01 Mandat widerrufen. „Test: Kontoauszug simulieren“
+  erzeugt einen passenden Auszug.
+- **Mahnwesen**: Stufen mit Abstand und Gebühr (einstellbar), Vorschlag der Automatik, Freigabe durch die Buchhaltung;
+  Rechnungen im laufenden Einzug werden nicht gemahnt; ein offener Vorschlag passt sich an Zahlungseingänge an.
+- **Honorare als Plugins**: `IHonorarModell` (Kennung, Version, Parameterbeschreibung, `Berechne(HonorarKontext)`), rein
+  und deterministisch. Eingebaut: „Honorar pro UE“ (Ausfallvergütung bei kurzfristiger Absage < 48 h) und „Basis pro
+  Termin + pro UE + pro Teilnehmer“ (Mindest-/Höchstbetrag), beide mit Fahrtkosten (pauschal oder km). Der Kontext
+  enthält nur anonyme Teilnahmezahlen. Der Kern verhindert Doppelabrechnung; an jeder Abrechnung stehen Modell, Version
+  und Parameter als Snapshot. Weitere Modelle: DLL in `plugins/honorare` (eigener AssemblyLoadContext). Verträge mit
+  Modellauswahl, erzeugtem Formular und Vorschau an der Person; neue Version beendet die alte am Vortag.
+- **Übergabe an die Finanzsoftware** (Mock): Buchungsstapel als CSV (Platzhalter-Sachkonten, mit der Kämmerei
+  abzustimmen), dokumentiert im Postausgang und Finanzprotokoll.
+- **Prüfung (FA-132)**: ZIP mit `belege.csv`, `positionen.csv`, `finanzprotokoll.csv`, `index.xml`
+  (Beschreibungsstandard GDPdU) und Verfahrensdoku-Bausteinen (FA-133, auch einzeln als Markdown).
+- **Aufbewahrung (FA-130/131)**: Buchungsbelege 8 Jahre (Migration stellt den alten Vorschlag 10 → 8 um),
+  Mahnungen als Geschäftsbriefe 6 Jahre, jeweils ab Jahresende. Belege sind Aufbewahrungsgründe im Löschlauf: gesperrt
+  statt anonymisiert bis zum Ende der längsten Frist; danach werden Name, Anschrift, Mandate und Kontodaten entfernt,
+  Nummer, Betrag und Prüfsumme bleiben.
+- **Aufgaben**: Lastschriftlauf freigeben, Mahnvorschlag freigeben, Honorarentwürfe freigeben, Kontoauszug zuordnen,
+  Rücklastschrift klären (Buchhaltung); Freigabe für Lastschrift und Mahnung je Regel einstellbar (QA-32).
+- **Noch offen**: XSD-Prüfung der SEPA- und XRechnungsdateien gegen die offiziellen Schemata (Download der XSD-Dateien
+  braucht Klaus' Zustimmung; bis dahin prüfen die Tests Struktur, Summen und Pflichtfelder), Kassenbuch (FA-36, Soll),
+  automatische Erstattung von Guthaben, Entfernung je Ort für km-Fahrtkosten.
 
 ## Testbenutzer der Pilot-VHS
 

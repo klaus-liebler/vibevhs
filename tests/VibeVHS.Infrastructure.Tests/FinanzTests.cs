@@ -288,6 +288,38 @@ public class FinanzTests
     }
 
     [Fact]
+    public async Task Einzug_und_Ruecklastschrift_im_selben_Auszug()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var t = await TestDatenbank.ErzeugenAsync();
+        var (kurs, p, _) = await KursAsync(t, 1);
+        await using (var db = t.NeuerKontext())
+        {
+            await Erzeugen(t, db, Tresen).Finanzen.MandatAnlegenAsync(p[0].Id, "Vorname1 Nachname1", "DE89 3704 0044 0532 0130 00", null, new DateOnly(2026, 11, 1), ct);
+        }
+
+        await AnmeldenAsync(t, kurs, p[0], Zahlart.Lastschrift);
+        await RechnungslaufAsync(t);
+        await using var db2 = t.NeuerKontext();
+        var w = Erzeugen(t, db2, Buchhaltung);
+        var lauf = (await w.Zahlungen.LastschriftVorschlagAsync(ct))!;
+        await w.Zahlungen.FreigebenAsync(lauf.Id, ct);
+        await w.Zahlungen.ExportierenAsync(lauf.Id, ct);
+        var x = lauf.Posten[0];
+        var einst = await w.Finanzen.EinstellungenAsync(ct);
+        var camt = Camt053.Erzeugen("A-R", einst.Iban, new DateOnly(2026, 11, 24),
+        [
+            new(new DateOnly(2026, 11, 21), null, x.BetragCent, x.Name, x.Iban, x.Verwendungszweck, x.EndToEndId, null),
+            new(new DateOnly(2026, 11, 24), null, -x.BetragCent, x.Name, x.Iban, "RUECKLASTSCHRIFT", x.EndToEndId, "MD06"),
+        ]);
+        (await w.Zahlungen.EinlesenAsync("a.xml", Encoding.UTF8.GetBytes(camt), ct)).Sicher.ShouldBe(2);
+        (await w.Zahlungen.SichereZuordnenAsync(abbruch: ct)).ShouldBe(2);
+        var konto = await w.Finanzen.KontoAsync(p[0].Id, ct);
+        konto.Zeilen.ShouldContain(z => z.Beleg.Art == Belegart.Storno && z.Beleg.Text!.StartsWith("Rücklastschrift MD06"));
+        konto.SaldoCent.ShouldBe(9000 + 300);
+    }
+
+    [Fact]
     public async Task Zuordnungsvorschlag_nach_Belegnummer_Betrag_und_Name()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -330,7 +362,7 @@ public class FinanzTests
 
         await using (var db = t.NeuerKontext())
         {
-            (await Erzeugen(t, db, Buchhaltung).Mahnungen.VorschlagAsync(ct)).ShouldBeNull();
+            (await Erzeugen(t, db, Buchhaltung).Mahnungen.VorschlagAsync(abbruch: ct)).ShouldBeNull();
         }
 
         t.Uhr.Advance(TimeSpan.FromDays(21)); // 06.12.: 7 Tage nach Fälligkeit → Zahlungserinnerung
@@ -338,7 +370,7 @@ public class FinanzTests
         await using (var db = t.NeuerKontext())
         {
             var w = Erzeugen(t, db, Benutzer.Automatik);
-            var lauf = await w.Mahnungen.VorschlagAsync(ct);
+            var lauf = await w.Mahnungen.VorschlagAsync(abbruch: ct);
             lauf!.Posten.ShouldHaveSingleItem().Stufenname.ShouldBe("Zahlungserinnerung");
             laufId = lauf.Id;
             (await db.Set<Beleg>().CountAsync(b => b.Art == Belegart.Mahnung, ct)).ShouldBe(0); // nur Vorschlag
@@ -350,7 +382,7 @@ public class FinanzTests
         await using (var db = t.NeuerKontext())
         {
             var w = Erzeugen(t, db, Buchhaltung);
-            var lauf = await w.Mahnungen.VorschlagAsync(ct);
+            var lauf = await w.Mahnungen.VorschlagAsync(abbruch: ct);
             lauf!.Posten.Single().GebuehrCent.ShouldBe(500);
             await w.Mahnungen.FreigebenAsync(lauf.Id, abbruch: ct);
             var mahnungen = await db.Set<Beleg>().Where(b => b.Art == Belegart.Mahnung).OrderBy(b => b.Laufnummer).ToListAsync(ct);
@@ -358,6 +390,22 @@ public class FinanzTests
             mahnungen[1].Text!.ShouldContain("1. Mahnung");
             (await w.Finanzen.KontoAsync(p[0].Id, ct)).SaldoCent.ShouldBe(9500);
             (await db.Postausgang.CountAsync(n => n.Betreff.StartsWith("Mahnung MA-"), ct)).ShouldBe(2);
+        }
+
+        // Neuer Vorschlag (2. Mahnung) – dann zahlt die Person: Der offene Vorschlag passt sich an und entfällt.
+        t.Uhr.Advance(TimeSpan.FromDays(14));
+        await using (var db = t.NeuerKontext())
+        {
+            var w = Erzeugen(t, db, Buchhaltung);
+            (await w.Mahnungen.VorschlagAsync(abbruch: ct))!.Posten.Single().Stufenname.ShouldBe("2. Mahnung");
+            var einst = await w.Finanzen.EinstellungenAsync(ct);
+            await w.Zahlungen.EinlesenAsync("z.xml", Encoding.UTF8.GetBytes(Camt053.Erzeugen("Z-1", einst.Iban, t.Uhr.GetLocalNow().Date is var d ? DateOnly.FromDateTime(d) : default,
+                [new(DateOnly.FromDateTime(t.Uhr.GetLocalNow().Date), null, 9500, "Vorname1 Nachname1", null, "RE-2026-00001 und Mahngebuehr", null, null)])), ct);
+            (await w.Zahlungen.SichereZuordnenAsync(abbruch: ct)).ShouldBe(0); // Betrag weicht ab (9.000 offen) → nur „wahrscheinlich“
+            var u = await db.Set<Umsatz>().SingleAsync(ct);
+            await w.Zahlungen.ZuordnenAsync(u.Id, abbruch: ct);
+            (await w.Mahnungen.VorschlagAsync(nurAktualisieren: true, abbruch: ct)).ShouldBeNull();
+            (await db.Set<Mahnlauf>().CountAsync(l => l.Status == Mahnlaufstatus.Verworfen, ct)).ShouldBe(1);
         }
     }
 

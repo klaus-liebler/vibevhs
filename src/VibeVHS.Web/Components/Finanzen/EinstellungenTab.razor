@@ -1,0 +1,101 @@
+@using VibeVHS.Application.Finanzen
+@using VibeVHS.Domain.Finanzen
+@using VibeVHS.Domain.Personen
+@inherits FinanzBaustein
+
+<div class="vhs-wsa">
+    <section class="vhs-card">
+        <h2>Bank, Gläubiger-ID, Steuern</h2>
+        @if (!Aendern.Erlaubt) { <div class="vhs-alert vhs-info">@Aendern.Begruendung</div> }
+        <div class="vhs-form">
+            <RadzenFormField Text="Kontoinhaber"><RadzenTextBox @bind-Value="inhaber" Disabled="@(!Aendern.Erlaubt)" /></RadzenFormField>
+            <RadzenFormField Text="Anschrift (Briefkopf)"><RadzenTextArea @bind-Value="anschrift" Rows="2" Disabled="@(!Aendern.Erlaubt)" /></RadzenFormField>
+            <RadzenFormField Text="IBAN"><RadzenTextBox @bind-Value="iban" Disabled="@(!Aendern.Erlaubt)" /></RadzenFormField>
+            @if (Iban.Fehler(iban) is { } fehler) { <div class="vhs-small" style="color:var(--vhs-crit)">@fehler</div> }
+            <RadzenFormField Text="BIC"><RadzenTextBox @bind-Value="bic" Disabled="@(!Aendern.Erlaubt)" /></RadzenFormField>
+            <RadzenFormField Text="Gläubiger-Identifikationsnummer"><RadzenTextBox @bind-Value="glaeubiger" Disabled="@(!Aendern.Erlaubt)" /></RadzenFormField>
+            <RadzenFormField Text="Steuernummer"><RadzenTextBox @bind-Value="steuernummer" Disabled="@(!Aendern.Erlaubt)" /></RadzenFormField>
+            <RadzenFormField Text="USt-IdNr. (falls vorhanden)"><RadzenTextBox @bind-Value="ustId" Disabled="@(!Aendern.Erlaubt)" /></RadzenFormField>
+            <RadzenFormField Text="Steuerhinweis auf Rechnungen"><RadzenTextBox @bind-Value="steuerhinweis" Disabled="@(!Aendern.Erlaubt)" /></RadzenFormField>
+            <RadzenFormField Text="Zahlungsziel (Tage)"><RadzenNumeric TValue="int" @bind-Value="ziel" Min="0" Max="90" Disabled="@(!Aendern.Erlaubt)" /></RadzenFormField>
+            <RadzenFormField Text="Vorabankündigung (Tage)"><RadzenNumeric TValue="int" @bind-Value="vorab" Min="1" Max="30" Disabled="@(!Aendern.Erlaubt)" /></RadzenFormField>
+            <RadzenFormField Text="Bankgebühr Rücklastschrift (€)"><RadzenNumeric TValue="decimal" @bind-Value="rueckgebuehr" Min="0" Format="0.00" Disabled="@(!Aendern.Erlaubt)" /></RadzenFormField>
+        </div>
+        <h3>Mahnstufen</h3>
+        <div class="vhs-tbl">
+            <table>
+                <thead><tr><th>Stufe</th><th>Bezeichnung</th><th>Tage nach Vorstufe</th><th>Gebühr (€)</th></tr></thead>
+                <tbody>
+                    @foreach (var s in stufen)
+                    {
+                        <tr><td>@s.Stufe</td><td><RadzenTextBox @bind-Value="s.Bezeichnung" Disabled="@(!Aendern.Erlaubt)" /></td>
+                            <td><RadzenNumeric TValue="int" @bind-Value="s.Tage" Min="1" Max="90" Disabled="@(!Aendern.Erlaubt)" Style="width:90px" /></td>
+                            <td><RadzenNumeric TValue="decimal" @bind-Value="s.Gebuehr" Min="0" Format="0.00" Disabled="@(!Aendern.Erlaubt)" Style="width:110px" /></td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <BegruendeterButton Text="Speichern" Icon="save" IsBusy="@Beschaeftigt"
+                            Freigabe="@(Aendern.Und(() => Iban.Fehler(iban) is { } f ? Freigabe.Nein(f) : Freigabe.Ja))"
+                            Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<FinanzDienst>().EinstellungenAendernAsync(inhaber, anschrift, iban, bic, glaeubiger, steuernummer, ustId, steuerhinweis, ziel, vorab,
+                                (long)Math.Round(rueckgebuehr * 100), stufen.Select(s => new Mahnstufe(s.Stufe, s.Bezeichnung, s.Tage, (long)Math.Round(s.Gebuehr * 100)))); return "Gespeichert (vorher/nachher im Finanzprotokoll)."; }, "Einstellungen"))" />
+    </section>
+
+    <section class="vhs-card">
+        <h2>Firmenkunden (XRechnung)</h2>
+        <p class="vhs-small vhs-muted">Auftraggeber geschlossener Kurse bekommen eine Rechnung mit XRechnung (UBL). Öffentliche Auftraggeber geben eine Leitweg-ID vor.</p>
+        @if (firmen.Count == 0) { <div class="vhs-small vhs-muted">Keine Kurse mit Auftraggeber.</div> }
+        @foreach (var o in firmen)
+        {
+            <details class="vhs-aufgabe">
+                <summary><b>@o.Org.Name</b> · Leitweg-ID @(o.Org.LeitwegId ?? "–") · @(o.Org.RechnungsEMail ?? "keine E-Rechnungsadresse")</summary>
+                <div class="vhs-form">
+                    <RadzenFormField Text="Rechnungsanschrift"><RadzenTextArea @bind-Value="o.Anschrift" Rows="3" Disabled="@(!Buchen.Erlaubt)" /></RadzenFormField>
+                    <RadzenFormField Text="Leitweg-ID"><RadzenTextBox @bind-Value="o.Leitweg" Disabled="@(!Buchen.Erlaubt)" /></RadzenFormField>
+                    <RadzenFormField Text="E-Rechnung an"><RadzenTextBox @bind-Value="o.EMail" Disabled="@(!Buchen.Erlaubt)" /></RadzenFormField>
+                </div>
+                <BegruendeterButton Text="Speichern" Size="ButtonSize.Small" Freigabe="@Buchen"
+                                    Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<FinanzDienst>().RechnungsdatenSetzenAsync(o.Org.Id, o.Anschrift, o.Leitweg, o.EMail); return "Rechnungsdaten gespeichert."; }, o.Org.Name))" />
+            </details>
+        }
+    </section>
+</div>
+
+@code {
+    private sealed class Mahnzeile
+    {
+        public int Stufe { get; init; }
+        public string Bezeichnung { get; set; } = "";
+        public int Tage { get; set; }
+        public decimal Gebuehr { get; set; }
+    }
+
+    private sealed class Firma(Organisation org)
+    {
+        public Organisation Org { get; } = org;
+        public string? Anschrift { get; set; } = org.Rechnungsanschrift;
+        public string? Leitweg { get; set; } = org.LeitwegId;
+        public string? EMail { get; set; } = org.RechnungsEMail;
+    }
+
+    private string inhaber = "", anschrift = "", iban = "", glaeubiger = "", steuerhinweis = "";
+    private string? bic, steuernummer, ustId;
+    private int ziel, vorab;
+    private decimal rueckgebuehr;
+    private List<Mahnzeile> stufen = [];
+    private List<Firma> firmen = [];
+
+    private Freigabe Aendern => Benutzer.Rolle == Rolle.Pruefung ? Freigabe.Nein("Die Rolle „Prüfung“ hat nur lesenden Zugriff.") : Freigabe.NurFuer(Benutzer.Rolle, Rolle.Verwaltungsleitung, Rolle.Leitung);
+
+    protected override async Task LadenAsync()
+    {
+        await LesenAsync(async d =>
+        {
+            var e = await d.GetRequiredService<FinanzDienst>().EinstellungenAsync();
+            (inhaber, anschrift, iban, bic, glaeubiger, steuernummer, ustId, steuerhinweis) = (e.Kontoinhaber, e.Anschrift, Iban.Anzeige(e.Iban), e.Bic, e.GlaeubigerId, e.Steuernummer, e.UstId, e.Steuerhinweis);
+            (ziel, vorab, rueckgebuehr) = (e.ZahlungszielTage, e.VorabankuendigungTage, e.RuecklastschriftGebuehrCent / 100m);
+            stufen = e.Mahnstufen.Select(s => new Mahnzeile { Stufe = s.Stufe, Bezeichnung = s.Bezeichnung, Tage = s.TageNachVorstufe, Gebuehr = s.GebuehrCent / 100m }).ToList();
+            firmen = (await d.GetRequiredService<IFinanzSpeicher>().AuftraggeberAsync()).Select(o => new Firma(o)).ToList();
+        });
+    }
+}

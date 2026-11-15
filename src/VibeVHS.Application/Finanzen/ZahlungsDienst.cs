@@ -396,6 +396,14 @@ public sealed partial class ZahlungsDienst(
             throw new InvalidOperationException("Zur Rücklastschrift gehört keine Rechnung.");
         }
 
+        // Einzug und Rückgabe im selben Auszug: Die Zahlung wurde eben erst gebucht – sie über die Referenz finden.
+        if (zahlung is null && u.EndToEndId is { } e2e
+            && (await speicher.BelegeAsync(rechnung.PersonId ?? rechnung.OrganisationId, abbruch))
+                .FirstOrDefault(b => b.Art == Belegart.Zahlungseingang && b.BezugBelegId == rechnung.Id && !b.Storniert && b.Text?.Contains(e2e, StringComparison.Ordinal) == true) is { } gebucht)
+        {
+            zahlung = await speicher.BelegAsync(gebucht.Id, abbruch);
+        }
+
         Beleg erzeugt;
         if (zahlung is { Storniert: false })
         {
@@ -485,11 +493,12 @@ public sealed partial class ZahlungsDienst(
             for (var i = 0; i < liste.Count; i++)
             {
                 var p = liste[i];
-                umsaetze.Add(new(lauf.Ausfuehrung, lauf.Ausfuehrung, lauf.Art == Zahlungslaufart.Lastschrift ? p.BetragCent : -p.BetragCent, p.Name, p.Iban, p.Verwendungszweck,
+                // Simulation: Buchungstag heute (auch wenn der Einzug für später angekündigt war), damit keine Belege in der Zukunft entstehen.
+                umsaetze.Add(new(Heute, lauf.Ausfuehrung, lauf.Art == Zahlungslaufart.Lastschrift ? p.BetragCent : -p.BetragCent, p.Name, p.Iban, p.Verwendungszweck,
                     p.EndToEndId, null));
                 if (lauf.Art == Zahlungslaufart.Lastschrift && i == 0)
                 {
-                    umsaetze.Add(new(lauf.Ausfuehrung.AddDays(3), lauf.Ausfuehrung.AddDays(3), -p.BetragCent, p.Name, p.Iban, $"RUECKLASTSCHRIFT {p.Verwendungszweck}", p.EndToEndId, "AM04"));
+                    umsaetze.Add(new(Heute, lauf.Ausfuehrung, -p.BetragCent, p.Name, p.Iban, $"RUECKLASTSCHRIFT {p.Verwendungszweck}", p.EndToEndId, "AM04"));
                 }
             }
         }

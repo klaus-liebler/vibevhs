@@ -1,0 +1,131 @@
+@using VibeVHS.Application.Finanzen
+@using VibeVHS.Domain.Finanzen
+@inherits FinanzBaustein
+
+<div class="vhs-row">
+    <RadzenTextBox @bind-Value="suche" @bind-Value:after="Filtern" Placeholder="Belegnummer oder Name" Style="min-width:240px" aria-label="Belege suchen" />
+    <RadzenDropDown TValue="string" Data="@arten" @bind-Value="art" @bind-Value:after="Filtern" Style="min-width:200px" aria-label="Belegart" />
+    <RadzenCheckBox @bind-Value="nurOffen" @bind-Value:after="Filtern" Name="nurOffen" /><RadzenLabel Text="nur offene Posten" Component="nurOffen" />
+</div>
+
+<div class="vhs-split">
+    <section class="vhs-card">
+        <RadzenDataGrid TItem="Beleg" Data="@gefiltert" AllowSorting="true" AllowPaging="true" PageSize="20" class="vhs-klickbar"
+                        EmptyText="Keine Belege." RowClick="@(a => ausgewaehlt = a.Data)">
+            <Columns>
+                <RadzenDataGridColumn TItem="Beleg" Property="@nameof(Beleg.Nummer)" Title="Nummer" Width="150px">
+                    <Template Context="b"><span class="vhs-mono">@b.Anzeige</span></Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="Beleg" Property="@nameof(Beleg.Belegdatum)" Title="Datum" Width="105px" FormatString="{0:dd.MM.yyyy}" />
+                <RadzenDataGridColumn TItem="Beleg" Property="@nameof(Beleg.EmpfaengerName)" Title="Partei" />
+                <RadzenDataGridColumn TItem="Beleg" Property="@nameof(Beleg.BetragCent)" Title="Betrag" Width="110px" TextAlign="TextAlign.Right">
+                    <Template Context="b">@Euro(b.BetragCent)</Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="Beleg" Title="Status" Width="150px" Sortable="false">
+                    <Template Context="b">
+                        @if (!b.Festgeschrieben) { <StatusPille Stil="info">Entwurf</StatusPille> }
+                        else if (b.Storniert) { <StatusPille Stil="neutral">storniert</StatusPille> }
+                        else if (offen.TryGetValue(b.Id, out var o) && o > 0) { <StatusPille Stil="@(b.Faellig < Heute ? "krit" : "warn")">offen @Euro(o)</StatusPille> }
+                        else if (offen.ContainsKey(b.Id)) { <StatusPille Stil="gut">ausgeglichen</StatusPille> }
+                        else { <StatusPille Stil="neutral">gebucht</StatusPille> }
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </section>
+
+    <section class="vhs-card">
+        @if (ausgewaehlt is not { } b)
+        {
+            <p class="vhs-muted">Beleg in der Liste anklicken.</p>
+        }
+        else
+        {
+            <div class="vhs-head">
+                <h2>@BelegartInfo.Name(b.Art) @b.Nummer</h2>
+                @if (b.PersonId is { } pid) { <a href="@($"personen/{pid}")">Personenkonto</a> }
+            </div>
+            <div class="vhs-small vhs-muted">
+                Belegdatum @b.Belegdatum.ToString("dd.MM.yyyy")@(b.Faellig is { } f ? $" · fällig {f:dd.MM.yyyy}" : "") · erfasst @b.ErfasstAm.ToLocalTime().ToString("dd.MM.yyyy HH:mm") von @b.ErfasstVon
+                @if (b.FestgeschriebenAm is { } fa) { <br />@($"festgeschrieben {fa.ToLocalTime():dd.MM.yyyy HH:mm:ss} · SHA-256 {b.Sha256?[..16]}…") }
+                @if (b.BezugBelegId is { } bezug && nummern.TryGetValue(bezug, out var bn)) { <br /><span>Bezug: <a href="@($"finanzen?tab=belege&beleg={bezug}")">@bn</a></span> }
+                @if (b.StorniertDurchId is { } st && nummern.TryGetValue(st, out var sn)) { <br /><span>Storniert durch <a href="@($"finanzen?tab=belege&beleg={st}")">@sn</a></span> }
+                @if (b.Text is not null) { <br />@b.Text }
+            </div>
+            <div class="vhs-small">An: @b.EmpfaengerName@(b.EmpfaengerAnschrift is null ? "" : ", " + b.EmpfaengerAnschrift.Replace('\n', ' '))</div>
+            <div class="vhs-tbl">
+                <table>
+                    <thead><tr><th>Pos.</th><th>Text</th><th>Menge</th><th>Einzel</th><th>Betrag</th></tr></thead>
+                    <tbody>
+                        @foreach (var p in b.Positionen)
+                        {
+                            <tr><td>@p.Nr</td><td>@p.Text</td><td>@p.Menge.ToString("0.##")</td><td>@Euro(p.EinzelCent)</td><td>@Euro(p.BetragCent)</td></tr>
+                        }
+                        <tr><td></td><td><b>Summe</b></td><td></td><td></td><td><b>@Euro(b.BetragCent)</b></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            @if (b.Grundlage is not null)
+            {
+                <details><summary class="vhs-small">Berechnungsgrundlage (Snapshot: Honorarmodell, Version, Parameter)</summary><pre class="vhs-code">@b.Grundlage</pre></details>
+            }
+            <div class="vhs-row">
+                @if (b.DokumentId is { } dok) { <a class="vhs-small" href="@($"dokumente/{dok}.pdf")" target="_blank" data-enhance-nav="false">Druckstück (PDF, Prüfsumme wird geprüft)</a> }
+                @if (b.Xml is not null) { <a class="vhs-small" href="@($"finanzen/belege/{b.Id}/xrechnung.xml")" data-enhance-nav="false" download>XRechnung (XML)</a> }
+            </div>
+            @if (b.Festgeschrieben)
+            {
+                <div class="vhs-row">
+                    <RadzenTextBox @bind-Value="stornogrund" Placeholder="Begründung für das Storno" Style="min-width:280px" aria-label="Stornobegründung" />
+                    <BegruendeterButton Text="Stornieren" Icon="undo" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" IsBusy="@Beschaeftigt"
+                                        Freigabe="@(Buchen.Und(() => b.Art == Belegart.Storno ? Freigabe.Nein("Ein Storno wird nicht storniert – bitte einen neuen Beleg erstellen.")
+                                            : b.Storniert ? Freigabe.Nein("Der Beleg ist bereits storniert.")
+                                            : string.IsNullOrWhiteSpace(stornogrund) ? Freigabe.Nein("Bitte zuerst die Begründung eintragen (GoBD: Storno nur mit Begründung).") : Freigabe.Ja))"
+                                        Click="@(() => AusfuehrenAsync(async d => $"Stornobeleg {(await d.GetRequiredService<FinanzDienst>().StornierenAsync(b.Id, stornogrund!)).Nummer} erstellt.", "Storno"))" />
+                </div>
+                <p class="vhs-small vhs-muted">Festgeschriebene Belege werden nie geändert oder gelöscht. Korrekturen: Storno mit Begründung und ggf. neuer Beleg.</p>
+            }
+            else
+            {
+                <BegruendeterButton Text="Entwurf verwerfen" Icon="delete" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Freigabe="@Buchen"
+                                    Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<FinanzDienst>().EntwurfVerwerfenAsync(b.Id); ausgewaehlt = null; return "Entwurf verworfen (hatte noch keine Nummer)."; }, "Entwurf"))" />
+            }
+        }
+    </section>
+</div>
+
+@code {
+    [Parameter]
+    public Guid? BelegId { get; set; }
+
+    private IReadOnlyList<Beleg> alle = [];
+    private List<Beleg> gefiltert = [];
+    private IReadOnlyDictionary<Guid, long> offen = new Dictionary<Guid, long>();
+    private Dictionary<Guid, string> nummern = [];
+    private Beleg? ausgewaehlt;
+    private string? suche;
+    private string art = "alle Belegarten";
+    private bool nurOffen;
+    private string? stornogrund;
+    private static readonly IReadOnlyList<string> arten = ["alle Belegarten", .. Enum.GetValues<Belegart>().Select(BelegartInfo.Name)];
+
+    protected override async Task LadenAsync()
+    {
+        alle = await LesenAsync(d => d.GetRequiredService<IFinanzSpeicher>().BelegeAsync());
+        offen = Offenposten.Berechnen(alle);
+        nummern = alle.Where(b => b.Nummer is not null).ToDictionary(b => b.Id, b => b.Nummer!);
+        Filtern();
+        ausgewaehlt = alle.FirstOrDefault(b => b.Id == (ausgewaehlt?.Id ?? BelegId));
+        stornogrund = null;
+    }
+
+    private void Filtern()
+    {
+        var s = suche?.Trim();
+        gefiltert = alle
+            .Where(b => art == "alle Belegarten" || BelegartInfo.Name(b.Art) == art)
+            .Where(b => string.IsNullOrEmpty(s) || (b.Nummer?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) || b.EmpfaengerName.Contains(s, StringComparison.OrdinalIgnoreCase))
+            .Where(b => !nurOffen || offen.GetValueOrDefault(b.Id) > 0)
+            .OrderByDescending(b => b.Festgeschrieben ? b.FestgeschriebenAm : b.ErfasstAm).ToList();
+    }
+}

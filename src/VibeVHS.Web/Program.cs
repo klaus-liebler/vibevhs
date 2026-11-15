@@ -63,6 +63,10 @@ builder.Services
     .AddVibeVhsInfrastruktur(builder.Configuration, builder.Environment.ContentRootPath)
     .AddVibeVhsMocks(builder.Configuration);
 
+// Zusätzliche Honorarmodelle (Plugins): je DLL im Ordner „plugins/honorare“ (Erweiterungspunkt, I6).
+var honorarPlugins = VibeVHS.Application.Finanzen.Honorare.HonorarPlugins.Laden(builder.Services,
+    Path.Combine(builder.Environment.ContentRootPath, builder.Configuration["Finanzen:HonorarPlugins"] ?? "plugins/honorare"));
+
 // Schlüssel für Anmelde-Cookies dauerhaft im Datenverzeichnis halten, damit ein Neustart niemanden abmeldet.
 builder.Services.AddDataProtection()
     .SetApplicationName("VibeVHS")
@@ -78,6 +82,10 @@ if (hinterProxy)
 }
 
 var app = builder.Build();
+foreach (var plugin in honorarPlugins)
+{
+    app.Logger.LogInformation("Honorarmodell-Plugin geladen: {Plugin}", plugin);
+}
 
 await DatenbankInitialisierung.InitialisierenAsync(app.Services);
 
@@ -113,6 +121,7 @@ if (app.Configuration.GetValue("Demodaten:Anlegen", false))
                  ("Anmeldungen", AnmeldungDemodaten.AnlegenAsync),
                  ("Qualifikationen", QualifikationsDemodaten.AnlegenAsync),
                  ("Durchführung", DurchfuehrungDemodaten.AnlegenAsync),
+                 ("Finanzen", FinanzDemodaten.AnlegenAsync),
              })
     {
         try
@@ -205,10 +214,50 @@ app.MapGet("/belegungen/{id:guid}/termine.ics", async (Guid id, VibeVHS.Applicat
     return Results.File(System.Text.Encoding.UTF8.GetBytes(inhalt), "text/calendar", datei);
 }).RequireAuthorization();
 
+// Weitere Anhänge; Binärdateien (z. B. Rechnungs-PDF) liegen als Base64 mit dem Typzusatz „;base64“ vor.
 app.MapGet("/postausgang/{id:guid}/anhang/{nr:int}", async (Guid id, int nr, VibeVHS.Application.Postausgang.INachrichtenSpeicher speicher) =>
-    await speicher.LadenAsync(id) is { } n && nr >= 0 && nr < n.WeitereAnhaenge.Count
-        ? Results.File(System.Text.Encoding.UTF8.GetBytes(n.WeitereAnhaenge[nr].Inhalt), n.WeitereAnhaenge[nr].Typ, n.WeitereAnhaenge[nr].Name)
+{
+    if (await speicher.LadenAsync(id) is not { } n || nr < 0 || nr >= n.WeitereAnhaenge.Count)
+    {
+        return Results.NotFound();
+    }
+
+    var a = n.WeitereAnhaenge[nr];
+    return a.Typ.EndsWith(";base64", StringComparison.Ordinal)
+        ? Results.File(Convert.FromBase64String(a.Inhalt), a.Typ[..^7], a.Name)
+        : Results.File(System.Text.Encoding.UTF8.GetBytes(a.Inhalt), a.Typ, a.Name);
+}).RequireAuthorization();
+
+// Finanzen: XRechnung, SEPA-Datei, Prüfexport, Verfahrensdoku, Buchungsstapel. Rechte prüfen die Dienste.
+app.MapGet("/finanzen/belege/{id:guid}/xrechnung.xml", async (Guid id, VibeVHS.Application.Finanzen.IFinanzSpeicher speicher, HttpContext http) =>
+    MockAnmeldung.AlsBenutzer(http.User)?.Rolle is { } r && VibeVHS.Application.Finanzen.Finanzrollen.Lesen.Contains(r)
+    && await speicher.BelegAsync(id) is { Xml: { } xml } b
+        ? Results.File(System.Text.Encoding.UTF8.GetBytes(xml), "application/xml", $"{b.Nummer}-xrechnung.xml")
         : Results.NotFound()).RequireAuthorization();
+app.MapGet("/finanzen/laeufe/{id:guid}/sepa.xml", async (Guid id, VibeVHS.Application.Finanzen.IFinanzSpeicher speicher, HttpContext http) =>
+    MockAnmeldung.AlsBenutzer(http.User)?.Rolle is { } r && VibeVHS.Application.Finanzen.Finanzrollen.Lesen.Contains(r)
+    && await speicher.ZahlungslaufAsync(id) is { Xml: { } xml } lauf
+        ? Results.File(System.Text.Encoding.UTF8.GetBytes(xml), "application/xml", VibeVHS.Application.Finanzen.ZahlungsDienst.Dateiname(lauf))
+        : Results.NotFound()).RequireAuthorization();
+app.MapGet("/finanzen/uebergaben/{id:guid}.csv", async (Guid id, VibeVHS.Application.Finanzen.IFinanzSpeicher speicher, HttpContext http) =>
+    MockAnmeldung.AlsBenutzer(http.User)?.Rolle is { } r && VibeVHS.Application.Finanzen.GobdDienst.PruefRollen.Contains(r)
+    && await speicher.UebergabeAsync(id) is { } u
+        ? Results.File(System.Text.Encoding.UTF8.GetBytes(u.Inhalt), "text/csv", u.Datei)
+        : Results.NotFound()).RequireAuthorization();
+app.MapGet("/finanzen/pruefexport", async (DateOnly von, DateOnly bis, VibeVHS.Application.Finanzen.GobdDienst gobd) =>
+{
+    try
+    {
+        var (datei, zip) = await gobd.PruefexportAsync(von, bis);
+        return Results.File(zip, "application/zip", datei);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Problem(ex.Message, statusCode: StatusCodes.Status403Forbidden);
+    }
+}).RequireAuthorization();
+app.MapGet("/finanzen/verfahrensdokumentation.md", async (VibeVHS.Application.Finanzen.GobdDienst gobd) =>
+    Results.File(System.Text.Encoding.UTF8.GetBytes(await gobd.VerfahrensdokuAsync()), "text/markdown", "verfahrensdokumentation-finanzen.md")).RequireAuthorization();
 
 // Nachdruck aus dem Dokumentarchiv: immer das Original, nach Prüfung des SHA-256-Hashs (protokolliert).
 app.MapGet("/dokumente/{id:guid}.pdf", async (Guid id, VibeVHS.Application.Dokumente.DokumentDienst dokumente) =>
