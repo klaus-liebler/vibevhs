@@ -1,0 +1,64 @@
+@page "/portal/dozierende"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@layout PortalLayout
+@using VibeVHS.Application.Portal
+@inject DozentenportalDienst Portal
+
+<PageTitle>Meine Termine · Dozierendenportal</PageTitle>
+
+@if (fehler is not null)
+{
+    <div class="vhs-alert vhs-warn" role="alert">@fehler</div>
+}
+else
+{
+    <h1 style="font-size:22px;margin:0">Meine nächsten Termine</h1>
+    <p class="vhs-small vhs-muted" style="margin:0">Die nächsten vier Wochen. Änderungen an Raum und Zeit sind farbig markiert.
+        <a href="portal/dozierende/daten#kalender">Alle Termine im eigenen Kalender abonnieren</a></p>
+    @if (termine.Count == 0)
+    {
+        <div class="vhs-portal-karte">In den nächsten vier Wochen haben Sie keine Termine.</div>
+    }
+    @foreach (var t in termine)
+    {
+        <article class="vhs-portal-karte @(t.Ausgefallen ? "vhs-portal-entfaellt" : t.Aenderung is not null ? "vhs-portal-geaendert" : null)">
+            <h2 style="font-size:17px">@t.Beginn.ToString("dddd, dd.MM.") · @t.Beginn.ToString("HH:mm")–@t.Ende.ToString("HH:mm")</h2>
+            <div><b>@t.Kurstitel</b> <span class="vhs-small vhs-muted">@t.Kursnummer · Termin @t.Nummer</span></div>
+            @if (t.Aenderung is not null)
+            {
+                <div class="vhs-portal-hinweis" role="note">@(t.Ausgefallen ? "✖" : "⚠") @t.Aenderung</div>
+            }
+            <div>📍 @t.Orte · 👥 @t.Teilnehmende Teilnehmende@(t.ListeAbgeschlossen ? " · Liste abgeschlossen" : "")</div>
+            @if (t.Wegbeschreibung is not null)
+            {
+                <details><summary>Wegbeschreibung</summary><p class="vhs-small" style="white-space:pre-line">@t.Wegbeschreibung</p></details>
+            }
+            <div class="vhs-row" style="margin-top:6px">
+                <a class="vhs-btn" href="@($"portal/dozierende/termin/{t.VeranstaltungId}")">@(t.Ausgefallen ? "Details" : "Anwesenheit & Nachricht")</a>
+                <a class="vhs-btn" href="@($"portal/dozierende/termin/{t.VeranstaltungId}.ics")" download>In meinen Kalender</a>
+            </div>
+        </article>
+    }
+}
+
+@code {
+    private IReadOnlyList<PortalTermin> termine = [];
+    private string? fehler;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            termine = await Portal.TermineAsync();
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+            HttpContext.Response.StatusCode = f.Status;
+        }
+    }
+}

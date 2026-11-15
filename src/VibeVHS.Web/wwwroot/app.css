@@ -248,3 +248,23 @@ details.vhs-card > summary { cursor: pointer; }
 .vhs-dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0 0 8px; }
 .vhs-dl dt { color: var(--vhs-muted, #555); }
 .vhs-dl dd { margin: 0; }
+
+/* Dozierendenportal (mobil zuerst) */
+.vhs-portal { min-height: 100vh; background: var(--vhs-bg, #f6f7f8); }
+.vhs-portal-kopf { position: sticky; top: 0; z-index: 5; background: var(--vhs-surface); border-bottom: 1px solid var(--vhs-line); padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.vhs-portal-kopf b { font-size: 17px; }
+.vhs-portal-nav { display: flex; gap: 4px; overflow-x: auto; padding: 6px 12px; background: var(--vhs-surface); border-bottom: 1px solid var(--vhs-line); }
+.vhs-portal-nav a { padding: 10px 12px; border-radius: 8px; white-space: nowrap; color: inherit; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.vhs-portal-nav a.active { background: var(--vhs-accent); color: var(--vhs-accent-fg); }
+.vhs-portal-inhalt { max-width: 760px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.vhs-portal-karte { background: var(--vhs-surface); border: 1px solid var(--vhs-line); border-radius: 12px; padding: 14px 16px; }
+.vhs-portal-karte h2, .vhs-portal-karte h3 { margin: 0 0 6px; }
+.vhs-portal-geaendert { border-left: 5px solid #b35c00; }
+.vhs-portal-entfaellt { border-left: 5px solid #8a1c1c; opacity: .85; }
+.vhs-portal-hinweis { background: #fff4e5; color: #6b3a00; border-radius: 8px; padding: 6px 10px; font-weight: 600; margin: 6px 0; }
+.vhs-portal form { display: flex; flex-direction: column; gap: 8px; }
+.vhs-portal input, .vhs-portal textarea, .vhs-portal select { font: inherit; padding: 10px; min-height: 44px; border: 1px solid var(--vhs-line); border-radius: 8px; width: 100%; box-sizing: border-box; }
+.vhs-portal label { font-weight: 600; }
+.vhs-portal button, .vhs-portal .vhs-btn { min-height: 44px; justify-content: center; }
+.vhs-portal button[disabled] { opacity: .6; cursor: not-allowed; }
+.vhs-portal details summary { cursor: pointer; padding: 8px 0; font-weight: 600; min-height: 32px; }

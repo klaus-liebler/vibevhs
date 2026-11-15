@@ -57,6 +57,9 @@ public static class Aufgabentypen
     public const string Ruecklastschrift = "ruecklastschrift";
     public const string Ausweiskontrolle = "ausweiskontrolle";
     public const string IkKursbeginn = "ik-kursbeginn";
+    public const string PortalAusfall = "portal-ausfall";
+    public const string PortalBuchhaltung = "portal-buchhaltung";
+    public const string PortalFachbereich = "portal-fachbereich";
 
     public static IReadOnlyList<Aufgabentyp> Vorschlaege() =>
     [
@@ -89,6 +92,15 @@ public static class Aufgabentypen
             nameof(Rolle.IntegrationskursTeam), jeFachbereich: false, eskalationNachTagen: 3),
         new(IkKursbeginn, "Integrationskurs: Kursbeginn vorbereiten", "Berechtigungen und Ausweise prüfen, dann den Kursbeginn an das BAMF melden.",
             nameof(Rolle.IntegrationskursTeam), jeFachbereich: false, eskalationNachTagen: 1),
+        new(PortalAusfall, "Ausfall gemeldet (Dozierendenportal)",
+            "Eine Kursleitung hat einen Termin abgesagt (z. B. Krankheit): Vertretung suchen oder Termin ausfallen lassen und die Teilnehmenden informieren.",
+            nameof(Rolle.Fachbereichsleitung), jeFachbereich: true, eskalationNachTagen: 1),
+        new(PortalBuchhaltung, "Anliegen an die Buchhaltung (Dozierendenportal)",
+            "Neue Bankverbindung freigeben (Vier-Augen) oder einen Einwand zur Honorarabrechnung klären.",
+            nameof(Rolle.Buchhaltung), jeFachbereich: false, eskalationNachTagen: 7),
+        new(PortalFachbereich, "Anliegen an die Fachbereichsleitung (Dozierendenportal)",
+            "Qualifikationsnachweis prüfen, Verfügbarkeit oder Kursvorschlag fürs nächste Semester sichten.",
+            nameof(Rolle.Fachbereichsleitung), jeFachbereich: true, eskalationNachTagen: 14),
         new(Ruecklastschrift, "Rücklastschrift klären", "Nach einer Rücklastschrift ist die Rechnung wieder offen: Kontakt aufnehmen, neues Mandat oder Überweisung.",
             nameof(Rolle.Buchhaltung), jeFachbereich: false, eskalationNachTagen: 7),
     ];

@@ -36,6 +36,39 @@ public static class Kalenderdatei
         return sb.ToString();
     }
 
+    /// <summary>Kalender über mehrere Kurse (Kalender-Abo der Kursleitung); ausgefallene Termine erscheinen als abgesagt.</summary>
+    public static string Erzeugen(string name, IEnumerable<(Kurs Kurs, Veranstaltung Termin, string? Hinweis)> termine, string einrichtung, DateTimeOffset jetzt)
+    {
+        var sb = new StringBuilder();
+        Zeile(sb, "BEGIN:VCALENDAR");
+        Zeile(sb, "VERSION:2.0");
+        Zeile(sb, "PRODID:-//VibeVHS//Dozierendenportal//DE");
+        Zeile(sb, "CALSCALE:GREGORIAN");
+        Zeile(sb, "METHOD:PUBLISH");
+        Zeile(sb, "X-WR-CALNAME:" + Text(name));
+        Zeile(sb, "REFRESH-INTERVAL;VALUE=DURATION:PT4H");
+        foreach (var (kurs, v, hinweis) in termine.OrderBy(t => t.Termin.Beginn))
+        {
+            Zeile(sb, "BEGIN:VEVENT");
+            Zeile(sb, $"UID:{v.Id:N}@vibevhs");
+            Zeile(sb, "DTSTAMP:" + Utc(jetzt.UtcDateTime));
+            Zeile(sb, "DTSTART:" + Utc(Lokal(v.Beginn)));
+            Zeile(sb, "DTEND:" + Utc(Lokal(v.Ende)));
+            Zeile(sb, "SUMMARY:" + Text($"{(v.Ausgefallen ? "ENTFÄLLT: " : "")}{kurs.Titel} ({kurs.Kursnummer}), Termin {v.Nummer}"));
+            Zeile(sb, "LOCATION:" + Text(string.Join(" + ", v.Orte.Select(o => o.OrtName))));
+            Zeile(sb, "DESCRIPTION:" + Text(hinweis is null ? einrichtung : einrichtung + "\n" + hinweis));
+            if (v.Ausgefallen)
+            {
+                Zeile(sb, "STATUS:CANCELLED");
+            }
+
+            Zeile(sb, "END:VEVENT");
+        }
+
+        Zeile(sb, "END:VCALENDAR");
+        return sb.ToString();
+    }
+
     private static DateTime Lokal(DateTime wanduhr) => TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(wanduhr, DateTimeKind.Unspecified), Zeitzone);
 
     private static string Utc(DateTime utc) => utc.ToString("yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture);

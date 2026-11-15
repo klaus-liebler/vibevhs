@@ -1,0 +1,42 @@
+@page "/portal/dozierende/anmelden"
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@layout PortalLayout
+@using VibeVHS.Application.Portal
+@inject IServiceScopeFactory Bereiche
+
+<PageTitle>Anmelden · Dozierendenportal</PageTitle>
+
+<section class="vhs-portal-karte">
+    <h1 style="font-size:22px;margin:0 0 8px">Anmelden</h1>
+    @if (gesendet)
+    {
+        <div class="vhs-alert vhs-info" role="status">Wenn die Adresse zu einer Kursleitung gehört, ist ein Anmeldelink unterwegs. Er gilt 15 Minuten und nur einmal.</div>
+    }
+    <p>Geben Sie die E-Mail-Adresse ein, die bei der vhs hinterlegt ist. Sie bekommen einen Anmeldelink – ein Passwort brauchen Sie nicht.</p>
+    <form method="post" @formname="link" @onsubmit="AnfordernAsync">
+        <AntiforgeryToken />
+        <label for="mail">E-Mail-Adresse</label>
+        <input id="mail" name="EMail" type="email" autocomplete="email" required />
+        <button type="submit" class="vhs-btn">Anmeldelink schicken</button>
+    </form>
+    <p class="vhs-small vhs-muted" style="margin-top:12px">Später erfolgt die Anmeldung über das Servicekonto der Kommune (OIDC).
+        Im Testbetrieb: <a href="@($"anmelden?ReturnUrl={Uri.EscapeDataString(ReturnUrl ?? "/portal/dozierende")}")">Testanmeldung mit Demokonto</a>.</p>
+</section>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromForm(FormName = "link")]
+    private string? EMail { get; set; }
+
+    private bool gesendet;
+
+    private async Task AnfordernAsync()
+    {
+        await using var bereich = Bereiche.CreateAsyncScope();
+        await bereich.ServiceProvider.GetRequiredService<DozentenportalDienst>().LinkAnfordernAsync(EMail ?? "");
+        gesendet = true;
+    }
+}

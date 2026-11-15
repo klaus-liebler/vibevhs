@@ -47,6 +47,15 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         o.Cookie.Name = "vibevhs.anmeldung";
         o.ExpireTimeSpan = TimeSpan.FromHours(10);
         o.SlidingExpiration = true;
+        // Dozierendenportal: eigene, schlanke Anmeldeseite (Link per Mail oder Testanmeldung).
+        o.Events.OnRedirectToLogin = k =>
+        {
+            var ziel = k.Request.Path.StartsWithSegments("/portal/dozierende")
+                ? $"{k.Request.PathBase}/portal/dozierende/anmelden?ReturnUrl={Uri.EscapeDataString(k.Request.PathBase + k.Request.Path + k.Request.QueryString)}"
+                : k.RedirectUri;
+            k.Response.Redirect(ziel);
+            return Task.CompletedTask;
+        };
     });
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
@@ -168,6 +177,7 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 app.UseRequestLocalization("de-DE");
 app.UseAuthentication();
 app.UseAuthorization();
+VibeVHS.Web.Sicherheit.DozierendenBereich.UseDozierendenBereich(app);
 app.UseAntiforgery();
 
 app.MapStaticAssets();
@@ -331,6 +341,7 @@ app.MapGet("/personen/export", async (string? suche, string? rolle, string? stat
         $"personen-{uhr.GetLocalNow():yyyy-MM-dd-HHmm}.xlsx");
 }).RequireAuthorization();
 app.MapShopApi();
+VibeVHS.Web.Portal.PortalApi.MapPortalApi(app);
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

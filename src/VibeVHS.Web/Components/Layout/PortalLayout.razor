@@ -1,0 +1,50 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+
+@* Schlankes Layout des Dozierendenportals: mobil zuerst, statisch gerendert, große Ziele, keine Seitenleiste. *@
+
+<div class="vhs-portal">
+    <header class="vhs-portal-kopf">
+        <b>Dozierendenportal</b>
+        <span class="vhs-small vhs-muted" style="flex:1">Volkshochschule</span>
+        <AuthorizeView>
+            <Authorized>
+                <span class="vhs-small">@context.User.Identity?.Name</span>
+                <form method="post" action="abmelden" style="display:inline">
+                    <AntiforgeryToken />
+                    <button type="submit" class="vhs-linkbutton">Abmelden</button>
+                </form>
+            </Authorized>
+        </AuthorizeView>
+    </header>
+    <AuthorizeView>
+        <Authorized>
+            <nav class="vhs-portal-nav" aria-label="Portal">
+                @foreach (var (pfad, text) in Navigationspunkte)
+                {
+                    <a href="@pfad" class="@(Aktiv(pfad) ? "active" : null)" aria-current="@(Aktiv(pfad) ? "page" : null)">@text</a>
+                }
+            </nav>
+        </Authorized>
+    </AuthorizeView>
+    <main class="vhs-portal-inhalt">
+        @Body
+    </main>
+</div>
+
+@code {
+    private static readonly (string Pfad, string Text)[] Navigationspunkte =
+    [
+        ("portal/dozierende", "Termine"),
+        ("portal/dozierende/kurse", "Kurse & Unterlagen"),
+        ("portal/dozierende/honorar", "Honorar"),
+        ("portal/dozierende/planung", "Nächstes Semester"),
+        ("portal/dozierende/daten", "Meine Daten"),
+    ];
+
+    private bool Aktiv(string pfad)
+    {
+        var hier = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?')[0].TrimEnd('/');
+        return pfad == "portal/dozierende" ? hier == pfad || hier.StartsWith("portal/dozierende/termin", StringComparison.Ordinal) : hier.StartsWith(pfad, StringComparison.Ordinal);
+    }
+}

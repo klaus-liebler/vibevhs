@@ -17,7 +17,7 @@ internal static class Sicherheitsheader
                               + "font-src 'self' data:; connect-src 'self' ws: wss:; media-src 'self' blob: mediastream:; worker-src 'self' blob:; "
                               + "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
 
-    public static readonly string[] OeffentlichePfade = ["/anmelden", "/checkin", "/brief", "/uebersetzen", "/k"];
+    public static readonly string[] OeffentlichePfade = ["/anmelden", "/checkin", "/brief", "/uebersetzen", "/k", "/u", "/portal/dozierende/anmelden", "/portal/dozierende/link", "/portal/dozierende/kalender"];
 
     public static IApplicationBuilder UseSicherheitsheader(this IApplicationBuilder app)
         => app.Use(async (kontext, weiter) =>

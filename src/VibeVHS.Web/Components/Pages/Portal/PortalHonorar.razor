@@ -1,0 +1,99 @@
+@page "/portal/dozierende/honorar"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@layout PortalLayout
+@using VibeVHS.Application.Portal
+@using VibeVHS.Domain.Gemeinsam
+@inject DozentenportalDienst Portal
+
+<PageTitle>Honorar · Dozierendenportal</PageTitle>
+
+<h1 style="font-size:22px;margin:0">Honorarabrechnungen</h1>
+<p class="vhs-small vhs-muted" style="margin:0">Entwürfe prüft die Buchhaltung; nach der Freigabe erhalten Sie die Gutschrift als PDF. Stimmt etwas nicht, melden Sie hier einen Einwand.</p>
+@if (fehler is not null)
+{
+    <div class="vhs-alert vhs-warn" role="alert">@fehler</div>
+}
+@if (meldung is not null)
+{
+    <div class="vhs-alert vhs-info" role="status">@meldung</div>
+}
+@if (abrechnungen.Count == 0 && fehler is null)
+{
+    <div class="vhs-portal-karte">Noch keine Abrechnungen. Festangestellte Kursleitungen erhalten kein Honorar.</div>
+}
+@foreach (var a in abrechnungen)
+{
+    <article class="vhs-portal-karte">
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <b>@(a.Nummer ?? "Entwurf") · @a.Belegdatum.ToString("dd.MM.yyyy")</b>
+            <b>@(new Geld(a.BetragCent))</b>
+        </div>
+        <div class="vhs-small">@(a.Storniert ? "storniert" : a.Festgeschrieben ? "festgeschrieben" : "Entwurf – wird von der Buchhaltung geprüft")</div>
+        <details><summary>Positionen (@a.Positionen.Count)</summary><ul class="vhs-small">@foreach (var p in a.Positionen) { <li>@p</li> }</ul></details>
+        <div class="vhs-row">
+            @if (a.Festgeschrieben && a.PdfVorhanden)
+            {
+                <a class="vhs-btn" href="@($"portal/dozierende/honorar/{a.BelegId}.pdf")">Gutschrift (PDF)</a>
+            }
+            else
+            {
+                <span class="vhs-why" tabindex="0" data-why="@(a.Festgeschrieben ? "Für diese Abrechnung liegt kein PDF vor – bitte bei der Buchhaltung melden." : "Entwürfe haben noch kein PDF – erst nach der Freigabe durch die Buchhaltung.")">
+                    <button type="button" class="vhs-btn" disabled>Gutschrift (PDF)</button></span>
+            }
+        </div>
+        @if (a.OffenerEinwand is { } e)
+        {
+            <p class="vhs-small vhs-portal-hinweis">Ihr Einwand vom @e.EingereichtAm.ToLocalTime().ToString("dd.MM.yyyy") liegt bei der Buchhaltung.</p>
+        }
+        else
+        {
+            <details>
+                <summary>Einwand melden</summary>
+                <form method="post" @formname="@($"einwand-{a.BelegId}")" @onsubmit="@(() => EinwandAsync(a.BelegId))">
+                    <AntiforgeryToken />
+                    <textarea name="Text" rows="3" maxlength="1000" required placeholder="Was stimmt nicht? z. B. Termin am 03.12. fehlt."></textarea>
+                    <button type="submit" class="vhs-btn">An die Buchhaltung senden</button>
+                </form>
+            </details>
+        }
+    </article>
+}
+
+@code {
+    [SupplyParameterFromForm]
+    private string? Text { get; set; }
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private IReadOnlyList<PortalAbrechnung> abrechnungen = [];
+    private string? fehler, meldung;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            abrechnungen = await Portal.AbrechnungenAsync();
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+            HttpContext.Response.StatusCode = f.Status;
+        }
+    }
+
+    private async Task EinwandAsync(Guid belegId)
+    {
+        try
+        {
+            await Portal.EinwandAsync(belegId, Text ?? "");
+            meldung = "Einwand gesendet – die Buchhaltung hat eine Aufgabe und meldet sich.";
+            abrechnungen = await Portal.AbrechnungenAsync();
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+        }
+    }
+}

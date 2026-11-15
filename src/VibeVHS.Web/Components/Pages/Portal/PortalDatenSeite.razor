@@ -1,0 +1,208 @@
+@page "/portal/dozierende/daten"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@layout PortalLayout
+@using VibeVHS.Application.Portal
+@using VibeVHS.Domain.Portal
+@inject DozentenportalDienst Portal
+@inject IServiceScopeFactory Bereiche
+
+<PageTitle>Meine Daten · Dozierendenportal</PageTitle>
+
+<h1 style="font-size:22px;margin:0">Meine Daten</h1>
+@if (Ok is not null || meldung is not null)
+{
+    <div class="vhs-alert vhs-info" role="status">@(meldung ?? Ok)</div>
+}
+@if (Fehler is not null || fehler is not null)
+{
+    <div class="vhs-alert vhs-crit" role="alert">@(fehler ?? Fehler)</div>
+}
+
+@if (daten is { } d)
+{
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">@d.Name</h2>
+        <div class="vhs-small">E-Mail: @(d.EMail ?? "–") · Beschäftigung: @d.Beschaeftigung</div>
+        <div class="vhs-small">Anschrift: @(d.Adresse ?? "–")</div>
+        <div class="vhs-small">Bankverbindung: @(d.Bankverbindung ?? "–")</div>
+    </section>
+
+    <section class="vhs-portal-karte" id="kalender">
+        <h2 style="font-size:18px">Kalender-Abo</h2>
+        <p class="vhs-small">Alle Ihre Termine in Outlook, Google oder dem Handy-Kalender – Raumänderungen und Ausfälle kommen automatisch mit. Die Adresse ist persönlich; Sie können sie jederzeit sperren.</p>
+        @if (kalenderLink is not null)
+        {
+            <label for="kal">Ihre Kalenderadresse (kopieren und im Kalender „Kalender abonnieren“ wählen)</label>
+            <input id="kal" readonly value="@kalenderLink" onclick="this.select()" />
+        }
+        <div class="vhs-row">
+            <form method="post" @formname="kalender" @onsubmit="KalenderAsync"><AntiforgeryToken /><button type="submit" class="vhs-btn">@(kalenderAktiv ? "Neue Adresse erzeugen (alte sperren)" : "Kalenderadresse erzeugen")</button></form>
+            @if (kalenderAktiv)
+            {
+                <form method="post" @formname="sperren" @onsubmit="KalenderSperrenAsync"><AntiforgeryToken /><button type="submit" class="vhs-btn">Abo sperren</button></form>
+            }
+            else
+            {
+                <span class="vhs-why" tabindex="0" data-why="Es gibt kein aktives Abo, das gesperrt werden könnte."><button type="button" class="vhs-btn" disabled>Abo sperren</button></span>
+            }
+        </div>
+    </section>
+
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Anschrift ändern</h2>
+        <form method="post" @formname="adresse" @onsubmit="AdresseAsync">
+            <AntiforgeryToken />
+            <label for="str">Straße und Hausnummer</label><input id="str" name="Strasse" autocomplete="street-address" value="@d.Strasse" required />
+            <label for="plz">Postleitzahl</label><input id="plz" name="Plz" autocomplete="postal-code" inputmode="numeric" value="@d.Postleitzahl" required />
+            <label for="ort">Ort</label><input id="ort" name="Ort" autocomplete="address-level2" value="@d.Ort" required />
+            <label for="ab">Gültig ab</label><input id="ab" name="Ab" type="date" value="@DateTime.Today.ToString("yyyy-MM-dd")" required />
+            <button type="submit" class="vhs-btn">Anschrift speichern</button>
+            <span class="vhs-small vhs-muted">Wirkt sofort; frühere Anschriften bleiben in der Datenhistorie.</span>
+        </form>
+    </section>
+
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Bankverbindung ändern</h2>
+        @if (d.Antraege.Any(a => a.Art == Antragsart.Bankverbindung && a.Status == Antragsstatus.Offen))
+        {
+            <span class="vhs-why" tabindex="0" data-why="Ihre Änderung wartet auf die Freigabe durch die Buchhaltung (Vier-Augen-Prinzip)."><button type="button" class="vhs-btn" disabled>Neue Bankverbindung beantragen</button></span>
+            <p class="vhs-small vhs-muted">Ihre Änderung wartet auf die Freigabe durch die Buchhaltung.</p>
+        }
+        else
+        {
+            <form method="post" @formname="bank" @onsubmit="BankAsync">
+                <AntiforgeryToken />
+                <label for="inh">Kontoinhaber/in</label><input id="inh" name="Inhaber" autocomplete="cc-name" required />
+                <label for="iban">IBAN</label><input id="iban" name="IbanEingabe" spellcheck="false" required />
+                <label for="bic">BIC (optional)</label><input id="bic" name="Bic" spellcheck="false" />
+                <button type="submit" class="vhs-btn">Neue Bankverbindung beantragen</button>
+                <span class="vhs-small vhs-muted">Aus Sicherheitsgründen wird die Änderung erst nach Freigabe durch die Buchhaltung wirksam (Vier-Augen-Prinzip).</span>
+            </form>
+        }
+    </section>
+
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Qualifikationen</h2>
+        <ul class="vhs-small">
+            @foreach (var q in d.Qualifikationen)
+            {
+                <li>@q.Name@(q.Wert is null ? "" : $": {q.Wert}") · gültig ab @q.Von.ToString("dd.MM.yyyy")@(q.Bis is { } b ? $" bis {b:dd.MM.yyyy}" : "")</li>
+            }
+            @if (d.Qualifikationen.Count == 0) { <li>Noch keine eingetragen.</li> }
+        </ul>
+        <details>
+            <summary>Nachweis hochladen</summary>
+            <form method="post" action="portal/dozierende/nachweis" enctype="multipart/form-data">
+                <AntiforgeryToken />
+                <label for="mk">Qualifikation</label>
+                <select id="mk" name="merkmal" required>
+                    @foreach (var m in merkmale)
+                    {
+                        <option value="@m.Schluessel">@m.Name</option>
+                    }
+                </select>
+                <label for="wert">Art / Sprachen (falls zutreffend)</label><input id="wert" name="wert" placeholder="z. B. Englisch, Spanisch" />
+                <label for="bis">Gültig bis (falls befristet)</label><input id="bis" name="bis" type="date" />
+                <label for="nw">Nachweis (PDF oder Foto)</label><input id="nw" name="datei" type="file" required accept=".pdf,.jpg,.jpeg,.png" />
+                <button type="submit" class="vhs-btn">Zur Prüfung einreichen</button>
+                <span class="vhs-small vhs-muted">Die Fachbereichsleitung prüft den Nachweis und trägt die Qualifikation ein.</span>
+            </form>
+        </details>
+    </section>
+
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Meine Anliegen</h2>
+        @if (d.Antraege.Count == 0)
+        {
+            <p class="vhs-small vhs-muted">Keine.</p>
+        }
+        @foreach (var a in d.Antraege)
+        {
+            <div class="vhs-small" style="padding:4px 0;border-bottom:1px solid var(--vhs-line)">
+                <b>@AntragAnzeige.Art(a.Art)</b>: @a.Titel · @a.EingereichtAm.ToLocalTime().ToString("dd.MM.yyyy") ·
+                <StatusPille Stil="@(a.Status == Antragsstatus.Offen ? "warn" : a.Status == Antragsstatus.Angenommen ? "gut" : "krit")">@AntragAnzeige.Status(a.Status)</StatusPille>
+                @if (a.Vermerk is not null) { <br /><span>Vermerk: @a.Vermerk</span> }
+            </div>
+        }
+    </section>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? Ok { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? Fehler { get; set; }
+
+    [SupplyParameterFromForm(FormName = "adresse")] private string? Strasse { get; set; }
+    [SupplyParameterFromForm(FormName = "adresse")] private string? Plz { get; set; }
+    [SupplyParameterFromForm(FormName = "adresse")] private string? Ort { get; set; }
+    [SupplyParameterFromForm(FormName = "adresse")] private DateOnly? Ab { get; set; }
+    [SupplyParameterFromForm(FormName = "bank")] private string? Inhaber { get; set; }
+    [SupplyParameterFromForm(FormName = "bank")] private string? IbanEingabe { get; set; }
+    [SupplyParameterFromForm(FormName = "bank")] private string? Bic { get; set; }
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private PortalDaten? daten;
+    private IReadOnlyList<VibeVHS.Domain.Programm.Merkmal> merkmale = [];
+    private bool kalenderAktiv;
+    private string? kalenderLink, meldung, fehler;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LadenAsync();
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+            HttpContext.Response.StatusCode = f.Status;
+        }
+    }
+
+    private async Task LadenAsync()
+    {
+        daten = await Portal.DatenAsync();
+        kalenderAktiv = await Portal.KalenderAktivAsync();
+        await using var bereich = Bereiche.CreateAsyncScope();
+        merkmale = await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Programm.QualifikationsDienst>().PersonenmerkmaleAsync();
+    }
+
+    private async Task Aktion(Func<Task> arbeit, string erfolg)
+    {
+        try
+        {
+            await arbeit();
+            meldung = erfolg;
+            await LadenAsync();
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+        }
+    }
+
+    private async Task KalenderAsync()
+    {
+        try
+        {
+            kalenderLink = (await Portal.KalenderLinkErzeugenAsync()).ToString();
+            kalenderAktiv = true;
+            meldung = "Neue Kalenderadresse erzeugt; frühere Adressen sind gesperrt.";
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+        }
+    }
+
+    private Task KalenderSperrenAsync() => Aktion(() => Portal.KalenderSperrenAsync(), "Kalender-Abo gesperrt.");
+
+    private Task AdresseAsync() => Aktion(() => Portal.AdresseAendernAsync(Strasse ?? "", Plz ?? "", Ort ?? "", Ab ?? DateOnly.FromDateTime(DateTime.Today)), "Anschrift gespeichert.");
+
+    private Task BankAsync() => Aktion(() => Portal.BankverbindungBeantragenAsync(Inhaber ?? "", IbanEingabe ?? "", Bic), "Änderung beantragt – die Buchhaltung gibt sie frei.");
+}

@@ -1,0 +1,161 @@
+@page "/portal/dozierende/termin/{Id:guid}"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@layout PortalLayout
+@using VibeVHS.Application.Portal
+@using VibeVHS.Domain.Programm
+@inject DozentenportalDienst Portal
+@inject TimeProvider Uhr
+
+<PageTitle>Termin · Dozierendenportal</PageTitle>
+
+@if (fehler is not null)
+{
+    <div class="vhs-alert vhs-warn" role="alert">@fehler</div>
+    <a href="portal/dozierende" class="vhs-btn">Zu meinen Terminen</a>
+}
+else if (kurs is not null && termin is not null)
+{
+    <div>
+        <a href="portal/dozierende" class="vhs-small">← Meine Termine</a>
+        <h1 style="font-size:21px;margin:4px 0">@kurs.Titel</h1>
+        <p class="vhs-small vhs-muted" style="margin:0">@kurs.Kursnummer · Termin @termin.Nummer · @termin.Beginn.ToString("dddd, dd.MM.yyyy, HH:mm")–@termin.Ende.ToString("HH:mm") · @string.Join(" + ", termin.Orte.Select(o => o.OrtName))</p>
+    </div>
+    @if (meldung is not null)
+    {
+        <div class="vhs-alert vhs-info" role="status">@meldung</div>
+    }
+    @if (eingabefehler is not null)
+    {
+        <div class="vhs-alert vhs-crit" role="alert">@eingabefehler</div>
+    }
+
+    @if (termin.Ausgefallen)
+    {
+        <div class="vhs-portal-karte vhs-portal-entfaellt"><b>Dieser Termin entfällt.</b> @termin.Bemerkung</div>
+    }
+    else
+    {
+        <section class="vhs-portal-karte">
+            <h2 style="font-size:18px">Anwesenheit</h2>
+            <p class="vhs-small vhs-muted">Teilnehmerausweise scannen (Kamera), Termin-QR zeigen oder abhaken. Bei Integrationskursen mit Lichtbild-Sichtvergleich.</p>
+            <VibeVHS.Web.Components.Pages.AnwesenheitListe @rendermode="InteractiveServer" Id="Id" Portal="true" />
+        </section>
+    }
+
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Nachricht an die Teilnehmenden dieses Termins</h2>
+        <form method="post" @formname="nachricht" @onsubmit="NachrichtAsync">
+            <AntiforgeryToken />
+            <label for="betreff">Betreff</label>
+            <input id="betreff" name="Betreff" maxlength="120" value="@($"Termin am {termin.Beginn:dd.MM.yyyy}")" />
+            <label for="text">Nachricht</label>
+            <textarea id="text" name="Text" rows="4" maxlength="2000" placeholder="z. B. Bitte Sportschuhe mitbringen."></textarea>
+            <span class="vhs-small vhs-muted">Geht per E-Mail mit Übersetzungslink an @teilnehmende Teilnehmende; Ihre Adresse bleibt verborgen.</span>
+            <button type="submit" class="vhs-btn">Nachricht senden</button>
+        </form>
+    </section>
+
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Ausfall melden</h2>
+        @if (AusfallGesperrt is { } grund)
+        {
+            <span class="vhs-why" tabindex="0" data-why="@grund"><button type="button" class="vhs-btn" disabled>Ausfall melden</button></span>
+            <p class="vhs-small vhs-muted">@grund</p>
+        }
+        else
+        {
+            <form method="post" @formname="ausfall" @onsubmit="AusfallAsync">
+                <AntiforgeryToken />
+                <label for="grund">Grund (für die Fachbereichsleitung)</label>
+                <input id="grund" name="Grund" maxlength="300" placeholder="z. B. Krankheit" required />
+                <label><input type="checkbox" name="Informieren" value="ja" style="width:auto;min-height:0" /> Teilnehmende sofort informieren</label>
+                <textarea name="AusfallText" rows="3" maxlength="2000">Der Termin am @termin.Beginn.ToString("dd.MM.yyyy") muss leider ausfallen. Die vhs meldet sich wegen eines Ersatztermins.</textarea>
+                <button type="submit" class="vhs-btn">Ausfall melden</button>
+                <span class="vhs-small vhs-muted">Die Fachbereichsleitung bekommt eine Aufgabe und entscheidet über Vertretung oder Absage.</span>
+            </form>
+        }
+    </section>
+
+    <div class="vhs-row">
+        <a class="vhs-btn" href="@($"portal/dozierende/termin/{Id}.ics")" download>Termin in meinen Kalender</a>
+        <a class="vhs-btn" href="@($"portal/dozierende/kurs/{kurs.Id}")">Unterlagen zum Kurs</a>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "nachricht")]
+    private string? Betreff { get; set; }
+
+    [SupplyParameterFromForm(FormName = "nachricht")]
+    private string? Text { get; set; }
+
+    [SupplyParameterFromForm(FormName = "ausfall")]
+    private string? Grund { get; set; }
+
+    [SupplyParameterFromForm(FormName = "ausfall")]
+    private string? Informieren { get; set; }
+
+    [SupplyParameterFromForm(FormName = "ausfall")]
+    private string? AusfallText { get; set; }
+
+    private Kurs? kurs;
+    private Veranstaltung? termin;
+    private int teilnehmende;
+    private string? fehler, meldung, eingabefehler;
+    private bool ausfallGemeldet;
+
+    private string? AusfallGesperrt => termin is null ? null
+        : ausfallGemeldet ? "Für diesen Termin haben Sie den Ausfall bereits gemeldet; die Fachbereichsleitung kümmert sich."
+        : termin.Ende < Uhr.GetLocalNow().DateTime ? "Der Termin liegt in der Vergangenheit."
+        : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            (kurs, termin) = await Portal.TerminAsync(Id);
+            teilnehmende = (await Portal.TeilnehmendeAsync(Id)).Count;
+            ausfallGemeldet = (await Portal.DatenAsync()).Antraege.Any(a => a.Art == VibeVHS.Domain.Portal.Antragsart.Ausfall && a.BezugId == Id
+                                                                             && a.Status == VibeVHS.Domain.Portal.Antragsstatus.Offen);
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+            HttpContext.Response.StatusCode = f.Status;
+        }
+    }
+
+    private async Task NachrichtAsync()
+    {
+        try
+        {
+            var n = await Portal.NachrichtAsync(Id, Betreff ?? "", Text ?? "");
+            meldung = $"Nachricht an {n} Teilnehmende verschickt (Postausgang).";
+        }
+        catch (PortalFehler f)
+        {
+            eingabefehler = f.Message;
+        }
+    }
+
+    private async Task AusfallAsync()
+    {
+        try
+        {
+            var n = await Portal.AusfallMeldenAsync(Id, Grund ?? "", Informieren == "ja" ? AusfallText : null);
+            ausfallGemeldet = true;
+            meldung = "Ausfall gemeldet – die Fachbereichsleitung hat eine Aufgabe." + (n > 0 ? $" {n} Teilnehmende wurden informiert." : "");
+        }
+        catch (PortalFehler f)
+        {
+            eingabefehler = f.Message;
+        }
+    }
+}

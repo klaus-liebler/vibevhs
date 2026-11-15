@@ -15,7 +15,7 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261115113526_Schnellanmeldung";
+    public override string LastMigrationId => "20261115114756_Portal";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -2552,6 +2552,142 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.HasIndex("PersonId", "GueltigVon");
 
                 b.ToTable("PersonRufnummern");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Portal.Datei", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErstelltAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("Groesse")
+                    .HasColumnType("INTEGER");
+
+                b.Property<byte[]>("Inhalt")
+                    .IsRequired()
+                    .HasColumnType("BLOB");
+
+                b.Property<string>("Name")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Sha256")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Typ")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.ToTable("Dateien");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Portal.Kursunterlage", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("Abrufe")
+                    .HasColumnType("INTEGER");
+
+                b.Property<Guid>("DateiId")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("GueltigBis")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("HochgeladenAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<Guid>("HochgeladenVon")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("KursId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Titel")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("TokenHash")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("ZurueckgezogenAm")
+                    .HasColumnType("INTEGER");
+
+                b.HasKey("Id");
+
+                b.HasIndex("KursId");
+
+                b.HasIndex("TokenHash")
+                    .IsUnique();
+
+                b.ToTable("Kursunterlagen");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Portal.Portalantrag", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Art")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("BezugId")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("DateiId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Daten")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("EingereichtAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long?>("EntschiedenAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("EntschiedenVon")
+                    .HasColumnType("TEXT");
+
+                b.Property<int?>("Fachbereich")
+                    .HasColumnType("INTEGER");
+
+                b.Property<Guid>("PersonId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Text")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Titel")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Vermerk")
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("PersonId");
+
+                b.HasIndex("Status");
+
+                b.ToTable("Portalanliegen");
             });
 
         modelBuilder.Entity("VibeVHS.Domain.Programm.Ferienzeitraum", b =>

@@ -1,0 +1,133 @@
+@page "/portal-anliegen"
+@page "/portal-anliegen/{Id:guid}"
+@using VibeVHS.Application.Portal
+@using VibeVHS.Domain.Portal
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+
+<PageTitle>Anliegen der Kursleitungen · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Anliegen der Kursleitungen</h1>
+        <p class="vhs-sub">Aus dem Dozierendenportal: Ausfälle, Bankverbindungen (Vier-Augen), Qualifikationsnachweise, Verfügbarkeiten, Kursvorschläge und Einwände zu Honorarabrechnungen. Jedes offene Anliegen steht auch als Aufgabe im Korb.</p>
+    </div>
+    <label class="vhs-row vhs-small"><input type="checkbox" @bind="alle" @bind:after="LadenAsync" /> auch entschiedene zeigen</label>
+</div>
+
+@if (fehler is not null)
+{
+    <div class="vhs-alert vhs-info">@fehler</div>
+}
+else
+{
+    <div class="vhs-grid2">
+        <section class="vhs-card">
+            <div class="vhs-list">
+                @if (liste.Count == 0) { <div class="vhs-small vhs-muted">Keine offenen Anliegen.</div> }
+                @foreach (var a in liste)
+                {
+                    <div>
+                        <a class="vhs-grow" href="@($"portal-anliegen/{a.Id}")"><b>@AntragAnzeige.Art(a.Art)</b> · @namen.GetValueOrDefault(a.PersonId) · @a.Titel</a>
+                        <span class="vhs-small vhs-muted">@a.EingereichtAm.ToLocalTime().ToString("dd.MM.yyyy")</span>
+                        <StatusPille Stil="@(a.Status == Antragsstatus.Offen ? "warn" : a.Status == Antragsstatus.Angenommen ? "gut" : "neutral")">@AntragAnzeige.Status(a.Status)</StatusPille>
+                    </div>
+                }
+            </div>
+        </section>
+        @if (gewaehlt is { } g)
+        {
+            <section class="vhs-card">
+                <h2>@AntragAnzeige.Art(g.Art)</h2>
+                <p><a href="@($"personen/{g.PersonId}")">@namen.GetValueOrDefault(g.PersonId)</a> · eingereicht @g.EingereichtAm.ToLocalTime().ToString("dd.MM.yyyy HH:mm")@(g.Fachbereich is { } fb ? $" · FB {fb}" : "")</p>
+                <p><b>@g.Titel</b></p>
+                @if (g.Text.Length > 0) { <p style="white-space:pre-line">@g.Text</p> }
+                @if (g.Daten.Count > 0)
+                {
+                    <dl class="vhs-dl">
+                        @foreach (var (k, v) in g.Daten.Where(x => x.Value.Length > 0))
+                        {
+                            <dt>@k</dt><dd>@(k == "iban" ? VibeVHS.Domain.Finanzen.Iban.Anzeige(v) : v)</dd>
+                        }
+                    </dl>
+                }
+                @if (g.DateiId is not null) { <p><a href="@($"portal-anliegen/{g.Id}/datei")" target="_blank">Hochgeladenen Nachweis öffnen</a></p> }
+                @if (g.Status != Antragsstatus.Offen)
+                {
+                    <div class="vhs-alert vhs-info">@AntragAnzeige.Status(g.Status) von @g.EntschiedenVon am @g.EntschiedenAm?.ToLocalTime().ToString("dd.MM.yyyy")@(g.Vermerk is null ? "" : $": {g.Vermerk}")</div>
+                }
+                else
+                {
+                    <RadzenFormField Text="Vermerk (bei Ablehnung Pflicht; die Kursleitung sieht ihn)" Variant="Variant.Outlined" Style="width:100%"><RadzenTextBox @bind-Value="vermerk" /></RadzenFormField>
+                    <div class="vhs-row" style="margin-top:8px">
+                        <BegruendeterButton Text="@AnnehmenText(g.Art)" Icon="check" ButtonStyle="ButtonStyle.Primary" Freigabe="@darf" Click="@(() => EntscheidenAsync(true))" />
+                        <BegruendeterButton Text="Ablehnen" Icon="close" ButtonStyle="ButtonStyle.Light"
+                                            Freigabe="@darf.Und(() => string.IsNullOrWhiteSpace(vermerk) ? Freigabe.Nein("Bitte zuerst einen Vermerk eingeben – die Kursleitung erfährt so den Grund.") : Freigabe.Ja)"
+                                            Click="@(() => EntscheidenAsync(false))" />
+                    </div>
+                    @if (g.Art == Antragsart.Ausfall && g.BezugId is not null)
+                    {
+                        <p class="vhs-small vhs-muted">Nächster Schritt nach dem Annehmen: Termin im Kurs ausfallen lassen oder Vertretung eintragen; die Teilnehmenden informiert die Absage automatisch.</p>
+                    }
+                }
+            </section>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid? Id { get; set; }
+
+    private IReadOnlyList<Portalantrag> liste = [];
+    private IReadOnlyDictionary<Guid, string> namen = new Dictionary<Guid, string>();
+    private Portalantrag? gewaehlt;
+    private Freigabe darf = Freigabe.Ja;
+    private bool alle;
+    private string? vermerk, fehler;
+
+    private static string AnnehmenText(Antragsart art) => art switch
+    {
+        Antragsart.Bankverbindung => "Bankverbindung freigeben",
+        Antragsart.Qualifikationsnachweis => "Nachweis anerkennen und eintragen",
+        Antragsart.Ausfall => "Zur Kenntnis genommen",
+        _ => "Erledigt",
+    };
+
+    protected override Task OnParametersSetAsync() => LadenAsync();
+
+    private async Task LadenAsync()
+    {
+        try
+        {
+            (liste, namen, gewaehlt, darf) = await Vorgang.AusfuehrenAsync(async d =>
+            {
+                var v = d.GetRequiredService<PortalVerwaltung>();
+                var l = await v.AntraegeAsync(!alle);
+                var g = Id is { } id ? (await v.AntraegeAsync(false)).FirstOrDefault(a => a.Id == id) : null;
+                var n = await d.GetRequiredService<VibeVHS.Application.Personen.IPersonenSpeicher>().AnzeigenamenAsync(l.Select(a => a.PersonId).Append(g?.PersonId ?? Guid.Empty));
+                return (l, n, g, g is null ? Freigabe.Ja : await v.DarfEntscheidenAsync(g));
+            });
+            fehler = null;
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+        }
+    }
+
+    private async Task EntscheidenAsync(bool angenommen)
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(async d => { await d.GetRequiredService<PortalVerwaltung>().EntscheidenAsync(gewaehlt!.Id, angenommen, vermerk); return 0; });
+            Hinweise.Notify(NotificationSeverity.Success, "Entschieden", angenommen ? "Angenommen; die Aufgabe ist geschlossen." : "Abgelehnt; die Aufgabe ist geschlossen.");
+            vermerk = null;
+            await LadenAsync();
+        }
+        catch (Exception ex) when (ex is PortalFehler or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Warning, "Nicht möglich", ex.Message);
+        }
+    }
+}

@@ -62,6 +62,7 @@ public static class Registrierung
         dienste.AddScoped<Application.Betrieb.ISicherung, Betrieb.SqliteSicherung>();
         dienste.AddScoped<Application.Betrieb.IImportSpeicher, Betrieb.ImportSpeicher>();
         dienste.AddScoped<Application.Finanzen.IFinanzprotokoll, Finanzen.Finanzprotokoll>();
+        dienste.AddScoped<Application.Portal.IPortalSpeicher, Portal.PortalSpeicher>();
         dienste.AddScoped<Shop.ShopSpeicher>();
         dienste.AddScoped<Application.Shop.IShopSpeicher>(d => d.GetRequiredService<Shop.ShopSpeicher>());
         dienste.AddScoped<Application.Anmeldung.IPlatzreservierungen>(d => d.GetRequiredService<Shop.ShopSpeicher>());

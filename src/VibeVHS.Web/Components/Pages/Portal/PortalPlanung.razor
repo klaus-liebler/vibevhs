@@ -1,0 +1,119 @@
+@page "/portal/dozierende/planung"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@layout PortalLayout
+@using VibeVHS.Application.Portal
+@inject DozentenportalDienst Portal
+
+<PageTitle>Nächstes Semester · Dozierendenportal</PageTitle>
+
+<h1 style="font-size:22px;margin:0">Nächstes Semester</h1>
+<p class="vhs-small vhs-muted" style="margin:0">Teilen Sie der Fachbereichsleitung mit, wann Sie unterrichten können, und schlagen Sie neue Kurse vor.</p>
+@if (meldung is not null)
+{
+    <div class="vhs-alert vhs-info" role="status">@meldung</div>
+}
+@if (fehler is not null)
+{
+    <div class="vhs-alert vhs-crit" role="alert">@fehler</div>
+}
+
+<section class="vhs-portal-karte">
+    <h2 style="font-size:18px">Verfügbarkeit und Wunschzeiten</h2>
+    <form method="post" @formname="verfuegbar" @onsubmit="VerfuegbarAsync">
+        <AntiforgeryToken />
+        <label for="sem">Semester</label><input id="sem" name="Semester" value="@NaechstesSemester" required />
+        <fieldset style="border:0;padding:0;margin:0">
+            <legend style="font-weight:600">Wochentage</legend>
+            <div style="display:flex;flex-wrap:wrap;gap:6px 14px">
+                @foreach (var t in new[] { "Mo", "Di", "Mi", "Do", "Fr", "Sa", "So" })
+                {
+                    <label style="font-weight:400"><input type="checkbox" name="Tage" value="@t" style="width:auto;min-height:0" /> @t</label>
+                }
+            </div>
+        </fieldset>
+        <label for="zeiten">Uhrzeiten</label><input id="zeiten" name="Zeiten" placeholder="z. B. ab 17 Uhr, vormittags" />
+        <label for="fb">Fachbereich</label>
+        <select id="fb" name="Fb">@foreach (var (nr, name) in fachbereiche) { <option value="@nr" selected="@(nr == eigenerFb)">@nr – @name</option> }</select>
+        <label for="hin">Hinweise</label><textarea id="hin" name="Hinweis" rows="2" maxlength="1000" placeholder="z. B. nicht in den Herbstferien"></textarea>
+        <button type="submit" class="vhs-btn">An die Fachbereichsleitung senden</button>
+    </form>
+</section>
+
+<section class="vhs-portal-karte">
+    <h2 style="font-size:18px">Kursvorschlag</h2>
+    <form method="post" @formname="vorschlag" @onsubmit="VorschlagAsync">
+        <AntiforgeryToken />
+        <label for="kt">Titel</label><input id="kt" name="Titel" maxlength="120" required />
+        <label for="kb">Beschreibung</label><textarea id="kb" name="Beschreibung" rows="4" maxlength="3000" required></textarea>
+        <label for="ku">Umfang</label><input id="ku" name="Umfang" placeholder="z. B. 8 Termine à 90 Minuten" />
+        <label for="kz">Zielgruppe</label><input id="kz" name="Zielgruppe" placeholder="z. B. Einsteiger/innen ab 50" />
+        <label for="kfb">Fachbereich</label>
+        <select id="kfb" name="VorschlagFb">@foreach (var (nr, name) in fachbereiche) { <option value="@nr" selected="@(nr == eigenerFb)">@nr – @name</option> }</select>
+        <button type="submit" class="vhs-btn">Vorschlag einreichen</button>
+    </form>
+</section>
+
+@code {
+    [SupplyParameterFromForm(FormName = "verfuegbar")] private string? Semester { get; set; }
+    [SupplyParameterFromForm(FormName = "verfuegbar")] private string[]? Tage { get; set; }
+    [SupplyParameterFromForm(FormName = "verfuegbar")] private string? Zeiten { get; set; }
+    [SupplyParameterFromForm(FormName = "verfuegbar")] private int? Fb { get; set; }
+    [SupplyParameterFromForm(FormName = "verfuegbar")] private string? Hinweis { get; set; }
+    [SupplyParameterFromForm(FormName = "vorschlag")] private string? Titel { get; set; }
+    [SupplyParameterFromForm(FormName = "vorschlag")] private string? Beschreibung { get; set; }
+    [SupplyParameterFromForm(FormName = "vorschlag")] private string? Umfang { get; set; }
+    [SupplyParameterFromForm(FormName = "vorschlag")] private string? Zielgruppe { get; set; }
+    [SupplyParameterFromForm(FormName = "vorschlag")] private int? VorschlagFb { get; set; }
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private IReadOnlyList<(int Nr, string Name)> fachbereiche = [];
+    private int? eigenerFb;
+    private string? meldung, fehler;
+
+    private static string NaechstesSemester => DateTime.Today.Month >= 2 && DateTime.Today.Month <= 7 ? $"Herbst {DateTime.Today.Year}" : $"Frühjahr {DateTime.Today.Year + (DateTime.Today.Month >= 8 ? 1 : 0)}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await Portal.IchAsync();
+            fachbereiche = await Portal.FachbereicheAsync();
+            // Vorauswahl: Fachbereich des eigenen (häufigsten) Kurses
+            eigenerFb = (await Portal.KurseAsync()).GroupBy(k => k.Fachbereich).OrderByDescending(g => g.Count()).Select(g => (int?)g.Key).FirstOrDefault();
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+            HttpContext.Response.StatusCode = f.Status;
+        }
+    }
+
+    private async Task VerfuegbarAsync()
+    {
+        try
+        {
+            await Portal.VerfuegbarkeitAsync(Semester ?? "", Tage ?? [], Zeiten ?? "", Hinweis, Fb);
+            meldung = "Danke! Die Fachbereichsleitung hat Ihre Verfügbarkeit als Aufgabe erhalten.";
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+        }
+    }
+
+    private async Task VorschlagAsync()
+    {
+        try
+        {
+            await Portal.KursvorschlagAsync(Titel ?? "", Beschreibung ?? "", VorschlagFb ?? 0, Umfang, Zielgruppe);
+            meldung = "Danke! Ihr Kursvorschlag liegt bei der Fachbereichsleitung.";
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+        }
+    }
+}

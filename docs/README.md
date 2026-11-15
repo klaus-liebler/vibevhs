@@ -384,6 +384,17 @@ Fachbereichsleitung und Prüfung lesen).
   hier nicht ausgeführt (kein PHP auf dem Entwicklungs-PC).
 - Details: `docs/webshop.md`.
 
+## Kurs-QR, Schnellanmeldung und Dozierendenportal
+
+- **Kurs-QR** je Kurs (PNG/SVG, Sammel-PDF fürs Programmheft) → `/k/{nummer}`: ohne gemerktes Gerät Kursseite mit
+  „In den Warenkorb“, mit gemerktem Gerät oder persönlichem Link **Schnellanmeldung** mit einem Klick; Storno-Link per Mail
+  (24 h kostenlos, danach AGB).
+- **Dozierendenportal** `/portal/dozierende` (mobil, Anmeldelink per Mail): Termine mit Änderungen, Kalender-Abo,
+  Anwesenheit, Nachricht an Teilnehmende, Ausfall melden, Unterlagen verteilen, Honorar mit PDF und Einwand, eigene Daten
+  (Bankverbindung mit Vier-Augen-Freigabe, Nachweise), Verfügbarkeit und Kursvorschläge. Anliegen landen als Aufgaben bei
+  Fachbereichsleitung bzw. Buchhaltung (`/portal-anliegen`).
+- Details: `docs/dozierendenportal.md`.
+
 ## Testbenutzer der Pilot-VHS
 
 Die Startdaten liegen in [`tools/Testdaten/testbenutzer-vhs-egs.json`](../tools/Testdaten/testbenutzer-vhs-egs.json)

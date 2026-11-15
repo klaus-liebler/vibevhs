@@ -4,6 +4,8 @@
     protected override void OnInitialized()
     {
         var zurueck = "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
-        Navigation.NavigateTo($"anmelden?ReturnUrl={Uri.EscapeDataString(zurueck)}", forceLoad: true);
+        // Dozierendenportal: eigene, schlanke Anmeldeseite (Link per Mail oder Testanmeldung).
+        var ziel = zurueck.StartsWith("/portal/dozierende", StringComparison.Ordinal) ? "portal/dozierende/anmelden" : "anmelden";
+        Navigation.NavigateTo($"{ziel}?ReturnUrl={Uri.EscapeDataString(zurueck)}", forceLoad: true);
     }
 }

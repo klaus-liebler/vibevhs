@@ -14,6 +14,12 @@ public enum Tokenart
 
     /// <summary>QR-Code des Teilnehmerausweises (Pseudonym, keine Klardaten).</summary>
     Ausweis,
+
+    /// <summary>Kalender-Abo einer Kursleitung (ICS-Adresse, widerrufbar).</summary>
+    Kalender,
+
+    /// <summary>Anmeldelink für das Dozierendenportal per Mail (15 Minuten, einmal).</summary>
+    PortalLink,
 }
 
 public static class TokenAnzeige
@@ -22,6 +28,8 @@ public static class TokenAnzeige
     {
         Tokenart.CheckinLink => "Check-in-Link (Mail)",
         Tokenart.Geraet => "gemerktes Gerät",
+        Tokenart.Kalender => "Kalender-Abo (Kursleitung)",
+        Tokenart.PortalLink => "Anmeldelink Dozierendenportal",
         _ => "Teilnehmerausweis",
     };
 }

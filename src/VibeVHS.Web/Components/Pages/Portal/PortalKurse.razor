@@ -1,0 +1,130 @@
+@page "/portal/dozierende/kurse"
+@page "/portal/dozierende/kurs/{Id:guid}"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@layout PortalLayout
+@using VibeVHS.Application.Portal
+@inject DozentenportalDienst Portal
+
+<PageTitle>Kurse und Unterlagen · Dozierendenportal</PageTitle>
+
+@if (fehler is not null)
+{
+    <div class="vhs-alert vhs-warn" role="alert">@fehler</div>
+    <a href="portal/dozierende/kurse" class="vhs-btn">Zu meinen Kursen</a>
+}
+else if (Id is null)
+{
+    <h1 style="font-size:22px;margin:0">Meine Kurse</h1>
+    @foreach (var k in kurse)
+    {
+        <a class="vhs-portal-karte" style="display:block;color:inherit;text-decoration:none" href="@($"portal/dozierende/kurs/{k.Id}")">
+            <b>@k.Titel</b> <span class="vhs-small vhs-muted">@k.Kursnummer@(k.Leitung ? " · Leitung" : " · im Team")</span><br />
+            <span class="vhs-small">@(k.Beginn?.ToString("dd.MM.yyyy") ?? "–") bis @(k.Ende?.ToString("dd.MM.yyyy") ?? "–") · @k.Termine Termine · @k.Teilnehmende Teilnehmende</span>
+        </a>
+    }
+    @if (kurse.Count == 0)
+    {
+        <div class="vhs-portal-karte">Ihnen sind derzeit keine Kurse zugeordnet.</div>
+    }
+}
+else if (kurs is not null)
+{
+    <div>
+        <a href="portal/dozierende/kurse" class="vhs-small">← Meine Kurse</a>
+        <h1 style="font-size:21px;margin:4px 0">@kurs.Titel</h1>
+        <p class="vhs-small vhs-muted" style="margin:0">@kurs.Kursnummer</p>
+    </div>
+    @if (Ok is not null)
+    {
+        <div class="vhs-alert vhs-info" role="status">@Ok</div>
+    }
+    @if (Fehler is not null)
+    {
+        <div class="vhs-alert vhs-crit" role="alert">@Fehler</div>
+    }
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Unterlage hochladen</h2>
+        <form method="post" action="@($"portal/dozierende/kurs/{kurs.Id}/unterlagen")" enctype="multipart/form-data">
+            <AntiforgeryToken />
+            <label for="titel">Titel</label>
+            <input id="titel" name="titel" maxlength="120" placeholder="z. B. Übungsblatt Woche 3" />
+            <label for="datei">Datei</label>
+            <input id="datei" name="datei" type="file" required accept="@string.Join(",", Uploadregeln.Erlaubt.Keys)" />
+            <span class="vhs-small vhs-muted">@Uploadregeln.Hinweis Jede Datei wird auf Viren geprüft.</span>
+            <label><input type="checkbox" name="verteilen" value="ja" checked style="width:auto;min-height:0" /> Sofort an alle angemeldeten Teilnehmenden schicken (Link per E-Mail)</label>
+            <button type="submit" class="vhs-btn">Hochladen</button>
+        </form>
+    </section>
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Unterlagen</h2>
+        @if (unterlagen.Count == 0)
+        {
+            <p class="vhs-small vhs-muted">Noch keine.</p>
+        }
+        @foreach (var u in unterlagen)
+        {
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--vhs-line)">
+                <span style="flex:1"><b>@u.Titel</b><br /><span class="vhs-small vhs-muted">@u.Dateiname · @(u.Groesse / 1024) KB · @u.HochgeladenAm.ToLocalTime().ToString("dd.MM.yyyy") · @u.Abrufe Abrufe@(u.Zurueckgezogen ? " · zurückgezogen" : "")</span></span>
+                @if (u.Zurueckgezogen)
+                {
+                    <span class="vhs-why" tabindex="0" data-why="Bereits zurückgezogen: der Link der Teilnehmenden ist gesperrt."><button type="button" class="vhs-btn" disabled>Zurückziehen</button></span>
+                }
+                else
+                {
+                    <form method="post" @formname="@($"zurueck-{u.Id}")" @onsubmit="@(() => ZurueckziehenAsync(u.Id))">
+                        <AntiforgeryToken />
+                        <button type="submit" class="vhs-btn">Zurückziehen</button>
+                    </form>
+                }
+            </div>
+        }
+    </section>
+}
+
+@code {
+    [Parameter]
+    public Guid? Id { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? Ok { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? Fehler { get; set; }
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private IReadOnlyList<PortalKurs> kurse = [];
+    private VibeVHS.Domain.Programm.Kurs? kurs;
+    private IReadOnlyList<PortalUnterlage> unterlagen = [];
+    private string? fehler;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            if (Id is { } id)
+            {
+                kurs = await Portal.KursAsync(id);
+                unterlagen = await Portal.UnterlagenAsync(id);
+            }
+            else
+            {
+                kurse = await Portal.KurseAsync();
+            }
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+            HttpContext.Response.StatusCode = f.Status;
+        }
+    }
+
+    private async Task ZurueckziehenAsync(Guid unterlageId)
+    {
+        await Portal.UnterlageZurueckziehenAsync(unterlageId);
+        unterlagen = await Portal.UnterlagenAsync(Id!.Value);
+        Ok = "Unterlage zurückgezogen; der Link ist gesperrt.";
+    }
+}

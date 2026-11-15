@@ -47,6 +47,8 @@ public static class Registrierung
         dienste.AddSingleton<Shop.ShopZwischenspeicher>();
         dienste.AddScoped<Shop.ShopDienst>();
         dienste.AddScoped<Shop.Schnellanmeldedienst>();
+        dienste.AddScoped<Portal.PortalVerwaltung>();
+        dienste.AddScoped<Portal.DozentenportalDienst>();
         return dienste;
     }
 }
