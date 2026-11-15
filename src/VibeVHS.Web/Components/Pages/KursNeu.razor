@@ -26,7 +26,7 @@
         <RadzenFormField Text="Semester" Variant="Variant.Outlined"><RadzenDropDown TValue="Guid" @bind-Value="semesterId" Data="@alleSemester" TextProperty="Name" ValueProperty="Id" /></RadzenFormField>
         <RadzenFormField Text="Fachbereich" Variant="Variant.Outlined"><RadzenDropDown TValue="int" @bind-Value="fachbereich" Data="@fachbereiche" TextProperty="Anzeige" ValueProperty="Nr" /></RadzenFormField>
         <RadzenFormField Text="Kursart" Variant="Variant.Outlined">
-            <RadzenDropDown TValue="Guid" @bind-Value="kursartId" @bind-Value:after="OrteNeuBewertenAsync" Data="@kursarten" TextProperty="Name" ValueProperty="Id" />
+            <RadzenDropDown TValue="Guid" @bind-Value="kursartId" @bind-Value:after="KursartGewechseltAsync" Data="@kursarten" TextProperty="Name" ValueProperty="Id" />
         </RadzenFormField>
         <RadzenFormField Text="Mindestzahl" Variant="Variant.Outlined"><RadzenNumeric TValue="int" @bind-Value="min" Min="0" /></RadzenFormField>
         <RadzenFormField Text="Höchstzahl" Variant="Variant.Outlined"><RadzenNumeric TValue="int" @bind-Value="max" Min="1" /></RadzenFormField>
@@ -80,8 +80,8 @@
         }
     </div>
     <div class="vhs-row">
-        <label><input type="checkbox" @bind="ferienAuslassen" @bind:after="OrteNeuBewertenAsync" /> Schulferien NRW auslassen</label>
-        <label><input type="checkbox" @bind="feiertageAuslassen" @bind:after="OrteNeuBewertenAsync" /> Feiertage NRW auslassen</label>
+        <label><input type="checkbox" @bind="ferienAuslassen" @bind:after="OrteNeuBewertenAsync" /> in den Schulferien NRW pausieren <span class="vhs-small vhs-muted">(Vorgabe der Kursart)</span></label>
+        <span class="vhs-small vhs-muted">Gesetzliche Feiertage werden immer ausgelassen.</span>
     </div>
 
     <h3>Ort(e) <span class="vhs-small vhs-muted">– mehrere wählen = hybrid (z. B. Raum + Online)</span></h3>
@@ -159,7 +159,7 @@
     private DateOnly ende = DateOnly.FromDateTime(DateTime.Today.AddDays(90));
     private string beginnText = "18:00";
     private string umfang = "Anzahl";
-    private bool ferienAuslassen = true, feiertageAuslassen = true, rechnet, speichert;
+    private bool ferienAuslassen, rechnet, speichert;
     private readonly List<Guid> ortIds = [];
     private KursVorschau? vorschau;
 
@@ -192,7 +192,7 @@
         }
 
         kursartId = kursarten.FirstOrDefault(k => k.Name == "Sprachkurs")?.Id ?? kursarten.FirstOrDefault()?.Id ?? Guid.Empty;
-        await OrteNeuBewertenAsync();
+        await KursartGewechseltAsync();
     }
 
     private Serienregel? Regel() => TimeOnly.TryParse(beginnText, out var b) && tage.Count > 0
@@ -205,11 +205,16 @@
             Beginn = b,
             DauerMinuten = dauer,
             FerienAuslassen = ferienAuslassen,
-            FeiertageAuslassen = feiertageAuslassen,
             OrtIds = [.. ortIds],
             DozentId = dozent?.PersonId,
         }
         : null;
+
+    private async Task KursartGewechseltAsync()
+    {
+        ferienAuslassen = Kursart?.FerienAuslassen ?? false;
+        await OrteNeuBewertenAsync();
+    }
 
     private async Task OrteNeuBewertenAsync()
     {

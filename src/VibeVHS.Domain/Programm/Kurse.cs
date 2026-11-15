@@ -137,7 +137,7 @@ public sealed class Kursart
     }
 
     public Kursart(string name, Nutzungsart nutzungsart, IEnumerable<string> merkmale, Buchungsrichtlinie richtlinie,
-        Sichtbarkeit sichtbarkeit = Sichtbarkeit.Oeffentlich)
+        Sichtbarkeit sichtbarkeit = Sichtbarkeit.Oeffentlich, bool ferienAuslassen = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         Id = Ids.Neu();
@@ -146,6 +146,7 @@ public sealed class Kursart
         BenoetigteMerkmale = merkmale.ToList();
         Richtlinie = richtlinie;
         Sichtbarkeit = sichtbarkeit;
+        FerienAuslassen = ferienAuslassen;
     }
 
     public Guid Id { get; private set; }
@@ -160,6 +161,9 @@ public sealed class Kursart
     public Buchungsrichtlinie Richtlinie { get; private set; }
 
     public Sichtbarkeit Sichtbarkeit { get; private set; }
+
+    /// <summary>Vorgabe für neue Serien: in den Schulferien pausieren (z. B. Sprachkurse) oder weiterlaufen (z. B. Bewegung).</summary>
+    public bool FerienAuslassen { get; private set; }
 }
 
 public sealed record KursDozent(Guid PersonId, string Name, bool Leitung);

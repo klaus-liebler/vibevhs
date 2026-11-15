@@ -160,7 +160,7 @@
     private string SerieText => kurs?.Serie is not { } s ? "keine (nur Einzeltermine)"
         : $"{string.Join("/", s.Wochentage.Select(KursAnzeige.Wochentag))} {s.Beginn:HH\\:mm}, {s.DauerMinuten} Min., ab {s.Start:dd.MM.yyyy}, "
           + (s.Unbefristet ? $"unbefristet (erzeugt bis {kurs.ErzeugtBis:dd.MM.yyyy}, rollierend)" : s.Anzahl is { } a ? $"{a} Termine" : $"bis {s.Ende:dd.MM.yyyy}")
-          + (s.FerienAuslassen ? ", ohne Schulferien" : "") + (s.FeiertageAuslassen ? ", ohne Feiertage" : "");
+          + (s.FerienAuslassen ? ", pausiert in den Schulferien" : ", läuft in den Schulferien weiter") + ", Feiertage ausgelassen";
 
     protected override async Task OnParametersSetAsync()
     {

@@ -9,7 +9,7 @@
 <div class="vhs-head">
     <div>
         <h1>Ferien und Feiertage (NRW)</h1>
-        <p class="vhs-sub">Feiertage berechnet das System selbst (auch Ostern-abhängige). Schulferien werden hier gepflegt – bitte mit dem Ferienkalender des Schulministeriums NRW abgleichen.</p>
+        <p class="vhs-sub">Feiertage berechnet das System selbst (auch Ostern-abhängige). Schulferien werden hier gepflegt; die Vorgaben stammen aus der amtlichen Ferienordnung NRW. Ob ein Kurs in den Ferien pausiert, legt die Kursart bzw. der Kurs fest.</p>
     </div>
 </div>
 
@@ -18,11 +18,11 @@
         <h2>Schulferien</h2>
         <div class="vhs-tbl">
             <table>
-                <thead><tr><th>Ferien</th><th>von</th><th>bis</th><th>Tage</th></tr></thead>
+                <thead><tr><th>Ferien</th><th>von</th><th>bis</th><th>Tage</th><th>Quelle</th></tr></thead>
                 <tbody>
                     @foreach (var f in ferien)
                     {
-                        <tr><td>@f.Name</td><td class="vhs-mono">@f.Von.ToString("ddd dd.MM.yyyy")</td><td class="vhs-mono">@f.Bis.ToString("ddd dd.MM.yyyy")</td><td>@(f.Bis.DayNumber - f.Von.DayNumber + 1)</td></tr>
+                        <tr><td>@f.Name</td><td class="vhs-mono">@f.Von.ToString("ddd dd.MM.yyyy")</td><td class="vhs-mono">@f.Bis.ToString("ddd dd.MM.yyyy")</td><td>@(f.Bis.DayNumber - f.Von.DayNumber + 1)</td><td class="vhs-small">@if (f.Quelle?.StartsWith("http", StringComparison.Ordinal) == true) { <a href="@f.Quelle" target="_blank" rel="noopener">Ferienordnung NRW</a> } else { @(f.Quelle ?? "–") }</td></tr>
                     }
                 </tbody>
             </table>
@@ -75,7 +75,7 @@
 
     private async Task SpeichernAsync()
     {
-        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().FerienHinzufuegenAsync(new Ferienzeitraum(name!, von!.Value, bis!.Value)));
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().FerienHinzufuegenAsync(new Ferienzeitraum(name!, von!.Value, bis!.Value, quelle: "manuell eingetragen")));
         Hinweise.Notify(NotificationSeverity.Success, "Eingetragen", $"{name} eingetragen.");
         name = null;
         von = bis = null;

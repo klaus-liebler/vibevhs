@@ -23,9 +23,8 @@ public sealed record Serienregel
     /// <summary>1 = jede Woche, 2 = alle zwei Wochen.</summary>
     public int IntervallWochen { get; init; } = 1;
 
-    public bool FerienAuslassen { get; init; } = true;
-
-    public bool FeiertageAuslassen { get; init; } = true;
+    /// <summary>Pausiert die Serie in den Schulferien? Vorgabe aus der Kursart; viele Kurse laufen in den Ferien weiter.</summary>
+    public bool FerienAuslassen { get; init; }
 
     public List<Guid> OrtIds { get; init; } = [];
 
@@ -109,7 +108,8 @@ public static class Seriengenerator
                 }
 
                 var beginn = datum.ToDateTime(regel.Beginn);
-                var grund = regel.FeiertageAuslassen && kalender.Feiertag(datum) is { } f ? $"Feiertag: {f}"
+                // Gesetzliche Feiertage werden immer ausgelassen.
+                var grund = kalender.Feiertag(datum) is { } f ? $"Feiertag: {f}"
                     : regel.FerienAuslassen && kalender.Ferien(datum) is { } fe ? $"Ferien: {fe}"
                     : null;
                 ergebnis.Add(new Serientermin(datum, beginn, beginn.AddMinutes(regel.DauerMinuten), grund));

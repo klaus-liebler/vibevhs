@@ -42,6 +42,7 @@ public class SeriengeneratorTests
         Wochentage = [DayOfWeek.Wednesday],
         Beginn = new TimeOnly(18, 0),
         DauerMinuten = 90,
+        FerienAuslassen = true,
     };
 
     [Fact]
@@ -84,6 +85,31 @@ public class SeriengeneratorTests
 
         termine.ShouldAllBe(t => t.Findet);
         termine.Count.ShouldBe(5);
+    }
+
+    [Fact]
+    public void Feiertage_werden_immer_ausgelassen_auch_wenn_die_Serie_in_den_Ferien_weiterlaeuft()
+    {
+        var kalender = new Kalender([new Ferienzeitraum("Weihnachtsferien", new DateOnly(2026, 12, 23), new DateOnly(2027, 1, 6))]);
+        var regel = new Serienregel
+        {
+            Start = new DateOnly(2026, 12, 21), Ende = new DateOnly(2027, 1, 8), Wochentage = [DayOfWeek.Friday, DayOfWeek.Saturday],
+            Beginn = new TimeOnly(10, 0), DauerMinuten = 60, FerienAuslassen = false,
+        };
+
+        var termine = Seriengenerator.Erzeugen(regel, kalender);
+
+        termine.Single(t => t.Datum == new DateOnly(2026, 12, 26)).AusgelassenWeil.ShouldBe("Feiertag: 2. Weihnachtstag");
+        termine.Single(t => t.Datum == new DateOnly(2027, 1, 1)).AusgelassenWeil.ShouldBe("Feiertag: Neujahr");
+        termine.Where(t => t.Findet).Select(t => t.Datum).ShouldBe(
+            [new DateOnly(2027, 1, 2), new DateOnly(2027, 1, 8)]);
+    }
+
+    [Fact]
+    public void Ferienpause_kommt_als_Vorgabe_aus_der_Kursart()
+    {
+        new Kursart("Sprachkurs", Nutzungsart.Seminar, [], Buchungsrichtlinie.Oeffentlich, ferienAuslassen: true).FerienAuslassen.ShouldBeTrue();
+        new Kursart("Bewegung", Nutzungsart.Bewegung, [], Buchungsrichtlinie.Oeffentlich).FerienAuslassen.ShouldBeFalse();
     }
 
     [Fact]
@@ -245,7 +271,7 @@ public class KursUndPlanungTests
         kurs.SerieFestlegen(new Serienregel
         {
             Start = new DateOnly(2026, 11, 3), Anzahl = 8, Wochentage = [DayOfWeek.Tuesday], Beginn = new TimeOnly(18, 0), DauerMinuten = 90,
-            OrtIds = [raum.Id],
+            OrtIds = [raum.Id], FerienAuslassen = true,
         }, kalender, id => v.Finden(id)!.Anzeige, new DateOnly(2027, 3, 1));
         kurs.Veranstaltungen.Count.ShouldBe(8);
         kurs.Veranstaltungen.ShouldNotContain(x => x.Datum == new DateOnly(2026, 12, 29));

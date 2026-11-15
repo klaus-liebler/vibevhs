@@ -11,7 +11,7 @@ public sealed class Ferienzeitraum
         Bundesland = "NRW";
     }
 
-    public Ferienzeitraum(string name, DateOnly von, DateOnly bisEinschliesslich, string bundesland = "NRW")
+    public Ferienzeitraum(string name, DateOnly von, DateOnly bisEinschliesslich, string bundesland = "NRW", string? quelle = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (bisEinschliesslich < von)
@@ -24,6 +24,7 @@ public sealed class Ferienzeitraum
         Von = von;
         Bis = bisEinschliesslich;
         Bundesland = bundesland;
+        Quelle = string.IsNullOrWhiteSpace(quelle) ? null : quelle.Trim();
     }
 
     public Guid Id { get; private set; }
@@ -36,6 +37,9 @@ public sealed class Ferienzeitraum
     public DateOnly Bis { get; private set; }
 
     public string Bundesland { get; private set; }
+
+    /// <summary>Woher die Angabe stammt, z. B. die amtliche Ferienordnung.</summary>
+    public string? Quelle { get; private set; }
 
     public bool Enthaelt(DateOnly tag) => Von <= tag && tag <= Bis;
 }

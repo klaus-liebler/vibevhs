@@ -53,14 +53,19 @@ internal static class ProgrammDemodaten
         db.Merkmale.AddRange(katalog);
         var m = katalog.ToDictionary(x => x.Schluessel);
 
-        // Schulferien NRW (pflegbar; bitte mit dem Ferienkalender des Schulministeriums NRW abgleichen)
+        // Schulferien NRW nach der amtlichen Ferienordnung (erster und letzter Ferientag)
+        const string Ferienordnung = "https://www.schulministerium.nrw/service/ferienordnung-nrw-bis-2029-30";
         var ferien = new List<Ferienzeitraum>
         {
-            new("Herbstferien", new DateOnly(2026, 10, 17), new DateOnly(2026, 10, 31)),
-            new("Weihnachtsferien", new DateOnly(2026, 12, 23), new DateOnly(2027, 1, 6)),
-            new("Osterferien", new DateOnly(2027, 3, 22), new DateOnly(2027, 4, 3)),
-            new("Pfingstferien", new DateOnly(2027, 5, 18), new DateOnly(2027, 5, 18)),
-            new("Sommerferien", new DateOnly(2027, 7, 19), new DateOnly(2027, 8, 31)),
+            new("Sommerferien 2026", new DateOnly(2026, 7, 20), new DateOnly(2026, 9, 1), quelle: Ferienordnung),
+            new("Herbstferien 2026", new DateOnly(2026, 10, 17), new DateOnly(2026, 10, 31), quelle: Ferienordnung),
+            new("Weihnachtsferien 2026/27", new DateOnly(2026, 12, 23), new DateOnly(2027, 1, 6), quelle: Ferienordnung),
+            new("Osterferien 2027", new DateOnly(2027, 3, 22), new DateOnly(2027, 4, 3), quelle: Ferienordnung),
+            new("Pfingstferien 2027", new DateOnly(2027, 5, 18), new DateOnly(2027, 5, 18), quelle: Ferienordnung),
+            new("Sommerferien 2027", new DateOnly(2027, 7, 19), new DateOnly(2027, 8, 31), quelle: Ferienordnung),
+            new("Herbstferien 2027", new DateOnly(2027, 10, 23), new DateOnly(2027, 11, 6), quelle: Ferienordnung),
+            new("Weihnachtsferien 2027/28", new DateOnly(2027, 12, 24), new DateOnly(2028, 1, 8), quelle: Ferienordnung),
+            new("Osterferien 2028", new DateOnly(2028, 4, 10), new DateOnly(2028, 4, 22), quelle: Ferienordnung),
         };
         db.Ferien.AddRange(ferien);
         var kalender = new Kalender(ferien);
@@ -161,10 +166,10 @@ internal static class ProgrammDemodaten
         // Kursarten mit Nutzungsart, Merkmalen und Vorlage für die Buchungsrichtlinie
         var arten = new Dictionary<string, Kursart>
         {
-            ["Sprache"] = new("Sprachkurs", Nutzungsart.Seminar, [], Buchungsrichtlinie.Oeffentlich),
-            ["Seminar"] = new("Seminar", Nutzungsart.Seminar, [], Buchungsrichtlinie.Oeffentlich),
+            ["Sprache"] = new("Sprachkurs", Nutzungsart.Seminar, [], Buchungsrichtlinie.Oeffentlich, ferienAuslassen: true),
+            ["Seminar"] = new("Seminar", Nutzungsart.Seminar, [], Buchungsrichtlinie.Oeffentlich, ferienAuslassen: true),
             ["Vortrag"] = new("Vortrag", Nutzungsart.Vortrag, [], Buchungsrichtlinie.Oeffentlich),
-            ["Integration"] = new("Integrationskurs", Nutzungsart.Integrationskurs, ["bamf"], Buchungsrichtlinie.Integrationskurs, Sichtbarkeit.Intern),
+            ["Integration"] = new("Integrationskurs", Nutzungsart.Integrationskurs, ["bamf"], Buchungsrichtlinie.Integrationskurs, Sichtbarkeit.Intern, ferienAuslassen: true),
             ["EDV"] = new("EDV-Kurs", Nutzungsart.PcKurs, ["pc"], Buchungsrichtlinie.Oeffentlich),
             ["Bewegung"] = new("Bewegungskurs", Nutzungsart.Bewegung, [], Buchungsrichtlinie.Oeffentlich),
             ["Kochen"] = new("Kochkurs", Nutzungsart.Kueche, ["kueche"], Buchungsrichtlinie.Oeffentlich),
@@ -266,7 +271,7 @@ internal static class ProgrammDemodaten
                 Beginn = TimeOnly.Parse(p.Beginn, System.Globalization.CultureInfo.InvariantCulture),
                 DauerMinuten = p.Minuten,
                 OrtIds = ortIds,
-                FerienAuslassen = p.Art != "Fortlaufend",
+                FerienAuslassen = arten[p.Art].FerienAuslassen,
             }, kalender, id => orte.First(o => o.Id == id).Anzeige, horizont);
             kurs.StatusSetzen(p.Status);
             db.Kurse.Add(kurs);
