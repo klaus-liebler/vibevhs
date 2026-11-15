@@ -1,0 +1,250 @@
+@page "/datenschutz"
+@using VibeVHS.Application.Datenschutz
+@using VibeVHS.Domain.Datenschutz
+@using VibeVHS.Domain.Programm
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+
+<PageTitle>Datenschutz · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Datenschutz</h1>
+        <p class="vhs-sub">Archivieren, Sperren, Anonymisieren. Es werden nie Zeilen gelöscht, auf die andere Daten zeigen; Löschläufe brauchen zwei Freigaben durch verschiedene Personen.</p>
+    </div>
+</div>
+
+<section class="vhs-card">
+    <div class="vhs-head">
+        <h2>Löschläufe</h2>
+        <BegruendeterButton Text="Vorschau erstellen" Icon="playlist_add_check" Click="VorschauAsync" IsBusy="@arbeitet"
+                            Freigabe="@(Freigabe.NurFuer(rolle, Rolle.Verwaltungsleitung, Rolle.Leitung, Rolle.Systemverwaltung).Und(() => laeufe.Any(l => l.Status is Loeschlaufstatus.Vorschau or Loeschlaufstatus.TeilweiseFreigegeben) ? Freigabe.Nein("Es wartet bereits ein Löschlauf auf Freigabe. Bitte zuerst freigeben oder verwerfen.") : Freigabe.Ja))" />
+    </div>
+    <p class="vhs-small vhs-muted" style="margin-top:-6px">Regel: Personen ohne Aktivität seit <b>@inaktivMonate</b> Monaten sowie abgelaufene Sperren. Läuft eine Aufbewahrungsfrist, wird gesperrt statt anonymisiert. Monatlich bereitet ein Job automatisch eine Vorschau vor.</p>
+    <div class="vhs-tbl">
+        <table>
+            <thead><tr><th>Erstellt</th><th>Regel</th><th>Treffer</th><th>Freigaben</th><th>Status / Ergebnis</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var l in laeufe)
+                {
+                    <tr>
+                        <td class="vhs-mono vhs-small">@l.ErstelltAm.ToLocalTime().ToString("dd.MM.yyyy HH:mm")<br />@l.ErstelltVon</td>
+                        <td class="vhs-small">@l.Regel</td>
+                        <td class="vhs-small">@l.ZuAnonymisieren anonymisieren<br />@l.ZuSperren sperren</td>
+                        <td class="vhs-small">@(l.Freigabe1Name ?? "–")<br />@(l.Freigabe2Name ?? "–")</td>
+                        <td>
+                            <StatusPille Stil="@(l.Status == Loeschlaufstatus.Ausgefuehrt ? "gut" : l.Status == Loeschlaufstatus.Verworfen ? "neutral" : "warn")">@StatusText(l.Status)</StatusPille>
+                            @if (l.Status == Loeschlaufstatus.Ausgefuehrt)
+                            {
+                                <br /><span class="vhs-small">@l.Anonymisiert anonymisiert, @l.Gesperrt gesperrt, @l.Uebersprungen übersprungen</span>
+                            }
+                        </td>
+                        <td>
+                            @if (l.Status is Loeschlaufstatus.Vorschau or Loeschlaufstatus.TeilweiseFreigegeben)
+                            {
+                                <div class="vhs-row">
+                                    <BegruendeterButton Text="@(l.Freigabe1Kennung is null ? "Freigeben (1/2)" : "Freigeben (2/2) und ausführen")" Size="ButtonSize.Small" Icon="verified"
+                                                        Freigabe="@FreigabeFuer(l)" Click="@(() => FreigebenAsync(l.Id))" IsBusy="@arbeitet" />
+                                    <BegruendeterButton Text="Verwerfen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                                        Freigabe="@(Freigabe.NurFuer(rolle, Rolle.Verwaltungsleitung, Rolle.Leitung, Rolle.Systemverwaltung))" Click="@(() => VerwerfenAsync(l.Id))" />
+                                </div>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="vhs-grid-2">
+    <section class="vhs-card">
+        <h2>Suche nach Kriterien</h2>
+        <div class="vhs-fields">
+            <RadzenFormField Text="Personen ohne Aktivität seit (Monaten)" Variant="Variant.Outlined"><RadzenNumeric TValue="int" @bind-Value="inaktivMonate" Min="1" /></RadzenFormField>
+            <RadzenFormField Text="Kursende vor" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly" @bind-Value="kursendeVor" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+            <RadzenFormField Text="Semester älter als (Monate)" Variant="Variant.Outlined"><RadzenNumeric TValue="int" @bind-Value="semesterMonate" Min="0" /></RadzenFormField>
+        </div>
+        <div class="vhs-row"><RadzenButton Text="Suchen" Icon="search" Click="SuchenAsync" IsBusy="@arbeitet" /></div>
+        @if (inaktive is not null)
+        {
+            <h3>@inaktive.Count Personen ohne Aktivität seit @inaktivMonate Monaten</h3>
+            <div class="vhs-list">
+                @foreach (var p in inaktive.Take(12))
+                {
+                    <div><span class="vhs-mono vhs-small vhs-zeit">@p.LetzteAktivitaet.ToLocalTime().ToString("dd.MM.yyyy")</span><span class="vhs-grow"><a href="@($"personen/{p.Id}")">@p.Anzeigename</a></span><StatusPille Stil="neutral">@DatenschutzAnzeige.Text(p.Status)</StatusPille></div>
+                }
+                @if (inaktive.Count > 12) { <div class="vhs-small vhs-muted">… und @(inaktive.Count - 12) weitere. Ein Löschlauf übernimmt sie alle.</div> }
+            </div>
+        }
+        @if (kurse is not null)
+        {
+            <h3>@kurse.Count Kurse mit Ende vor @kursendeVor.ToString("dd.MM.yyyy")</h3>
+            <div class="vhs-list">
+                @foreach (var k in kurse.Take(12))
+                {
+                    <div><span class="vhs-mono vhs-small vhs-zeit">@k.Ende?.ToString("dd.MM.yyyy")</span><span class="vhs-grow"><a href="@($"kurse/{k.Id}")">@k.Kursnummer @k.Titel</a></span>@if (k.Archiviert) { <StatusPille Stil="neutral">archiviert</StatusPille> }</div>
+                }
+            </div>
+            <BegruendeterButton Text="@($"{kurse.Count(k => !k.Archiviert)} Kurse archivieren")" Icon="inventory_2" Click="KurseArchivierenAsync"
+                                Freigabe="@(Freigabe.NurFuer(rolle, Rolle.Verwaltungsleitung, Rolle.Leitung, Rolle.Fachbereichsleitung).Und(() => kurse.All(k => k.Archiviert) ? Freigabe.Nein("Alle gefundenen Kurse sind schon archiviert.") : Freigabe.Ja))" />
+        }
+        @if (semester is not null)
+        {
+            <h3>@semester.Count Semester mit Ende vor @DateOnly.FromDateTime(DateTime.Today).AddMonths(-semesterMonate).ToString("dd.MM.yyyy")</h3>
+            <div class="vhs-list">
+                @foreach (var s in semester)
+                {
+                    <div><span class="vhs-grow">@s.Name</span>
+                        <BegruendeterButton Text="@(s.Archiviert ? "wiederherstellen" : "archivieren")" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                            Freigabe="@(Freigabe.NurFuer(rolle, Rolle.Verwaltungsleitung, Rolle.Leitung))" Click="@(() => SemesterAsync(s.Id, !s.Archiviert))" />
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="vhs-card">
+        <h2>Aufbewahrungsfristen</h2>
+        <p class="vhs-small vhs-muted" style="margin-top:-6px">Vorschläge – bitte mit dem Datenschutzbeauftragten abstimmen. Solange eine Frist läuft, wird gesperrt statt anonymisiert.</p>
+        <div class="vhs-tbl">
+            <table>
+                <thead><tr><th>Datenart</th><th>Jahre</th><th>Rechtsgrundlage</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var f in fristen)
+                    {
+                        <tr>
+                            <td>@f.Bezeichnung<br /><span class="vhs-small vhs-muted">@f.Hinweis</span></td>
+                            <td>
+                                @if (bearbeitet == f.Schluessel)
+                                {
+                                    <RadzenNumeric TValue="int" @bind-Value="fJahre" Min="0" Style="width:80px" />
+                                    <label class="vhs-small"><input type="checkbox" @bind="fJahresende" /> ab Jahresende</label>
+                                }
+                                else
+                                {
+                                    <span>@f.Jahre@(f.AbJahresende ? " (ab Jahresende)" : "")</span>
+                                }
+                            </td>
+                            <td class="vhs-small">@if (bearbeitet == f.Schluessel) { <RadzenTextBox @bind-Value="fRecht" /> } else { @f.Rechtsgrundlage }</td>
+                            <td>
+                                @if (bearbeitet == f.Schluessel)
+                                {
+                                    <RadzenButton Icon="save" Size="ButtonSize.Small" Click="@(() => FristSpeichernAsync(f))" />
+                                }
+                                else
+                                {
+                                    <BegruendeterButton Text="ändern" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                                        Freigabe="@(Freigabe.NurFuer(rolle, Rolle.Verwaltungsleitung, Rolle.Leitung))"
+                                                        Click="@(() => { bearbeitet = f.Schluessel; fJahre = f.Jahre; fJahresende = f.AbJahresende; fRecht = f.Rechtsgrundlage; })" />
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+@code {
+    private IReadOnlyList<Loeschlauf> laeufe = [];
+    private IReadOnlyList<Aufbewahrungsfrist> fristen = [];
+    private IReadOnlyList<PersonAktivitaet>? inaktive;
+    private IReadOnlyList<KursEnde>? kurse;
+    private IReadOnlyList<Semester>? semester;
+    private int inaktivMonate = 36, semesterMonate = 12, fJahre;
+    private DateOnly kursendeVor = DateOnly.FromDateTime(DateTime.Today.AddMonths(-1));
+    private bool arbeitet, fJahresende;
+    private string? bearbeitet, fRecht;
+    private Benutzer? ich;
+    private Rolle? rolle;
+
+    private Freigabe FreigabeFuer(Loeschlauf l)
+        => Freigabe.NurFuer(rolle, DatenschutzDienst.FreigabeRollen)
+            .Und(() => l.Freigabe1Kennung == ich?.Kennung
+                ? Freigabe.Nein($"Vier-Augen-Prinzip: Sie haben bereits freigegeben. Die zweite Freigabe muss von einer anderen Person kommen (z. B. Leitung).")
+                : Freigabe.Ja);
+
+    protected override async Task OnInitializedAsync()
+    {
+        ich = await Vorgang.BenutzerAsync();
+        rolle = ich.Rolle;
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync()
+    {
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var s = d.GetRequiredService<IDatenschutzSpeicher>();
+            laeufe = await s.LoeschlaeufeAsync();
+            fristen = await s.FristenAsync();
+        });
+    }
+
+    private static string StatusText(Loeschlaufstatus s) => s switch
+    {
+        Loeschlaufstatus.Vorschau => "Vorschau – wartet auf 2 Freigaben",
+        Loeschlaufstatus.TeilweiseFreigegeben => "1 von 2 Freigaben",
+        Loeschlaufstatus.Ausgefuehrt => "ausgeführt",
+        _ => "verworfen",
+    };
+
+    private async Task Ausfuehren(Func<IServiceProvider, Task> arbeit, string erfolg)
+    {
+        arbeitet = true;
+        try
+        {
+            await Vorgang.AusfuehrenAsync(arbeit);
+            Hinweise.Notify(NotificationSeverity.Success, "Erledigt", erfolg);
+            await LadenAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+        finally
+        {
+            arbeitet = false;
+        }
+    }
+
+    private Task VorschauAsync() => Ausfuehren(d => d.GetRequiredService<DatenschutzDienst>().LoeschlaufVorschauAsync(inaktivMonate), "Löschlauf vorbereitet. Er wartet auf zwei Freigaben.");
+
+    private Task FreigebenAsync(Guid id) => Ausfuehren(d => d.GetRequiredService<DatenschutzDienst>().FreigebenAsync(id), "Freigabe erteilt.");
+
+    private Task VerwerfenAsync(Guid id) => Ausfuehren(d => d.GetRequiredService<DatenschutzDienst>().VerwerfenAsync(id), "Löschlauf verworfen.");
+
+    private async Task SuchenAsync()
+    {
+        arbeitet = true;
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var dienst = d.GetRequiredService<DatenschutzDienst>();
+            inaktive = await dienst.InaktivePersonenAsync(inaktivMonate);
+            kurse = await dienst.KurseEndeVorAsync(kursendeVor);
+            semester = await dienst.SemesterAelterAlsAsync(semesterMonate);
+        });
+        arbeitet = false;
+    }
+
+    private async Task KurseArchivierenAsync()
+    {
+        var ids = kurse!.Where(k => !k.Archiviert).Select(k => k.Id).ToList();
+        await Ausfuehren(d => d.GetRequiredService<DatenschutzDienst>().KurseArchivierenAsync(ids), $"{ids.Count} Kurse archiviert (schreibgeschützt, in der Kursliste unter „archivierte“).");
+        await SuchenAsync();
+    }
+
+    private async Task SemesterAsync(Guid id, bool archivieren)
+    {
+        await Ausfuehren(d => d.GetRequiredService<DatenschutzDienst>().SemesterArchivierenAsync(id, archivieren), archivieren ? "Semester archiviert." : "Semester wiederhergestellt.");
+        await SuchenAsync();
+    }
+
+    private async Task FristSpeichernAsync(Aufbewahrungsfrist f)
+    {
+        await Ausfuehren(d => d.GetRequiredService<DatenschutzDienst>().FristAendernAsync(f.Schluessel, fJahre, fJahresende, fRecht ?? f.Rechtsgrundlage, f.Hinweis), "Frist geändert.");
+        bearbeitet = null;
+    }
+}

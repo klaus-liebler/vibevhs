@@ -2,6 +2,8 @@
 @using VibeVHS.Application.Personen
 @using VibeVHS.Application.Postausgang
 @using VibeVHS.Domain.Personen
+@using VibeVHS.Domain.Datenschutz
+@using VibeVHS.Application.Datenschutz
 @inject Vorgang Vorgang
 @inject TimeProvider Uhr
 @inject NotificationService Hinweise
@@ -14,6 +16,30 @@
     <h1>Person nicht gefunden</h1>
     <NaechsteSchritte Schritte="@([new NaechsterSchritt("Zur Personenliste", "personen", Hauptschritt: true)])" />
     return;
+}
+
+@if (person.Datenschutz == Datenschutzstatus.Gesperrt && !sperrzugriff)
+{
+    <h1>Gesperrter Datensatz</h1>
+    <div class="vhs-alert vhs-warn" role="alert">
+        Die Daten dieser Person sind nach Art. 18 DSGVO gesperrt (Aufbewahrungsfrist bis @person.GesperrtBis?.ToString("dd.MM.yyyy")).
+        Einsehen dürfen sie nur Buchhaltung und Integrationskurs-Team; jeder Zugriff wird protokolliert. Ihre Rolle: @rolle?.Anzeigename().
+    </div>
+    <NaechsteSchritte Schritte="@([new NaechsterSchritt("Zur Personenliste", "personen", Hauptschritt: true)])" />
+    return;
+}
+
+@if (person.IstAnonymisiert)
+{
+    <div class="vhs-alert vhs-info">Dieser Datensatz wurde am @person.AnonymisiertAm?.ToLocalTime().ToString("dd.MM.yyyy") anonymisiert. Erhalten sind nur Rollen und Statistikmerkmale (Altersgruppe @person.StatistikAltersgruppe, @person.StatistikGebiet), damit alte Kurse und Statistiken stimmen.</div>
+}
+else if (person.Datenschutz == Datenschutzstatus.Gesperrt)
+{
+    <div class="vhs-alert vhs-warn">Gesperrt bis @person.GesperrtBis?.ToString("dd.MM.yyyy") – Ihr Zugriff wurde protokolliert. Grund: @person.Sperrgrund</div>
+}
+else if (person.Datenschutz == Datenschutzstatus.Archiviert)
+{
+    <div class="vhs-alert vhs-info">Archiviert am @person.ArchiviertAm?.ToLocalTime().ToString("dd.MM.yyyy"): in Listen ausgeblendet. Zum Weiterarbeiten unten im Bereich „Datenschutz“ reaktivieren.</div>
 }
 
 @if (person.ZusammengefuehrtIn is { } zielId)
@@ -148,9 +174,103 @@ else if (dubletten.Count > 0)
     </div>
 </details>
 
+<details class="vhs-card" open="@dsOffen">
+    <summary><b>Datenschutz</b> <span class="vhs-small vhs-muted">– Status @DatenschutzAnzeige.Text(person.Datenschutz) · Auskunft, Archivieren, Löschverlangen</span></summary>
+    <div class="vhs-row">
+        @if (AuskunftFreigabe.Erlaubt)
+        {
+            <a class="rz-button rz-button-sm rz-variant-filled rz-light rz-shade-default" href="@($"personen/{Id}/auskunft.pdf")" download><span class="rz-button-box"><span class="rz-button-text">Auskunft Art. 15 (PDF)</span></span></a>
+            <a class="rz-button rz-button-sm rz-variant-filled rz-light rz-shade-default" href="@($"personen/{Id}/auskunft.json")" download><span class="rz-button-box"><span class="rz-button-text">Auskunft (JSON)</span></span></a>
+        }
+        else
+        {
+            <BegruendeterButton Text="Auskunft Art. 15" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@AuskunftFreigabe" />
+        }
+        @if (person.Datenschutz == Datenschutzstatus.Aktiv)
+        {
+            <BegruendeterButton Text="Archivieren" Icon="inventory_2" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@VerwaltenFreigabe" Click="ArchivierenAsync" />
+        }
+        else if (!person.IstAnonymisiert)
+        {
+            <BegruendeterButton Text="Reaktivieren" Icon="unarchive" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@VerwaltenFreigabe" Click="ReaktivierenAsync" />
+        }
+        <BegruendeterButton Text="Löschverlangen prüfen" Icon="delete_sweep" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                            Freigabe="@(person.IstAnonymisiert ? Freigabe.Nein("Die Person ist bereits anonymisiert.") : VerwaltenFreigabe)" Click="LoeschpruefungAsync" />
+    </div>
+    @if (pruefung is { } pr)
+    {
+        <div class="vhs-alert @(pr.Entscheidung.Aktion == Loeschaktion.Anonymisieren ? "vhs-info" : "vhs-warn")">
+            @if (pr.Entscheidung.Aktion == Loeschaktion.Anonymisieren)
+            {
+                <b>Keine Aufbewahrungspflicht:</b> <span>Die Person wird vollständig anonymisiert (Platzhalter, alle Versionen, Kontaktdaten, Postausgang, Suchindex).</span>
+            }
+            else
+            {
+                <b>Aufbewahrungspflicht bis @pr.Entscheidung.GesperrtBis?.ToString("dd.MM.yyyy"):</b>
+                <span>Telefon, E-Mail, Vollmachten und Einwilligungsnachweise werden sofort gelöscht, der Rest wird gesperrt.</span>
+                <ul class="vhs-kompakt">@foreach (var g in pr.Entscheidung.Gruende) { <li>@g</li> }</ul>
+            }
+            @(person.EMail is null ? "Es ist keine E-Mail-Adresse hinterlegt; das Antwortschreiben bitte per Post." : "Ein Antwortschreiben geht in den Postausgang.")
+        </div>
+        <BegruendeterButton Text="Löschverlangen jetzt ausführen" Icon="delete_forever" ButtonStyle="ButtonStyle.Danger" Freigabe="@VerwaltenFreigabe"
+                            Click="LoeschverlangenAsync" IsBusy="@speichert" />
+    }
+</details>
+
 <NaechsteSchritte Schritte="@folgeschritte" />
 
 @code {
+    private bool sperrzugriff, dsOffen;
+    private Rolle? rolle;
+    private Loeschpruefung? pruefung;
+
+    private Freigabe VerwaltenFreigabe => Freigabe.NurFuer(rolle, Rolle.Teilnehmerservice, Rolle.Verwaltungsleitung, Rolle.Leitung);
+
+    private Freigabe AuskunftFreigabe => rolle is null or Rolle.Fachbereichsleitung
+        ? Freigabe.Nein("Auskünfte nach Art. 15 erstellen Teilnehmerservice, Verwaltung und Leitung.")
+        : Freigabe.Ja;
+
+    private async Task ArchivierenAsync()
+    {
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<DatenschutzDienst>().ArchivierenAsync(Id));
+        Hinweise.Notify(NotificationSeverity.Info, "Archiviert", "Die Person ist archiviert und in Listen ausgeblendet.");
+        await LadenAsync();
+    }
+
+    private async Task ReaktivierenAsync()
+    {
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<DatenschutzDienst>().ReaktivierenAsync(Id));
+        Hinweise.Notify(NotificationSeverity.Success, "Reaktiviert", "Die Person ist wieder aktiv.");
+        await LadenAsync();
+    }
+
+    private async Task LoeschpruefungAsync()
+    {
+        dsOffen = true;
+        pruefung = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<DatenschutzDienst>().PruefenAsync(Id));
+    }
+
+    private async Task LoeschverlangenAsync()
+    {
+        speichert = true;
+        try
+        {
+            var ergebnis = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<DatenschutzDienst>().LoeschverlangenAsync(Id));
+            Hinweise.Notify(NotificationSeverity.Success, "Löschverlangen bearbeitet",
+                ergebnis.Entscheidung.Aktion == Loeschaktion.Anonymisieren ? "Die Person wurde anonymisiert." : $"Kontaktdaten gelöscht, Rest gesperrt bis {ergebnis.Entscheidung.GesperrtBis:dd.MM.yyyy}.");
+            pruefung = null;
+            folgeschritte = ergebnis.AntwortEingereiht
+                ? [new("Antwortschreiben im Postausgang ansehen", "postausgang", Hauptschritt: true), new("Protokoll ansehen", "protokoll")]
+                : [new("Antwort per Brief", "#", Freigabe: Freigabe.Geplant("Der Briefdruck", "I4"), Hauptschritt: true), new("Protokoll ansehen", "protokoll")];
+            sperrzugriff = true;
+            await LadenAsync();
+        }
+        finally
+        {
+            speichert = false;
+        }
+    }
+
     [Parameter]
     public Guid Id { get; set; }
 
@@ -176,7 +296,7 @@ else if (dubletten.Count > 0)
     private IReadOnlyList<PersonZeile> vmTreffer = [];
     private IReadOnlyList<Organisation> organisationen = [];
 
-    private Freigabe VollmachtFreigabe =>
+    private Freigabe VollmachtFreigabe => !Schreibschutz.Erlaubt ? Schreibschutz :
         (vmArt == Bevollmaechtigtenart.Person ? vmPersonId : vmOrganisationId) is null
             ? Freigabe.Nein(vmArt == Bevollmaechtigtenart.Person ? "Bitte die bevollmächtigte Person suchen und auswählen." : "Bitte eine Organisation auswählen.")
             : vmVon is null || string.IsNullOrWhiteSpace(vmNachweis)
@@ -189,7 +309,11 @@ else if (dubletten.Count > 0)
         ? Freigabe.Nein("Für diese Person ist keine E-Mail-Adresse hinterlegt.")
         : Freigabe.Ja;
 
-    private Freigabe AenderungFreigabe =>
+    private Freigabe Schreibschutz => person is { Datenschutz: not Datenschutzstatus.Aktiv } p
+        ? Freigabe.Nein($"Der Datensatz ist {DatenschutzAnzeige.Text(p.Datenschutz)} und daher schreibgeschützt.")
+        : Freigabe.Ja;
+
+    private Freigabe AenderungFreigabe => !Schreibschutz.Erlaubt ? Schreibschutz :
         string.IsNullOrWhiteSpace(neuVorname) || string.IsNullOrWhiteSpace(neuNachname)
             ? Freigabe.Nein("Bitte Vor- und Nachnamen eintragen.")
             : aenderungsdatum is null
@@ -211,6 +335,11 @@ else if (dubletten.Count > 0)
     private async Task LadenAsync()
     {
         person = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenSpeicher>().LadenAsync(Id));
+        rolle ??= (await Vorgang.BenutzerAsync()).Rolle;
+        if (person?.Datenschutz == Datenschutzstatus.Gesperrt && !sperrzugriff)
+        {
+            sperrzugriff = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<DatenschutzDienst>().SperrzugriffAsync(Id));
+        }
         var jetzt = Uhr.GetLocalNow();
         stand = person?.StandAm(DateOnly.FromDateTime(jetzt.Date), jetzt);
         if (stand?.Name is { } name)

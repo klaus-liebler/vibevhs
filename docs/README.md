@@ -140,6 +140,29 @@ Einwilligung, bevorzugt) und E-Mail-Adressen (Art, bevorzugt). Die Kennzeichen �
   Online-Räume, ein Treffpunkt, 40 Kurse über alle Fachbereiche, darunter Integrationskurse, ein hybrider Vortrag und
   ein unbefristeter Kurs mit 10er-Karte.
 
+## Datenschutz (I2a)
+
+- **Zustände einer Person**: aktiv → archiviert (ausgeblendet, umkehrbar) → gesperrt (Art. 18, solange eine
+  Aufbewahrungsfrist läuft; Zugriff nur Buchhaltung und Integrationskurs-Team, jeder Zugriff wird protokolliert) →
+  anonymisiert. Referenzierte Datensätze werden nie gelöscht, sondern **an Ort und Stelle anonymisiert**: eigener
+  Platzhalter je Person in allen bitemporalen Versionen, Kontaktdaten, Einwilligungen, Vollmachten, Suchindex,
+  Postausgang und Dozierendenangaben in Kursen. Übrig bleiben nur Altersgruppe, Geschlecht und Kreis (Statistik).
+- **Protokoll ohne Klarnamen**: Einträge nennen nur Pseudonyme („Person #XXXXXXXX“); die Anzeige löst den aktuellen
+  Namen auf, nach Anonymisierung den Platzhalter.
+- **Archivieren von Semestern und Kursen** (`/datenschutz`, Kursdetail): schreibgeschützt, ausgeblendet, Filter
+  „archivierte Kurse zeigen“, wiederherstellbar. Kriteriensuche: Kursende vor Datum, Semester älter als n Jahre,
+  Personen ohne Aktivität seit n Monaten.
+- **Aufbewahrungsfristen** sind eine pflegbare Tabelle. Die mitgelieferten Werte (z. B. Buchhaltung 10 Jahre ab
+  Jahresende nach § 147 AO / § 257 HGB) sind **Vorschläge** und müssen mit der/dem Datenschutzbeauftragten abgestimmt
+  werden.
+- **Löschläufe**: monatlich erzeugt ein Quartz-Job (oder man selbst) eine Vorschau; ausgeführt wird erst nach zwei
+  Freigaben durch zwei verschiedene Personen (Verwaltungsleitung, Leitung). Das Löschprotokoll enthält nur Zahlen.
+- **Art. 17 Löschverlangen** auf der Personenseite: Prüfung zeigt, was gelöscht und was wegen laufender Frist gesperrt
+  wird; das Antwortschreiben landet im Postausgang.
+- **Art. 15 Auskunft** als PDF (MigraDoc) und JSON: `/personen/{id}/auskunft.pdf` bzw. `.json`.
+- Hinweis zu den Demodaten: Die Massendaten enthalten viele lange inaktive Personen; ein Löschlauf mit 36 Monaten
+  anonymisiert davon über tausend. Zum Ausprobieren eine eigene Datenbank verwenden.
+
 ## Testbenutzer der Pilot-VHS
 
 Die Startdaten liegen in [`tools/Testdaten/testbenutzer-vhs-egs.json`](../tools/Testdaten/testbenutzer-vhs-egs.json)

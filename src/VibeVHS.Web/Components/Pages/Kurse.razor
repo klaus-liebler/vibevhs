@@ -47,6 +47,7 @@
             <RadzenIcon Icon="search" />
             <input type="search" @bind="suche" @bind:event="oninput" @bind:after="LadenAsync" placeholder="Kursnummer oder Titel" aria-label="Kurse suchen" />
         </div>
+        <label class="vhs-small"><input type="checkbox" @bind="archivierte" @bind:after="LadenAsync" /> archivierte Kurse zeigen</label>
     </div>
     <div class="vhs-filter">
         <span class="vhs-filter-lbl">Fachbereich</span>
@@ -98,7 +99,7 @@
     private int? fachbereich;
     private Kursstatus? status;
     private Rolle? rolle;
-    private bool kopieOffen, kopiert;
+    private bool kopieOffen, kopiert, archivierte;
     private Guid? kopieVon, kopieNach;
     private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
 
@@ -126,7 +127,7 @@
     private async Task LadenAsync()
     {
         semester = alleSemester.FirstOrDefault(s => s.Id == semesterId);
-        alle = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IProgrammSpeicher>().KurseAsync(new KursFilter(semesterId, Suche: suche)));
+        alle = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IProgrammSpeicher>().KurseAsync(new KursFilter(semesterId, Suche: suche, Archivierte: archivierte)));
         Filtern();
     }
 

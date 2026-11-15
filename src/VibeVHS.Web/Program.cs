@@ -91,6 +91,12 @@ else
     app.Logger.LogWarning("Startdaten {Datei} nicht gefunden; es gibt keine Benutzerkonten", startdaten);
 }
 
+// Aufbewahrungsfristen (Vorschläge) anlegen, falls die Tabelle leer ist.
+await using (var bereich = app.Services.CreateAsyncScope())
+{
+    await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Datenschutz.DatenschutzDienst>().GrundeinstellungenAsync();
+}
+
 if (app.Configuration.GetValue("Demodaten:Anlegen", false))
 {
     await Demodaten.AnlegenAsync(app.Services);
@@ -143,6 +149,31 @@ app.MapPost("/rolle-wechseln", async (HttpContext http, [FromForm] string rolle,
     var lokal = !ziel.Contains("//", StringComparison.Ordinal) && !ziel.Contains('\\') && !ziel.Contains(':');
     return Results.LocalRedirect("~/" + (lokal ? ziel.TrimStart('/') : string.Empty));
 }).RequireAuthorization();
+// Auskunft nach Art. 15 DSGVO als JSON oder PDF (jede Auskunft wird protokolliert).
+app.MapGet("/personen/{id:guid}/auskunft.{format}", async (Guid id, string format, HttpContext http,
+    VibeVHS.Application.Datenschutz.DatenschutzDienst datenschutz, VibeVHS.Application.Datenschutz.IAuskunftPdf pdf) =>
+{
+    var rolle = MockAnmeldung.AlsBenutzer(http.User)?.Rolle;
+    if (rolle is null or Rolle.Fachbereichsleitung)
+    {
+        return Results.Forbid();
+    }
+
+    var auskunft = await datenschutz.AuskunftAsync(id);
+    var datei = $"auskunft-{VibeVHS.Domain.Datenschutz.Pseudonym.Kurz(id)}-{DateTime.Today:yyyy-MM-dd}";
+    return format switch
+    {
+        "pdf" => Results.File(pdf.Erzeugen(auskunft), "application/pdf", datei + ".pdf"),
+        "json" => Results.File(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(auskunft, new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
+        }), "application/json", datei + ".json"),
+        _ => Results.NotFound(),
+    };
+}).RequireAuthorization();
+
 // Excel-Export der Personenliste mit den aktuellen Filtern. Jeder Export wird protokolliert (DSGVO).
 app.MapGet("/personen/export", async (string? suche, string? rolle, string? status, int? fb, bool? dubletten,
     IPersonenExport export, IAuditProtokoll protokoll, VibeVhsDbContext db, TimeProvider uhr) =>

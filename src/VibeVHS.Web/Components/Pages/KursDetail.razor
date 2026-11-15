@@ -29,6 +29,13 @@
     </div>
 </div>
 
+@if (kurs.Archiviert)
+{
+    <div class="vhs-alert vhs-info">Archiviert am @kurs.ArchiviertAm?.ToLocalTime().ToString("dd.MM.yyyy"): schreibgeschützt und in der Kursliste ausgeblendet.
+        <BegruendeterButton Text="Wiederherstellen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@(Freigabe.NurFuer(rolle, Rolle.Verwaltungsleitung, Rolle.Leitung, Rolle.Fachbereichsleitung))" Click="WiederherstellenAsync" />
+    </div>
+}
+
 <NaechsteSchritte Titel="Wie geht es weiter?" Schritte="@folgeschritte" />
 
 <div class="vhs-grid-2">
@@ -143,7 +150,15 @@
     private string? aBemerkung;
     private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
 
-    private Freigabe Planen => Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Leitung);
+    private Freigabe Planen => kurs?.Archiviert == true
+        ? Freigabe.Nein("Der Kurs ist archiviert und schreibgeschützt. Bitte zuerst wiederherstellen.")
+        : Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Leitung);
+
+    private async Task WiederherstellenAsync()
+    {
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Datenschutz.DatenschutzDienst>().KursWiederherstellenAsync(Id));
+        await LadenAsync();
+    }
 
     private Freigabe VeroeffentlichenFreigabe => Planen.Und(() => kurs!.Status == Kursstatus.Veroeffentlicht
         ? Freigabe.Nein("Der Kurs ist bereits veröffentlicht.")

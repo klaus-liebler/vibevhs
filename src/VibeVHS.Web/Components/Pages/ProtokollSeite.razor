@@ -21,7 +21,15 @@
             <RadzenDataGridColumn TItem="AuditEintrag" Property="@nameof(AuditEintrag.Benutzer)" Title="Wer" Width="220px">
                 <Template Context="e">@e.Benutzer@(e.Rolle is null ? "" : $" ({e.Rolle})")</Template>
             </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="AuditEintrag" Property="@nameof(AuditEintrag.Beschreibung)" Title="Was" />
+            <RadzenDataGridColumn TItem="AuditEintrag" Property="@nameof(AuditEintrag.Beschreibung)" Title="Was">
+                <Template Context="e">
+                    @e.Beschreibung
+                    @if (e.ObjektTyp == "Person" && e.ObjektId is { } pid && namen.TryGetValue(pid, out var n))
+                    {
+                        <br /><a class="vhs-small" href="@($"personen/{pid}")">Bezug: @n</a>
+                    }
+                </Template>
+            </RadzenDataGridColumn>
             <RadzenDataGridColumn TItem="AuditEintrag" Property="@nameof(AuditEintrag.Aktion)" Title="Aktion" Width="220px">
                 <Template Context="e"><span class="vhs-mono vhs-small">@e.Aktion</span></Template>
             </RadzenDataGridColumn>
@@ -45,5 +53,15 @@
     private IReadOnlyList<AuditEintrag> eintraege = [];
 
     protected override async Task OnInitializedAsync()
-        => eintraege = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IAuditProtokoll>().NeuesteAsync(2000));
+    {
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            eintraege = await d.GetRequiredService<IAuditProtokoll>().NeuesteAsync(2000);
+            // Das Protokoll speichert nur Pseudonyme; der aktuelle Name wird zur Anzeige aufgelöst (nach Anonymisierung: Platzhalter).
+            namen = await d.GetRequiredService<VibeVHS.Application.Personen.IPersonenSpeicher>()
+                .AnzeigenamenAsync(eintraege.Where(e => e.ObjektTyp == "Person" && e.ObjektId is not null).Select(e => e.ObjektId!.Value));
+        });
+    }
+
+    private IReadOnlyDictionary<Guid, string> namen = new Dictionary<Guid, string>();
 }

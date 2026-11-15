@@ -134,6 +134,12 @@
             {
                 @Chip($"FB {nr}", n, filter.Fachbereich == nr, () => Setzen(filter with { Fachbereich = filter.Fachbereich == nr ? null : nr }), FachbereichName(nr))
             }
+            <span class="vhs-filter-lbl">Datenschutz</span>
+            @foreach (var (d, n) in z.Datenschutz ?? new Dictionary<VibeVHS.Domain.Datenschutz.Datenschutzstatus, int>())
+            {
+                @Chip(VibeVHS.Domain.Datenschutz.DatenschutzAnzeige.Text(d), n, filter.Datenschutz == d, () => Setzen(filter with { Datenschutz = filter.Datenschutz == d ? null : d }),
+                    "Standardmäßig werden nur aktive Personen gezeigt")
+            }
             <span class="vhs-filter-lbl">Hinweise</span>
             @Chip("mögliche Dubletten", z.DublettenHinweise, filter.NurDublettenHinweise, () => Setzen(filter with { NurDublettenHinweise = !filter.NurDublettenHinweise }))
             @if (z.DublettenHinweise > 0)
