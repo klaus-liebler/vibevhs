@@ -273,3 +273,7 @@ details.vhs-card > summary { cursor: pointer; }
 /* Rücksprung zur Liste (ZurueckZurListe) und zuletzt angesehene Zeile */
 .vhs-zurueck { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; font-size: 14px; color: var(--vhs-muted); text-decoration: none; align-self: flex-start; }
 .vhs-zurueck:hover, .vhs-zurueck:focus-visible { color: var(--vhs-fg); text-decoration: underline; }
+
+/* Einstellungen: Logo-Vorschau */
+.vhs-logo-vorschau { padding: 12px; border: 1px dashed var(--vhs-line); border-radius: 8px; background: #fff; align-self: flex-start; }
+.vhs-logo-vorschau img { display: block; max-height: 64px; max-width: 100%; }

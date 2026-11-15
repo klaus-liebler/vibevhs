@@ -19,6 +19,8 @@
     <!-- Startdaten der Pilot-VHS: wird beim ersten Start in eine leere Datenbank geladen. -->
     <Content Include="..\..\tools\Testdaten\testbenutzer-vhs-egs.json" Link="Startdaten\testbenutzer-vhs-egs.json"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\tools\Testdaten\logo-vhs-egs.png" Link="Startdaten\logo-vhs-egs.png"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

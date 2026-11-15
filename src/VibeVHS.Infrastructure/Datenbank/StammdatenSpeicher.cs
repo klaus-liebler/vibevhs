@@ -5,8 +5,13 @@ using VibeVHS.Domain.Stammdaten;
 
 namespace VibeVHS.Infrastructure.Datenbank;
 
-internal sealed class StammdatenSpeicher(VibeVhsDbContext db) : IStammdaten, IBenutzerkonten
+internal sealed class StammdatenSpeicher(VibeVhsDbContext db) : IStammdaten, IBenutzerkonten, IEinrichtungAendern
 {
+    public Task<Einrichtung?> EinrichtungZumAendernAsync(CancellationToken abbruch = default)
+        => db.Einrichtungen.FirstOrDefaultAsync(e => e.Id == Einrichtung.EinzigeId, abbruch);
+
+    public Task SpeichernAsync(CancellationToken abbruch = default) => db.SaveChangesAsync(abbruch);
+
     public Task<Einrichtung?> EinrichtungAsync(CancellationToken abbruch = default)
         => db.Einrichtungen.AsNoTracking().FirstOrDefaultAsync(e => e.Id == Einrichtung.EinzigeId, abbruch);
 

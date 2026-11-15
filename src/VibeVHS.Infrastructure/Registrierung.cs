@@ -37,6 +37,7 @@ public static class Registrierung
         dienste.AddScoped<StammdatenSpeicher>();
         dienste.AddScoped<IStammdaten>(d => d.GetRequiredService<StammdatenSpeicher>());
         dienste.AddScoped<IBenutzerkonten>(d => d.GetRequiredService<StammdatenSpeicher>());
+        dienste.AddScoped<IEinrichtungAendern>(d => d.GetRequiredService<StammdatenSpeicher>());
         dienste.AddScoped<StartdatenLader>();
         dienste.AddScoped<DublettenSuche>();
         dienste.AddScoped<IDublettenSuche>(d => d.GetRequiredService<DublettenSuche>());

@@ -1,0 +1,112 @@
+@page "/einstellungen"
+@using VibeVHS.Application.Stammdaten
+@using VibeVHS.Domain.Stammdaten
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+
+@* Einstellungen der Einrichtung: Logo (Briefe, Kurs-QR-Bogen, Aushänge) und Website (Fußzeilen). *@
+
+<PageTitle>Einstellungen · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Einstellungen</h1>
+        <p class="vhs-sub">Briefkopf der Einrichtung: Logo und Website erscheinen auf Briefen, Bescheinigungen, Rechnungen und dem Kurs-QR-Bogen.</p>
+    </div>
+</div>
+
+@if (einrichtung is null)
+{
+    <div class="vhs-alert vhs-warn">Es ist noch keine Einrichtung angelegt (Startdaten fehlen).</div>
+}
+else
+{
+    <section class="vhs-card" aria-labelledby="h-logo">
+        <div class="vhs-head"><h2 id="h-logo">Logo</h2><span class="vhs-small vhs-muted">PNG oder JPEG, höchstens @(Einrichtung.LogoMaxBytes / 1024) KB; am besten quer mit transparentem Hintergrund</span></div>
+        @if (einrichtung.Logo is { } logo)
+        {
+            <div class="vhs-logo-vorschau"><img src="@($"data:{(logo[0] == 0x89 ? "image/png" : "image/jpeg")};base64,{Convert.ToBase64String(logo)}")" alt="Aktuelles Logo der Einrichtung" /></div>
+        }
+        else
+        {
+            <p class="vhs-small vhs-muted">Kein Logo hinterlegt – Briefe zeigen dann nur den Namen der Einrichtung.</p>
+        }
+        <div class="vhs-row">
+            @if (recht.Erlaubt)
+            {
+                <label class="vhs-btn vhs-btn-light" for="logo-datei">Logo hochladen …</label>
+                <InputFile id="logo-datei" accept="image/png,image/jpeg" OnChange="LogoHochladenAsync" style="position:absolute;left:-9999px" />
+            }
+            <BegruendeterButton Text="Logo entfernen" Icon="delete" ButtonStyle="ButtonStyle.Light"
+                                Freigabe="@(recht.Und(() => einrichtung.Logo is null ? Freigabe.Nein("Es ist kein Logo hinterlegt.") : Freigabe.Ja))"
+                                Click="@(() => SpeichernAsync(d => d.LogoSetzenAsync(null), "Logo entfernt"))" />
+            @if (!recht.Erlaubt)
+            {
+                <span class="vhs-small vhs-muted">@recht.Begruendung</span>
+            }
+        </div>
+    </section>
+
+    <section class="vhs-card" aria-labelledby="h-web">
+        <div class="vhs-head"><h2 id="h-web">Website</h2><span class="vhs-small vhs-muted">erscheint in Fußzeilen, z. B. www.vhs-egs.de</span></div>
+        <div class="vhs-row">
+            <RadzenTextBox @bind-Value="website" Disabled="@(!recht.Erlaubt)" aria-label="Website" Style="min-width:280px" />
+            <BegruendeterButton Text="Speichern" Icon="save" Freigabe="@recht" Click="@(() => SpeichernAsync(d => d.WebsiteSetzenAsync(website), "Website gespeichert"))" />
+        </div>
+    </section>
+
+    <NaechsteSchritte Schritte="@folgeschritte" />
+}
+
+@code {
+    private Einrichtung? einrichtung;
+    private string? website;
+    private Freigabe recht = Freigabe.Ja;
+    private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        recht = Freigabe.NurFuer((await Vorgang.BenutzerAsync()).Rolle, EinrichtungDienst.Rollen);
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync()
+    {
+        einrichtung = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IStammdaten>().EinrichtungAsync());
+        website = einrichtung?.Website;
+    }
+
+    private async Task LogoHochladenAsync(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            using var strom = e.File.OpenReadStream(Einrichtung.LogoMaxBytes);
+            using var ms = new MemoryStream();
+            await strom.CopyToAsync(ms);
+            await SpeichernAsync(d => d.LogoSetzenAsync(ms.ToArray()), "Logo gespeichert");
+        }
+        catch (IOException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Logo", $"Die Datei ist zu groß (höchstens {Einrichtung.LogoMaxBytes / 1024} KB).");
+        }
+    }
+
+    private async Task SpeichernAsync(Func<EinrichtungDienst, Task> aktion, string meldung)
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => aktion(d.GetRequiredService<EinrichtungDienst>()));
+            Hinweise.Notify(NotificationSeverity.Success, "Einstellungen", meldung);
+            folgeschritte =
+            [
+                new("Kurs-QR-Bogen ansehen", "kurse", "Logo und Website im Kopf und in der Fußzeile prüfen", Hauptschritt: true),
+                new("Protokoll ansehen", "protokoll"),
+            ];
+            await LadenAsync();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Einstellungen", ex.Message);
+        }
+    }
+}

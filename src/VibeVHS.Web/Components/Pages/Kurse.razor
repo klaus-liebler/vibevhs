@@ -21,6 +21,8 @@
         <RadzenButton Text="Raumplan" Icon="calendar_view_week" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("raumplan"))" />
         <a class="vhs-btn vhs-btn-light" href="@($"kurse/qr-bogen.pdf?semester={semesterId}{(fachbereich is { } f ? $"&fb={f}" : "")}")" target="_blank"
            title="Sammel-PDF mit den QR-Codes aller öffentlichen Kurse des gewählten Semesters (und Fachbereichs) für das Programmheft">Kurs-QR-Bogen (PDF)</a>
+        <a class="vhs-btn vhs-btn-light" href="@($"kurse/qr-bogen.pdf?semester={semesterId}{(fachbereich is { } f2 ? $"&fb={f2}" : "")}&schnitt=1")" target="_blank"
+           title="Gleicher Bogen mit gestrichelten Kartenrändern zum Ausschneiden (Aushang, Flyer)">… zum Ausschneiden</a>
     </div>
 </div>
 

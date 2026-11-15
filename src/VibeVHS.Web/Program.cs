@@ -119,6 +119,13 @@ else
     app.Logger.LogWarning("Startdaten {Datei} nicht gefunden; es gibt keine Benutzerkonten", startdaten);
 }
 
+// Logo und Website für Briefe und Aushänge (Einstellungen → Einrichtung).
+await using (var bereich = app.Services.CreateAsyncScope())
+{
+    app.Services.GetRequiredService<VibeVHS.Application.Stammdaten.Briefkopf>()
+        .Uebernehmen(await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Stammdaten.IStammdaten>().EinrichtungAsync());
+}
+
 // Aufbewahrungsfristen (Vorschläge) anlegen, falls die Tabelle leer ist.
 await using (var bereich = app.Services.CreateAsyncScope())
 {
