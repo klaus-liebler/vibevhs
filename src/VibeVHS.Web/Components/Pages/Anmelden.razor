@@ -5,42 +5,85 @@
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Authentication.Cookies
 @using VibeVHS.Adapters.Mocks
+@using VibeVHS.Application.Stammdaten
+@using VibeVHS.Domain.Stammdaten
 @inject NavigationManager Navigation
+@inject Zugangsschutz Schutz
+@inject IBenutzerkonten Konten
+@inject IStammdaten Stammdaten
+@inject ILogger<Anmelden> Log
 
 <PageTitle>Anmelden · VibeVHS</PageTitle>
 
 <div class="vhs-login">
-    <div class="vhs-brand"><b>VibeVHS</b><span>VHS Musterstadt</span></div>
+    <div class="vhs-brand"><b>VibeVHS</b><span>@(einrichtung?.Name ?? "Volkshochschule")</span></div>
     <h1>Anmelden</h1>
     <div class="vhs-alert vhs-warn">
-        <b>Testanmeldung für die Entwicklung.</b> Wählen Sie ein Konto und die Rolle, in der Sie arbeiten möchten.
-        Im Betrieb ersetzt die Anmeldung über die kommunale Benutzerverwaltung (OIDC/SAML) diese Seite.
+        <b>Testanmeldung.</b> Wählen Sie Ihr Konto. Haben Sie mehrere Rollen, wechseln Sie die aktive Rolle nach der
+        Anmeldung oben rechts. Im Betrieb ersetzt die Anmeldung über die kommunale Benutzerverwaltung (OIDC/SAML) diese Seite.
     </div>
+
+    @if (!Schutz.AnmeldungEingerichtet)
+    {
+        <div class="vhs-alert vhs-crit" role="alert">
+            Die Anmeldung ist auf diesem System noch nicht eingerichtet: Es ist kein Zugangscode hinterlegt
+            (Umgebungsvariable <code>Anmeldung__Zugangscode</code>).
+        </div>
+        return;
+    }
 
     @if (Fehler is not null)
     {
         <div class="vhs-alert vhs-crit" role="alert">@Fehler</div>
     }
 
+    @if (konten.Count == 0)
+    {
+        <div class="vhs-alert vhs-crit" role="alert">
+            Es sind noch keine Benutzerkonten angelegt. Die Startdaten (<code>Startdaten:Datei</code>) wurden nicht gefunden.
+        </div>
+    }
+
     <form method="post" @formname="anmelden" @onsubmit="AnmeldenAsync">
         <AntiforgeryToken />
+        @if (Schutz.ZugangscodeNoetig)
+        {
+            <div class="vhs-field" style="max-width:320px">
+                <label class="vhs-lbl" for="zugangscode">Zugangscode für das Testsystem</label>
+                <input id="zugangscode" name="Zugangscode" type="password" autocomplete="current-password" required class="vhs-input" />
+            </div>
+        }
         <div class="vhs-list">
-            @foreach (var konto in MockAnmeldung.Konten)
+            @foreach (var konto in konten)
             {
                 <div>
-                    <span class="vhs-grow"><b>@konto.Name</b><br /><span class="vhs-small vhs-muted">@konto.Kennung</span></span>
-                    <span class="vhs-row">
-                        @foreach (var rolle in konto.Rollen)
+                    <span class="vhs-grow">
+                        <b>@konto.Name</b>@if (konto.Funktion is not null) { <span class="vhs-muted"> · @konto.Funktion</span> }
+                        <br />
+                        <span class="vhs-row" style="gap:4px;margin-top:4px">
+                            @foreach (var rolle in konto.Rollen)
+                            {
+                                <StatusPille Stil="info">@rolle.Anzeigename()</StatusPille>
+                            }
+                            @foreach (var nr in konto.Fachbereiche)
+                            {
+                                <span class="vhs-pill vhs-p-neutral" title="@FachbereichName(nr)">FB @nr</span>
+                            }
+                        </span>
+                        @if (konto.Fachbereiche.Count > 0)
                         {
-                            <button type="submit" name="Auswahl" value="@($"{konto.Kennung}|{rolle}")" class="vhs-btn">
-                                @rolle.Anzeigename()
-                            </button>
+                            <span class="vhs-small vhs-muted">@string.Join("; ", konto.Fachbereiche.Select(FachbereichName))</span>
                         }
                     </span>
+                    <button type="submit" name="Login" value="@konto.Login" class="vhs-btn">Anmelden</button>
                 </div>
             }
         </div>
     </form>
+    <p class="vhs-small vhs-muted">
+        Die Testkonten stammen von der öffentlichen Teamseite der vhs (nur Name und Zuständigkeit, keine Kontaktdaten).
+        Die Rollenzuordnung ist abgeleitet und noch zu bestätigen.
+    </p>
 </div>
 
 @code {
@@ -48,33 +91,54 @@
     private HttpContext HttpContext { get; set; } = default!;
 
     [SupplyParameterFromForm(FormName = "anmelden")]
-    private string? Auswahl { get; set; }
+    private string? Login { get; set; }
+
+    [SupplyParameterFromForm(FormName = "anmelden")]
+    private string? Zugangscode { get; set; }
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
     private string? Fehler { get; set; }
 
+    private IReadOnlyList<Benutzerkonto> konten = [];
+    private IReadOnlyList<Fachbereich> fachbereiche = [];
+    private Einrichtung? einrichtung;
+
+    protected override async Task OnInitializedAsync()
+    {
+        konten = await Konten.AlleAsync();
+        fachbereiche = await Stammdaten.FachbereicheAsync();
+        einrichtung = await Stammdaten.EinrichtungAsync();
+    }
+
+    private string FachbereichName(int nr) => fachbereiche.FirstOrDefault(f => f.Nr == nr)?.Anzeige ?? $"FB {nr}";
+
     private async Task AnmeldenAsync()
     {
-        var teile = (Auswahl ?? string.Empty).Split('|');
-        if (teile.Length != 2
-            || MockAnmeldung.Finden(teile[0]) is not { } konto
-            || !Enum.TryParse<Rolle>(teile[1], out var rolle)
-            || !konto.Rollen.Contains(rolle))
+        if (!Schutz.ZugangscodePruefen(Zugangscode))
         {
-            Fehler = "Diese Kombination aus Konto und Rolle gibt es nicht.";
+            Log.LogWarning("Testanmeldung mit falschem Zugangscode abgelehnt");
+            await Task.Delay(TimeSpan.FromSeconds(1));
+            Fehler = "Der Zugangscode stimmt nicht.";
             return;
         }
 
-        var principal = MockAnmeldung.Anmelden(konto, rolle, CookieAuthenticationDefaults.AuthenticationScheme);
+        if (string.IsNullOrWhiteSpace(Login) || await Konten.FindenAsync(Login) is not { } konto)
+        {
+            Fehler = "Dieses Konto gibt es nicht.";
+            return;
+        }
+
+        var principal = MockAnmeldung.Anmelden(konto.AlsBenutzer(), CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+        Log.LogInformation("Testanmeldung: {Login}", konto.Login);
         Navigation.NavigateTo(SicheresZiel(ReturnUrl));
     }
 
     private static string SicheresZiel(string? ziel)
         => !string.IsNullOrEmpty(ziel) && ziel.StartsWith('/') && !ziel.StartsWith("//", StringComparison.Ordinal)
            && !ziel.StartsWith("/anmelden", StringComparison.OrdinalIgnoreCase)
-            ? ziel
-            : "/";
+            ? ziel.TrimStart('/')
+            : "./";
 }

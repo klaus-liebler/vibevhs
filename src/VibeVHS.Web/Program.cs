@@ -1,6 +1,11 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
+using VibeVHS.Application.Protokoll;
+using VibeVHS.Infrastructure.Startdaten;
 using Radzen;
 using Serilog;
 using VibeVHS.Adapters.Mocks;
@@ -51,14 +56,52 @@ var oeffentlicheAdresse = new Uri(builder.Configuration["OeffentlicheAdresse"] ?
 builder.Services
     .AddVibeVhsAnwendung(oeffentlicheAdresse)
     .AddVibeVhsInfrastruktur(builder.Configuration, builder.Environment.ContentRootPath)
-    .AddVibeVhsMocks();
+    .AddVibeVhsMocks(builder.Configuration);
+
+// Schlüssel für Anmelde-Cookies dauerhaft im Datenverzeichnis halten, damit ein Neustart niemanden abmeldet.
+builder.Services.AddDataProtection()
+    .SetApplicationName("VibeVHS")
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath,
+        builder.Configuration["Speicher:Schluessel"] ?? "data/schluessel")));
+
+// Betrieb hinter einem Reverse Proxy (nginx/Apache), der TLS übernimmt.
+var hinterProxy = builder.Configuration.GetValue("ReverseProxy:Aktiv", false);
+if (hinterProxy)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(o =>
+        o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost);
+}
 
 var app = builder.Build();
 
 await DatenbankInitialisierung.InitialisierenAsync(app.Services);
-if (app.Environment.IsDevelopment())
+
+// Startdaten der VHS (Briefkopf, Fachbereiche, Benutzerkonten). Idempotent: lädt nur, was noch fehlt.
+var startdaten = app.Configuration["Startdaten:Datei"] ?? Path.Combine("Startdaten", "testbenutzer-vhs-egs.json");
+startdaten = Path.IsPathRooted(startdaten) ? startdaten : Path.Combine(AppContext.BaseDirectory, startdaten);
+if (File.Exists(startdaten))
+{
+    await using var bereich = app.Services.CreateAsyncScope();
+    await bereich.ServiceProvider.GetRequiredService<StartdatenLader>().AusDateiLadenAsync(startdaten);
+}
+else
+{
+    app.Logger.LogWarning("Startdaten {Datei} nicht gefunden; es gibt keine Benutzerkonten", startdaten);
+}
+
+if (app.Configuration.GetValue("Demodaten:Anlegen", false))
 {
     await Demodaten.AnlegenAsync(app.Services);
+}
+
+if (hinterProxy)
+{
+    app.UseForwardedHeaders();
+}
+
+if (app.Configuration["PathBase"] is { Length: > 1 } pfad)
+{
+    app.UsePathBase(pfad);
 }
 
 if (!app.Environment.IsDevelopment())
@@ -77,8 +120,25 @@ app.MapStaticAssets();
 app.MapPost("/abmelden", async (HttpContext http) =>
 {
     await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-    return Results.LocalRedirect("/anmelden");
+    return Results.LocalRedirect("~/anmelden");
 });
+app.MapPost("/rolle-wechseln", async (HttpContext http, [FromForm] string rolle, [FromForm] string? zurueck,
+    IAuditProtokoll protokoll, VibeVhsDbContext db) =>
+{
+    if (!Enum.TryParse<Rolle>(rolle, out var neueRolle)
+        || MockAnmeldung.RolleWechseln(http.User, neueRolle, CookieAuthenticationDefaults.AuthenticationScheme) is not { } neu)
+    {
+        return Results.Forbid();
+    }
+
+    await protokoll.ProtokollierenAsync("Anmeldung.RolleGewechselt", $"Aktive Rolle gewechselt zu {neueRolle.Anzeigename()}");
+    await db.SaveChangesAsync();
+    await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, neu);
+
+    var ziel = zurueck ?? string.Empty;
+    var lokal = !ziel.Contains("//", StringComparison.Ordinal) && !ziel.Contains('\\') && !ziel.Contains(':');
+    return Results.LocalRedirect("~/" + (lokal ? ziel.TrimStart('/') : string.Empty));
+}).RequireAuthorization();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

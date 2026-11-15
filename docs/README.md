@@ -28,12 +28,14 @@ cd C:\repos\vibevhs
 dotnet run --project src\VibeVHS.Web --launch-profile http
 ```
 
-Dann im Browser <http://localhost:5189> öffnen und bei der **Testanmeldung** Konto und Rolle wählen
-(Teilnehmerservice, Fachbereichsleitung, Buchhaltung, Integrationskurs-Team).
+Dann im Browser <http://localhost:5189> öffnen und bei der **Testanmeldung** ein Konto wählen. Wer mehrere Rollen hat,
+wechselt die aktive Rolle oben rechts (Leitung, Verwaltungsleitung, Fachbereichsleitung, Teilnehmerservice,
+Buchhaltung, Integrationskurs-Team, Systemverwaltung).
 
 Beim ersten Start wird die SQLite-Datenbank `src/VibeVHS.Web/data/vibevhs.db` angelegt (WAL-Modus, Migrationen
-werden automatisch eingespielt). In der Entwicklungsumgebung kommen fünf Beispielpersonen dazu, darunter
-Anna Becker mit Namenshistorie (Tippfehler korrigiert, später Heirat).
+werden automatisch eingespielt). Danach werden die **Startdaten** der Pilot-VHS geladen (idempotent, nur was fehlt):
+Briefkopf, Fachbereiche 1 bis 8 und die Benutzerkonten samt zugehöriger Person (Rolle Mitarbeitende).
+In der Entwicklungsumgebung kommen fünf fiktive Beispielpersonen dazu, darunter Anna Becker mit Namenshistorie.
 
 Mehr Testdaten (reproduzierbar, fester Startwert):
 
@@ -82,6 +84,26 @@ Erlaubt: Radzen.Blazor, EF Core + SQLite, Serilog, Quartz.NET, xUnit, Shouldly, 
 Nicht verwenden: QuestPDF, Nager.Date, MediatR, AutoMapper, FluentAssertions.
 Versionen zentral in `Directory.Packages.props`.
 
+## Testbenutzer der Pilot-VHS
+
+Die Startdaten liegen in [`tools/Testdaten/testbenutzer-vhs-egs.json`](../tools/Testdaten/testbenutzer-vhs-egs.json)
+(Volkshochschule Emsdetten Greven Saerbeck, NRW; Orte Emsdetten, Greven, Saerbeck).
+
+- Die Testbenutzer stammen von der **öffentlichen Teamseite** der vhs (<https://www.vhs-egs.de/ueber-uns/team-neu>,
+  abgerufen am 15.11.2026). Übernommen sind **nur Name, Funktion und Zuständigkeit**, keine E-Mail-Adressen oder
+  Telefonnummern. Das Testsystem verschickt ohnehin nichts, sondern legt alles in den Postausgang.
+- Die **Rollenzuordnung ist abgeleitet** und muss von Klaus bzw. der Verwaltungsleitung bestätigt werden.
+- Fachbereich 6 heißt auf der Teamseite einmal „Informationstechnologie“ und einmal „Beruf und Wirtschaft“;
+  hier zusammengefasst zu „Beruf, Wirtschaft und Informationstechnologie“.
+- „Was steht an?“ zeigt der Fachbereichsleitung nur Einträge ihrer eigenen Fachbereiche.
+
+## Später: Testsystem auf dem Server
+
+Ziel: <https://liebler.iui.hs-osnabrueck.de/vibevhs> (Pfad-Basis `/vibevhs`, Umgebung `Testsystem`).
+Vor der Testanmeldung schützt ein **gemeinsames Zugangspasswort am Webserver (Basic Auth)**, damit niemand von außen
+ohne Passwort die Konten der echten Teammitglieder auswählen kann. Vorlagen (systemd, nginx mit Basic Auth,
+Ausrollskript) liegen in `deploy/`; umgesetzt wird das in einem späteren Schritt.
+
 ## Nachgetragene Anforderungen
 
 - **Allgemeine Suche umfasst auch Orte** (zusätzlich zu Personen, Kursen und Kursnummern). Die Suche folgt in einer
@@ -90,7 +112,8 @@ Versionen zentral in `Directory.Packages.props`.
 ## Offene Punkte nach Iteration 0
 
 - Docker-Image und `docker-compose.yml` mit Mailpit (bewusst zurückgestellt, zuerst nativer Betrieb)
-- Echte Anmeldung über die kommunale Benutzerverwaltung (OIDC/SAML) statt Mock-Anmeldung
+- Echte Anmeldung über die kommunale Benutzerverwaltung (OIDC/SAML) statt Testanmeldung
+- Bereitstellung auf dem Testserver (siehe oben)
 - Übersetzungsseite `/uebersetzen/{id}` ist ein Platzhalter; Übersetzungsdienst noch nicht angebunden
 - Briefe mit QR-Code „Translate this letter in your language“ (Dokumenterzeugung folgt)
 - Stammdaten bearbeiten (außer Namen), Rollen von Personen, Kurse, Anmeldung per QR-Code

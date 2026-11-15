@@ -1,11 +1,14 @@
 ﻿@inherits LayoutComponentBase
+@using VibeVHS.Application.Stammdaten
+@using VibeVHS.Domain.Stammdaten
 @inject NavigationManager Navigation
+@inject Vorgang Vorgang
 
 <RadzenComponents />
 
 <div class="vhs-app">
     <aside class="vhs-side">
-        <div class="vhs-brand"><b>VibeVHS</b><span>VHS Musterstadt</span></div>
+        <div class="vhs-brand" title="@einrichtung?.Name"><b>VibeVHS</b><span>@(einrichtung?.Kurzname ?? "Volkshochschule")</span></div>
         <nav class="vhs-nav" aria-label="Hauptnavigation">
             @foreach (var gruppe in Navigationspunkte.GroupBy(n => n.Gruppe))
             {
@@ -34,9 +37,32 @@
             </div>
             <AuthorizeView>
                 <Authorized>
+                    @{
+                        var benutzer = VibeVHS.Adapters.Mocks.MockAnmeldung.AlsBenutzer(context.User);
+                    }
                     <div class="vhs-role">
-                        <span>Angemeldet als <b>@context.User.Identity?.Name</b>, Rolle <b>@RolleAnzeige(context.User)</b></span>
-                        <a href="anmelden" class="vhs-link" title="Andere Rolle oder anderes Testkonto wählen">Rolle wechseln</a>
+                        <span>Angemeldet als <b>@benutzer?.Name</b></span>
+                        @if (benutzer is { Rollen.Count: > 1 })
+                        {
+                            <form method="post" action="rolle-wechseln" class="vhs-inline">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="zurueck" value="@AktuellerPfad" />
+                                <label for="rolle-wahl">Rolle</label>
+                                <select id="rolle-wahl" name="rolle" class="vhs-select" onchange="this.form.submit()"
+                                        title="Aktive Rolle wechseln: Aufgaben und Rechte richten sich nach ihr.">
+                                    @foreach (var r in benutzer.Rollen)
+                                    {
+                                        <option value="@r" selected="@(r == benutzer.Rolle)">@r.Anzeigename()</option>
+                                    }
+                                </select>
+                                <noscript><button type="submit" class="vhs-linkbutton">wechseln</button></noscript>
+                            </form>
+                        }
+                        else
+                        {
+                            <span class="vhs-why" tabindex="0" data-why="Ihrem Konto ist nur diese eine Rolle zugeordnet.">Rolle <b>@benutzer?.Rolle?.Anzeigename()</b></span>
+                        }
+                        <a href="anmelden" class="vhs-link" title="Mit einem anderen Testkonto anmelden">Konto wechseln</a>
                         <form method="post" action="abmelden" class="vhs-inline">
                             <AntiforgeryToken />
                             <button type="submit" class="vhs-linkbutton">Abmelden</button>
@@ -78,6 +104,10 @@
         new("Verwaltung", "Protokoll", "protokoll"),
     ];
 
-    private static string RolleAnzeige(System.Security.Claims.ClaimsPrincipal user)
-        => VibeVHS.Adapters.Mocks.MockAnmeldung.AlsBenutzer(user)?.Rolle?.Anzeigename() ?? "keine";
+    private Einrichtung? einrichtung;
+
+    private string AktuellerPfad => Navigation.ToBaseRelativePath(Navigation.Uri);
+
+    protected override async Task OnInitializedAsync()
+        => einrichtung = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IStammdaten>().EinrichtungAsync());
 }

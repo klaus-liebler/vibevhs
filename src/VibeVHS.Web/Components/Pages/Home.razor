@@ -1,7 +1,9 @@
-﻿@page "/"
+@page "/"
 @using VibeVHS.Application.Personen
 @using VibeVHS.Application.Postausgang
 @using VibeVHS.Application.Protokoll
+@using VibeVHS.Application.Stammdaten
+@using VibeVHS.Domain.Stammdaten
 @inject Vorgang Vorgang
 @inject TimeProvider Uhr
 @inject NavigationManager Navigation
@@ -11,7 +13,11 @@
 <div class="vhs-head">
     <div>
         <h1>Guten Tag@(Anrede is null ? "" : ", " + Anrede)</h1>
-        <p class="vhs-sub">@Uhr.GetLocalNow().ToString("dddd, d. MMMM yyyy")</p>
+        <p class="vhs-sub">@Uhr.GetLocalNow().ToString("dddd, d. MMMM yyyy")@if (einrichtung is not null) { <span> · @einrichtung.Name · @einrichtung.OrteAnzeige</span> }</p>
+        @if (eigeneFachbereiche.Count > 0)
+        {
+            <p class="vhs-small vhs-muted" style="margin:4px 0 0">Ihre Fachbereiche: @string.Join("; ", eigeneFachbereiche.Select(f => f.Anzeige))</p>
+        }
     </div>
     <div class="vhs-row">
         <BegruendeterButton Text="Person anlegen" Icon="person_add" Click="@(() => Navigation.NavigateTo("personen?neu=1"))" />
@@ -64,8 +70,10 @@
     private IReadOnlyList<AuditEintrag> letzte = [];
     private IReadOnlyList<NaechsterSchritt> Schritte = [];
     private Rolle? rolle;
+    private Einrichtung? einrichtung;
+    private IReadOnlyList<Fachbereich> eigeneFachbereiche = [];
 
-    private Freigabe KursAnlegen => Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung)
+    private Freigabe KursAnlegen => Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Leitung)
         .Und(() => Freigabe.Geplant("Das Anlegen von Kursen"));
 
     [CascadingParameter]
@@ -79,7 +87,9 @@
             Anrede = zustand.User.FindFirst(VibeVHS.Adapters.Mocks.MockAnmeldung.AnredeClaim)?.Value;
         }
 
-        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        var benutzer = await Vorgang.BenutzerAsync();
+        rolle = benutzer.Rolle;
+        IReadOnlyList<Fachbereich> fachbereiche = [];
         await Vorgang.AusfuehrenAsync(async d =>
         {
             var post = d.GetRequiredService<INachrichtenSpeicher>();
@@ -88,42 +98,12 @@
             zugestellt = await post.AnzahlAsync(NachrichtenStatus.Zugestellt);
             fehlgeschlagen = await post.AnzahlAsync(NachrichtenStatus.Fehlgeschlagen);
             letzte = await d.GetRequiredService<IAuditProtokoll>().NeuesteAsync(8);
+            var stammdaten = d.GetRequiredService<IStammdaten>();
+            einrichtung = await stammdaten.EinrichtungAsync();
+            fachbereiche = await stammdaten.FachbereicheAsync();
         });
 
-        Schritte = SchritteFuer(rolle);
-    }
-
-    private IReadOnlyList<NaechsterSchritt> SchritteFuer(Rolle? r)
-    {
-        var liste = new List<NaechsterSchritt>();
-        if (fehlgeschlagen > 0)
-        {
-            liste.Add(new($"{fehlgeschlagen} fehlgeschlagene Nachricht(en) prüfen", "postausgang?status=Fehlgeschlagen",
-                "Diese Nachrichten wurden nach mehreren Versuchen nicht zugestellt.", Hauptschritt: true));
-        }
-
-        switch (r)
-        {
-            case Rolle.Teilnehmerservice:
-                liste.Add(new("Person anlegen", "personen?neu=1", "Neue Teilnehmende oder Dozierende erfassen", Hauptschritt: liste.Count == 0));
-                liste.Add(new("Anmeldung erfassen", "anmeldung", Freigabe: Freigabe.Geplant("Die Kursanmeldung")));
-                liste.Add(new("Personen durchsuchen", "personen"));
-                break;
-            case Rolle.Fachbereichsleitung:
-                liste.Add(new("Kurse unter Mindestzahl prüfen", "kurse", Freigabe: Freigabe.Geplant("Die Mindestteilnehmerprüfung")));
-                liste.Add(new("Protokoll ansehen", "protokoll", Hauptschritt: liste.Count == 0));
-                break;
-            case Rolle.Buchhaltung:
-                liste.Add(new("Mahnvorschläge freigeben", "finanzen", Freigabe: Freigabe.Geplant("Das Mahnwesen")));
-                liste.Add(new("Postausgang (Übergaben an die Kämmerei)", "postausgang", Hauptschritt: liste.Count == 0));
-                break;
-            case Rolle.IntegrationskursTeam:
-                liste.Add(new("BAMF-Meldungen prüfen", "integration", Freigabe: Freigabe.Geplant("Die BAMF-Schnittstelle")));
-                liste.Add(new("Postausgang ansehen", "postausgang", Hauptschritt: liste.Count == 0));
-                break;
-        }
-
-        liste.Add(new("Postausgang ansehen", "postausgang"));
-        return liste.DistinctBy(s => s.Ziel).ToList();
+        Schritte = WasStehtAn.Fuer(benutzer, fachbereiche, new WasStehtAn.Lage(fehlgeschlagen));
+        eigeneFachbereiche = benutzer.Rolle == Rolle.Fachbereichsleitung ? WasStehtAn.EigeneFachbereiche(benutzer, fachbereiche) : [];
     }
 }

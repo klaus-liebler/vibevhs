@@ -6,6 +6,9 @@ using Quartz;
 using VibeVHS.Application.Personen;
 using VibeVHS.Application.Postausgang;
 using VibeVHS.Application.Protokoll;
+using VibeVHS.Application.Sicherheit;
+using VibeVHS.Application.Stammdaten;
+using VibeVHS.Infrastructure.Startdaten;
 using VibeVHS.Infrastructure.Datenbank;
 using VibeVHS.Infrastructure.Hintergrund;
 
@@ -28,6 +31,10 @@ public static class Registrierung
         dienste.AddScoped<IPersonenSpeicher, PersonenSpeicher>();
         dienste.AddScoped<INachrichtenSpeicher, NachrichtenSpeicher>();
         dienste.AddScoped<IAuditProtokoll, AuditProtokoll>();
+        dienste.AddScoped<StammdatenSpeicher>();
+        dienste.AddScoped<IStammdaten>(d => d.GetRequiredService<StammdatenSpeicher>());
+        dienste.AddScoped<IBenutzerkonten>(d => d.GetRequiredService<StammdatenSpeicher>());
+        dienste.AddScoped<StartdatenLader>();
 
         var takt = konfiguration.GetValue("Postausgang:TaktSekunden", 15);
         dienste.AddQuartz(q =>

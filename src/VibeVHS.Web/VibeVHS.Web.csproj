@@ -12,6 +12,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Startdaten der Pilot-VHS: wird beim ersten Start in eine leere Datenbank geladen. -->
+    <Content Include="..\..\tools\Testdaten\testbenutzer-vhs-egs.json" Link="Startdaten\testbenutzer-vhs-egs.json"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\VibeVHS.Application\VibeVHS.Application.csproj" />
     <ProjectReference Include="..\VibeVHS.Infrastructure\VibeVHS.Infrastructure.csproj" />
     <ProjectReference Include="..\VibeVHS.Adapters.Mocks\VibeVHS.Adapters.Mocks.csproj" />

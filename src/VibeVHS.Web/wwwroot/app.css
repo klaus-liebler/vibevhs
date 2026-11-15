@@ -117,6 +117,8 @@ pre.vhs-code { background: var(--vhs-surface-2); border: 1px solid var(--vhs-lin
 /* Anmeldung und schlichte Seiten */
 .vhs-leer { min-height: 100vh; display: flex; justify-content: center; padding: 48px 16px; }
 .vhs-login { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 16px; background: var(--vhs-surface); border: 1px solid var(--vhs-line); border-radius: 12px; padding: 24px; align-self: flex-start; }
+.vhs-select { padding: 5px 8px; border: 1px solid var(--vhs-line); border-radius: 6px; background: var(--vhs-surface); font: inherit; font-size: 13px; color: var(--vhs-fg); margin-left: 4px; }
+.vhs-input { padding: 8px 10px; border: 1px solid var(--vhs-line); border-radius: 7px; font: inherit; background: var(--vhs-surface); }
 .vhs-btn { display: inline-flex; align-items: center; padding: 7px 12px; border-radius: 7px; border: 1px solid var(--vhs-accent); background: var(--vhs-surface); color: var(--vhs-accent); cursor: pointer; font: inherit; font-weight: 500; }
 .vhs-btn:hover { background: var(--vhs-accent); color: var(--vhs-accent-fg); }
 

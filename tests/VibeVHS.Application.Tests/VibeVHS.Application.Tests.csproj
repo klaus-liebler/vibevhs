@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\VibeVHS.Application\VibeVHS.Application.csproj" />
+    <ProjectReference Include="..\..\src\VibeVHS.Adapters.Mocks\VibeVHS.Adapters.Mocks.csproj" />
   </ItemGroup>
 
 </Project>

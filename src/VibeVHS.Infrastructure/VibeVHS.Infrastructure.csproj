@@ -14,4 +14,8 @@
     <ProjectReference Include="..\VibeVHS.Application\VibeVHS.Application.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="VibeVHS.Infrastructure.Tests" />
+  </ItemGroup>
+
 </Project>

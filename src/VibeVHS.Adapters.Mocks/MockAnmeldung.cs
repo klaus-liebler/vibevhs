@@ -1,52 +1,97 @@
+using System.Globalization;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.Extensions.Options;
 using VibeVHS.Application.Sicherheit;
 
 namespace VibeVHS.Adapters.Mocks;
 
-/// <summary>Ein Testkonto für die Mock-Anmeldung (ersetzt später die kommunale Anmeldung per OIDC/SAML).</summary>
-public sealed record MockKonto(string Kennung, string Name, string Anrede, IReadOnlyList<Rolle> Rollen);
+/// <summary>Konfiguration der Testanmeldung (Abschnitt "Anmeldung" in appsettings).</summary>
+public sealed class TestanmeldungOptionen
+{
+    public const string Abschnitt = "Anmeldung";
 
-/// <summary>
-/// Mock-Anmeldung für Entwicklung und Vorführung: Konto und Rolle werden ausgewählt, ein Passwort gibt es nicht.
-/// Darf nur in der Entwicklungsumgebung aktiv sein.
-/// </summary>
+    /// <summary>
+    /// Optionaler gemeinsamer Zugangscode auf der Anmeldeseite. Gehört NICHT ins Repository,
+    /// sondern in eine Umgebungsvariable (Anmeldung__Zugangscode). Auf dem Testserver schützt
+    /// stattdessen Basic Auth am Webserver; dann bleibt dieser Wert leer.
+    /// </summary>
+    public string? Zugangscode { get; set; }
+
+    /// <summary>Ohne gesetzten Zugangscode ist dann keine Anmeldung möglich.</summary>
+    public bool ZugangscodeErforderlich { get; set; }
+}
+
+/// <summary>Prüft den optionalen Zugangscode der Testanmeldung.</summary>
+public sealed class Zugangsschutz(IOptions<TestanmeldungOptionen> optionen)
+{
+    public bool ZugangscodeNoetig => optionen.Value.ZugangscodeErforderlich || !string.IsNullOrEmpty(optionen.Value.Zugangscode);
+
+    public bool AnmeldungEingerichtet => !optionen.Value.ZugangscodeErforderlich || !string.IsNullOrEmpty(optionen.Value.Zugangscode);
+
+    public bool ZugangscodePruefen(string? eingabe)
+    {
+        if (!ZugangscodeNoetig)
+        {
+            return true;
+        }
+
+        var erwartet = optionen.Value.Zugangscode;
+        if (string.IsNullOrEmpty(erwartet) || string.IsNullOrEmpty(eingabe))
+        {
+            return false;
+        }
+
+        return CryptographicOperations.FixedTimeEquals(
+            SHA256.HashData(Encoding.UTF8.GetBytes(eingabe)),
+            SHA256.HashData(Encoding.UTF8.GetBytes(erwartet)));
+    }
+}
+
+/// <summary>Erzeugen, Auslesen und Rollenwechsel der Anmeldeidentität.</summary>
 public static class MockAnmeldung
 {
     public const string RollenClaim = ClaimTypes.Role;
     public const string KennungClaim = ClaimTypes.NameIdentifier;
     public const string AnredeClaim = "vibevhs:anrede";
+    public const string VerfuegbareRolleClaim = "vibevhs:rolle-verfuegbar";
+    public const string FachbereichClaim = "vibevhs:fachbereich";
 
-    public static IReadOnlyList<MockKonto> Konten { get; } =
-    [
-        new("jkrueger", "Julia Krüger", "Frau Krüger", [Rolle.Teilnehmerservice, Rolle.Fachbereichsleitung]),
-        new("moeztuerk", "Murat Öztürk", "Herr Öztürk", [Rolle.Teilnehmerservice]),
-        new("slorenz", "Sabine Lorenz", "Frau Lorenz", [Rolle.Fachbereichsleitung]),
-        new("tbaumann", "Thomas Baumann", "Herr Baumann", [Rolle.Buchhaltung]),
-        new("nschaefer", "Nina Schäfer", "Frau Schäfer", [Rolle.IntegrationskursTeam]),
-    ];
-
-    public static MockKonto? Finden(string kennung) => Konten.FirstOrDefault(k => k.Kennung == kennung);
-
-    /// <summary>Erzeugt die Identität mit genau einer aktiven Rolle.</summary>
-    public static ClaimsPrincipal Anmelden(MockKonto konto, Rolle aktiveRolle, string authentifizierungsart)
+    /// <summary>Erzeugt die Identität. Die aktive Rolle steht im Rollen-Claim, alle Rollen als "verfügbar".</summary>
+    public static ClaimsPrincipal Anmelden(Benutzer benutzer, string authentifizierungsart)
     {
-        ArgumentNullException.ThrowIfNull(konto);
-        if (!konto.Rollen.Contains(aktiveRolle))
+        ArgumentNullException.ThrowIfNull(benutzer);
+        if (benutzer.Rolle is not { } aktiv || !benutzer.Rollen.Contains(aktiv))
         {
-            throw new InvalidOperationException($"{konto.Name} hat die Rolle {aktiveRolle.Anzeigename()} nicht.");
+            throw new InvalidOperationException($"{benutzer.Name}: Die aktive Rolle muss eine der eigenen Rollen sein.");
         }
 
-        var identitaet = new ClaimsIdentity(
-        [
-            new Claim(KennungClaim, konto.Kennung),
-            new Claim(ClaimTypes.Name, konto.Name),
-            new Claim(AnredeClaim, konto.Anrede),
-            new Claim(RollenClaim, aktiveRolle.ToString()),
-        ], authentifizierungsart, ClaimTypes.Name, RollenClaim);
-        return new ClaimsPrincipal(identitaet);
+        var claims = new List<Claim>
+        {
+            new(KennungClaim, benutzer.Kennung),
+            new(ClaimTypes.Name, benutzer.Name),
+            new(AnredeClaim, benutzer.Name),
+            new(RollenClaim, aktiv.ToString()),
+        };
+        claims.AddRange(benutzer.Rollen.Select(r => new Claim(VerfuegbareRolleClaim, r.ToString())));
+        claims.AddRange(benutzer.ZustaendigeFachbereiche.Select(f => new Claim(FachbereichClaim, f.ToString(CultureInfo.InvariantCulture))));
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, authentifizierungsart, ClaimTypes.Name, RollenClaim));
     }
 
-    /// <summary>Liest Benutzer und aktive Rolle aus einer Identität.</summary>
+    /// <summary>Gleiche Identität mit anderer aktiver Rolle; <c>null</c>, wenn die Rolle nicht zum Benutzer gehört.</summary>
+    public static ClaimsPrincipal? RolleWechseln(ClaimsPrincipal principal, Rolle neueRolle, string authentifizierungsart)
+    {
+        var benutzer = AlsBenutzer(principal);
+        if (benutzer is null || !benutzer.Rollen.Contains(neueRolle))
+        {
+            return null;
+        }
+
+        return Anmelden(benutzer with { Rolle = neueRolle }, authentifizierungsart);
+    }
+
+    /// <summary>Liest Benutzer, aktive und verfügbare Rollen sowie Fachbereiche aus einer Identität.</summary>
     public static Benutzer? AlsBenutzer(ClaimsPrincipal? principal)
     {
         if (principal?.Identity?.IsAuthenticated != true)
@@ -57,6 +102,19 @@ public static class MockAnmeldung
         var kennung = principal.FindFirst(KennungClaim)?.Value ?? principal.Identity.Name ?? "unbekannt";
         var name = principal.Identity.Name ?? kennung;
         Rolle? rolle = Enum.TryParse<Rolle>(principal.FindFirst(RollenClaim)?.Value, out var r) ? r : null;
-        return new Benutzer(kennung, name, rolle);
+        var verfuegbar = principal.FindAll(VerfuegbareRolleClaim)
+            .Select(c => Enum.TryParse<Rolle>(c.Value, out var v) ? v : (Rolle?)null)
+            .OfType<Rolle>()
+            .ToList();
+        if (verfuegbar.Count == 0 && rolle is { } einzige)
+        {
+            verfuegbar.Add(einzige);
+        }
+
+        var fachbereiche = principal.FindAll(FachbereichClaim)
+            .Select(c => int.TryParse(c.Value, CultureInfo.InvariantCulture, out var f) ? f : (int?)null)
+            .OfType<int>()
+            .ToList();
+        return new Benutzer(kennung, name, rolle, verfuegbar, fachbereiche);
     }
 }

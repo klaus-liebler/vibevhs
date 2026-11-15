@@ -492,3 +492,5 @@ data/
 *.db-shm
 *.db-wal
 logs/
+
+deploy/ausgabe/

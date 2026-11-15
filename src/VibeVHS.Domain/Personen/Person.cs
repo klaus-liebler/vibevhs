@@ -25,7 +25,27 @@ public sealed class Person
 
     public DateTimeOffset AngelegtAm { get; private set; }
 
+    /// <summary>Akademischer Grad oder Titel, z. B. "Dr." (nicht Teil des versionierten Namens).</summary>
+    public string? Titel { get; private set; }
+
+    public Personenrolle Rollen { get; private set; }
+
+    /// <summary>Anmeldename, wenn die Person ein Benutzerkonto hat (Mitarbeitende).</summary>
+    public string? Benutzerkennung { get; private set; }
+
     public IReadOnlyCollection<PersonName> Namen => _namen;
+
+    public void RolleHinzufuegen(Personenrolle rolle) => Rollen |= rolle;
+
+    public void TitelSetzen(string? titel) => Titel = string.IsNullOrWhiteSpace(titel) ? null : titel.Trim();
+
+    /// <summary>Verknüpft die Person mit einem Benutzerkonto und macht sie zur Mitarbeitenden.</summary>
+    public void AlsMitarbeitendeVerknuepfen(string benutzerkennung)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(benutzerkennung);
+        Benutzerkennung = benutzerkennung.Trim();
+        RolleHinzufuegen(Personenrolle.Mitarbeitende);
+    }
 
     public static Person Anlegen(string vorname, string nachname, DateOnly nameGueltigAb, DateTimeOffset jetzt,
         DateOnly? geburtsdatum = null, string? eMail = null, string sprache = "de")
