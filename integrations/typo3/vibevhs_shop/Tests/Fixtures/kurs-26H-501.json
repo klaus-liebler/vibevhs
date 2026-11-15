@@ -1,0 +1,158 @@
+{
+  "kurs": {
+    "nummer": "26H-501",
+    "titel": "Englisch A2 – Konversation",
+    "slug": "26h-501-englisch-a2-konversation",
+    "fachbereich": 5,
+    "fachbereichName": "Fremdsprachen",
+    "fachbereichSlug": "fremdsprachen",
+    "semester": "Herbst 2026",
+    "beginn": "2026-09-29T18:00:00",
+    "ende": "2027-01-12T19:30:00",
+    "termine": 12,
+    "zeiten": "Di 18:00–19:30",
+    "ort": "A 1.12 Kursraum, Emsdetten",
+    "entgeltCent": 9800,
+    "ermaessigtCent": 7300,
+    "barrierefrei": true,
+    "onlineBuchbar": true,
+    "geaendertAm": "2026-11-15T10:53:32.7459+00:00"
+  },
+  "beschreibung": null,
+  "bildungsurlaub": null,
+  "minTeilnehmende": 8,
+  "maxTeilnehmende": 14,
+  "stornofristTage": 7,
+  "bearbeitungsgebuehrCent": 0,
+  "warteliste": true,
+  "termine": [
+    {
+      "nummer": 1,
+      "beginn": "2026-09-29T18:00:00",
+      "ende": "2026-09-29T19:30:00",
+      "orte": [
+        "A 1.12 Kursraum"
+      ],
+      "ausgefallen": false
+    },
+    {
+      "nummer": 2,
+      "beginn": "2026-10-06T18:00:00",
+      "ende": "2026-10-06T19:30:00",
+      "orte": [
+        "A 1.12 Kursraum"
+      ],
+      "ausgefallen": false
+    },
+    {
+      "nummer": 3,
+      "beginn": "2026-10-13T18:00:00",
+      "ende": "2026-10-13T19:30:00",
+      "orte": [
+        "A 1.12 Kursraum"
+      ],
+      "ausgefallen": false
+    },
+    {
+      "nummer": 4,
+      "beginn": "2026-11-03T18:00:00",
+      "ende": "2026-11-03T19:30:00",
+      "orte": [
+        "A 1.12 Kursraum"
+      ],
+      "ausgefallen": false
+    },
+    {
+      "nummer": 5,
+      "beginn": "2026-11-10T18:00:00",
+      "ende": "2026-11-10T19:30:00",
+      "orte": [
+        "A 1.12 Kursraum"
+      ],
+      "ausgefallen": false
+    },
+    {
+      "nummer": 6,
+      "beginn": "2026-11-17T18:00:00",
+      "ende": "2026-11-17T19:30:00",
+      "orte": [
+        "A 1.12 Kursraum"
+      ],
+      "ausgefallen": false
+    },
+    {
+      "nummer": 7,
+      "beginn": "2026-11-24T18:00:00",
+      "ende": "2026-11-24T19:30:00",
+      "orte": [
+        "A 1.12 Kursraum"
+      ],
+      "ausgefallen": false
+    },
+    {
+      "nummer": 8,
+      "beginn": "2026-12-01T18:00:00",
+      "ende": "2026-12-01T19:30:00",
+      "orte": [
+        "A 1.12 Kursraum"
+      ],
+      "ausgefallen": false
+    },
+    {
+      "nummer": 9,
+      "beginn": "2026-12-08T18:00:00",
+      "ende": "2026-12-08T19:30:00",
+      "orte": [
+        "A 1.12 Kursraum"
+      ],
+      "ausgefallen": false
+    },
+    {
+      "nummer": 10,
+      "beginn": "2026-12-15T18:00:00",
+      "ende": "2026-12-15T19:30:00",
+      "orte": [
+        "A 1.12 Kursraum"
+      ],
+      "ausgefallen": false
+    },
+    {
+      "nummer": 11,
+      "beginn": "2026-12-22T18:00:00",
+      "ende": "2026-12-22T19:30:00",
+      "orte": [
+        "A 1.12 Kursraum"
+      ],
+      "ausgefallen": false
+    },
+    {
+      "nummer": 12,
+      "beginn": "2027-01-12T18:00:00",
+      "ende": "2027-01-12T19:30:00",
+      "orte": [
+        "A 1.12 Kursraum"
+      ],
+      "ausgefallen": false
+    }
+  ],
+  "orte": [
+    {
+      "name": "A 1.12 Kursraum",
+      "strasse": "Bildungsweg 1",
+      "postleitzahl": "48282",
+      "stadt": "Emsdetten",
+      "wegbeschreibung": "vhs-Haus Emsdetten (fiktiv), Bildungsweg 1, 48282 Emsdetten.\r\nZufahrt über den Bildungsweg; Parkplatz hinter Haus B, Bushaltestelle 100 m entfernt.\r\nHaus A: Haus A liegt direkt an der Straße; Haupteingang mit Rampe, Tresen im Erdgeschoss links.\r\nZum Raum A 1.12: 1. OG, rechts, zweite Tür.\r\nKarte: https://www.openstreetmap.org/?mlat=52.173&mlon=7.5268#map=18/52.173/7.5268",
+      "merkmale": [
+        "Beamer",
+        "Barrierefreier Zugang (DIN 18040)",
+        "Rollstuhlgerechtes WC",
+        "Aufzug",
+        "ÖPNV-Haltestelle",
+        "Parkplätze"
+      ],
+      "barrierefrei": true,
+      "breitengrad": 52.173,
+      "laengengrad": 7.5268
+    }
+  ]
+}

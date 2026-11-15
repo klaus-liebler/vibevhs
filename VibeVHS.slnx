@@ -10,6 +10,7 @@
     <Project Path="tests/VibeVHS.Domain.Tests/VibeVHS.Domain.Tests.csproj" />
     <Project Path="tests/VibeVHS.Application.Tests/VibeVHS.Application.Tests.csproj" />
     <Project Path="tests/VibeVHS.Infrastructure.Tests/VibeVHS.Infrastructure.Tests.csproj" />
+    <Project Path="tests/VibeVHS.Web.Tests/VibeVHS.Web.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/Testdaten/VibeVHS.Testdaten.csproj" />

@@ -1,0 +1,10 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:layout name="Default" />
+<f:section name="Main">
+    <h1>Warenkorb</h1>
+    <!-- Warenkorb und Kasse über die VibeVHS-Buchungs-API (CORS); Personendaten gehen direkt an VibeVHS, nicht an TYPO3. -->
+    <vhs-kurse ansicht="kasse" api="{api}"></vhs-kurse>
+    <noscript><p>Für den Warenkorb wird JavaScript benötigt.</p></noscript>
+    <f:render partial="KontoLink" arguments="{kontoUrl: kontoUrl}" />
+</f:section>
+</html>

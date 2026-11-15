@@ -1,0 +1,40 @@
+# In die Site-Konfiguration übernehmen:  imports: - { resource: "EXT:vibevhs_shop/Configuration/Routes/Default.yaml" }
+# Ergebnis:  /kurse/{kategorie}  (z. B. /kurse/sprachen)   und   /kurse/{nummer}-{titel}  (z. B. /kurse/26h-501-englisch-a2-konversation)
+routeEnhancers:
+  VibevhsKursliste:
+    type: Extbase
+    limitToPages: []
+    extension: VibevhsShop
+    plugin: Kursliste
+    routes:
+      - routePath: '/'
+        _controller: 'Kurs::list'
+      - routePath: '/{kategorie}'
+        _controller: 'Kurs::list'
+        _arguments:
+          kategorie: kategorie
+    defaultController: 'Kurs::list'
+    defaults:
+      kategorie: ''
+    aspects:
+      kategorie:
+        type: PersistedAliasMapper
+        tableName: tx_vibevhsshop_domain_model_kurs
+        routeFieldName: kategorie
+  VibevhsKursdetail:
+    type: Extbase
+    limitToPages: []
+    extension: VibevhsShop
+    plugin: Kursdetail
+    routes:
+      - routePath: '/{kurs}'
+        _controller: 'Kurs::show'
+        _arguments:
+          kurs: kurs
+    defaultController: 'Kurs::show'
+    aspects:
+      # slug = „nummer-titel“ aus VibeVHS (Kleinbuchstaben, Umlaute ausgeschrieben)
+      kurs:
+        type: PersistedAliasMapper
+        tableName: tx_vibevhsshop_domain_model_kurs
+        routeFieldName: slug

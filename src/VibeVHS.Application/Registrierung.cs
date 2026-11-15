@@ -43,6 +43,9 @@ public static class Registrierung
         dienste.AddSingleton<Finanzen.Honorare.IHonorarModell, Finanzen.Honorare.HonorarProUe>();
         dienste.AddSingleton<Finanzen.Honorare.IHonorarModell, Finanzen.Honorare.HonorarBasisUeTeilnehmende>();
         dienste.AddSingleton<Finanzen.Honorare.HonorarModelle>();
+        dienste.TryAddSingleton(new Shop.ShopOptionen());
+        dienste.AddSingleton<Shop.ShopZwischenspeicher>();
+        dienste.AddScoped<Shop.ShopDienst>();
         return dienste;
     }
 }

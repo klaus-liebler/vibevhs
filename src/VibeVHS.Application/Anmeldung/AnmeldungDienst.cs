@@ -16,7 +16,14 @@ namespace VibeVHS.Application.Anmeldung;
 
 /// <summary>Auftrag des Tresen-Assistenten (oder der Online-Anmeldung mit <see cref="Weg"/> = Online).</summary>
 public sealed record AnmeldeAuftrag(Guid PersonId, Guid KursId, Zahlart Zahlart, Guid? BevollmaechtigterId = null, bool Ueberbuchen = false,
-    Buchungsweg? Weg = null);
+    Buchungsweg? Weg = null, Guid? Warenkorb = null);
+
+/// <summary>Im Webshop reservierte Plätze (offene Warenkörbe); sie zählen bei jeder Buchung gegen die Kapazität.</summary>
+public interface IPlatzreservierungen
+{
+    /// <param name="ausserWarenkorb">Die eigenen Reservierungen dieses Warenkorbs nicht mitzählen.</param>
+    Task<int> ReserviertAsync(Guid kursId, Guid? ausserWarenkorb, CancellationToken abbruch = default);
+}
 
 public sealed record AnmeldeErgebnis(Belegung Belegung, Buchungsergebnis Pruefung, Guid? NachrichtId);
 
@@ -67,7 +74,8 @@ public sealed class AnmeldungDienst(
     IAktuellerBenutzer benutzer,
     TimeProvider uhr,
     Durchfuehrung.CheckinZugang zugang,
-    Dokumente.IQrCode qr)
+    Dokumente.IQrCode qr,
+    IPlatzreservierungen? reservierungen = null)
 {
     /// <summary>Rollen, die am Tresen buchen, stornieren und umbuchen dürfen.</summary>
     public static readonly Rolle[] BuchungsRollen = [Rolle.Teilnehmerservice, Rolle.IntegrationskursTeam, Rolle.Verwaltungsleitung, Rolle.Leitung];
@@ -143,7 +151,8 @@ public sealed class AnmeldungDienst(
         var belegungen = await speicher.BelegungenDesKursesAsync(kurs.Id, abbruch);
         var jetzt = uhr.GetLocalNow();
         var bestehend = belegungen.Where(b => b.PersonId == person.Id && b.Offen).Select(b => (Belegungsstatus?)b.Status).FirstOrDefault();
-        var lage = new Buchungslage(belegungen.Count(b => b.HaeltPlatz), belegungen.Count(b => b.Status == Belegungsstatus.Warteliste), bestehend);
+        var reserviert = reservierungen is null ? 0 : await reservierungen.ReserviertAsync(kurs.Id, auftrag.Warenkorb, abbruch);
+        var lage = new Buchungslage(belegungen.Count(b => b.HaeltPlatz) + reserviert, belegungen.Count(b => b.Status == Belegungsstatus.Warteliste), bestehend);
         var pruefung = Buchungspruefung.Pruefen(kurs, person, weg, auftrag.BevollmaechtigterId, lage, jetzt);
         var ueberbuchen = auftrag.Ueberbuchen && pruefung.Ueberbuchbar;
         if (!pruefung.Moeglich && !(pruefung.Code == Buchungscode.Ausgebucht && ueberbuchen))
@@ -377,13 +386,34 @@ public sealed class AnmeldungDienst(
     public async Task<Stornoregel> StornierenAsync(Guid belegungId, string grund, CancellationToken abbruch = default)
     {
         var wer = await BuchendeRolleAsync(abbruch);
+        return await StornoAusfuehrenAsync(await BelegungAsync(belegungId, abbruch), grund, wer.Anzeige, abbruch);
+    }
+
+    /// <summary>Abmeldung durch die Person selbst (Kundenkonto im Webshop): nur eigene Belegungen, Regeln wie am Tresen (AGB).</summary>
+    public async Task<Stornoregel> SelbstStornierenAsync(Guid belegungId, Guid personId, string grund, CancellationToken abbruch = default)
+    {
         var b = await BelegungAsync(belegungId, abbruch);
+        if (b.PersonId != personId)
+        {
+            throw new InvalidOperationException("Diese Belegung gehört nicht zu Ihrem Konto.");
+        }
+
+        if (!b.Offen)
+        {
+            throw new InvalidOperationException("Diese Belegung ist bereits beendet oder storniert.");
+        }
+
+        return await StornoAusfuehrenAsync(b, grund, "Webshop (Kundenkonto)", abbruch);
+    }
+
+    private async Task<Stornoregel> StornoAusfuehrenAsync(Belegung b, string grund, string von, CancellationToken abbruch)
+    {
         var kurs = await KursAsync(b.KursId, abbruch);
         var belegungen = await speicher.BelegungenDesKursesAsync(kurs.Id, abbruch);
         var jetzt = uhr.GetLocalNow();
         var regel = Buchungspruefung.Storno(b, kurs, jetzt);
         var hielt = b.HaeltPlatz;
-        b.Stornieren(regel.GebuehrCent, string.IsNullOrWhiteSpace(grund) ? "ohne Angabe" : grund.Trim(), wer.Anzeige, jetzt);
+        b.Stornieren(regel.GebuehrCent, string.IsNullOrWhiteSpace(grund) ? "ohne Angabe" : grund.Trim(), von, jetzt);
         await protokoll.ProtokollierenAsync("Anmeldung.Storniert",
             $"{Pseudonym.Person(b.PersonId)} von {kurs.Kursnummer} abgemeldet · {regel.Erklaerung} · Gebühr {regel.Gebuehr}", nameof(Person), b.PersonId, abbruch: abbruch);
         var person = await personen.LadenAsync(b.PersonId, abbruch);

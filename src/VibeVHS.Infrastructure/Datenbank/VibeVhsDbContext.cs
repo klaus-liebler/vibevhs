@@ -173,6 +173,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
         Finanzen.FinanzMapping.Anwenden(modelBuilder);
         Integration.IntegrationMapping.Anwenden(modelBuilder);
         Betrieb.BetriebMapping.Anwenden(modelBuilder);
+        Shop.ShopMapping.Anwenden(modelBuilder);
 
         modelBuilder.Entity<VibeVHS.Domain.Datenschutz.Aufbewahrungsfrist>(b =>
         {

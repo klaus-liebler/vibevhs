@@ -1,0 +1,29 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+    public: false
+
+  Vhs\VibevhsShop\:
+    resource: '../Classes/*'
+    exclude: '../Classes/Domain/Model/*'
+
+  # Server-zu-Server-Abgleich: Basis-URL der Buchungs-API und Ordner (pid) für die Kurse aus der Umgebung,
+  # z. B. VIBEVHS_API_URL=https://liebler.iui.hs-osnabrueck.de/vibevhs/api/v1/shop
+  Vhs\VibevhsShop\Service\ApiKursQuelle:
+    arguments:
+      $basis: '%env(VIBEVHS_API_URL)%'
+
+  Vhs\VibevhsShop\Service\DatenbankKursSpeicher:
+    arguments:
+      $pid: '%env(int:VIBEVHS_SPEICHER_PID)%'
+
+  Vhs\VibevhsShop\Service\KursQuelle: '@Vhs\VibevhsShop\Service\ApiKursQuelle'
+  Vhs\VibevhsShop\Service\KursSpeicher: '@Vhs\VibevhsShop\Service\DatenbankKursSpeicher'
+
+  # Als Scheduler-Task nutzbar („Execute console commands“)
+  Vhs\VibevhsShop\Command\AbgleichCommand:
+    tags:
+      - name: console.command
+        command: 'vibevhs:abgleich'
+        schedulable: true

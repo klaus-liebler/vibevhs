@@ -15,7 +15,7 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261115102612_Betrieb";
+    public override string LastMigrationId => "20261115104637_Shop";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -3058,6 +3058,168 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.HasIndex("KursId");
 
                 b.ToTable("Veranstaltungen");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Shop.Kursstand", b =>
+            {
+                b.Property<Guid>("KursId")
+                    .HasColumnType("TEXT");
+
+                b.Property<bool>("Entfernt")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("GeaendertAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Hash")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Kursnummer")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.HasKey("KursId");
+
+                b.ToTable("Kursstaende");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Shop.Shopbuchung", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("AnfrageHash")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Einwilligungen")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Idempotenzschluessel")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("KontoId")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("MandatId")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("PersonId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Positionen")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("WarenkorbId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Zahlart")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("Zeitpunkt")
+                    .HasColumnType("INTEGER");
+
+                b.HasKey("Id");
+
+                b.HasIndex("Idempotenzschluessel")
+                    .IsUnique();
+
+                b.HasIndex("WarenkorbId");
+
+                b.ToTable("Shopbuchungen");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Shop.Shopkonto", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("BestaetigtAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("EMail")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErstelltAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<DateOnly?>("Geburtsdatum")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Nachname")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("PersonId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Sprache")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("TokenGueltigBis")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("TokenHash")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Vorname")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("EMail")
+                    .IsUnique();
+
+                b.HasIndex("TokenHash");
+
+                b.ToTable("Shopkonten");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Shop.Warenkorb", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("AbgeschlossenAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("ErstelltAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<Guid?>("KontoId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Positionen")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ReserviertBis")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("Status");
+
+                b.ToTable("Warenkoerbe");
             });
 
         modelBuilder.Entity("VibeVHS.Domain.Stammdaten.Einrichtung", b =>

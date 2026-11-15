@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kursangebot – Demo der Web-Komponente vhs-kurse</title>
+  <link rel="stylesheet" href="seite.css">
+  <script type="module" src="shop.js"></script>
+  <style>
+    /* Beispiel: Anpassung an das Erscheinungsbild der VHS-Website über CSS-Variablen */
+    vhs-kurse { --vhs-farbe: #00506b; --vhs-schrift: Georgia, serif; --vhs-radius: 2px; }
+  </style>
+</head>
+<body>
+  <a class="sprung" href="#kurse">Zum Kursangebot springen</a>
+  <header>
+    <p><strong>Volkshochschule Musterstadt</strong> · Demoseite</p>
+  </header>
+  <main id="kurse">
+    <h1>Unser Kursangebot</h1>
+    <p>Diese Seite zeigt die Web-Komponente <code>&lt;vhs-kurse&gt;</code>, wie sie auf der Website einer VHS eingebunden wird:
+      <code>&lt;script type="module" src="…/shop/shop.js"&gt;&lt;/script&gt;</code> und <code>&lt;vhs-kurse&gt;&lt;/vhs-kurse&gt;</code>.
+      Kasse wahlweise in der Komponente oder auf der Kassenseite von VibeVHS (<code>kasse="extern"</code>).</p>
+    <vhs-kurse></vhs-kurse>
+  </main>
+  <footer><p>Barrierefreiheit: Die Komponente ist per Tastatur bedienbar und für Screenreader ausgezeichnet (Ziel: BITV 2.0 / WCAG 2.2 AA).</p></footer>
+</body>
+</html>

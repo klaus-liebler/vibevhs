@@ -1,0 +1,55 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:layout name="Default" />
+<f:section name="Main">
+    <article class="vibevhs-kurs">
+        <h1>{kurs.titel}</h1>
+        <p>Kursnummer {kurs.nummer} · {kurs.fachbereichName} · {kurs.semester}</p>
+        <f:if condition="{kurs.beschreibung}"><p>{kurs.beschreibung}</p></f:if>
+        <p><strong>Entgelt:</strong>
+            <f:if condition="{kurs.entgelt} !== null">
+                <f:then><f:format.currency currencySign="€" decimalSeparator="," thousandsSeparator=".">{kurs.entgelt}</f:format.currency></f:then>
+                <f:else>auf Anfrage</f:else>
+            </f:if>
+            <f:if condition="{kurs.ermaessigt} !== null">, ermäßigt <f:format.currency currencySign="€" decimalSeparator="," thousandsSeparator=".">{kurs.ermaessigt}</f:format.currency></f:if>
+        </p>
+
+        <f:if condition="{kurs.onlineBuchbar}">
+            <f:then>
+                <!-- Verfügbarkeit, Warenkorb und Kasse live aus VibeVHS; ohne JavaScript bleibt der Hinweis darunter. -->
+                <vhs-kurse ansicht="buchen" kurs="{kurs.nummer}" api="{api}" kasse="extern"></vhs-kurse>
+                <noscript><p>Zur Online-Buchung wird JavaScript benötigt. Sie können auch telefonisch oder am Tresen der vhs buchen.</p></noscript>
+            </f:then>
+            <f:else><p>Dieser Kurs ist online nicht buchbar. Bitte wenden Sie sich an die vhs.</p></f:else>
+        </f:if>
+
+        <table>
+            <caption>Termine ({detail.termine -> f:count()})</caption>
+            <thead><tr><th scope="col">Nr.</th><th scope="col">Datum</th><th scope="col">Uhrzeit</th><th scope="col">Ort</th></tr></thead>
+            <tbody>
+                <f:for each="{detail.termine}" as="t">
+                    <tr>
+                        <td>{t.nummer}</td>
+                        <td><f:format.date format="d.m.Y">{t.beginn}</f:format.date><f:if condition="{t.ausgefallen}"> (fällt aus)</f:if></td>
+                        <td><f:format.date format="H:i">{t.beginn}</f:format.date>–<f:format.date format="H:i">{t.ende}</f:format.date></td>
+                        <td><f:for each="{t.orte}" as="o" iteration="i">{o}<f:if condition="{i.isLast}"><f:else>, </f:else></f:if></f:for></td>
+                    </tr>
+                </f:for>
+            </tbody>
+        </table>
+
+        <f:for each="{detail.orte}" as="ort">
+            <section>
+                <h2>{ort.name}</h2>
+                <f:if condition="{ort.strasse}"><p>{ort.strasse}, {ort.postleitzahl} {ort.stadt}</p></f:if>
+                <p><strong>Wegbeschreibung:</strong> <f:format.nl2br>{ort.wegbeschreibung}</f:format.nl2br></p>
+                <f:if condition="{ort.merkmale}">
+                    <p><strong>Ausstattung und Zugang:</strong></p>
+                    <ul><f:for each="{ort.merkmale}" as="m"><li>{m}</li></f:for></ul>
+                </f:if>
+            </section>
+        </f:for>
+        <p><f:link.action action="list" pluginName="Kursliste">Zurück zur Kursliste</f:link.action></p>
+        <f:render partial="KontoLink" arguments="{kontoUrl: kontoUrl}" />
+    </article>
+</f:section>
+</html>

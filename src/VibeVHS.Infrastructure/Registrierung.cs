@@ -61,6 +61,9 @@ public static class Registrierung
         dienste.AddScoped<Application.Betrieb.ISicherung, Betrieb.SqliteSicherung>();
         dienste.AddScoped<Application.Betrieb.IImportSpeicher, Betrieb.ImportSpeicher>();
         dienste.AddScoped<Application.Finanzen.IFinanzprotokoll, Finanzen.Finanzprotokoll>();
+        dienste.AddScoped<Shop.ShopSpeicher>();
+        dienste.AddScoped<Application.Shop.IShopSpeicher>(d => d.GetRequiredService<Shop.ShopSpeicher>());
+        dienste.AddScoped<Application.Anmeldung.IPlatzreservierungen>(d => d.GetRequiredService<Shop.ShopSpeicher>());
         dienste.AddScoped<Anmeldung.AnmeldungSpeicher>();
         dienste.AddScoped<Application.Anmeldung.IAnmeldungSpeicher>(d => d.GetRequiredService<Anmeldung.AnmeldungSpeicher>());
         dienste.AddScoped<Application.Anmeldung.IVorlagenSpeicher>(d => d.GetRequiredService<Anmeldung.AnmeldungSpeicher>());
@@ -104,6 +107,10 @@ public static class Registrierung
                 q.AddJob<SicherungJob>(j => j.WithIdentity(SicherungJob.Schluessel));
                 q.AddTrigger(t => t.ForJob(SicherungJob.Schluessel).WithIdentity("sicherung-nachts", "automatik").WithCronSchedule(konfiguration["Sicherung:Zeitplan"] ?? "0 30 1 * * ?"));
             }
+
+            q.AddJob<Shop.ShopJob>(j => j.WithIdentity(Shop.ShopJob.Schluessel));
+            q.AddTrigger(t => t.ForJob(Shop.ShopJob.Schluessel).WithIdentity("shop-minuetlich", "automatik").StartAt(DateTimeOffset.UtcNow.AddSeconds(30))
+                .WithSimpleSchedule(s => s.WithInterval(TimeSpan.FromMinutes(1)).RepeatForever()));
 
             q.AddJob<FinanzJob>(j => j.WithIdentity(FinanzJob.Schluessel));
             q.AddTrigger(t => t.ForJob(FinanzJob.Schluessel).WithIdentity("finanzen-morgens", "automatik").WithCronSchedule("0 30 6 * * ?"));

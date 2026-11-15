@@ -1,0 +1,197 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "VibeVHS Buchungs-API",
+    "version": "1.0.0",
+    "summary": "Öffentliche Kursdaten, Verfügbarkeit, Warenkorb, Buchung und Kundenkonto für Webshop, TYPO3 und Portale.",
+    "description": "Versioniert über den Pfad (/api/v1). Neue Felder können ohne Versionswechsel hinzukommen; Clients ignorieren unbekannte Felder. Fehler kommen als application/problem+json mit maschinenlesbarem `code`. Schreibende Aufrufe brauchen einen Arbeitsnachweis (Proof-of-Work, Header `X-VHS-PoW`). CORS nur für die in `Shop:ErlaubteOrigins` konfigurierten Origins. Es werden nur veröffentlichte, öffentliche Kurse geliefert; gebucht wird mit derselben Buchungsprüfung wie in der Verwaltung (Buchungsweg „Online“)."
+  },
+  "servers": [{ "url": "/api/v1/shop" }],
+  "tags": [
+    { "name": "Kurse" }, { "name": "Warenkorb" }, { "name": "Konto" }, { "name": "Allgemein" }
+  ],
+  "paths": {
+    "/einstellungen": {
+      "get": {
+        "tags": ["Allgemein"], "summary": "Aktuelle Fassungen von AGB, Datenschutz und Mandatstext, Reservierungsdauer, PoW-Schwierigkeit",
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Einstellungen" } } } } }
+      }
+    },
+    "/pow": {
+      "get": {
+        "tags": ["Allgemein"], "summary": "Proof-of-Work-Aufgabe holen",
+        "description": "Gesucht ist eine Zahl n, sodass SHA-256(`challenge:n`) mit `bits` Null-Bits beginnt. Lösung als Header `X-VHS-PoW: challenge:n`. Jede Aufgabe gilt einmal und 5 Minuten.",
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Aufgabe" } } } } }
+      }
+    },
+    "/kurse": {
+      "get": {
+        "tags": ["Kurse"], "summary": "Öffentliche Kurse (Delta-fähig)",
+        "parameters": [
+          { "name": "geaendertSeit", "in": "query", "description": "Nur Kurse, die sich seit diesem Zeitpunkt (ISO 8601) geändert haben; `entfernt` nennt Kurse, die nicht mehr öffentlich sind. Für den nächsten Abgleich `stand` merken.", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "fachbereich", "in": "query", "schema": { "type": "integer" } },
+          { "name": "q", "in": "query", "description": "Volltext in Titel, Nummer und Beschreibung (alle Wörter)", "schema": { "type": "string" } },
+          { "name": "ort", "in": "query", "description": "Ortsname oder Stadt", "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/IfNoneMatch" }
+        ],
+        "responses": {
+          "200": { "description": "OK", "headers": { "ETag": { "$ref": "#/components/headers/ETag" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Kursliste" } } } },
+          "304": { "description": "Unverändert (If-None-Match)" },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "429": { "$ref": "#/components/responses/ZuVieleAnfragen" }
+        }
+      }
+    },
+    "/kurse/{nummer}": {
+      "get": {
+        "tags": ["Kurse"], "summary": "Kursdetails mit Terminen und Orten (Wegbeschreibung, Merkmale wie barrierefrei)",
+        "parameters": [ { "$ref": "#/components/parameters/Nummer" }, { "$ref": "#/components/parameters/IfNoneMatch" } ],
+        "responses": {
+          "200": { "description": "OK", "headers": { "ETag": { "$ref": "#/components/headers/ETag" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/KursDetail" } } } },
+          "304": { "description": "Unverändert" },
+          "404": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/kurse/{nummer}/verfuegbarkeit": {
+      "get": {
+        "tags": ["Kurse"], "summary": "Freie Plätze, Warteliste, Buchbarkeit mit Begründung (30 s zwischengespeichert)",
+        "parameters": [ { "$ref": "#/components/parameters/Nummer" } ],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Verfuegbarkeit" } } } },
+          "404": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/warenkorb": {
+      "post": {
+        "tags": ["Warenkorb"], "summary": "Warenkorb anlegen und Plätze reservieren (15 Minuten, gleitend)",
+        "description": "Ein Warenkorb gilt für eine teilnehmende Person. Ist ein Kurs ausgebucht und führt eine Warteliste, wird die Position als Warteliste angelegt (ohne Reservierung).",
+        "parameters": [ { "$ref": "#/components/parameters/Pow" } ],
+        "security": [ {}, { "konto": [] } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WarenkorbEingabe" } } } },
+        "responses": {
+          "201": { "description": "Angelegt", "headers": { "Location": { "schema": { "type": "string" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Warenkorb" } } } },
+          "404": { "$ref": "#/components/responses/Problem" },
+          "409": { "description": "Nicht buchbar (code `nicht-buchbar`, `buchungscode` wie in der Verwaltung)", "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } } },
+          "428": { "$ref": "#/components/responses/PowFehlt" },
+          "429": { "$ref": "#/components/responses/ZuVieleAnfragen" }
+        }
+      }
+    },
+    "/warenkorb/{id}": {
+      "get": {
+        "tags": ["Warenkorb"], "summary": "Warenkorb mit Restzeit der Reservierung",
+        "parameters": [ { "$ref": "#/components/parameters/Id" } ],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Warenkorb" } } } }, "404": { "$ref": "#/components/responses/Problem" } }
+      }
+    },
+    "/warenkorb/{id}/positionen": {
+      "put": {
+        "tags": ["Warenkorb"], "summary": "Positionen ersetzen (verlängert die Reservierung)",
+        "parameters": [ { "$ref": "#/components/parameters/Id" } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WarenkorbEingabe" } } } },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Warenkorb" } } } },
+          "409": { "$ref": "#/components/responses/Problem" },
+          "410": { "description": "Reservierung abgelaufen (code `reservierung-abgelaufen`)", "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } } }
+        }
+      }
+    },
+    "/warenkorb/{id}/buchen": {
+      "post": {
+        "tags": ["Warenkorb"], "summary": "Warenkorb verbindlich buchen (alles oder nichts)",
+        "description": "Pflicht: Header `Idempotency-Key` (8–100 Zeichen). Dieselbe Anfrage mit demselben Schlüssel liefert dieselbe Antwort (200, `wiederholt: true`); eine abweichende Anfrage mit demselben Schlüssel wird abgelehnt (422 `idempotenz-konflikt`). Gast: `teilnehmer` angeben; mit Konto (Bearer) wird die Person des Kontos gebucht. Einwilligungen `agb` und `datenschutz` (bei Lastschrift auch `sepa`) in der aktuellen Version sind Pflicht, `werbung` optional.",
+        "parameters": [ { "$ref": "#/components/parameters/Id" }, { "$ref": "#/components/parameters/Pow" },
+          { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 8, "maxLength": 100 } } ],
+        "security": [ {}, { "konto": [] } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BuchungsAnfrage" } } } },
+        "responses": {
+          "201": { "description": "Gebucht", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Buchung" } } } },
+          "200": { "description": "Wiederholung mit bekanntem Schlüssel", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Buchung" } } } },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "409": { "$ref": "#/components/responses/Problem" },
+          "410": { "$ref": "#/components/responses/Problem" },
+          "422": { "$ref": "#/components/responses/Problem" },
+          "428": { "$ref": "#/components/responses/PowFehlt" }
+        }
+      }
+    },
+    "/konto/registrierung": {
+      "post": {
+        "tags": ["Konto"], "summary": "Kundenkonto registrieren (Double-Opt-in)",
+        "description": "Antwortet immer 202, auch wenn es die Adresse schon gibt (keine Auskunft über bestehende Konten). Der Bestätigungslink gilt 48 Stunden; unbestätigte Registrierungen werden danach gelöscht. Rate-Limit je IP.",
+        "parameters": [ { "$ref": "#/components/parameters/Pow" } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Registrierung" } } } },
+        "responses": { "202": { "description": "Angenommen" }, "422": { "$ref": "#/components/responses/Problem" }, "428": { "$ref": "#/components/responses/PowFehlt" }, "429": { "$ref": "#/components/responses/ZuVieleAnfragen" } }
+      }
+    },
+    "/konto/anmelden": {
+      "post": {
+        "tags": ["Konto"], "summary": "Test-Identitätsdienst (nur mit Shop:MockIdp): Token für ein bestätigtes Konto",
+        "description": "Platzhalter für den Identitätsdienst der Kommune (OIDC). Das Token wird als `Authorization: Bearer …` gesendet und gilt 1 Stunde.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "eMail": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Token" } } } }, "401": { "$ref": "#/components/responses/Problem" }, "501": { "$ref": "#/components/responses/Problem" } }
+      }
+    },
+    "/konto/buchungen": {
+      "get": {
+        "tags": ["Konto"], "summary": "Eigene Buchungen mit Stornobedingungen", "security": [ { "konto": [] } ],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/KontoBuchung" } } } } }, "401": { "$ref": "#/components/responses/Problem" } }
+      }
+    },
+    "/konto/buchungen/{id}/storno": {
+      "post": {
+        "tags": ["Konto"], "summary": "Eigene Buchung stornieren (nach AGB-Fristen der Buchungsrichtlinie)", "security": [ { "konto": [] } ],
+        "parameters": [ { "$ref": "#/components/parameters/Id" } ],
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "grund": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "Storniert", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Stornoregel" } } } }, "401": { "$ref": "#/components/responses/Problem" }, "409": { "$ref": "#/components/responses/Problem" } }
+      }
+    },
+    "/openapi.json": { "get": { "tags": ["Allgemein"], "summary": "Dieses Dokument", "responses": { "200": { "description": "OK" } } } }
+  },
+  "components": {
+    "securitySchemes": { "konto": { "type": "http", "scheme": "bearer", "description": "Access-Token des Identitätsdienstes (OIDC; vorerst Test-Identitätsdienst)" } },
+    "parameters": {
+      "Nummer": { "name": "nummer", "in": "path", "required": true, "schema": { "type": "string" }, "example": "26H-801" },
+      "Id": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+      "IfNoneMatch": { "name": "If-None-Match", "in": "header", "schema": { "type": "string" } },
+      "Pow": { "name": "X-VHS-PoW", "in": "header", "required": true, "description": "`challenge:zahl` (siehe /pow)", "schema": { "type": "string" } }
+    },
+    "headers": { "ETag": { "schema": { "type": "string" }, "description": "Starker ETag über den Inhalt" } },
+    "responses": {
+      "Problem": { "description": "Fehler", "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } } },
+      "PowFehlt": { "description": "Arbeitsnachweis fehlt oder falsch (code `pow-…`)", "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } } },
+      "ZuVieleAnfragen": { "description": "Rate-Limit erreicht", "headers": { "Retry-After": { "schema": { "type": "integer" } } } }
+    },
+    "schemas": {
+      "Problem": { "type": "object", "properties": { "type": { "type": "string" }, "title": { "type": "string" }, "status": { "type": "integer" }, "detail": { "type": "string" }, "code": { "type": "string" }, "feld": { "type": "string" }, "kursnummer": { "type": "string" }, "buchungscode": { "type": "string" } } },
+      "Einstellungen": { "type": "object", "properties": { "agbVersion": { "type": "string" }, "agbUrl": { "type": "string" }, "datenschutzVersion": { "type": "string" }, "datenschutzUrl": { "type": "string" }, "mandatVersion": { "type": "string" }, "mandatText": { "type": "string" }, "reservierungMinuten": { "type": "integer" }, "einrichtung": { "type": "string" }, "powBits": { "type": "integer" } } },
+      "Aufgabe": { "type": "object", "properties": { "challenge": { "type": "string" }, "bits": { "type": "integer" }, "gueltigSekunden": { "type": "integer" } } },
+      "KursKurz": { "type": "object", "properties": {
+        "nummer": { "type": "string" }, "titel": { "type": "string" }, "slug": { "type": "string", "description": "nummer-titel für URLs" },
+        "fachbereich": { "type": "integer" }, "fachbereichName": { "type": "string" }, "fachbereichSlug": { "type": "string" }, "semester": { "type": "string" },
+        "beginn": { "type": ["string", "null"], "format": "date-time" }, "ende": { "type": ["string", "null"], "format": "date-time" }, "termine": { "type": "integer" },
+        "zeiten": { "type": ["string", "null"], "example": "Do 19:00–20:30" }, "ort": { "type": ["string", "null"] },
+        "entgeltCent": { "type": ["integer", "null"] }, "ermaessigtCent": { "type": ["integer", "null"] }, "barrierefrei": { "type": "boolean" },
+        "onlineBuchbar": { "type": "boolean", "description": "Buchungsrichtlinie erlaubt den Weg „Online“" }, "geaendertAm": { "type": "string", "format": "date-time" } } },
+      "Kursliste": { "type": "object", "properties": { "stand": { "type": "string", "format": "date-time" }, "kurse": { "type": "array", "items": { "$ref": "#/components/schemas/KursKurz" } }, "entfernt": { "type": "array", "items": { "type": "string" } } } },
+      "Termin": { "type": "object", "properties": { "nummer": { "type": "integer" }, "beginn": { "type": "string", "format": "date-time" }, "ende": { "type": "string", "format": "date-time" }, "orte": { "type": "array", "items": { "type": "string" } }, "ausgefallen": { "type": "boolean" } } },
+      "Ort": { "type": "object", "properties": { "name": { "type": "string" }, "strasse": { "type": ["string", "null"] }, "postleitzahl": { "type": ["string", "null"] }, "stadt": { "type": ["string", "null"] }, "wegbeschreibung": { "type": "string" }, "merkmale": { "type": "array", "items": { "type": "string" } }, "barrierefrei": { "type": "boolean" }, "breitengrad": { "type": ["number", "null"] }, "laengengrad": { "type": ["number", "null"] } } },
+      "KursDetail": { "type": "object", "properties": { "kurs": { "$ref": "#/components/schemas/KursKurz" }, "beschreibung": { "type": ["string", "null"] }, "bildungsurlaub": { "type": ["string", "null"] }, "minTeilnehmende": { "type": "integer" }, "maxTeilnehmende": { "type": "integer" }, "stornofristTage": { "type": "integer" }, "bearbeitungsgebuehrCent": { "type": "integer" }, "warteliste": { "type": "boolean" }, "termine": { "type": "array", "items": { "$ref": "#/components/schemas/Termin" } }, "orte": { "type": "array", "items": { "$ref": "#/components/schemas/Ort" } } } },
+      "Verfuegbarkeit": { "type": "object", "properties": { "kursnummer": { "type": "string" }, "plaetze": { "type": "integer" }, "belegt": { "type": "integer" }, "reserviert": { "type": "integer" }, "frei": { "type": "integer" }, "wartend": { "type": "integer" }, "warteliste": { "type": "boolean" }, "buchbar": { "type": "boolean" }, "code": { "type": "string", "enum": ["buchbar", "warteliste", "ausgebucht", "abgesagt", "beendet", "weg-nicht-erlaubt", "nur-oeffentlich", "archiviert", "entwurf"] }, "text": { "type": "string" }, "stand": { "type": "string", "format": "date-time" } } },
+      "WarenkorbEingabe": { "type": "object", "required": ["kursnummern"], "properties": { "kursnummern": { "type": "array", "maxItems": 10, "items": { "type": "string" } } } },
+      "Warenkorb": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "status": { "type": "string", "enum": ["offen", "gebucht", "verfallen"] }, "reserviertBis": { "type": "string", "format": "date-time" }, "restSekunden": { "type": "integer" }, "summeCent": { "type": "integer" }, "positionen": { "type": "array", "items": { "type": "object", "properties": { "kursnummer": { "type": "string" }, "titel": { "type": "string" }, "warteliste": { "type": "boolean" }, "entgeltCent": { "type": ["integer", "null"] }, "text": { "type": "string" } } } } } },
+      "BuchungsAnfrage": { "type": "object", "required": ["zahlart", "einwilligungen"], "properties": {
+        "teilnehmer": { "type": "object", "required": ["vorname", "nachname", "eMail", "strasse", "postleitzahl", "ort"], "properties": { "vorname": { "type": "string" }, "nachname": { "type": "string" }, "geburtsdatum": { "type": ["string", "null"], "format": "date" }, "eMail": { "type": "string", "format": "email" }, "strasse": { "type": "string" }, "postleitzahl": { "type": "string" }, "ort": { "type": "string" }, "sprache": { "type": ["string", "null"], "example": "de" } } },
+        "zahlart": { "type": "string", "enum": ["lastschrift", "rechnung"] },
+        "lastschrift": { "type": ["object", "null"], "properties": { "kontoinhaber": { "type": "string" }, "iban": { "type": "string" }, "bic": { "type": ["string", "null"] } } },
+        "einwilligungen": { "type": "array", "items": { "type": "object", "required": ["art", "version", "erteilt"], "properties": { "art": { "type": "string", "enum": ["agb", "datenschutz", "sepa", "werbung"] }, "version": { "type": "string" }, "erteilt": { "type": "boolean" } } } } } },
+      "Buchung": { "type": "object", "properties": { "buchungId": { "type": "string", "format": "uuid" }, "warenkorbId": { "type": "string", "format": "uuid" }, "zeitpunkt": { "type": "string", "format": "date-time" }, "zahlart": { "type": "string" }, "mandatsreferenz": { "type": ["string", "null"] }, "wiederholt": { "type": "boolean" }, "positionen": { "type": "array", "items": { "type": "object", "properties": { "kursnummer": { "type": "string" }, "belegungId": { "type": "string", "format": "uuid" }, "status": { "type": "string", "enum": ["angemeldet", "warteliste"] }, "hinweis": { "type": ["string", "null"] } } } } } },
+      "Registrierung": { "type": "object", "required": ["eMail", "vorname", "nachname"], "properties": { "eMail": { "type": "string", "format": "email" }, "vorname": { "type": "string" }, "nachname": { "type": "string" }, "geburtsdatum": { "type": ["string", "null"], "format": "date" }, "sprache": { "type": ["string", "null"] } } },
+      "Token": { "type": "object", "properties": { "accessToken": { "type": "string" }, "tokenType": { "type": "string" }, "expiresIn": { "type": "integer" } } },
+      "KontoBuchung": { "type": "object", "properties": { "belegungId": { "type": "string", "format": "uuid" }, "kursnummer": { "type": "string" }, "titel": { "type": "string" }, "beginn": { "type": ["string", "null"], "format": "date-time" }, "status": { "type": "string" }, "entgeltCent": { "type": "integer" }, "stornierbar": { "type": "boolean" }, "stornogebuehrCent": { "type": ["integer", "null"] }, "stornoText": { "type": ["string", "null"] } } },
+      "Stornoregel": { "type": "object", "properties": { "gebuehrCent": { "type": "integer" }, "erklaerung": { "type": "string" } } }
+    }
+  }
+}

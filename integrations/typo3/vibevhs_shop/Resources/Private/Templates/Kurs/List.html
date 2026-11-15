@@ -1,0 +1,40 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:layout name="Default" />
+<f:section name="Main">
+    <f:render partial="KontoLink" arguments="{kontoUrl: kontoUrl}" />
+    <form method="get" role="search" aria-label="Kurse durchsuchen" class="vibevhs-suche">
+        <label for="vibevhs-suche">Suchbegriff</label>
+        <input id="vibevhs-suche" type="search" name="tx_vibevhsshop_kursliste[suche]" value="{suche}">
+        <label for="vibevhs-kategorie">Fachbereich</label>
+        <select id="vibevhs-kategorie" name="tx_vibevhsshop_kursliste[kategorie]">
+            <option value="">alle</option>
+            <f:for each="{kategorien}" as="k">
+                <f:if condition="{k.kategorie} == {kategorie}">
+                    <f:then><option value="{k.kategorie}" selected="selected">{k.name}</option></f:then>
+                    <f:else><option value="{k.kategorie}">{k.name}</option></f:else>
+                </f:if>
+            </f:for>
+        </select>
+        <button type="submit">Suchen</button>
+    </form>
+    <p id="vibevhs-anzahl" role="status">{kurse -> f:count()} Kurse</p>
+    <ul class="vibevhs-kurse" aria-labelledby="vibevhs-anzahl">
+        <f:for each="{kurse}" as="kurs">
+            <li>
+                <h3><f:link.action action="show" pluginName="Kursdetail" arguments="{kurs: kurs}">{kurs.titel}</f:link.action></h3>
+                <p>
+                    <span class="vibevhs-nummer">{kurs.nummer}</span> ·
+                    <f:if condition="{kurs.beginn}">ab <f:format.date format="d.m.Y">{kurs.beginn}</f:format.date></f:if>
+                    <f:if condition="{kurs.zeiten}">, {kurs.zeiten}</f:if>
+                    <f:if condition="{kurs.ort}"> · {kurs.ort}</f:if> ·
+                    <f:if condition="{kurs.entgelt} !== null">
+                        <f:then><f:format.currency currencySign="€" decimalSeparator="," thousandsSeparator=".">{kurs.entgelt}</f:format.currency></f:then>
+                        <f:else>Entgelt auf Anfrage</f:else>
+                    </f:if>
+                    <f:if condition="{kurs.barrierefrei}"> · barrierefrei</f:if>
+                </p>
+            </li>
+        </f:for>
+    </ul>
+</f:section>
+</html>

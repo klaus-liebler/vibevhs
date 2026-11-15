@@ -1,4 +1,4 @@
-# Sicherheit: OWASP-Checkliste (Stand I8)
+# Sicherheit: OWASP-Checkliste (Stand I9)
 
 Orientierung: OWASP Top 10 (2021) und ASVS 4.0 Level 2. ✅ umgesetzt · ⚠️ teilweise/offen · ⏳ mit der kommunalen Anmeldung.
 
@@ -15,6 +15,7 @@ Orientierung: OWASP Top 10 (2021) und ASVS 4.0 Level 2. ✅ umgesetzt · ⚠️ 
 | A09 Protokollierung | ✅ | Revisionssicheres Protokoll (Pseudonyme), Serilog-Dateilogs, Exporte und Auskünfte protokolliert |
 | A10 SSRF | ✅ | Keine serverseitigen Abrufe von Adressen aus Benutzereingaben |
 | Rate-Limits | ✅ | Öffentliche Seiten (`/anmelden`, `/checkin`, `/brief`, `/uebersetzen`): `Sicherheit:RateLimitProMinute` (Standard 60) je Adresse und Bereich, Antwort 429 mit Retry-After |
+| Öffentliche Buchungs-API (I9) | ✅/⚠️ | `/api/v1/shop`: CORS nur für `Shop:ErlaubteOrigins`; Proof-of-Work (signiert, 5 Min., einmalig) bei Warenkorb, Buchung, Registrierung; Rate-Limits je IP (Lesen/Schreiben/Registrierung); Idempotency-Key gegen Doppelbuchung; Registrierung ohne Auskunft über bestehende Konten, Bestätigungstoken nur als SHA-256, Bestätigung erst per POST; nur öffentliche Kurse, Buchungsprüfung wie in der Verwaltung; Fehler als problem+json ohne interne Details. ⚠️ Kundenanmeldung noch über Test-Identitätsdienst (`Shop:MockIdp`, außerhalb der Entwicklung aus) – OIDC folgt; Rate-Limits je IP greifen hinter einem Proxy nur mit `ReverseProxy:Aktiv` |
 | Datenschutz | ✅ | Pseudonyme im Protokoll, Lichtbild nur als data:-URI, Löschläufe, Auskunft, Anonymisierung |
 | Uploads | ✅ | Größenlimits (CSV 10 MB, camt 5 MB, Lichtbild 400 KB), Typprüfung, keine Ablage im Webverzeichnis |
 

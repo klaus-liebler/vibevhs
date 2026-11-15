@@ -363,6 +363,21 @@ Fachbereichsleitung und Prüfung lesen).
   Dublettensuche (Datenbank und Datei); der Import legt nur neue Personen an und merkt sich die Altnummern.
   Beispieldatei: `tools/Testdaten/kufer-export-beispiel.csv`. Kurse und Belegungen aus Altdaten folgen bei Bedarf.
 
+## Webshop (I9): Buchungs-API, Web-Komponente, TYPO3
+
+- **Buchungs-API** `/api/v1/shop` (OpenAPI unter `/api/v1/shop/openapi.json`): öffentliche Kurse mit Delta (`geaendertSeit`,
+  entfernte Kurse) und ETag, Detail mit Terminen, Orten, Wegbeschreibung und Merkmalen (barrierefrei), Verfügbarkeit mit
+  Code und Begründung (30 s Cache), Warenkorb mit **15-Minuten-Reservierung** (zählt auch am Tresen), Buchen mit
+  **Idempotency-Key**, Gast oder Kundenkonto, Einwilligungen mit Version, SEPA-Mandat oder Rechnung; Konto mit
+  **Double-Opt-in**, eigene Buchungen und Storno nach AGB. Gebucht wird über dieselbe Buchungsprüfung wie in der Verwaltung.
+  CORS nur für konfigurierte Origins, Proof-of-Work statt Captcha, Rate-Limits je IP.
+- **Web-Komponente** `<vhs-kurse>` (`/shop/shop.js`, Demo `/shop/demo.html`, Kasse `/shop/kasse.html`, Konto `/shop/konto.html`):
+  Liste, Detail, Warenkorb, Kasse; Shadow DOM, CSS-Variablen, Tastatur und Screenreader (Ziel WCAG 2.2 AA).
+- **TYPO3-Extension** `integrations/typo3/vibevhs_shop` (TYPO3 13 LTS): Delta-Abgleich per Scheduler, Kursliste/Suche/Detail
+  serverseitig mit schema.org/Course, Routing `/kurse/{kategorie}` und `/kurse/{nummer}-{titel}`; PHPUnit-Tests vorbereitet,
+  hier nicht ausgeführt (kein PHP auf dem Entwicklungs-PC).
+- Details: `docs/webshop.md`.
+
 ## Testbenutzer der Pilot-VHS
 
 Die Startdaten liegen in [`tools/Testdaten/testbenutzer-vhs-egs.json`](../tools/Testdaten/testbenutzer-vhs-egs.json)

@@ -1,0 +1,25 @@
+{
+  "stand": "2026-11-15T10:53:32.7459+00:00",
+  "kurse": [
+    {
+      "nummer": "26H-501",
+      "titel": "Englisch A2 – Konversation",
+      "slug": "26h-501-englisch-a2-konversation",
+      "fachbereich": 5,
+      "fachbereichName": "Fremdsprachen",
+      "fachbereichSlug": "fremdsprachen",
+      "semester": "Herbst 2026",
+      "beginn": "2026-09-29T18:00:00",
+      "ende": "2027-01-12T19:30:00",
+      "termine": 12,
+      "zeiten": "Di 18:00–19:30",
+      "ort": "A 1.12 Kursraum, Emsdetten",
+      "entgeltCent": 9800,
+      "ermaessigtCent": 7300,
+      "barrierefrei": true,
+      "onlineBuchbar": true,
+      "geaendertAm": "2026-11-15T10:53:32.7459+00:00"
+    }
+  ],
+  "entfernt": []
+}

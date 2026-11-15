@@ -395,6 +395,16 @@ public sealed class FinanzDienst(
         CancellationToken abbruch = default)
     {
         await PruefenAsync(Finanzrollen.Mandate, abbruch);
+        return await MandatErfassenAsync(personId, kontoinhaber, iban, bic, unterschriebenAm, "erfasst", abbruch);
+    }
+
+    /// <summary>Mandat, das die Person selbst online erteilt hat (Webshop-Kasse); ohne Rollenprüfung, im Finanzprotokoll als „online“ vermerkt.</summary>
+    public Task<SepaMandat> MandatOnlineErteiltAsync(Guid personId, string kontoinhaber, string iban, string? bic, CancellationToken abbruch = default)
+        => MandatErfassenAsync(personId, kontoinhaber, iban, bic, Heute, "online erteilt (Webshop)", abbruch);
+
+    private async Task<SepaMandat> MandatErfassenAsync(Guid personId, string kontoinhaber, string iban, string? bic, DateOnly unterschriebenAm, string herkunft,
+        CancellationToken abbruch)
+    {
         if (Iban.Fehler(iban) is { } fehler)
         {
             throw new InvalidOperationException(fehler);
@@ -421,10 +431,12 @@ public sealed class FinanzDienst(
         speicher.Hinzufuegen(mandat);
         await finanzprotokoll.SchreibenAsync("Mandat.Angelegt", "SepaMandat", mandat.Id, null,
             $"{referenz}; {Pseudonym.Person(personId)}; {Iban.Maskiert(mandat.Iban)}; unterschrieben {unterschriebenAm:yyyy-MM-dd}", abbruch);
-        await protokoll.ProtokollierenAsync("Finanzen.Mandat", $"SEPA-Mandat {referenz} für {Pseudonym.Person(personId)} erfasst", nameof(Person), personId, abbruch: abbruch);
+        await protokoll.ProtokollierenAsync("Finanzen.Mandat", $"SEPA-Mandat {referenz} für {Pseudonym.Person(personId)} {herkunft}", nameof(Person), personId, abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
         return mandat;
     }
+
+    public async Task<string?> MandatReferenzAsync(Guid mandatId, CancellationToken abbruch = default) => (await speicher.MandatAsync(mandatId, abbruch))?.Referenz;
 
     public async Task MandatWiderrufenAsync(Guid mandatId, CancellationToken abbruch = default)
     {

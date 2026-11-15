@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="VibeVHS.Web.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Radzen.Blazor" />
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Serilog.Sinks.File" />
@@ -15,6 +19,11 @@
     <!-- Startdaten der Pilot-VHS: wird beim ersten Start in eine leere Datenbank geladen. -->
     <Content Include="..\..\tools\Testdaten\testbenutzer-vhs-egs.json" Link="Startdaten\testbenutzer-vhs-egs.json"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Vertrag der öffentlichen Buchungs-API (ausgeliefert unter /api/v1/shop/openapi.json). -->
+    <Content Update="Shop\openapi-v1.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,7 @@
+plugin.tx_vibevhsshop {
+  view {
+    templateRootPaths.10 = EXT:vibevhs_shop/Resources/Private/Templates/
+    partialRootPaths.10 = EXT:vibevhs_shop/Resources/Private/Partials/
+    layoutRootPaths.10 = EXT:vibevhs_shop/Resources/Private/Layouts/
+  }
+}

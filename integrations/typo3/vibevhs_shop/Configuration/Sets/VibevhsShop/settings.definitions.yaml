@@ -1,0 +1,25 @@
+categories:
+  vibevhsShop:
+    label: 'VibeVHS'
+
+settings:
+  vibevhsShop.vibevhsUrl:
+    label: 'Adresse von VibeVHS (lädt /shop/shop.js für Buchungsbox, Warenkorb und Kasse)'
+    category: vibevhsShop
+    type: string
+    default: 'https://liebler.iui.hs-osnabrueck.de/vibevhs'
+  vibevhsShop.apiUrl:
+    label: 'Basis der Buchungs-API für den Browser (CORS: diese Website muss in VibeVHS unter Shop:ErlaubteOrigins stehen)'
+    category: vibevhsShop
+    type: string
+    default: 'https://liebler.iui.hs-osnabrueck.de/vibevhs/api/v1/shop'
+  vibevhsShop.kontoUrl:
+    label: 'Link „Mein Konto“ (Kundenkonto liegt in VibeVHS)'
+    category: vibevhsShop
+    type: string
+    default: 'https://liebler.iui.hs-osnabrueck.de/vibevhs/shop/konto.html'
+  vibevhsShop.anbieter:
+    label: 'Name der Einrichtung (schema.org provider)'
+    category: vibevhsShop
+    type: string
+    default: 'Volkshochschule'

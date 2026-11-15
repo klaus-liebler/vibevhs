@@ -38,6 +38,14 @@ internal static class Sicherheitsheader
                     h["Cache-Control"] = "no-store";
                 }
 
+                if (kontext.Request.Path.Equals("/shop/shop.js", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Die Web-Komponente wird als ES-Modul von fremden Websites (z. B. TYPO3) geladen; Module brauchen CORS.
+                    // Unbedenklich: öffentliche, statische Datei ohne Zugangsdaten.
+                    h["Access-Control-Allow-Origin"] = "*";
+                    h["Cross-Origin-Resource-Policy"] = "cross-origin";
+                }
+
                 return Task.CompletedTask;
             });
             await weiter();

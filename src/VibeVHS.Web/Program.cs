@@ -17,6 +17,7 @@ using VibeVHS.Infrastructure;
 using VibeVHS.Infrastructure.Datenbank;
 using VibeVHS.Web.Components;
 using VibeVHS.Web.Entwicklung;
+using VibeVHS.Web.Shop;
 using VibeVHS.Web.Sicherheit;
 
 var deutsch = CultureInfo.GetCultureInfo("de-DE");
@@ -64,6 +65,8 @@ builder.Services
     .AddVibeVhsMocks(builder.Configuration);
 
 VibeVHS.Web.Sicherheit.Sicherheitsheader.AddRateLimits(builder.Services, builder.Configuration);
+// Öffentliche Buchungs-API (Webshop, TYPO3): CORS, Proof-of-Work, Rate-Limits, Test-Identitätsdienst.
+builder.Services.AddShopApi(builder.Configuration, builder.Environment);
 builder.Services.AddSingleton(new VibeVHS.Application.Integration.IntegrationOptionen(builder.Configuration.GetValue("Integration:LichtbildFristTage", 14)));
 
 // Zusätzliche Honorarmodelle (Plugins): je DLL im Ordner „plugins/honorare“ (Erweiterungspunkt, I6).
@@ -156,6 +159,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 VibeVHS.Web.Sicherheit.Sicherheitsheader.UseSicherheitsheader(app);
+app.UseCors();
 app.UseRateLimiter();
 
 app.UseSerilogRequestLogging();
@@ -325,6 +329,7 @@ app.MapGet("/personen/export", async (string? suche, string? rolle, string? stat
     return Results.File(datei, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         $"personen-{uhr.GetLocalNow():yyyy-MM-dd-HHmm}.xlsx");
 }).RequireAuthorization();
+app.MapShopApi();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

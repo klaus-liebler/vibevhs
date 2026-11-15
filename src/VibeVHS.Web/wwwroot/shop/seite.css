@@ -1,0 +1,10 @@
+/* Grundgestaltung der Shop-Seiten (Demo, Kasse, Kontobestätigung). Kontrast ≥ 4,5:1. */
+:root { color-scheme: light; font-family: system-ui, sans-serif; line-height: 1.5; color: #1a1a1a; background: #fff; }
+body { margin: 0; }
+header, main, footer { max-width: 60rem; margin: 0 auto; padding: 1rem; }
+header { border-bottom: 4px solid #005a70; }
+a { color: #005a70; }
+:focus-visible { outline: 3px solid #b35c00; outline-offset: 2px; }
+.sprung { position: absolute; left: -999px; } .sprung:focus { left: 1rem; top: 1rem; background: #fff; padding: .5rem; z-index: 10; }
+button { font: inherit; min-height: 44px; padding: .5rem 1rem; border-radius: 6px; border: 2px solid #005a70; background: #005a70; color: #fff; cursor: pointer; }
+code { background: #f3f6f7; padding: 0 .25rem; }
