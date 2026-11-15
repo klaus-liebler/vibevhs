@@ -313,6 +313,22 @@ public sealed class DatenschutzDienst(
             n.Anonymisieren(platzhalter);
         }
 
+        // Belegungen bleiben (Statistik, Buchhaltung), nur personenbezogene Texte werden ersetzt.
+        foreach (var b in await speicher.BelegungenAsync(person.Id, abbruch))
+        {
+            if (b.PersonId == person.Id)
+            {
+                b.PersonendatenEntfernen();
+            }
+
+            b.BevollmaechtigtenUmbenennen(person.Id, platzhalter);
+        }
+
+        foreach (var erm in await speicher.ErmaessigungenAsync(person.Id, abbruch))
+        {
+            erm.Anonymisieren();
+        }
+
         if (protokollieren)
         {
             await protokoll.ProtokollierenAsync("Datenschutz.Anonymisiert", $"{Pseudonym.Person(person.Id)} anonymisiert ({anlass})", nameof(Person), person.Id,
@@ -332,6 +348,9 @@ public sealed class DatenschutzDienst(
         var kurse = await speicher.KurseMitDozentAsync(personId, abbruch);
         var nachrichten = await speicher.NachrichtenAsync(personId, abbruch);
         var verlauf = await speicher.ProtokollZuAsync(personId, abbruch);
+        var belegungen = (await speicher.BelegungenAsync(personId, abbruch)).Where(b => b.PersonId == personId).ToList();
+        var titel = await speicher.KurstitelAsync(belegungen.Select(b => b.KursId).Distinct(), abbruch);
+        var ermaessigungen = await speicher.ErmaessigungenAsync(personId, abbruch);
 
         var auskunft = new Auskunft(
             (await stammdaten.EinrichtungAsync(abbruch))?.Name ?? "Volkshochschule",
@@ -355,6 +374,12 @@ public sealed class DatenschutzDienst(
             Datenhistorie.Erstellen(person),
             kurse.Select(k => new AuskunftKurs(k.Kursnummer, k.Titel, k.Veranstaltungen.Count(v => v.DozentId == personId),
                 k.Veranstaltungen.Count == 0 ? null : $"{k.Veranstaltungen.Min(v => v.Beginn):dd.MM.yyyy}–{k.Veranstaltungen.Max(v => v.Beginn):dd.MM.yyyy}")).ToList(),
+            belegungen.OrderBy(b => b.GebuchtAm).Select(b => new AuskunftBelegung(titel.GetValueOrDefault(b.KursId) ?? b.Kursnummer,
+                Domain.Anmeldung.BelegungAnzeige.Status(b.Status), b.GebuchtAm,
+                b.GebuchtVon + (b.BevollmaechtigterName is null ? "" : $" im Auftrag von {b.BevollmaechtigterName}"),
+                Domain.Anmeldung.BelegungAnzeige.Weg(b.Weg), b.Entgelt + (b.Ermaessigt ? " (ermäßigt)" : ""),
+                b.IstKontingent ? Anmeldung.AnmeldungDienst.Text(b.Kontingent) : null)).ToList(),
+            ermaessigungen.Select(e => $"{e.Art}, gültig {e.GueltigVon:dd.MM.yyyy}–{e.GueltigBis:dd.MM.yyyy}, Nachweis: {e.Nachweis}").ToList(),
             nachrichten.OrderBy(n => n.ErstelltAm).Select(n => new AuskunftNachricht(n.ErstelltAm, n.Kanal.ToString(), n.Betreff, n.Status.ToString())).ToList(),
             [
                 "Mitarbeitende der Volkshochschule im Rahmen ihrer Aufgaben",

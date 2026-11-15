@@ -38,6 +38,14 @@ public interface IDatenschutzSpeicher
 
     Task<IReadOnlyList<AusgehendeNachricht>> NachrichtenAsync(Guid personId, CancellationToken abbruch = default);
 
+    /// <summary>Belegungen der Person oder solche, die sie als Bevollmächtigte gebucht hat (verfolgt).</summary>
+    Task<IReadOnlyList<Domain.Anmeldung.Belegung>> BelegungenAsync(Guid personId, CancellationToken abbruch = default);
+
+    Task<IReadOnlyList<Domain.Anmeldung.Ermaessigung>> ErmaessigungenAsync(Guid personId, CancellationToken abbruch = default);
+
+    /// <summary>Kursnummer und Titel je Kurs-ID (für die Auskunft).</summary>
+    Task<IReadOnlyDictionary<Guid, string>> KurstitelAsync(IEnumerable<Guid> kursIds, CancellationToken abbruch = default);
+
     Task<IReadOnlyList<AuditEintrag>> ProtokollZuAsync(Guid personId, CancellationToken abbruch = default);
 
     Task<IReadOnlyList<Loeschlauf>> LoeschlaeufeAsync(CancellationToken abbruch = default);
@@ -60,6 +68,8 @@ public sealed record Auskunft(
     AuskunftStammdaten Stammdaten,
     IReadOnlyList<Personen.HistorienEintrag> Historie,
     IReadOnlyList<AuskunftKurs> KurseAlsDozent,
+    IReadOnlyList<AuskunftBelegung> Belegungen,
+    IReadOnlyList<string> Ermaessigungen,
     IReadOnlyList<AuskunftNachricht> Nachrichten,
     IReadOnlyList<string> Empfaenger,
     IReadOnlyList<AuskunftFrist> Aufbewahrung,
@@ -72,6 +82,8 @@ public sealed record AuskunftStammdaten(string? Titel, string? Geburtsdatum, str
     IReadOnlyList<string> Einwilligungen);
 
 public sealed record AuskunftKurs(string Kursnummer, string Titel, int Termine, string? Zeitraum);
+
+public sealed record AuskunftBelegung(string Kurs, string Status, DateTimeOffset GebuchtAm, string GebuchtVon, string Weg, string Entgelt, string? Kontingent);
 
 public sealed record AuskunftNachricht(DateTimeOffset Datum, string Kanal, string Betreff, string Status);
 

@@ -79,6 +79,11 @@ internal sealed class AuskunftPdf : IAuskunftPdf
 
         Abschnitt(s, "Kurse als Dozentin / Dozent");
         Liste(s, null, a.KurseAlsDozent.Select(x => $"{x.Kursnummer} {x.Titel}: {x.Termine} Termine {x.Zeitraum}").ToList());
+        Abschnitt(s, "Kursbelegungen");
+        Liste(s, null, a.Belegungen.Select(b => $"{b.Kurs}: {b.Status}, gebucht am {b.GebuchtAm.ToLocalTime():dd.MM.yyyy} von {b.GebuchtVon} ({b.Weg}), Entgelt {b.Entgelt}"
+                                                 + (b.Kontingent is null ? "" : $"; {b.Kontingent}")).ToList());
+        Abschnitt(s, "Ermäßigungen");
+        Liste(s, null, a.Ermaessigungen);
         Abschnitt(s, "Nachrichten an Sie");
         Liste(s, null, a.Nachrichten.Select(n => $"{n.Datum.ToLocalTime():dd.MM.yyyy} {n.Kanal}: {n.Betreff} ({n.Status})").ToList());
         Abschnitt(s, "Empfänger");

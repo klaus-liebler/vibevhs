@@ -51,6 +51,14 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
 
     public DbSet<VibeVHS.Domain.Aufgaben.Aufgabe> Aufgaben => Set<VibeVHS.Domain.Aufgaben.Aufgabe>();
 
+    public DbSet<VibeVHS.Domain.Anmeldung.Belegung> Belegungen => Set<VibeVHS.Domain.Anmeldung.Belegung>();
+
+    public DbSet<VibeVHS.Domain.Anmeldung.KontingentEreignis> KontingentEreignisse => Set<VibeVHS.Domain.Anmeldung.KontingentEreignis>();
+
+    public DbSet<VibeVHS.Domain.Anmeldung.Ermaessigung> Ermaessigungen => Set<VibeVHS.Domain.Anmeldung.Ermaessigung>();
+
+    public DbSet<VibeVHS.Domain.Vorlagen.Textvorlage> Vorlagen => Set<VibeVHS.Domain.Vorlagen.Textvorlage>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder konfiguration)
     {
         // SQLite kennt keinen Zeitstempel mit Offset; als sortierbare Zahl (UTC-Ticks) speichern.
@@ -151,6 +159,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
         });
 
         ProgrammMapping.Anwenden(modelBuilder);
+        AnmeldungMapping.Anwenden(modelBuilder);
 
         modelBuilder.Entity<VibeVHS.Domain.Datenschutz.Aufbewahrungsfrist>(b =>
         {
@@ -215,6 +224,8 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(n => n.Betreff).HasMaxLength(500);
             b.Property(n => n.Sprache).HasMaxLength(10);
             b.Property(n => n.AusgeloestVon).HasMaxLength(200);
+            b.Property(n => n.AnhangName).HasMaxLength(200);
+            b.Property(n => n.AnhangTyp).HasMaxLength(100);
             b.HasIndex(n => new { n.Status, n.ErstelltAm });
             b.HasIndex(n => n.PersonId);
         });
@@ -336,8 +347,8 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
     private void NurAnfuegenPruefen()
     {
         var verboten = ChangeTracker.Entries()
-            .Where(e => e.State == EntityState.Deleted && e.Entity is AuditEintrag or IHistorienwert
-                        || e.State == EntityState.Modified && e.Entity is AuditEintrag)
+            .Where(e => e.State == EntityState.Deleted && e.Entity is AuditEintrag or IHistorienwert or VibeVHS.Domain.Anmeldung.KontingentEreignis
+                        || e.State == EntityState.Modified && e.Entity is AuditEintrag or VibeVHS.Domain.Anmeldung.KontingentEreignis)
             .Select(e => e.Entity.GetType().Name)
             .ToList();
         if (verboten.Count > 0)

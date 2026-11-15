@@ -28,9 +28,27 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
             .Select(g => new { KursId = g.Key, Letzter = g.Max(v => v.Ende) })
             .Join(db.Kurse.IgnoreAutoIncludes(), x => x.KursId, k => k.Id, (x, k) => new { k.Kursnummer, x.Letzter })
             .ToListAsync(abbruch);
-        return alsDozent
+        var gruende = alsDozent
             .Select(x => new Aufbewahrungsgrund("buchhaltung", $"Honorarabrechnung als Dozent/in, Kurs {x.Kursnummer}", DateOnly.FromDateTime(x.Letzter)))
             .ToList();
+
+        // Kursentgelte: Belegungen mit Entgelt oder Gebühr sind buchhaltungsrelevant (ab dem letzten Termin bzw. der Buchung).
+        var belegungen = await db.Belegungen.IgnoreAutoIncludes().AsNoTracking()
+            .Where(b => b.PersonId == personId && (b.EntgeltCent > 0 || b.GebuehrCent > 0)
+                        && (b.Status == Domain.Anmeldung.Belegungsstatus.Angemeldet || b.Status == Domain.Anmeldung.Belegungsstatus.Storniert
+                            || b.Status == Domain.Anmeldung.Belegungsstatus.Umgebucht))
+            .Select(b => new { b.KursId, b.Kursnummer, b.GebuchtAm, b.Status, b.GebuehrCent })
+            .ToListAsync(abbruch);
+        var kursIds = belegungen.Select(b => b.KursId).Distinct().ToList();
+        var enden = await db.Veranstaltungen.AsNoTracking().Where(v => kursIds.Contains(v.KursId))
+            .GroupBy(v => v.KursId).Select(g => new { g.Key, Ende = g.Max(v => v.Ende) }).ToDictionaryAsync(x => x.Key, x => x.Ende, abbruch);
+        foreach (var b in belegungen.Where(b => b.Status == Domain.Anmeldung.Belegungsstatus.Angemeldet || b.GebuehrCent > 0))
+        {
+            var bezug = enden.TryGetValue(b.KursId, out var ende) ? DateOnly.FromDateTime(ende) : DateOnly.FromDateTime(b.GebuchtAm.Date);
+            gruende.Add(new Aufbewahrungsgrund("buchhaltung", $"Kursentgelt, Kurs {b.Kursnummer}", bezug));
+        }
+
+        return gruende;
     }
 
     public async Task<IReadOnlyList<PersonAktivitaet>> InaktivePersonenAsync(DateTimeOffset vor, CancellationToken abbruch = default)
@@ -70,6 +88,11 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
         Max((await db.Postausgang.AsNoTracking().Where(n => n.PersonId != null)
                 .Select(n => new { Id = n.PersonId!.Value, n.ErstelltAm }).ToListAsync(abbruch))
             .GroupBy(x => x.Id).Select(g => (g.Key, g.Max(x => x.ErstelltAm))));
+        Max((await db.Belegungen.IgnoreAutoIncludes().AsNoTracking().Select(b => new { b.PersonId, b.GebuchtAm }).ToListAsync(abbruch))
+            .GroupBy(x => x.PersonId).Select(g => (g.Key, g.Max(x => x.GebuchtAm))));
+        Max((await db.KontingentEreignisse.AsNoTracking()
+                .Join(db.Belegungen.IgnoreAutoIncludes(), e => e.BelegungId, b => b.Id, (e, b) => new { b.PersonId, e.Zeitpunkt }).ToListAsync(abbruch))
+            .GroupBy(x => x.PersonId).Select(g => (g.Key, g.Max(x => x.Zeitpunkt))));
 
         return kandidaten
             .Where(k => letzte[k.Id] < vor || (k.Datenschutz == Datenschutzstatus.Gesperrt))
@@ -133,6 +156,19 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
 
     public async Task<IReadOnlyList<AusgehendeNachricht>> NachrichtenAsync(Guid personId, CancellationToken abbruch = default)
         => await db.Postausgang.Where(n => n.PersonId == personId).ToListAsync(abbruch);
+
+    public async Task<IReadOnlyList<Domain.Anmeldung.Belegung>> BelegungenAsync(Guid personId, CancellationToken abbruch = default)
+        => await db.Belegungen.Where(b => b.PersonId == personId || b.BevollmaechtigterId == personId).ToListAsync(abbruch);
+
+    public async Task<IReadOnlyList<Domain.Anmeldung.Ermaessigung>> ErmaessigungenAsync(Guid personId, CancellationToken abbruch = default)
+        => await db.Ermaessigungen.Where(e => e.PersonId == personId).ToListAsync(abbruch);
+
+    public async Task<IReadOnlyDictionary<Guid, string>> KurstitelAsync(IEnumerable<Guid> kursIds, CancellationToken abbruch = default)
+    {
+        var ids = kursIds.ToList();
+        return await db.Kurse.IgnoreAutoIncludes().AsNoTracking().Where(k => ids.Contains(k.Id))
+            .ToDictionaryAsync(k => k.Id, k => k.Kursnummer + " " + k.Titel, abbruch);
+    }
 
     public async Task<IReadOnlyList<AuditEintrag>> ProtokollZuAsync(Guid personId, CancellationToken abbruch = default)
         => await db.Protokoll.AsNoTracking().Where(e => e.ObjektId == personId).OrderBy(e => e.Zeitpunkt).ToListAsync(abbruch);

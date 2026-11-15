@@ -132,4 +132,12 @@ public static class Ortsplanung
 
         return Math.Min(summe, kurs.MaxTeilnehmende);
     }
+
+    /// <summary>Plätze an einem Ort einer Veranstaltung (für die Vorab-Einbuchung bei hybriden Terminen).</summary>
+    public static int KapazitaetAmOrt(VeranstaltungsOrt vo, Kurs kurs, Ortsverzeichnis verzeichnis)
+    {
+        var ort = verzeichnis.Finden(vo.OrtId);
+        var nutzung = ort?.Art == Ortsart.VirtuellerRaum ? Nutzungsart.Online : kurs.Nutzungsart;
+        return Math.Min(vo.Hoechstzahl ?? ort?.KapazitaetFuer(nutzung) ?? ort?.KapazitaetFuer(kurs.Nutzungsart) ?? 0, kurs.MaxTeilnehmende);
+    }
 }

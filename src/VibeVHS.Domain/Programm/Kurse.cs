@@ -106,7 +106,35 @@ public sealed record Buchungsrichtlinie
 
     public int StornofristTage { get; init; } = 7;
 
+    /// <summary>Bearbeitungsgebühr bei fristgerechter Abmeldung (AGB), in Cent.</summary>
+    public long BearbeitungsgebuehrCent { get; init; }
+
+    /// <summary>Gebühr für eine Umbuchung auf einen anderen Kurs, in Cent.</summary>
+    public long UmbuchungsgebuehrCent { get; init; }
+
+    /// <summary>So lange gilt ein Nachrückangebot von der Warteliste.</summary>
+    public int NachrueckfristTage { get; init; } = 3;
+
+    /// <summary>Vorab-Einbuchung in eine Veranstaltung bis so viele Stunden vor Beginn.</summary>
+    public int EinbuchungsfristStunden { get; init; } = 24;
+
+    /// <summary>Austragen aus einer Veranstaltung bis so viele Stunden vor Beginn.</summary>
+    public int AustragefristStunden { get; init; } = 24;
+
+    /// <summary>Wer eingebucht ist und nicht erscheint, verbraucht die Einheit des Kontingents.</summary>
+    public bool NichterscheinenZaehlt { get; init; } = true;
+
     public bool Darf(Buchungsweg weg) => Rechte.Any(r => r.Weg == weg && r.DarfBuchen);
+
+    public bool DarfUeberbuchen(Buchungsweg weg) => Rechte.Any(r => r.Weg == weg && r.DarfBuchen && r.DarfUeberbuchen);
+
+    public static string WegAnzeige(Buchungsweg weg) => weg switch
+    {
+        Buchungsweg.Tresen => "den Teilnehmerservice (Tresen)",
+        Buchungsweg.IntegrationskursTeam => "das Integrationskurs-Team",
+        Buchungsweg.Online => "die Online-Anmeldung",
+        _ => "die beauftragende Organisation",
+    };
 
     public static Buchungsrichtlinie Oeffentlich { get; } = new()
     {
@@ -403,6 +431,21 @@ public sealed class Kurs
 
     /// <summary>Letzter Termin (für die Suche "Kursende vor …").</summary>
     public DateOnly? Kursende => _veranstaltungen.Count == 0 ? null : DateOnly.FromDateTime(_veranstaltungen.Max(v => v.Ende));
+
+    /// <summary>Beginn des ersten stattfindenden Termins (für Entgelt, Storno- und Umbuchungsfristen).</summary>
+    public DateTime? ErsterTermin => _veranstaltungen.Where(v => !v.Ausgefallen).Select(v => (DateTime?)v.Beginn).Min();
+
+    /// <summary>Begrenzter Kurs, dessen letzter Termin vorbei ist.</summary>
+    public bool BeendetAm(DateTime jetzt) => Umfang == Kursumfang.Begrenzt && _veranstaltungen.Count > 0 && _veranstaltungen.All(v => v.Ende < jetzt);
+
+    /// <summary>Entgelt, das bei einer Buchung jetzt gilt: gültig zum Kursbeginn (oder heute, falls der Kurs schon läuft), nach heutigem Wissensstand.</summary>
+    public KursEntgelt? EntgeltFuerBuchung(DateTimeOffset jetzt, DateTimeOffset? bekanntAm = null)
+    {
+        var heute = DateOnly.FromDateTime(jetzt.Date);
+        var beginn = ErsterTermin is { } b ? DateOnly.FromDateTime(b) : heute;
+        var stand = bekanntAm ?? jetzt;
+        return EntgeltAm(beginn > heute ? beginn : heute, stand) ?? EntgeltAm(beginn, stand);
+    }
 
     /// <summary>Nach Anonymisierung einer Dozentin: Platzhalter statt Name im Team und an den Terminen; die Verknüpfung bleibt.</summary>
     public void DozentAnonymisieren(Guid personId, string platzhalter)

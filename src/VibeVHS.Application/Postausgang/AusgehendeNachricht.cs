@@ -87,6 +87,21 @@ public sealed class AusgehendeNachricht
 
     public string? Fehler { get; private set; }
 
+    /// <summary>Optionaler Textanhang, z. B. "termine.ics".</summary>
+    public string? AnhangName { get; private set; }
+
+    public string? AnhangTyp { get; private set; }
+
+    public string? AnhangInhalt { get; private set; }
+
+    public AusgehendeNachricht MitAnhang(string name, string typ, string inhalt)
+    {
+        AnhangName = name;
+        AnhangTyp = typ;
+        AnhangInhalt = inhalt;
+        return this;
+    }
+
     public void AlsZugestelltMarkieren(DateTimeOffset zeitpunkt, string? rueckmeldung)
     {
         Versuche++;
@@ -114,6 +129,8 @@ public sealed class AusgehendeNachricht
         Betreff = "[anonymisiert]";
         Inhalt = "[Inhalt anonymisiert]";
         Uebersetzungslink = null;
+        AnhangName = AnhangName is null ? null : "anonymisiert";
+        AnhangInhalt = AnhangInhalt is null ? null : string.Empty;
         if (Status == NachrichtenStatus.Wartend)
         {
             Status = NachrichtenStatus.Fehlgeschlagen;

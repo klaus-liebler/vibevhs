@@ -21,7 +21,8 @@ public sealed class PostausgangDienst(
     /// fachliche Änderung gemeinsam festgeschrieben werden.
     /// </summary>
     public async Task<AusgehendeNachricht> KundenmailEinreihenAsync(string eMail, string? anzeigename, string betreff,
-        string text, string sprache, Guid? personId = null, CancellationToken abbruch = default)
+        string text, string sprache, Guid? personId = null, CancellationToken abbruch = default,
+        (string Name, string Typ, string Inhalt)? anhang = null)
     {
         var wer = await benutzer.ErmittelnAsync(abbruch);
         var id = Ids.Neu();
@@ -30,6 +31,10 @@ public sealed class PostausgangDienst(
 
         var nachricht = new AusgehendeNachricht(Kanal.EMail, eMail, anzeigename, betreff, inhalt, sprache,
             uhr.GetUtcNow(), wer.Anzeige, personId, link, id);
+        if (anhang is { } a)
+        {
+            nachricht.MitAnhang(a.Name, a.Typ, a.Inhalt);
+        }
         speicher.Hinzufuegen(nachricht);
         await protokoll.ProtokollierenAsync("Postausgang.MailEingereiht",
             $"Mail an {(personId is { } p ? Domain.Datenschutz.Pseudonym.Person(p) : "externe Adresse")} in den Postausgang gelegt", nameof(AusgehendeNachricht), nachricht.Id,
