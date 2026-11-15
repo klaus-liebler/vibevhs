@@ -74,7 +74,7 @@ internal sealed class ShopTestHost : IAsyncDisposable
         s.AddScoped<BenutzerKontext>();
         s.AddScoped<IAktuellerBenutzer, AktuellerBenutzer>();
         s.AddVibeVhsAnwendung(new Uri("http://localhost/"))
-            .AddVibeVhsInfrastruktur(builder.Configuration, ordner)
+            .AddVibeVhsInfrastruktur(builder.Configuration, ordner, strengeAbfragepruefung: true)
             .AddVibeVhsMocks(builder.Configuration);
         s.RemoveAll<IHostedService>();
         var uhr = new FakeTimeProvider(DateTimeOffset.UtcNow);

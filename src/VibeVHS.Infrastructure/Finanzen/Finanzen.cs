@@ -151,7 +151,7 @@ internal static class FinanzMapping
 
 internal sealed class FinanzSpeicher(VibeVhsDbContext db) : IFinanzSpeicher
 {
-    public Task<Finanzeinstellungen?> EinstellungenAsync(CancellationToken abbruch = default) => db.Set<Finanzeinstellungen>().FirstOrDefaultAsync(abbruch);
+    public Task<Finanzeinstellungen?> EinstellungenAsync(CancellationToken abbruch = default) => db.Set<Finanzeinstellungen>().OrderBy(e => e.Id).FirstOrDefaultAsync(abbruch);
 
     public async Task<Nummernkreis> NummernkreisAsync(Belegart art, int jahr, CancellationToken abbruch = default)
     {

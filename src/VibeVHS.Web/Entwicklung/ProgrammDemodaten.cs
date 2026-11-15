@@ -237,7 +237,7 @@ internal static class ProgrammDemodaten
             .OrderBy(p => p.Sortierschluessel)
             .Select(p => new { p.Id, p.Anzeigename, p.Fachbereiche })
             .ToListAsync();
-        var stadtwerke = await db.Organisationen.FirstOrDefaultAsync(o => o.Name.StartsWith("Stadtwerke"));
+        var stadtwerke = await db.Organisationen.Where(o => o.Name.StartsWith("Stadtwerke")).OrderBy(o => o.Name).ThenBy(o => o.Id).FirstOrDefaultAsync();
         var horizont = DateOnly.FromDateTime(jetzt.Date).AddDays(12 * 7);
         var zaehler = 0;
         foreach (var p in plaene)

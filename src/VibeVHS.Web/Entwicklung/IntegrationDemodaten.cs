@@ -63,7 +63,7 @@ internal static class IntegrationDemodaten
 
         // Eine vergangene Anwesenheit mit „Zweifel“ beim Sichtvergleich → vorläufig, Aufgabe Ausweiskontrolle
         if (await db.Kurse.IgnoreAutoIncludes().FirstOrDefaultAsync(k => k.Kursnummer == "26H-401") is { } k401
-            && await db.Set<Anwesenheit>().Where(a => a.KursId == k401.Id && a.Status == Anwesenheitsstatus.Anwesend).OrderByDescending(a => a.Datum).FirstOrDefaultAsync() is { } a)
+            && await db.Set<Anwesenheit>().Where(a => a.KursId == k401.Id && a.Status == Anwesenheitsstatus.Anwesend).OrderByDescending(a => a.Datum).ThenBy(a => a.Id).FirstOrDefaultAsync() is { } a)
         {
             a.VorlaeufigSetzen(IntegrationDienst.GrundZweifel);
             await db.SaveChangesAsync();

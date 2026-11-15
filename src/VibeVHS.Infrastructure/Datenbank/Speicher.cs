@@ -47,12 +47,12 @@ internal sealed class NachrichtenSpeicher(VibeVhsDbContext db) : INachrichtenSpe
     public async Task<IReadOnlyList<AusgehendeNachricht>> WartendeAsync(int maximal, CancellationToken abbruch = default)
         => await db.Postausgang
             .Where(n => n.Status == NachrichtenStatus.Wartend)
-            .OrderBy(n => n.ErstelltAm)
+            .OrderBy(n => n.ErstelltAm).ThenBy(n => n.Id)
             .Take(maximal)
             .ToListAsync(abbruch);
 
     public async Task<IReadOnlyList<AusgehendeNachricht>> NeuesteAsync(int anzahl, CancellationToken abbruch = default)
-        => await db.Postausgang.AsNoTracking().OrderByDescending(n => n.ErstelltAm).Take(anzahl).ToListAsync(abbruch);
+        => await db.Postausgang.AsNoTracking().OrderByDescending(n => n.ErstelltAm).ThenByDescending(n => n.Id).Take(anzahl).ToListAsync(abbruch);
 
     public Task<int> AnzahlAsync(NachrichtenStatus status, CancellationToken abbruch = default)
         => db.Postausgang.CountAsync(n => n.Status == status, abbruch);
@@ -71,5 +71,5 @@ internal sealed class AuditProtokoll(VibeVhsDbContext db, IAktuellerBenutzer ben
     }
 
     public async Task<IReadOnlyList<AuditEintrag>> NeuesteAsync(int anzahl, CancellationToken abbruch = default)
-        => await db.Protokoll.AsNoTracking().OrderByDescending(e => e.Zeitpunkt).Take(anzahl).ToListAsync(abbruch);
+        => await db.Protokoll.AsNoTracking().OrderByDescending(e => e.Zeitpunkt).ThenByDescending(e => e.Id).Take(anzahl).ToListAsync(abbruch);
 }

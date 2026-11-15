@@ -17,9 +17,10 @@ namespace VibeVHS.Infrastructure;
 
 public static class Registrierung
 {
+    /// <param name="strengeAbfragepruefung">Abfragen ohne eindeutige Sortierung brechen ab (Entwicklung, Tests) statt nur protokolliert zu werden.</param>
     /// <param name="basisVerzeichnis">Relative Datenbankpfade werden hierzu aufgelöst (Inhaltsverzeichnis der Anwendung).</param>
     public static IServiceCollection AddVibeVhsInfrastruktur(this IServiceCollection dienste, IConfiguration konfiguration,
-        string basisVerzeichnis)
+        string basisVerzeichnis, bool strengeAbfragepruefung = false)
     {
         var verbindung = new SqliteConnectionStringBuilder(konfiguration.GetConnectionString("VibeVHS") ?? "Data Source=data/vibevhs.db");
         if (!Path.IsPathRooted(verbindung.DataSource) && verbindung.DataSource != ":memory:")
@@ -28,7 +29,7 @@ public static class Registrierung
         }
 
         dienste.AddDbContext<VibeVhsDbContext>(o => o.UseSqlite(verbindung.ToString(),
-            s => s.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+            s => s.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)).Konfigurieren(strengeAbfragepruefung));
 
         dienste.AddScoped<IPersonenSpeicher, PersonenSpeicher>();
         dienste.AddScoped<INachrichtenSpeicher, NachrichtenSpeicher>();

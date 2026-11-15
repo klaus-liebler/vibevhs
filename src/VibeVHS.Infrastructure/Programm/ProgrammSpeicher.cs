@@ -144,12 +144,12 @@ internal sealed class GlobaleSuche(VibeVhsDbContext db, IPersonenAbfrage persone
             orte = orte.Where(o => o.Suchtext.Contains(w));
         }
 
-        foreach (var k in await kurse.OrderByDescending(k => k.Kursnummer).Take(jeTyp).Select(k => new { k.Id, k.Kursnummer, k.Titel }).ToListAsync(abbruch))
+        foreach (var k in await kurse.OrderByDescending(k => k.Kursnummer).ThenBy(k => k.Id).Take(jeTyp).Select(k => new { k.Id, k.Kursnummer, k.Titel }).ToListAsync(abbruch))
         {
             treffer.Add(new Suchtreffer(Treffertyp.Kurs, $"{k.Kursnummer} {k.Titel}", null, $"kurse/{k.Id}"));
         }
 
-        foreach (var o in await orte.OrderBy(o => o.Name).Take(jeTyp).Select(o => new { o.Id, o.Name, o.Kurzname, o.Stadt, o.Art }).ToListAsync(abbruch))
+        foreach (var o in await orte.OrderBy(o => o.Name).ThenBy(o => o.Id).Take(jeTyp).Select(o => new { o.Id, o.Name, o.Kurzname, o.Stadt, o.Art }).ToListAsync(abbruch))
         {
             treffer.Add(new Suchtreffer(Treffertyp.Ort, o.Kurzname is null ? o.Name : $"{o.Kurzname} {o.Name}",
                 o.Stadt ?? o.Art.ToString(), $"orte?id={o.Id}"));

@@ -100,7 +100,7 @@ internal static class FinanzDemodaten
         // Ältere Rechnungen (September), damit das Mahnwesen etwas zu tun hat
         var aelter = await db.Belegungen.IgnoreAutoIncludes().AsNoTracking()
             .Where(b => b.Status == Belegungsstatus.Angemeldet && b.Zahlart == Zahlart.Ueberweisung && b.EntgeltCent > 0)
-            .OrderBy(b => b.GebuchtAm).Take(5).ToListAsync();
+            .OrderBy(b => b.GebuchtAm).ThenBy(b => b.Id).Take(5).ToListAsync();
         foreach (var b in aelter)
         {
             if (await db.Personen.FindAsync(b.PersonId) is not { IstAnonymisiert: false } p || await db.Kurse.IgnoreAutoIncludes().FirstOrDefaultAsync(k => k.Id == b.KursId) is not { } kurs)

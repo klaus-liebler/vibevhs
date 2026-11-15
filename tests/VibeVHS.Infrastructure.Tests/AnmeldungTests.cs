@@ -248,8 +248,8 @@ public class AnmeldungTests
         Kurs zweiter;
         await using (var db = t.NeuerKontext())
         {
-            var art = await db.Kursarten.FirstAsync(ct);
-            var semester = await db.Semester.FirstAsync(ct);
+            var art = await db.Kursarten.OrderBy(k => k.Name).ThenBy(k => k.Id).FirstAsync(ct);
+            var semester = await db.Semester.OrderBy(s => s.Kuerzel).ThenBy(s => s.Id).FirstAsync(ct);
             zweiter = new Kurs("26H-802", "Yoga am Morgen", semester, 8, art, 2, 10);
             zweiter.EntgeltSetzenAb(Geld.Euro(70), null, semester.Beginn, Erfassung.Erst(t.Uhr.GetLocalNow().AddMonths(-1)));
             zweiter.SerieFestlegen(new Serienregel

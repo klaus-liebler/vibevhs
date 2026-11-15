@@ -83,7 +83,7 @@ internal static class QualifikationsDemodaten
 
         // Anschlusskurs, der über den Ablauf der Zulassung hinausläuft: Ablauf mitten in der Serie wird sichtbar markiert.
         var ablaufend = ikKurse.FirstOrDefault(k => k.BenoetigteDozierendenmerkmale.Contains("alpha"))?.Leitung;
-        var art = await db.Kursarten.FirstOrDefaultAsync(k => k.Nutzungsart == VibeVHS.Domain.Programm.Nutzungsart.Integrationskurs);
+        var art = await db.Kursarten.Where(k => k.Nutzungsart == VibeVHS.Domain.Programm.Nutzungsart.Integrationskurs).OrderBy(k => k.Name).ThenBy(k => k.Id).FirstOrDefaultAsync();
         var raum = await db.Orte.FirstOrDefaultAsync(o => o.Kurzname == "A 1.10");
         var semester = (await db.Semester.ToListAsync()).Where(s => s.Beginn <= heute && heute <= s.Ende).FirstOrDefault();
         if (ablaufend is not null && art is not null && raum is not null && semester is not null && !await db.Kurse.AnyAsync(k => k.Kursnummer == semester.Kuerzel + "-405"))

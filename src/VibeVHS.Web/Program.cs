@@ -72,7 +72,7 @@ VibeVHS.Web.LanBetrieb.Einrichten(builder);
 var oeffentlicheAdresse = new Uri(builder.Configuration["OeffentlicheAdresse"] ?? "http://localhost:5189/");
 builder.Services
     .AddVibeVhsAnwendung(oeffentlicheAdresse)
-    .AddVibeVhsInfrastruktur(builder.Configuration, builder.Environment.ContentRootPath)
+    .AddVibeVhsInfrastruktur(builder.Configuration, builder.Environment.ContentRootPath, builder.Environment.IsDevelopment())
     .AddVibeVhsMocks(builder.Configuration);
 
 VibeVHS.Web.Sicherheit.Sicherheitsheader.AddRateLimits(builder.Services, builder.Configuration);

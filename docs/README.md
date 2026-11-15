@@ -57,6 +57,12 @@ dotnet test --solution VibeVHS.slnx
 
 Tests laufen mit xUnit v3 auf Microsoft.Testing.Platform (eingestellt in `global.json`).
 
+Datenbankabfragen müssen eindeutig sortiert sein, wenn sie begrenzen (`Skip`/`Take`) oder den ersten Treffer ohne
+Filter holen (`First`/`FirstOrDefault`); Listen mit Nachladen sortieren zusätzlich nach `Id` (die Personenliste über
+den Sortierschlüssel, der die Id enthält). In Entwicklung und Tests bricht eine solche Abfrage ab
+(`Abfragewarnungen.Konfigurieren`, EF-Warnungen `RowLimitingOperationWithoutOrderBy` und
+`FirstWithoutOrderByAndFilter` auf Throw), im Betrieb wird sie nur protokolliert.
+
 ## Aufbau
 
 | Projekt | Inhalt |

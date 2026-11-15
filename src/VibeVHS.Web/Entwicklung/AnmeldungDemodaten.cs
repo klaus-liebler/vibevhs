@@ -52,11 +52,11 @@ internal static class AnmeldungDemodaten
         var zeiger = 0;
         Guid Naechste() => pool[zeiger++ % pool.Count];
 
-        var stadtwerke = await db.Organisationen.AsNoTracking().FirstOrDefaultAsync(o => o.Name.StartsWith("Stadtwerke"));
+        var stadtwerke = await db.Organisationen.AsNoTracking().Where(o => o.Name.StartsWith("Stadtwerke")).OrderBy(o => o.Name).ThenBy(o => o.Id).FirstOrDefaultAsync();
         var mitarbeitende = stadtwerke is null
             ? []
             : await db.Set<Organisationszugehoerigkeit>().AsNoTracking().Where(o => o.OrganisationId == stadtwerke.Id)
-                .Select(o => EF.Property<Guid>(o, "PersonId")).Distinct().Take(10).ToListAsync();
+                .Select(o => EF.Property<Guid>(o, "PersonId")).Distinct().OrderBy(id => id).Take(10).ToListAsync();
 
         // Ermäßigung für Olena (Nachweis Bürgergeld-Bescheid)
         Ermaessigung? olenaErm = null;

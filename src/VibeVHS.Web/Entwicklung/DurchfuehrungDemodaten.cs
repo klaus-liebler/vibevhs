@@ -109,8 +109,8 @@ internal static class DurchfuehrungDemodaten
         notizen.Add($"{anzahl} Anwesenheiten");
 
         // Frühjahr 2025: Anna Schmidt (heute Becker) leitet, Olena Kovalenko nimmt teil
-        var anna = await db.Personen.FirstOrDefaultAsync(p => p.Anzeigename == "Anna Becker");
-        var olena = await db.Personen.FirstOrDefaultAsync(p => p.Anzeigename == "Olena Kovalenko");
+        var anna = await db.Personen.Where(p => p.Anzeigename == "Anna Becker").OrderBy(p => p.Sortierschluessel).FirstOrDefaultAsync();
+        var olena = await db.Personen.Where(p => p.Anzeigename == "Olena Kovalenko").OrderBy(p => p.Sortierschluessel).FirstOrDefaultAsync();
         var raum = await db.Orte.FirstOrDefaultAsync(o => o.Kurzname == "A 1.12");
         var sprachkurs = await db.Kursarten.FirstOrDefaultAsync(k => k.Name == "Sprachkurs");
         Guid? olenaBelegung = null;
@@ -173,7 +173,7 @@ internal static class DurchfuehrungDemodaten
             await dokumente.BescheinigungErstellenAsync(ob, Domain.Dokumente.Dokumentart.Teilnahmebescheinigung);
         }
 
-        var mehmet = await db.Personen.AsNoTracking().FirstOrDefaultAsync(p => p.Anzeigename == "Mehmet Yılmaz" && p.AngelegtAm > jetzt.AddDays(-30));
+        var mehmet = await db.Personen.AsNoTracking().Where(p => p.Anzeigename == "Mehmet Yılmaz" && p.AngelegtAm > jetzt.AddDays(-30)).OrderBy(p => p.Sortierschluessel).FirstOrDefaultAsync();
         var englisch = await db.Kurse.AsNoTracking().FirstOrDefaultAsync(k => k.Kursnummer == "26H-501");
         if (mehmet is not null && englisch is not null
             && await db.Belegungen.AsNoTracking().FirstOrDefaultAsync(b => b.PersonId == mehmet.Id && b.KursId == englisch.Id) is { } mb

@@ -117,7 +117,7 @@ public class BetriebTests
         try
         {
             var cs = new SqliteConnectionStringBuilder { DataSource = Path.Combine(ordner, "vibevhs.db"), Pooling = false }.ToString();
-            await using var db = new VibeVhsDbContext(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite(cs).Options);
+            await using var db = new VibeVhsDbContext(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite(cs).Konfigurieren(streng: true).Options);
             await db.Database.MigrateAsync(ct);
             db.Personen.Add(Person.Anlegen("Anna", "Becker", new DateOnly(2025, 1, 1), uhr.GetLocalNow()));
             await db.SaveChangesAsync(ct);
