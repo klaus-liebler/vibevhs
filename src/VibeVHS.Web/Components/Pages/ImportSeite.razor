@@ -1,0 +1,169 @@
+@page "/import"
+@using VibeVHS.Application.Betrieb
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+
+<PageTitle>Import · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Altdaten importieren</h1>
+        <p class="vhs-sub">Personen aus KuferSQL-Exporten (CSV): Datei wählen, Spalten zuordnen, Probelauf mit Vorschau und Dublettenprüfung – erst „Importieren“ schreibt.</p>
+    </div>
+</div>
+
+@if (!recht.Erlaubt)
+{
+    <div class="vhs-alert vhs-info">@recht.Begruendung</div>
+}
+else
+{
+    <section class="vhs-card">
+        <h2>1. Datei</h2>
+        <InputFile OnChange="LesenAsync" accept=".csv,.txt" aria-label="CSV-Datei wählen" />
+        @if (datei is { } d)
+        {
+            <p class="vhs-small">@d.Name · @d.Zeilen.Count Zeilen · Zeichensatz @d.Kodierung · Trennzeichen „@(d.Trennzeichen == '\t' ? "Tab" : d.Trennzeichen.ToString())“ · SHA-256 @d.Sha256[..16]…</p>
+        }
+        <p class="vhs-small vhs-muted">Beispieldatei: <code>tools/Testdaten/kufer-export-beispiel.csv</code> (fiktive Personen, eine Dublette in der Datei, zwei fehlerhafte Zeilen).</p>
+    </section>
+
+    @if (datei is { } dd)
+    {
+        <section class="vhs-card">
+            <h2>2. Spalten zuordnen</h2>
+            <div class="vhs-form">
+                @for (var i = 0; i < dd.Spalten.Count; i++)
+                {
+                    var nr = i;
+                    <RadzenFormField Text="@dd.Spalten[nr]">
+                        <RadzenDropDown TValue="Importfeld" Data="@(Enum.GetValues<Importfeld>())" Value="@zuordnung.GetValueOrDefault(nr)"
+                                        ValueChanged="@(v => { zuordnung[nr] = v; pruefung = null; })" />
+                    </RadzenFormField>
+                }
+            </div>
+            <h3>Vorschau (erste 5 Zeilen)</h3>
+            <div class="vhs-tbl">
+                <table>
+                    <thead><tr>@foreach (var s in dd.Spalten) { <th>@s</th> }</tr></thead>
+                    <tbody>@foreach (var z in dd.Zeilen.Take(5)) { <tr>@foreach (var f in z) { <td class="vhs-small">@f</td> }</tr> }</tbody>
+                </table>
+            </div>
+            <div class="vhs-row">
+                <BegruendeterButton Text="Probelauf (schreibt nichts)" Icon="fact_check" IsBusy="@laeuft" Click="ProbelaufAsync" />
+            </div>
+        </section>
+    }
+
+    @if (pruefung is { } p)
+    {
+        <section class="vhs-card">
+            <div class="vhs-head">
+                <h2>3. @(p.Ausgefuehrt ? "Ergebnis" : "Probelauf")</h2>
+                <BegruendeterButton Text="@($"{p.Neu} Personen importieren")" Icon="upload" ButtonStyle="ButtonStyle.Primary" IsBusy="@laeuft"
+                                    Freigabe="@(p.Ausgefuehrt ? Freigabe.Nein("Diese Datei ist importiert.") : p.Neu == 0 ? Freigabe.Nein("Keine neuen Personen in der Datei.") : Freigabe.Ja)"
+                                    Click="ImportierenAsync" />
+            </div>
+            <div class="vhs-row">
+                <StatusPille Stil="gut">@p.Neu neu</StatusPille><StatusPille Stil="warn">@p.Dubletten Dubletten</StatusPille><StatusPille Stil="krit">@p.Fehler Fehler</StatusPille>
+                @if (p.Ausgefuehrt) { <StatusPille Stil="info">@p.Angelegt angelegt</StatusPille> }
+            </div>
+            <div class="vhs-tbl">
+                <table>
+                    <thead><tr><th>Zeile</th><th>Name</th><th>Geburtsdatum</th><th>Ort</th><th>Status</th><th>Hinweis</th></tr></thead>
+                    <tbody>
+                        @foreach (var z in p.Zeilen.Take(200))
+                        {
+                            <tr>
+                                <td>@z.Nr</td><td>@z.Wert(Importfeld.Vorname) @z.Wert(Importfeld.Nachname)</td><td>@z.Wert(Importfeld.Geburtsdatum)</td><td>@z.Wert(Importfeld.Ort)</td>
+                                <td><StatusPille Stil="@(z.Status == Importstatus.Neu ? "gut" : z.Status == Importstatus.Fehler ? "krit" : "warn")">@z.Status</StatusPille></td>
+                                <td class="vhs-small">@z.Hinweis@if (z.DublettePersonId is { } did) { <span> · <a href="@($"personen/{did}")">ansehen</a></span> }</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+
+    <section class="vhs-card">
+        <h2>Bisherige Importe</h2>
+        <div class="vhs-list">
+            @if (laeufe.Count == 0) { <div class="vhs-small vhs-muted">Noch keine.</div> }
+            @foreach (var l in laeufe)
+            {
+                <div><span class="vhs-grow">@l.Am.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @l.Datei · @l.Angelegt angelegt, @l.Dubletten Dubletten, @l.Fehler Fehler · @l.Von</span></div>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private Freigabe recht = Freigabe.Ja;
+    private ImportDatei? datei;
+    private Dictionary<int, Importfeld> zuordnung = [];
+    private Importpruefung? pruefung;
+    private IReadOnlyList<VibeVHS.Domain.Personen.Importlauf> laeufe = [];
+    private bool laeuft;
+
+    protected override async Task OnInitializedAsync()
+    {
+        recht = Freigabe.NurFuer((await Vorgang.BenutzerAsync()).Rolle, Betriebsrollen.Import);
+        if (recht.Erlaubt)
+        {
+            laeufe = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ImportDienst>().LaeufeAsync());
+        }
+    }
+
+    private async Task LesenAsync(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            using var ms = new MemoryStream();
+            await e.File.OpenReadStream(10_000_000).CopyToAsync(ms);
+            datei = ImportDienst.Lesen(e.File.Name, ms.ToArray());
+            zuordnung = ImportDienst.ZuordnungVorschlagen(datei.Spalten).ToDictionary();
+            pruefung = null;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException)
+        {
+            Hinweise.Notify(NotificationSeverity.Warning, "Datei", ex.Message);
+        }
+    }
+
+    private async Task ProbelaufAsync()
+    {
+        laeuft = true;
+        try
+        {
+            pruefung = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ImportDienst>().ProbelaufAsync(datei!, zuordnung));
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Warning, "Nicht möglich", ex.Message);
+        }
+        finally
+        {
+            laeuft = false;
+        }
+    }
+
+    private async Task ImportierenAsync()
+    {
+        laeuft = true;
+        try
+        {
+            pruefung = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ImportDienst>().ImportierenAsync(datei!, zuordnung));
+            laeufe = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ImportDienst>().LaeufeAsync());
+            Hinweise.Notify(NotificationSeverity.Success, "Import", $"{pruefung.Angelegt} Personen angelegt.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Warning, "Nicht möglich", ex.Message);
+        }
+        finally
+        {
+            laeuft = false;
+        }
+    }
+}

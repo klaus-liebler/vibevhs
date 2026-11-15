@@ -56,6 +56,10 @@ public static class Registrierung
         dienste.AddScoped<Application.Aufgaben.IAufgabenSpeicher, Aufgaben.AufgabenSpeicher>();
         dienste.AddScoped<Application.Finanzen.IFinanzSpeicher, Finanzen.FinanzSpeicher>();
         dienste.AddScoped<Application.Integration.IIntegrationSpeicher, Integration.IntegrationSpeicher>();
+        dienste.AddScoped<Application.Betrieb.IAuswertungsquelle, Betrieb.Auswertungsquelle>();
+        dienste.AddSingleton<Application.Betrieb.ITabellenExport, Betrieb.TabellenExport>();
+        dienste.AddScoped<Application.Betrieb.ISicherung, Betrieb.SqliteSicherung>();
+        dienste.AddScoped<Application.Betrieb.IImportSpeicher, Betrieb.ImportSpeicher>();
         dienste.AddScoped<Application.Finanzen.IFinanzprotokoll, Finanzen.Finanzprotokoll>();
         dienste.AddScoped<Anmeldung.AnmeldungSpeicher>();
         dienste.AddScoped<Application.Anmeldung.IAnmeldungSpeicher>(d => d.GetRequiredService<Anmeldung.AnmeldungSpeicher>());
@@ -95,6 +99,12 @@ public static class Registrierung
             q.AddJob<IntegrationJob>(j => j.WithIdentity(IntegrationJob.Schluessel));
             q.AddTrigger(t => t.ForJob(IntegrationJob.Schluessel).WithIdentity("integration-nachts", "automatik").WithCronSchedule("0 45 2 * * ?"));
             q.AddTrigger(t => t.ForJob(IntegrationJob.Schluessel).WithIdentity("integration-start", "automatik").StartAt(DateTimeOffset.UtcNow.AddSeconds(75)));
+            if (konfiguration.GetValue("Sicherung:Aktiv", true))
+            {
+                q.AddJob<SicherungJob>(j => j.WithIdentity(SicherungJob.Schluessel));
+                q.AddTrigger(t => t.ForJob(SicherungJob.Schluessel).WithIdentity("sicherung-nachts", "automatik").WithCronSchedule(konfiguration["Sicherung:Zeitplan"] ?? "0 30 1 * * ?"));
+            }
+
             q.AddJob<FinanzJob>(j => j.WithIdentity(FinanzJob.Schluessel));
             q.AddTrigger(t => t.ForJob(FinanzJob.Schluessel).WithIdentity("finanzen-morgens", "automatik").WithCronSchedule("0 30 6 * * ?"));
             q.AddTrigger(t => t.ForJob(FinanzJob.Schluessel).WithIdentity("finanzen-start", "automatik").StartAt(DateTimeOffset.UtcNow.AddSeconds(60)));

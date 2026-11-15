@@ -25,6 +25,7 @@
   <ItemGroup>
     <None Include="..\..\tools\Testdaten\testbenutzer-vhs-egs.json" Link="testbenutzer-vhs-egs.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Schemas\**\*.xsd" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\tools\Testdaten\kufer-export-beispiel.csv" Link="kufer-export-beispiel.csv" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

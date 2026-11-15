@@ -60,3 +60,16 @@ internal sealed class IntegrationJob(VibeVHS.Application.Integration.Integration
         log.LogInformation("Integrationskurse: {Geloescht} Lichtbilder gelöscht; Aufgaben {Aufgaben}", geloescht, aufgaben);
     }
 }
+
+/// <summary>Täglich 01:30: Online-Sicherung der Datenbank mit Prüfsumme und Wiederherstellungstest.</summary>
+[DisallowConcurrentExecution]
+internal sealed class SicherungJob(VibeVHS.Application.Betrieb.ISicherung sicherung, ILogger<SicherungJob> log) : IJob
+{
+    public static readonly JobKey Schluessel = new("sicherung", "automatik");
+
+    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
+    {
+        var e = await sicherung.SichernAsync(cancellationToken);
+        log.LogInformation("Sicherung {Datei}: {Ergebnis}", e.Datei, e.Pruefergebnis);
+    }
+}

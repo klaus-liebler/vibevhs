@@ -1,0 +1,104 @@
+@page "/betrieb"
+@using VibeVHS.Application.Betrieb
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+
+<PageTitle>Betrieb · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Betrieb</h1>
+        <p class="vhs-sub">Datensicherung mit Prüfsumme und Wiederherstellungstest, Sicherheitseinstellungen. Ausführliche Hinweise in docs/betrieb.md und docs/sicherheit.md.</p>
+    </div>
+    <div class="vhs-row">
+        <BegruendeterButton Text="Jetzt sichern" Icon="backup" IsBusy="@laeuft" Freigabe="@recht" Click="SichernAsync" />
+    </div>
+</div>
+
+@if (!recht.Erlaubt)
+{
+    <div class="vhs-alert vhs-info">@recht.Begruendung</div>
+}
+else
+{
+    <section class="vhs-card">
+        <div class="vhs-head"><h2>Sicherungen</h2><span class="vhs-small vhs-muted">täglich 01:30 Uhr (SQLite-Online-Sicherung), die letzten 14 bleiben erhalten</span></div>
+        <div class="vhs-tbl">
+            <table>
+                <thead><tr><th>Datei</th><th>Zeit</th><th>Größe</th><th>SHA-256</th><th>Wiederherstellungstest</th><th></th></tr></thead>
+                <tbody>
+                    @if (liste.Count == 0) { <tr><td colspan="6" class="vhs-muted">Noch keine Sicherung.</td></tr> }
+                    @foreach (var e in liste)
+                    {
+                        <tr>
+                            <td class="vhs-mono vhs-small">@e.Datei</td><td>@e.Am.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td><td>@((e.Bytes / 1024.0 / 1024.0).ToString("0.0")) MB</td>
+                            <td class="vhs-mono vhs-small">@e.Sha256[..16]…</td>
+                            <td><StatusPille Stil="@(e.Wiederherstellbar == true ? "gut" : e.Wiederherstellbar == false ? "krit" : "neutral")">@(e.Wiederherstellbar == true ? "ok" : e.Wiederherstellbar == false ? "Fehler" : "offen")</StatusPille>
+                                <span class="vhs-small vhs-muted"> @e.Pruefergebnis</span></td>
+                            <td><BegruendeterButton Text="erneut prüfen" Size="ButtonSize.ExtraSmall" Variant="Variant.Text" Freigabe="@recht" Click="@(() => PruefenAsync(e.Datei))" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="vhs-small vhs-muted">Wiederherstellung im Notfall: Anwendung beenden, gewünschte Sicherung nach Prüfsummenvergleich als <code>vibevhs.db</code> einsetzen, starten (Anleitung in docs/betrieb.md). Für Linux ist eine Litestream-Konfiguration vorbereitet (<code>deploy/litestream.yml</code>).</p>
+    </section>
+
+    <section class="vhs-card">
+        <h2>Sicherheit</h2>
+        <div class="vhs-list">
+            <div><StatusPille Stil="gut">aktiv</StatusPille><span class="vhs-grow">Sicherheitsheader: Content-Security-Policy, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy (Kamera nur für diese Seite)</span></div>
+            <div><StatusPille Stil="gut">aktiv</StatusPille><span class="vhs-grow">Rate-Limit für öffentliche Seiten (Anmeldung, Check-in, Übersetzungslinks): @rateLimit Aufrufe je Minute und Adresse</span></div>
+            <div><StatusPille Stil="gut">aktiv</StatusPille><span class="vhs-grow">Personen- und Finanzdaten mit „Cache-Control: no-store“</span></div>
+            <div><StatusPille Stil="warn">offen</StatusPille><span class="vhs-grow">CSP noch mit 'unsafe-inline' (Inline-Styles, zwei Inline-Handler) – siehe docs/sicherheit.md</span></div>
+        </div>
+    </section>
+}
+
+@code {
+    [Inject]
+    private IConfiguration Konfiguration { get; set; } = default!;
+
+    private Freigabe recht = Freigabe.Ja;
+    private IReadOnlyList<Sicherungseintrag> liste = [];
+    private bool laeuft;
+    private int rateLimit;
+
+    protected override async Task OnInitializedAsync()
+    {
+        recht = Freigabe.NurFuer((await Vorgang.BenutzerAsync()).Rolle, Betriebsrollen.Sicherung);
+        rateLimit = Konfiguration.GetValue("Sicherheit:RateLimitProMinute", 60);
+        if (recht.Erlaubt)
+        {
+            await LadenAsync();
+        }
+    }
+
+    private async Task LadenAsync() => liste = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ISicherung>().ListeAsync());
+
+    private async Task SichernAsync()
+    {
+        laeuft = true;
+        try
+        {
+            var e = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ISicherung>().SichernAsync());
+            Hinweise.Notify(e.Wiederherstellbar == true ? NotificationSeverity.Success : NotificationSeverity.Error, "Sicherung", $"{e.Datei}: {e.Pruefergebnis}");
+            await LadenAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Warning, "Nicht möglich", ex.Message);
+        }
+        finally
+        {
+            laeuft = false;
+        }
+    }
+
+    private async Task PruefenAsync(string datei)
+    {
+        var e = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ISicherung>().PruefenAsync(datei));
+        Hinweise.Notify(e.Wiederherstellbar == true ? NotificationSeverity.Success : NotificationSeverity.Error, "Wiederherstellungstest", e.Pruefergebnis ?? "");
+        await LadenAsync();
+    }
+}

@@ -1,0 +1,111 @@
+@page "/auswertungen"
+@using VibeVHS.Application.Betrieb
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+@inject NavigationManager Navigation
+
+<PageTitle>Auswertungen · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Auswertungen und Statistik</h1>
+        <p class="vhs-sub">Fertige Auswertungen mit Filter, Export als Excel (XLSX) oder CSV. Statistiken enthalten nur aggregierte Zahlen. Jeder Export wird protokolliert.</p>
+    </div>
+</div>
+
+<div class="vhs-row">
+    <RadzenDropDown TValue="string" Data="@AuswertungsDienst.Berichte" TextProperty="Name" ValueProperty="Schluessel" @bind-Value="bericht" @bind-Value:after="LadenAsync"
+                    Style="min-width:280px" aria-label="Auswertung" />
+    <RadzenDropDown TValue="Guid?" Data="@semester" TextProperty="Name" ValueProperty="Id" @bind-Value="semesterId" @bind-Value:after="LadenAsync" AllowClear="true"
+                    Placeholder="alle Semester" Style="min-width:180px" aria-label="Semester" />
+    <RadzenDropDown TValue="int?" Data="@fachbereiche" TextProperty="Name" ValueProperty="Nr" @bind-Value="fb" @bind-Value:after="LadenAsync" AllowClear="true"
+                    Placeholder="alle Fachbereiche" Style="min-width:200px" aria-label="Fachbereich" />
+    <RadzenNumeric TValue="int" @bind-Value="jahr" @bind-Value:after="LadenAsync" Min="2020" Max="2040" Style="width:100px" aria-label="Jahr" />
+    <a class="rz-button rz-button-md rz-variant-filled rz-primary" href="@Link("xlsx")" data-enhance-nav="false" download>Excel</a>
+    <a class="rz-button rz-button-md rz-variant-outlined rz-base" href="@Link("csv")" data-enhance-nav="false" download>CSV</a>
+    @if (AuswertungsDienst.Berichte.First(b => b.Schluessel == bericht).Statistik)
+    {
+        <BegruendeterButton Text="An die Statistikstelle übermitteln (Mock)" Icon="send" ButtonStyle="ButtonStyle.Light"
+                            Freigabe="@Freigabe.NurFuer(rolle, Rolle.Leitung, Rolle.Verwaltungsleitung)" Click="UebermittelnAsync" />
+    }
+</div>
+
+@if (fehler is not null)
+{
+    <div class="vhs-alert vhs-info">@fehler</div>
+}
+else if (t is { } tab)
+{
+    <section class="vhs-card">
+        <div class="vhs-head"><h2>@tab.Titel</h2><span class="vhs-small vhs-muted">@tab.Zeilen.Count Zeilen</span></div>
+        <p class="vhs-small vhs-muted" style="margin:0">@tab.Beschreibung</p>
+        <div class="vhs-tbl">
+            <table>
+                <thead><tr>@foreach (var s in tab.Spalten) { <th style="@(s.Typ == Spaltentyp.Text ? "" : "text-align:right")">@s.Titel</th> }</tr></thead>
+                <tbody>
+                    @foreach (var z in tab.Zeilen.Take(300))
+                    {
+                        <tr>@for (var i = 0; i < tab.Spalten.Count; i++) { <td style="@(tab.Spalten[i].Typ == Spaltentyp.Text ? "" : "text-align:right")">@Tabelle.Text(z[i], tab.Spalten[i].Typ)</td> }</tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (tab.Zeilen.Count > 300) { <p class="vhs-small vhs-muted">Angezeigt: die ersten 300 Zeilen. Der Export enthält alle.</p> }
+    </section>
+}
+
+@code {
+    private sealed record SemesterAuswahl(Guid? Id, string Name);
+
+    private sealed record FbAuswahl(int? Nr, string Name);
+
+    private string bericht = "kurse";
+    private Guid? semesterId;
+    private int? fb;
+    private int jahr = DateTime.Today.Year;
+    private Tabelle? t;
+    private string? fehler;
+    private Rolle? rolle;
+    private IReadOnlyList<SemesterAuswahl> semester = [];
+    private IReadOnlyList<FbAuswahl> fachbereiche = [];
+
+    private string Link(string format) => $"auswertungen/{bericht}.{format}?jahr={jahr}{(semesterId is { } s ? $"&semester={s}" : "")}{(fb is { } f ? $"&fb={f}" : "")}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var q = d.GetRequiredService<IAuswertungsquelle>();
+            semester = (await q.SemesterAsync()).Select(s => new SemesterAuswahl(s.Id, s.Name)).ToList();
+            fachbereiche = (await q.FachbereicheAsync()).OrderBy(f => f.Key).Select(f => new FbAuswahl(f.Key, $"{f.Key} {f.Value}")).ToList();
+        });
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync()
+    {
+        try
+        {
+            t = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AuswertungsDienst>().TabelleAsync(bericht, new Auswertungsfilter(semesterId, fb, jahr)));
+            fehler = null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            fehler = ex.Message;
+        }
+    }
+
+    private async Task UebermittelnAsync()
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AuswertungsDienst>().UebermittelnAsync(bericht, jahr));
+            Hinweise.Notify(NotificationSeverity.Success, "Statistik", "Übermittelt (Mock) – siehe Postausgang.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Warning, "Nicht möglich", ex.Message);
+        }
+    }
+}

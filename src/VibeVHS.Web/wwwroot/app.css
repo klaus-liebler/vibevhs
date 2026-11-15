@@ -231,3 +231,15 @@ details.vhs-card > summary { cursor: pointer; }
 .vhs-wsa h2 .vhs-zahl { font-weight: 500; color: var(--vhs-muted); margin-left: 6px; }
 @media (max-width: 600px) { .vhs-wsa { grid-template-columns: 1fr; } }
 .vhs-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 12px; }
+
+/* Dashboard (I8): ein Merkmal, eine Farbe; Spur recessiv, Wert mit gerundetem Ende */
+.vhs-balken { display: flex; flex-direction: column; gap: 6px; }
+.vhs-balken-zeile { display: grid; grid-template-columns: minmax(120px, 38%) 1fr 48px; gap: 8px; align-items: center; }
+.vhs-balken-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vhs-balken-spur { height: 14px; background: var(--vhs-surface-2); border-radius: 4px; overflow: hidden; }
+.vhs-balken-wert { display: block; height: 100%; background: var(--vhs-accent); border-radius: 0 4px 4px 0; }
+.vhs-balken-zahl { font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+.vhs-saeulen { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; align-items: end; height: 180px; }
+.vhs-saeule { display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; }
+.vhs-saeule-spur { flex: 1; width: 70%; display: flex; align-items: flex-end; }
+.vhs-saeule-wert { display: block; width: 100%; background: var(--vhs-accent); border-radius: 4px 4px 0 0; min-height: 1px; }

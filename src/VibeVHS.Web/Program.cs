@@ -63,6 +63,7 @@ builder.Services
     .AddVibeVhsInfrastruktur(builder.Configuration, builder.Environment.ContentRootPath)
     .AddVibeVhsMocks(builder.Configuration);
 
+VibeVHS.Web.Sicherheit.Sicherheitsheader.AddRateLimits(builder.Services, builder.Configuration);
 builder.Services.AddSingleton(new VibeVHS.Application.Integration.IntegrationOptionen(builder.Configuration.GetValue("Integration:LichtbildFristTage", 14)));
 
 // Zusätzliche Honorarmodelle (Plugins): je DLL im Ordner „plugins/honorare“ (Erweiterungspunkt, I6).
@@ -151,7 +152,11 @@ if (app.Configuration["PathBase"] is { Length: > 1 } pfad)
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseHsts();
 }
+
+VibeVHS.Web.Sicherheit.Sicherheitsheader.UseSicherheitsheader(app);
+app.UseRateLimiter();
 
 app.UseSerilogRequestLogging();
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
@@ -253,6 +258,27 @@ app.MapGet("/finanzen/pruefexport", async (DateOnly von, DateOnly bis, VibeVHS.A
     {
         var (datei, zip) = await gobd.PruefexportAsync(von, bis);
         return Results.File(zip, "application/zip", datei);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Problem(ex.Message, statusCode: StatusCodes.Status403Forbidden);
+    }
+}).RequireAuthorization();
+// Auswertungen als XLSX oder CSV (Rechte und Fachbereichsfilter im Dienst; jeder Export wird protokolliert).
+app.MapGet("/auswertungen/{bericht}.{format}", async (string bericht, string format, Guid? semester, int? fb, int? jahr,
+    VibeVHS.Application.Betrieb.AuswertungsDienst dienst, VibeVHS.Application.Betrieb.ITabellenExport export) =>
+{
+    try
+    {
+        var t = await dienst.TabelleAsync(bericht, new VibeVHS.Application.Betrieb.Auswertungsfilter(semester, fb, jahr));
+        await dienst.ExportProtokollierenAsync(bericht, format);
+        var datei = $"{bericht}-{DateTime.Today:yyyy-MM-dd}.{format}";
+        return format switch
+        {
+            "xlsx" => Results.File(export.Xlsx(t), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", datei),
+            "csv" => Results.File(t.Csv(), "text/csv; charset=utf-8", datei),
+            _ => Results.NotFound(),
+        };
     }
     catch (InvalidOperationException ex)
     {

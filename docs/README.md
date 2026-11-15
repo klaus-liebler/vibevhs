@@ -343,6 +343,26 @@ Fachbereichsleitung und Prüfung lesen).
   Aufbewahrungsgrund (Frist „integrationskurs“).
 - Noch offen: echte InGe-Online-Anbindung, BAMF-Formulare als PDF, NFC-Auslesen (FA-138, Ausbaustufe).
 
+## Betrieb und Daten (I8, FA-50 bis FA-52)
+
+- **Dashboard** `/dashboard`: Auslastung, Umsatz des Jahres, Ausfallquote, offene/überfällige Aufgaben, Auslastung je
+  Fachbereich, Umsatz je Monat, unterbelegte Kurse (Fachbereichsleitungen sehen ihre Fachbereiche).
+- **Auswertungen** `/auswertungen`: Kursliste mit Belegung, Auslastung je Fachbereich, Umsatz je Monat/Fachbereich,
+  unterbelegte Kurse; Filter Semester/Fachbereich/Jahr; Export **XLSX (ClosedXML)** und **CSV** (UTF-8 mit BOM, Semikolon);
+  jeder Export wird protokolliert.
+- **Statistik-Mock**: VHS-Statistik (DIE) je Programmbereich mit Geschlecht und Altersgruppen und WbG NRW je Sachbereich –
+  nur aggregierte Zahlen; Übermittlung (Leitung/Verwaltungsleitung) als Mock über den Postausgang. Die Zuordnung
+  Fachbereich → Programm-/Sachbereich ist mit der Statistikstelle abzustimmen.
+- **Sicherung** `/betrieb`: tägliche SQLite-Online-Sicherung mit SHA-256 und automatischem Wiederherstellungstest,
+  Aufbewahrung der letzten 14; Litestream-Vorlage für Linux. Details: `docs/betrieb.md`.
+- **Sicherheit**: Sicherheitsheader, Rate-Limits für öffentliche Seiten, no-store für sensible Seiten; OWASP-Checkliste
+  in `docs/sicherheit.md`.
+- **Lastmessung** (3.000 Personen, 500 Kurse, 6.000 Belegungen): alle gemessenen Abfragen unter 0,6 s (`docs/betrieb.md`).
+- **Import** `/import`: KuferSQL-CSV (UTF-8 oder Windows-Zeichensatz, Trennzeichen erkannt), Zuordnungsvorschlag aus
+  typischen Spaltennamen, Vorschau, **Probelauf ohne Schreiben** mit Prüfung (Pflichtfelder, Datum, PLZ, E-Mail) und
+  Dublettensuche (Datenbank und Datei); der Import legt nur neue Personen an und merkt sich die Altnummern.
+  Beispieldatei: `tools/Testdaten/kufer-export-beispiel.csv`. Kurse und Belegungen aus Altdaten folgen bei Bedarf.
+
 ## Testbenutzer der Pilot-VHS
 
 Die Startdaten liegen in [`tools/Testdaten/testbenutzer-vhs-egs.json`](../tools/Testdaten/testbenutzer-vhs-egs.json)

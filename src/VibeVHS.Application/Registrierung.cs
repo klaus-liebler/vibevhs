@@ -31,6 +31,8 @@ public static class Registrierung
         dienste.AddScoped<Programm.Entfernungen>();
         dienste.TryAddSingleton(new Integration.IntegrationOptionen());
         dienste.AddScoped<Integration.IntegrationDienst>();
+        dienste.AddScoped<Betrieb.AuswertungsDienst>();
+        dienste.AddScoped<Betrieb.ImportDienst>();
         dienste.AddScoped<Integration.IntegrationRoutinen>();
         dienste.AddScoped<Finanzen.FinanzDienst>();
         dienste.AddScoped<Finanzen.ZahlungsDienst>();

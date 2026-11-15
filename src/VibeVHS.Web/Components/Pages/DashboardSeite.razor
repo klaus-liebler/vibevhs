@@ -1,0 +1,101 @@
+@page "/dashboard"
+@using VibeVHS.Application.Betrieb
+@using VibeVHS.Domain.Gemeinsam
+@inject Vorgang Vorgang
+
+<PageTitle>Dashboard · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Dashboard</h1>
+        <p class="vhs-sub">Belegung, Umsatz, Ausfälle und offene Aufgaben auf einen Blick. Details und Export unter <a href="auswertungen">Auswertungen</a>.</p>
+    </div>
+    <div class="vhs-row">
+        <RadzenDropDown TValue="Guid?" Data="@semester" TextProperty="Name" ValueProperty="Id" @bind-Value="semesterId" @bind-Value:after="LadenAsync"
+                        AllowClear="true" Placeholder="alle Semester" Style="min-width:200px" aria-label="Semester" />
+    </div>
+</div>
+
+@if (fehler is not null)
+{
+    <div class="vhs-alert vhs-info">@fehler</div>
+}
+else if (d is { } x)
+{
+    <div class="vhs-kpis">
+        <div class="vhs-kpi"><div class="vhs-kpi-lbl">Auslastung</div><div class="vhs-kpi-val">@x.Auslastung.ToString("0.#") %</div><div class="vhs-kpi-note">@x.Belegungen von @x.Plaetze Plätzen · @x.Zeitraum</div></div>
+        <div class="vhs-kpi"><div class="vhs-kpi-lbl">Umsatz @DateTime.Today.Year</div><div class="vhs-kpi-val">@(new Geld(x.UmsatzJeMonat.Sum(m => m.UmsatzCent)))</div><div class="vhs-kpi-note">Rechnungen abzgl. Stornos und Gutschriften</div></div>
+        <div class="vhs-kpi"><div class="vhs-kpi-lbl">Ausfallquote</div><div class="vhs-kpi-val">@x.Ausfallquote.ToString("0.#") %</div><div class="vhs-kpi-note">@x.TermineAusgefallen von @x.Termine Terminen · @x.KurseAbgesagt Kurs(e) abgesagt</div></div>
+        <div class="vhs-kpi"><div class="vhs-kpi-lbl">Offene Aufgaben</div><div class="vhs-kpi-val">@x.OffeneAufgaben</div><div class="vhs-kpi-note">@x.UeberfaelligeAufgaben überfällig · <a href="aufgaben?ansicht=alle">ansehen</a></div></div>
+    </div>
+
+    <div class="vhs-wsa">
+        <section class="vhs-card" aria-labelledby="h-auslastung">
+            <h2 id="h-auslastung">Auslastung je Fachbereich</h2>
+            <div class="vhs-balken" role="table" aria-label="Auslastung je Fachbereich">
+                @foreach (var f in x.JeFachbereich)
+                {
+                    var quote = f.Plaetze == 0 ? 0 : Math.Min(100, Math.Round(100m * f.Belegt / f.Plaetze, 1));
+                    <div class="vhs-balken-zeile" role="row" title="@($"{f.Fachbereich}: {f.Belegt} von {f.Plaetze} Plätzen ({quote:0.#} %)")">
+                        <span class="vhs-balken-name" role="cell">@f.Fachbereich</span>
+                        <span class="vhs-balken-spur" role="cell"><span class="vhs-balken-wert" style="width:@(quote.ToString(System.Globalization.CultureInfo.InvariantCulture))%"></span></span>
+                        <span class="vhs-balken-zahl" role="cell">@quote.ToString("0") %</span>
+                    </div>
+                }
+            </div>
+        </section>
+        <section class="vhs-card" aria-labelledby="h-umsatz">
+            <h2 id="h-umsatz">Umsatz je Monat @DateTime.Today.Year</h2>
+            @{ var max = Math.Max(1, x.UmsatzJeMonat.Max(m => m.UmsatzCent)); }
+            <div class="vhs-saeulen" role="table" aria-label="Umsatz je Monat">
+                @foreach (var m in x.UmsatzJeMonat)
+                {
+                    var h = Math.Max(0, 100.0 * m.UmsatzCent / max);
+                    <div class="vhs-saeule" role="row" title="@($"{m.Monat}: {new Geld(m.UmsatzCent)}")">
+                        <span class="vhs-saeule-spur" role="cell"><span class="vhs-saeule-wert" style="height:@(h.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></span></span>
+                        <span class="vhs-small vhs-muted" role="cell">@m.Monat</span>
+                    </div>
+                }
+            </div>
+        </section>
+        <section class="vhs-card" aria-labelledby="h-unter">
+            <h2 id="h-unter">Unterbelegt, demnächst</h2>
+            <div class="vhs-list">
+                @if (x.Unterbelegt.Count == 0) { <div class="vhs-small vhs-muted">Keine unterbelegten Kurse in Sicht.</div> }
+                @foreach (var u in x.Unterbelegt)
+                {
+                    <div><span class="vhs-grow">@u.Kurs</span><StatusPille Stil="warn">@u.Belegt von mind. @u.Min</StatusPille></div>
+                }
+            </div>
+        </section>
+    </div>
+}
+
+@code {
+    private Dashboarddaten? d;
+    private string? fehler;
+    private Guid? semesterId;
+    private IReadOnlyList<Auswahl> semester = [];
+
+    private sealed record Auswahl(Guid? Id, string Name);
+
+    protected override async Task OnInitializedAsync()
+    {
+        semester = (await Vorgang.AusfuehrenAsync(s => s.GetRequiredService<IAuswertungsquelle>().SemesterAsync())).Select(x => new Auswahl(x.Id, x.Name)).ToList();
+        semesterId = semester.FirstOrDefault()?.Id;
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync()
+    {
+        try
+        {
+            d = await Vorgang.AusfuehrenAsync(s => s.GetRequiredService<AuswertungsDienst>().DashboardAsync(semesterId));
+            fehler = null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            fehler = ex.Message;
+        }
+    }
+}

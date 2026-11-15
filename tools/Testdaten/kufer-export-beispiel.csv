@@ -1,0 +1,9 @@
+﻿TN-Nr;Name;Vorname;GebDatum;Strasse;PLZ;Ort;E-Mail;Telefon
+100231;Kowalski;Jan;03.04.1978;Am Markt 3;48282;Emsdetten;jan.kowalski@example.org;02572 123456
+100232;Yılmaz;Elif;17.11.1990;Rheiner Straße 12;48268;Greven;elif.y@example.org;
+100233;Schulte-Brüning;Hildegard;01.02.1951;"Kirchweg 5; Hinterhaus";48369;Saerbeck;;02574 8899
+100234;Nguyen;Thi Lan;29.02.1988;Hauptstr. 1;48282;Emsdetten;lan.nguyen@example;
+100235;Kowalski;Jan;03.04.1978;Am Markt 3;48282;Emsdetten;;
+100236;;Peter;12.12.1985;Weg 1;48282;Emsdetten;;
+100237;Ivanova;Olga;5.6.1969;Lindenallee 7;4828;Emsdetten;olga@example.org;
+100238;Becker;Lukas;14.08.2001;Bahnhofstr. 22;48268;Greven;lukas.becker@example.org;0151 2345678

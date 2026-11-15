@@ -15,7 +15,7 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261115101055_Integrationskurse";
+    public override string LastMigrationId => "20261115102612_Betrieb";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -1998,6 +1998,49 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.HasIndex("PersonId", "GueltigVon");
 
                 b.ToTable("PersonEinwilligungen");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Personen.Importlauf", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("Am")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("Angelegt")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Datei")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("Dubletten")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("Fehler")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Sha256")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Von")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("Zeilen")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Zuordnungen")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("Sha256");
+
+                b.ToTable("Importlaeufe");
             });
 
         modelBuilder.Entity("VibeVHS.Domain.Personen.Organisation", b =>
