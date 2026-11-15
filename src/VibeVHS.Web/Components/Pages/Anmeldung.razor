@@ -1,0 +1,386 @@
+@page "/anmeldung"
+@using VibeVHS.Application.Anmeldung
+@using VibeVHS.Application.Personen
+@using VibeVHS.Application.Programm
+@using VibeVHS.Domain.Anmeldung
+@using VibeVHS.Domain.Gemeinsam
+@using VibeVHS.Domain.Personen
+@using VibeVHS.Domain.Programm
+@inject Vorgang Vorgang
+@inject TimeProvider Uhr
+@inject NotificationService Hinweise
+
+<PageTitle>Anmeldung · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Anmeldung am Tresen</h1>
+        <p class="vhs-sub">In drei Schritten: Person, Kurs, Zahlung. Die Buchungsprüfung zeigt sofort, was möglich ist und warum nicht.</p>
+    </div>
+</div>
+
+<div class="vhs-schritte" aria-label="Fortschritt">
+    @foreach (var (nr, titel) in new[] { (1, "Person"), (2, "Kurs"), (3, "Zahlung") })
+    {
+        <span class="@(ergebnis is not null || schritt > nr ? "fertig" : schritt == nr ? "on" : "")">@nr · @titel@(nr == 1 && person is not null ? $": {person.Anzeigename}" : nr == 2 && gewaehlt is not null ? $": {gewaehlt.Kurs.Kursnummer}" : "")</span>
+    }
+</div>
+
+@if (!Buchen.Erlaubt)
+{
+    <div class="vhs-alert vhs-warn">@Buchen.Begruendung Sie können Kurse und Buchungsprüfung ansehen, aber nicht speichern.</div>
+}
+
+@if (ergebnis is not null && person is not null && gewaehlt is not null)
+{
+    <section class="vhs-card">
+        <h2>@(ergebnis.Belegung.Status == Belegungsstatus.Warteliste ? "Auf die Warteliste gesetzt" : "Anmeldung gespeichert")</h2>
+        <p>
+            <b>@person.Anzeigename</b> ist @(ergebnis.Belegung.Status == Belegungsstatus.Warteliste ? "auf der Warteliste für" : "angemeldet für")
+            <b>@gewaehlt.Kurs.Titel</b> (@gewaehlt.Kurs.Kursnummer)@NaechsterTermin(gewaehlt.Kurs).
+            Entgelt <b>@ergebnis.Belegung.Entgelt</b>@(ergebnis.Belegung.Ermaessigt ? " (ermäßigt)" : "") – eingefroren zum Buchungszeitpunkt. Zahlart: @BelegungAnzeige.Zahlart(ergebnis.Belegung.Zahlart).
+        </p>
+        <p class="vhs-small vhs-muted">
+            Protokolliert: gebucht von @ergebnis.Belegung.GebuchtVon@(ergebnis.Belegung.GebuchtInRolle is { } r ? $" ({r})" : "") für @person.Anzeigename,
+            Weg @BelegungAnzeige.Weg(ergebnis.Belegung.Weg)@(ergebnis.Belegung.BevollmaechtigterName is { } bv ? $", im Auftrag von {bv} (Vollmacht)" : "").
+            @(ergebnis.NachrichtId is null ? "Keine E-Mail-Adresse hinterlegt: Bestätigung bitte ausdrucken oder mündlich geben." : $"Bestätigung mit Übersetzungslink ({person.Sprache}) liegt im Postausgang.")
+        </p>
+    </section>
+    <NaechsteSchritte Titel="Wie geht es weiter?" Schritte="@folgeschritte" />
+    return;
+}
+
+@if (schritt == 1)
+{
+    <section class="vhs-card">
+        <div class="vhs-suche">
+            <RadzenIcon Icon="search" />
+            <input type="search" @bind="suche" @bind:event="oninput" @bind:after="SuchenAsync" placeholder="Name, Geburtsdatum oder E-Mail" aria-label="Person suchen" autofocus />
+        </div>
+        <div class="vhs-wahl">
+            @foreach (var p in treffer)
+            {
+                <button class="vhs-option @(person?.Id == p.Id ? "sel" : "")" @onclick="@(() => PersonWaehlenAsync(p.Id))">
+                    <span class="vhs-grow"><b>@p.Anzeigename</b><br />
+                        <span class="vhs-small vhs-muted">@(p.Geburtsdatum is { } g ? $"geb. {g:dd.MM.yyyy}" : "ohne Geburtsdatum") · @(p.Wohnort ?? "kein Wohnort") · @PersonMerkmal.RollenAnzeige(p.Rollen)@(p.EMail is null ? " · keine E-Mail" : "")</span>
+                    </span>
+                    @if (person?.Id == p.Id) { <StatusPille Stil="gut">gewählt</StatusPille> }
+                </button>
+            }
+            @if (!string.IsNullOrWhiteSpace(suche) && treffer.Count == 0)
+            {
+                <p class="vhs-muted">Keine Person gefunden.</p>
+            }
+        </div>
+        @if (dubletten.Count > 0)
+        {
+            <div class="vhs-alert vhs-warn">
+                <b>Dublettenhinweis:</b> @string.Join("; ", dubletten.Select(d => $"„{d.Anzeigename}“{(d.Geburtsdatum is { } g ? $", geb. {g:dd.MM.yyyy}" : "")} ({d.Grund})")).
+                Wahrscheinlich dieselbe Person – bitte vor der Anmeldung prüfen.
+                <a href="dubletten">Zusammenführen prüfen</a>
+            </div>
+        }
+        @if (person is not null)
+        {
+            <div class="vhs-fields">
+                <RadzenFormField Text="Wer meldet an?" Variant="Variant.Outlined">
+                    <RadzenDropDown TValue="Guid?" @bind-Value="bevollmaechtigter" Data="@buchende" TextProperty="Text" ValueProperty="Id" />
+                </RadzenFormField>
+            </div>
+            <p class="vhs-small vhs-muted" style="margin-top:-6px">Gültige Buchungsvollmachten der Person erscheinen hier. Gebucht wird dann „im Auftrag“; die Vollmacht wird an der Belegung gespeichert.</p>
+        }
+        <div class="vhs-row">
+            <BegruendeterButton Text="Weiter zur Kursauswahl" Icon="arrow_forward" Freigabe="@(person is null ? Freigabe.Nein("Bitte zuerst eine Person auswählen.") : Freigabe.Ja)" Click="ZuSchritt2Async" />
+            <RadzenButton Text="Neue Person anlegen" Icon="person_add" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("personen?neu=1"))" title="Beim Speichern prüft das System auf Dubletten." />
+        </div>
+    </section>
+}
+else if (schritt == 2 && person is not null)
+{
+    <section class="vhs-card">
+        <p>Kurse für <b>@person.Anzeigename</b>@(bevollmaechtigter is not null ? $" (im Auftrag von {buchende.FirstOrDefault(b => b.Id == bevollmaechtigter)?.Text})" : "") · Buchungsweg <b>@BelegungAnzeige.Weg(weg)</b></p>
+        <div class="vhs-row">
+            <div class="vhs-suche" style="flex:1 1 300px">
+                <RadzenIcon Icon="search" />
+                <input type="search" @bind="kursSuche" @bind:event="oninput" placeholder="Kursnummer oder Titel" aria-label="Kurse filtern" />
+            </div>
+            <label class="vhs-small"><input type="checkbox" @bind="nurBuchbare" /> nur buchbare</label>
+        </div>
+        <div class="vhs-wahl">
+            @foreach (var o in SichtbareOptionen)
+            {
+                var k = o.Kurs;
+                var inhalt = (RenderFragment)(@<text>
+                    <span class="vhs-grow"><b>@k.Kursnummer @k.Titel</b><br />
+                        <span class="vhs-small vhs-muted">
+                            @(k.ErsterTermin is { } b ? $"ab {b:ddd dd.MM.yyyy HH:mm}" : "ohne Termine") · @(o.Entgelt is { } e ? e.Cent == 0 ? "entgeltfrei" : e.ToString() : "kein Entgelt") @(o.Ermaessigt is { } er && ermaessigung is not null ? $"(ermäßigt {er})" : "")
+                            · @KursAnzeige.Sichtbarkeit(k.Sichtbarkeit)@(k.Richtlinie.Belegung == Belegungsart.Kontingent ? $" · {k.Richtlinie.KontingentAnzahl}er-Kontingent" : "")
+                        </span>
+                    </span>
+                    <span class="vhs-belegt vhs-small">@(k.Richtlinie.Belegung == Belegungsart.Kontingent ? $"{o.Belegt} Kontingente" : $"{o.Belegt}/{k.MaxTeilnehmende}")@(o.Wartend > 0 ? $" · {o.Wartend} wartend" : "")</span>
+                    <StatusPille Stil="@(o.Pruefung.Code == Buchungscode.Buchbar ? "gut" : o.Pruefung.Moeglich ? "warn" : "neutral")">@o.Pruefung.Kurztext</StatusPille>
+                </text>);
+                @if (o.Pruefung.Moeglich || o.Pruefung.Ueberbuchbar)
+                {
+                    <button class="vhs-option @(gewaehlt?.Kurs.Id == k.Id ? "sel" : "")" title="@o.Pruefung.Erklaerung" @onclick="@(() => KursWaehlen(o))">@inhalt</button>
+                }
+                else
+                {
+                    <span class="vhs-why" tabindex="0" data-why="@o.Pruefung.Erklaerung"><button class="vhs-option" disabled>@inhalt</button></span>
+                }
+            }
+        </div>
+        <div class="vhs-row">
+            <RadzenButton Text="Zurück" Icon="arrow_back" ButtonStyle="ButtonStyle.Light" Click="@(() => schritt = 1)" />
+            <BegruendeterButton Text="Weiter zur Zahlung" Icon="arrow_forward" Freigabe="@(gewaehlt is null ? Freigabe.Nein("Bitte einen Kurs auswählen.") : Freigabe.Ja)" Click="@(() => schritt = 3)" />
+        </div>
+    </section>
+}
+else if (schritt == 3 && person is not null && gewaehlt is not null)
+{
+    var k = gewaehlt.Kurs;
+    var mitErm = ermaessigung is not null && gewaehlt.Ermaessigt is not null;
+    <section class="vhs-card">
+        <p><b>@person.Anzeigename</b> → <b>@k.Titel</b> (@k.Kursnummer)</p>
+        @if (gewaehlt.Pruefung.AufWarteliste || gewaehlt.Pruefung.Code == Buchungscode.Ausgebucht)
+        {
+            <div class="vhs-alert vhs-warn">
+                @gewaehlt.Pruefung.Begruendung
+                @if (gewaehlt.Pruefung.Ueberbuchbar)
+                {
+                    <br /><label><input type="checkbox" @bind="ueberbuchen" /> Trotzdem fest anmelden (überbuchen – Ihr Buchungsweg darf das; wird protokolliert)</label>
+                }
+            </div>
+        }
+        <div class="vhs-fields">
+            <RadzenFormField Text="Zahlart" Variant="Variant.Outlined">
+                <RadzenDropDown TValue="Zahlart" @bind-Value="zahlart" Data="@(Enum.GetValues<Zahlart>())" TextProperty="" ValueProperty="">
+                    <Template Context="z">@BelegungAnzeige.Zahlart((Zahlart)z)</Template>
+                    <ValueTemplate Context="z">@BelegungAnzeige.Zahlart((Zahlart)z)</ValueTemplate>
+                </RadzenDropDown>
+            </RadzenFormField>
+            <GesperrtesFeld Bezeichnung="Entgelt" Wert="@(mitErm ? $"{gewaehlt.Ermaessigt} (ermäßigt, regulär {gewaehlt.Entgelt})" : gewaehlt.Entgelt?.ToString() ?? "entgeltfrei")"
+                            Begruendung="Das Entgelt kommt aus dem Kurs (gültig zum Kursbeginn) und wird beim Speichern für diese Belegung eingefroren. Spätere Preisänderungen betreffen sie nicht." />
+            @if (k.Richtlinie.Belegung == Belegungsart.Kontingent)
+            {
+                <GesperrtesFeld Bezeichnung="Belegungsart" Wert="@($"{k.Richtlinie.KontingentAnzahl}er-Kontingent, gültig {k.Richtlinie.KontingentGueltigMonate} Monate")"
+                                Begruendung="Die Belegungsart legt die Buchungsrichtlinie des Kurses fest. Nach dem Speichern wird in einzelne Veranstaltungen eingebucht." />
+            }
+            @if (ermaessigung is not null)
+            {
+                <GesperrtesFeld Bezeichnung="Ermäßigung" Wert="@($"{ermaessigung.Art} · Nachweis: {ermaessigung.Nachweis} · gültig bis {ermaessigung.GueltigBis:dd.MM.yyyy}")"
+                                Begruendung="@(gewaehlt.Ermaessigt is null ? "Für diesen Kurs ist kein ermäßigtes Entgelt festgelegt." : "Ermäßigungen werden an der Person mit Nachweis und Gültigkeitszeitraum erfasst und automatisch angewendet.")" />
+            }
+            else
+            {
+                <GesperrtesFeld Bezeichnung="Ermäßigung" Wert="keine" Begruendung="Keine gültige Ermäßigung hinterlegt. Unten mit Nachweis erfassen, dann wird sie automatisch angewendet." />
+            }
+        </div>
+        @if (ermaessigung is null && gewaehlt.Ermaessigt is not null)
+        {
+            <details>
+                <summary class="vhs-small">Ermäßigung mit Nachweis erfassen (ermäßigt: @gewaehlt.Ermaessigt)</summary>
+                <div class="vhs-fields" style="margin-top:8px">
+                    <RadzenFormField Text="Art" Variant="Variant.Outlined"><RadzenDropDown TValue="string" @bind-Value="ermArt" Data="@Ermaessigung.Arten" /></RadzenFormField>
+                    <RadzenFormField Text="Nachweis (z. B. Bescheid vom …)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="ermNachweis" /></RadzenFormField>
+                    <RadzenFormField Text="Gültig bis" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly" @bind-Value="ermBis" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+                </div>
+                <BegruendeterButton Text="Ermäßigung speichern" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="ErmaessigungAsync"
+                                    Freigabe="@(Buchen.Und(() => string.IsNullOrWhiteSpace(ermArt) || string.IsNullOrWhiteSpace(ermNachweis) ? Freigabe.Nein("Art und Nachweis sind Pflicht.") : Freigabe.Ja))" />
+            </details>
+        }
+        @if (zahlart == Zahlart.Lastschrift)
+        {
+            <p class="vhs-small vhs-muted">SEPA-Mandate werden mit dem Finanzmodul (I6) verwaltet; bis dahin wird die Zahlart nur vermerkt.</p>
+        }
+        <div class="vhs-row">
+            <RadzenButton Text="Zurück" Icon="arrow_back" ButtonStyle="ButtonStyle.Light" Click="@(() => schritt = 2)" />
+            <BegruendeterButton Text="@(gewaehlt.Pruefung.AufWarteliste && !ueberbuchen ? "Auf die Warteliste setzen" : "Anmeldung speichern")" Icon="save"
+                                IsBusy="@speichert" Click="SpeichernAsync"
+                                Freigabe="@(Buchen.Und(() => gewaehlt.Pruefung.Code == Buchungscode.Ausgebucht && !ueberbuchen ? Freigabe.Nein("Der Kurs ist ausgebucht und führt keine Warteliste. Nur mit Überbuchung möglich.") : Freigabe.Ja))" />
+        </div>
+    </section>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "person")]
+    private Guid? PersonAusAdresse { get; set; }
+
+    [SupplyParameterFromQuery(Name = "kurs")]
+    private Guid? KursAusAdresse { get; set; }
+
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
+
+    private sealed record BuchendeOption(Guid? Id, string Text);
+
+    private int schritt = 1;
+    private string? suche;
+    private IReadOnlyList<PersonZeile> treffer = [];
+    private Person? person;
+    private IReadOnlyList<DublettenKandidat> dubletten = [];
+    private IReadOnlyList<BuchendeOption> buchende = [];
+    private Guid? bevollmaechtigter;
+    private IReadOnlyList<KursOption> optionen = [];
+    private KursOption? gewaehlt;
+    private string? kursSuche;
+    private bool nurBuchbare;
+    private Zahlart zahlart = Zahlart.Lastschrift;
+    private bool ueberbuchen, speichert;
+    private Ermaessigung? ermaessigung;
+    private string? ermArt, ermNachweis;
+    private DateOnly ermBis = DateOnly.FromDateTime(DateTime.Today).AddMonths(6);
+    private AnmeldeErgebnis? ergebnis;
+    private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
+    private Rolle? rolle;
+    private Buchungsweg weg = Buchungsweg.Tresen;
+
+    private Freigabe Buchen => Freigabe.NurFuer(rolle, AnmeldungDienst.BuchungsRollen);
+
+    private string NaechsterTermin(Kurs k)
+    {
+        var jetzt = Uhr.GetLocalNow().LocalDateTime;
+        var naechster = k.Veranstaltungen.Where(v => !v.Ausgefallen && v.Ende >= jetzt).OrderBy(v => v.Beginn).FirstOrDefault();
+        return naechster is null ? "" : k.ErsterTermin < jetzt ? $", läuft bereits – nächster Termin {naechster.Beginn:ddd dd.MM.yyyy HH:mm}" : $", Beginn {naechster.Beginn:ddd dd.MM.yyyy HH:mm}";
+    }
+
+    private IEnumerable<KursOption> SichtbareOptionen => optionen
+        .Where(o => !nurBuchbare || o.Pruefung.Moeglich)
+        .Where(o => Suchtext.Woerter(kursSuche).All(w => o.Kurs.Suchtext.Contains(w, StringComparison.Ordinal)));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        weg = AnmeldungDienst.WegFuer(rolle);
+        ergebnis = null;
+        gewaehlt = null;
+        schritt = 1;
+        if (PersonAusAdresse is { } pid)
+        {
+            await PersonWaehlenAsync(pid);
+            suche = person?.Anzeigename;
+            treffer = person is null ? [] : await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenAbfrage>().SeiteAsync(new PersonenFilter(suche), null, 8));
+            if (person is not null)
+            {
+                await ZuSchritt2Async();
+            }
+        }
+
+        if (KursAusAdresse is { } kid && optionen.FirstOrDefault(o => o.Kurs.Id == kid) is { } o && (o.Pruefung.Moeglich || o.Pruefung.Ueberbuchbar))
+        {
+            KursWaehlen(o);
+            schritt = 3;
+        }
+        else if (KursAusAdresse is not null && person is null)
+        {
+            Hinweise.Notify(NotificationSeverity.Info, "Kurs vorgemerkt", "Bitte zuerst die Person suchen; danach ist der Kurs vorausgewählt.");
+        }
+    }
+
+    private async Task SuchenAsync()
+    {
+        treffer = string.IsNullOrWhiteSpace(suche) ? [] : await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenAbfrage>().SeiteAsync(new PersonenFilter(suche), null, 8));
+    }
+
+    private async Task PersonWaehlenAsync(Guid id)
+    {
+        var jetzt = Uhr.GetLocalNow();
+        var heute = DateOnly.FromDateTime(jetzt.Date);
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            person = await d.GetRequiredService<IPersonenSpeicher>().LadenAsync(id);
+            if (person is null)
+            {
+                return;
+            }
+
+            var name = person.AktuellerName(jetzt);
+            dubletten = await d.GetRequiredService<IDublettenSuche>().KandidatenAsync(name.Vorname, name.Nachname, person.Geburtsdatum, person.Id);
+            ermaessigung = await d.GetRequiredService<AnmeldungDienst>().ErmaessigungHeuteAsync(person.Id);
+        });
+        if (person is null)
+        {
+            return;
+        }
+
+        buchende =
+        [
+            new(null, $"{person.Anzeigename} selbst (am Tresen)"),
+            .. person.Vollmachten.AlleAmStichtag(heute, jetzt).Select(v => new BuchendeOption(v.BevollmaechtigterId,
+                $"{v.BevollmaechtigterName} ({(v.Art == Bevollmaechtigtenart.Person ? "bevollmächtigte Person" : "Organisation")}, Nachweis: {v.Nachweis})")),
+        ];
+        bevollmaechtigter = null;
+        gewaehlt = null;
+    }
+
+    private async Task ZuSchritt2Async()
+    {
+        if (person is null)
+        {
+            return;
+        }
+
+        var heute = DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+        optionen = await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var semester = (await d.GetRequiredService<IProgrammSpeicher>().SemesterAsync()).Where(s => s.Ende >= heute).Select(s => s.Id).ToList();
+            return await d.GetRequiredService<AnmeldungDienst>().KursauswahlAsync(person.Id, semester, bevollmaechtigter);
+        });
+        gewaehlt = null;
+        schritt = 2;
+    }
+
+    private void KursWaehlen(KursOption o)
+    {
+        gewaehlt = o;
+        ueberbuchen = false;
+    }
+
+    private async Task ErmaessigungAsync()
+    {
+        try
+        {
+            var heute = DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+            ermaessigung = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AnmeldungDienst>().ErmaessigungErfassenAsync(person!.Id, ermArt!, ermNachweis!, heute, ermBis));
+            Hinweise.Notify(NotificationSeverity.Success, "Ermäßigung gespeichert", "Sie wird bei dieser und künftigen Anmeldungen angewendet.");
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task SpeichernAsync()
+    {
+        speichert = true;
+        try
+        {
+            var auftrag = new AnmeldeAuftrag(person!.Id, gewaehlt!.Kurs.Id, zahlart, bevollmaechtigter, ueberbuchen);
+            ergebnis = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AnmeldungDienst>().AnmeldenAsync(auftrag));
+            var b = ergebnis.Belegung;
+            var vorname = person.AktuellerName(Uhr.GetLocalNow()).Vorname;
+            var kontingent = b.IstKontingent && b.Status == Belegungsstatus.Angemeldet;
+            folgeschritte =
+            [
+                .. kontingent ? [new NaechsterSchritt("In Veranstaltungen einbuchen", $"belegungen/{b.Id}", "Vorab-Einbuchung je Termin mit Kapazitätsprüfung", Hauptschritt: true)] : Array.Empty<NaechsterSchritt>(),
+                new("Bestätigung im Postausgang ansehen", "postausgang", "Mail mit Übersetzungslink und Kalenderdatei",
+                    Freigabe: ergebnis.NachrichtId is null ? Freigabe.Nein("Für die Person ist keine E-Mail-Adresse hinterlegt.") : null, Hauptschritt: !kontingent),
+                new("Termine als Kalenderdatei", $"belegungen/{b.Id}/termine.ics",
+                    Freigabe: b.Status != Belegungsstatus.Angemeldet ? Freigabe.Nein("Auf der Warteliste gibt es noch keine Termine.") : kontingent ? Freigabe.Nein("Bei Kontingenten enthält die Kalenderdatei nur eingebuchte Veranstaltungen – zuerst einbuchen.") : null),
+                new($"Weitere Anmeldung für {vorname}", $"anmeldung?person={person.Id}&neu={Guid.NewGuid():N}"),
+                new("Belegung ansehen", $"belegungen/{b.Id}", "Storno, Umbuchung, Kontingent"),
+                new("Zur Person", $"personen/{person.Id}"),
+                new("Zum Kurs", $"kurse/{gewaehlt.Kurs.Id}"),
+            ];
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", "Anmeldung gespeichert und protokolliert.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+        finally
+        {
+            speichert = false;
+        }
+    }
+}

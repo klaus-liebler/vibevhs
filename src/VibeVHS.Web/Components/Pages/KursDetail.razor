@@ -111,7 +111,20 @@
                         <td class="vhs-mono">@v.Beginn.ToString("HH:mm")–@v.Ende.ToString("HH:mm")</td>
                         <td>@string.Join(" + ", v.Orte.Select(o => o.OrtName))</td>
                         <td class="vhs-small">@v.DozentName</td>
-                        <td class="vhs-mono">@Ortsplanung.Kapazitaet(v, kurs, verzeichnis)</td>
+                        <td class="vhs-mono">
+                            @if (kurs.Richtlinie.VorabEinbuchung && v.Ende < Uhr.GetLocalNow().LocalDateTime)
+                            {
+                                <span title="besucht">@teilnehmende.Sum(t => t.Belegung.Ereignisse.Count(e => e.VeranstaltungId == v.Id && e.Art == VibeVHS.Domain.Anmeldung.Kontingentereignisart.Besucht)) besucht</span>
+                            }
+                            else if (kurs.Richtlinie.VorabEinbuchung)
+                            {
+                                <span title="eingebucht / Plätze">@v.Orte.Sum(o => lage.Belegt(v.Id, o.OrtId))/@Ortsplanung.Kapazitaet(v, kurs, verzeichnis)</span>
+                            }
+                            else
+                            {
+                                @Ortsplanung.Kapazitaet(v, kurs, verzeichnis)
+                            }
+                        </td>
                         <td>
                             @if (v.Ausgefallen) { <StatusPille Stil="neutral">fällt aus</StatusPille> }
                             @if (v.Ausnahme && !v.Ausgefallen) { <StatusPille Stil="info">einzeln geändert</StatusPille> }
@@ -129,7 +142,80 @@
     </div>
 </section>
 
+<section class="vhs-card">
+    @{
+        var belegt = teilnehmende.Count(t => t.Belegung.HaeltPlatz);
+        var wartend = teilnehmende.Count(t => t.Belegung.Status == VibeVHS.Domain.Anmeldung.Belegungsstatus.Warteliste);
+        var kontingent = kurs.Richtlinie.Belegung == Belegungsart.Kontingent;
+    }
+    <div class="vhs-head">
+        <h2>@(kontingent ? "Kontingente" : "Teilnehmende") · @(kontingent ? $"{belegt} aktiv" : $"{belegt} von {kurs.MaxTeilnehmende}")@(wartend > 0 ? $" · {wartend} auf der Warteliste" : "")</h2>
+        <div class="vhs-row">
+            <BegruendeterButton Text="Person anmelden" Icon="person_add" Size="ButtonSize.Small" Click="@(() => Navigation.NavigateTo($"anmeldung?kurs={Id}"))"
+                                Freigabe="@(Freigabe.NurFuer(rolle, VibeVHS.Application.Anmeldung.AnmeldungDienst.BuchungsRollen))" />
+            <BegruendeterButton Text="Freie Plätze an die Warteliste" Icon="low_priority" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="NachrueckenAsync"
+                                Freigabe="@(Freigabe.NurFuer(rolle, VibeVHS.Application.Anmeldung.AnmeldungDienst.BuchungsRollen).Und(() => wartend == 0 ? Freigabe.Nein("Niemand steht auf der Warteliste.") : belegt >= kurs.MaxTeilnehmende ? Freigabe.Nein($"Der Kurs ist voll ({belegt} von {kurs.MaxTeilnehmende}). Wird ein Platz frei, bekommt die erste Person automatisch ein Angebot.") : Freigabe.Ja))" />
+        </div>
+    </div>
+    @if (belegt < kurs.MinTeilnehmende && kurs.Status == Kursstatus.Veroeffentlicht && !kontingent)
+    {
+        <div class="vhs-alert vhs-warn">Mindestteilnehmerzahl noch nicht erreicht: @belegt von mindestens @kurs.MinTeilnehmende.</div>
+    }
+    @if (teilnehmende.Count == 0)
+    {
+        <p class="vhs-muted">Noch keine Anmeldungen.</p>
+    }
+    else
+    {
+        <div class="vhs-tbl">
+            <table>
+                <thead><tr><th>Name</th><th>Status</th><th>Weg</th><th>Gebucht</th><th>Entgelt</th>@if (kontingent) { <th>Kontingent</th> }</tr></thead>
+                <tbody>
+                    @foreach (var t in teilnehmende.Where(t => alleBelegungen || t.Belegung.Offen))
+                    {
+                        var bl = t.Belegung;
+                        <tr class="vhs-klickzeile" @onclick="@(() => Navigation.NavigateTo($"belegungen/{bl.Id}"))">
+                            <td><a href="@($"belegungen/{bl.Id}")">@t.Name</a></td>
+                            <td>
+                                <StatusPille Stil="@(bl.Status == VibeVHS.Domain.Anmeldung.Belegungsstatus.Angemeldet ? "gut" : bl.Offen ? "warn" : "neutral")">@VibeVHS.Domain.Anmeldung.BelegungAnzeige.Status(bl.Status)@(t.Warteplatz is { } wp ? $" ({wp})" : "")</StatusPille>
+                                @if (bl.AngebotBis is { } ab) { <span class="vhs-small vhs-muted">bis @ab.ToLocalTime().ToString("dd.MM. HH:mm")</span> }
+                            </td>
+                            <td class="vhs-small">@VibeVHS.Domain.Anmeldung.BelegungAnzeige.Weg(bl.Weg)@(bl.BevollmaechtigterName is { } bv ? $" · für {bv}" : "")</td>
+                            <td class="vhs-small">@bl.GebuchtAm.ToLocalTime().ToString("dd.MM.yyyy") · @bl.GebuchtVon</td>
+                            <td class="vhs-mono">@bl.Entgelt@(bl.Ermaessigt ? " erm." : "")</td>
+                            @if (kontingent)
+                            {
+                                var s = bl.Kontingent;
+                                <td class="vhs-small">@(bl.KontingentAnzahl is null ? "–" : $"{s.Besucht} besucht · {s.Verfallen} verfallen · {s.Eingebucht} eingebucht · {s.Verbleibend} übrig")</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <label class="vhs-small"><input type="checkbox" @bind="alleBelegungen" /> auch stornierte und umgebuchte zeigen</label>
+        @if (kontingent)
+        {
+            <p class="vhs-small vhs-muted">Regel dieses Kurses: Einbuchen bis @kurs.Richtlinie.EinbuchungsfristStunden Stunden vorher, Austragen bis @kurs.Richtlinie.AustragefristStunden Stunden vorher. Nichterscheinen @(kurs.Richtlinie.NichterscheinenZaehlt ? "verbraucht die Einheit" : "wird nicht angerechnet").</p>
+        }
+    }
+</section>
+
 @code {
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
+
+    private IReadOnlyList<VibeVHS.Application.Anmeldung.TeilnehmerZeile> teilnehmende = [];
+    private VibeVHS.Application.Anmeldung.Einbuchungslage lage = new(new Dictionary<(Guid, Guid?), int>(), new Dictionary<Guid, int>());
+    private bool alleBelegungen;
+
+    private async Task NachrueckenAsync()
+    {
+        var n = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Anmeldung.AnmeldungDienst>().NachrueckenAnbietenAsync(Id));
+        Hinweise.Notify(NotificationSeverity.Success, "Warteliste", $"{n} Nachrückangebot(e) mit Annahmefrist verschickt.");
+        await LadenAsync();
+    }
+
     [Parameter]
     public Guid Id { get; set; }
 
@@ -199,6 +285,8 @@
             var p = d.GetRequiredService<IProgrammSpeicher>();
             kurs = await p.KursLadenAsync(Id);
             verzeichnis = await p.OrtsverzeichnisAsync();
+            teilnehmende = await d.GetRequiredService<VibeVHS.Application.Anmeldung.AnmeldungDienst>().TeilnehmendeAsync(Id);
+            lage = VibeVHS.Application.Anmeldung.Einbuchungslage.Berechnen(teilnehmende.Select(t => t.Belegung));
             if (kurs is { Veranstaltungen.Count: > 0 })
             {
                 var von = kurs.Veranstaltungen.Min(v => v.Beginn);
@@ -264,7 +352,7 @@
         Hinweise.Notify(NotificationSeverity.Info, "Fällt aus", "Der Termin ist als ausgefallen markiert.");
         gewaehlt = null;
         await LadenAsync();
-        folgeschritte = [new("Teilnehmende informieren", "#", Freigabe: Freigabe.Geplant("Die Benachrichtigung der Teilnehmenden", "I3"), Hauptschritt: true)];
+        folgeschritte = [new("Teilnehmende informieren", "#", Freigabe: Freigabe.Geplant("Die Benachrichtigung bei Terminausfall", "I5"), Hauptschritt: true)];
     }
 
     private async Task StatusAsync(Kursstatus status)
@@ -272,7 +360,7 @@
         await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().StatusSetzenAsync(Id, status));
         await LadenAsync();
         folgeschritte = status == Kursstatus.Abgesagt
-            ? [new("Teilnehmende informieren", "#", Freigabe: Freigabe.Geplant("Die Absage an Teilnehmende", "I3"), Hauptschritt: true)]
-            : [new("Anmeldungen erfassen", "anmeldung", Freigabe: Freigabe.Geplant("Die Kursanmeldung", "I3"), Hauptschritt: true), new("Zur Kursliste", "kurse")];
+            ? [new("Teilnehmende umbuchen oder abmelden", $"kurse/{Id}", "Je Belegung: Umbuchungsvorschläge oder kostenlose Abmeldung (Kurs abgesagt)", Hauptschritt: true)]
+            : [new("Person anmelden", $"anmeldung?kurs={Id}", Hauptschritt: true), new("Zur Kursliste", "kurse")];
     }
 }

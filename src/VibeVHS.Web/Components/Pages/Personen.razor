@@ -374,7 +374,7 @@
             folgeschritte =
             [
                 new("Person öffnen", $"personen/{person.Id}", "Adresse, Einwilligungen und Vollmachten ergänzen", Hauptschritt: true),
-                new("Kursanmeldung erfassen", "anmeldung", Freigabe: Freigabe.Geplant("Die Kursanmeldung")),
+                new("Zu einem Kurs anmelden", $"anmeldung?person={person.Id}", "Tresen-Assistent mit dieser Person starten"),
                 new("Weitere Person anlegen", "personen?neu=1"),
             ];
             vorname = nachname = eMail = null;

@@ -85,6 +85,38 @@ else if (dubletten.Count > 0)
     <StammdatenKompakt Stand="@stand" PersonId="@Id" Widerrufen="@VollmachtWiderrufenAsync" />
 </section>
 
+<section class="vhs-card">
+    <div class="vhs-head">
+        <h2>Kurse und Anmeldungen</h2>
+        <BegruendeterButton Text="Neue Anmeldung" Icon="add" Size="ButtonSize.Small" Click="@(() => Navigation.NavigateTo($"anmeldung?person={Id}"))"
+                            Freigabe="@(Schreibschutz.Und(() => Freigabe.NurFuer(rolle, VibeVHS.Application.Anmeldung.AnmeldungDienst.BuchungsRollen)))" />
+    </div>
+    @if (belegungen.Count == 0)
+    {
+        <p class="vhs-muted">Noch keine Anmeldungen.</p>
+    }
+    else
+    {
+        <div class="vhs-list">
+            @foreach (var pb in belegungen)
+            {
+                var bl = pb.Belegung;
+                <div>
+                    <span class="vhs-grow"><a href="@($"belegungen/{bl.Id}")"><b>@bl.Kursnummer</b> @pb.Kurstitel</a>
+                        <br /><span class="vhs-small vhs-muted">@(pb.Beginn is { } bg ? $"ab {bg:dd.MM.yyyy}" : "") · gebucht @bl.GebuchtAm.ToLocalTime().ToString("dd.MM.yyyy") (@VibeVHS.Domain.Anmeldung.BelegungAnzeige.Weg(bl.Weg)) · @bl.Entgelt@(bl.IstKontingent && bl.KontingentAnzahl is not null ? $" · Kontingent: {bl.Kontingent.Verbleibend} von {bl.Kontingent.Anzahl} übrig" : "")</span>
+                    </span>
+                    @if (pb.KursAbgesagt && bl.Offen) { <StatusPille Stil="krit">Kurs abgesagt</StatusPille> }
+                    <StatusPille Stil="@(bl.Status == VibeVHS.Domain.Anmeldung.Belegungsstatus.Angemeldet ? "gut" : bl.Offen ? "warn" : "neutral")">@VibeVHS.Domain.Anmeldung.BelegungAnzeige.Status(bl.Status)</StatusPille>
+                </div>
+            }
+        </div>
+    }
+    @if (ermaessigungen.Count > 0)
+    {
+        <p class="vhs-small">Ermäßigungen: @string.Join("; ", ermaessigungen.Select(e => $"{e.Art} ({e.GueltigVon:dd.MM.yyyy}–{e.GueltigBis:dd.MM.yyyy}, Nachweis: {e.Nachweis})"))</p>
+    }
+</section>
+
 <details class="vhs-card">
     <summary><b>Einwilligung ändern</b> <span class="vhs-small vhs-muted">– je Kanal und Zweck, mit Nachweis; die bisherige bleibt in der Historie</span></summary>
     <div class="vhs-fields">
@@ -221,6 +253,8 @@ else if (dubletten.Count > 0)
 
 @code {
     private bool sperrzugriff, dsOffen;
+    private IReadOnlyList<VibeVHS.Application.Anmeldung.PersonBelegung> belegungen = [];
+    private IReadOnlyList<VibeVHS.Domain.Anmeldung.Ermaessigung> ermaessigungen = [];
     private Rolle? rolle;
     private Loeschpruefung? pruefung;
 
@@ -342,6 +376,15 @@ else if (dubletten.Count > 0)
         }
         var jetzt = Uhr.GetLocalNow();
         stand = person?.StandAm(DateOnly.FromDateTime(jetzt.Date), jetzt);
+        if (person is not null && (person.Datenschutz != Datenschutzstatus.Gesperrt || sperrzugriff))
+        {
+            await Vorgang.AusfuehrenAsync(async d =>
+            {
+                var anmeldung = d.GetRequiredService<VibeVHS.Application.Anmeldung.AnmeldungDienst>();
+                belegungen = await anmeldung.BelegungenDerPersonAsync(Id);
+                ermaessigungen = await anmeldung.ErmaessigungenAsync(Id);
+            });
+        }
         if (stand?.Name is { } name)
         {
             neuVorname ??= name.Vorname;

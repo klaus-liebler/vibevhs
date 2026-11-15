@@ -88,6 +88,10 @@
             {
                 <div class="vhs-small">Übersetzungslink: <a href="@n.Uebersetzungslink" target="_blank" rel="noopener">@n.Uebersetzungslink</a></div>
             }
+            @if (n.AnhangName is not null)
+            {
+                <div class="vhs-small">Anhang: <a href="@($"postausgang/{n.Id}/anhang")" data-enhance-nav="false" download>@n.AnhangName</a></div>
+            }
             <div class="vhs-row">
                 <BegruendeterButton Text="Erneut versuchen" Icon="replay" ButtonStyle="ButtonStyle.Light" Click="@(() => ErneutAsync(n.Id))"
                                     Freigabe="@(n.Status == NachrichtenStatus.Fehlgeschlagen ? Freigabe.Ja : Freigabe.Nein("Nur fehlgeschlagene Nachrichten können erneut versendet werden. Wartende Nachrichten werden automatisch zugestellt."))" />

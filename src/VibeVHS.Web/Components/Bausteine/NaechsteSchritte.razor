@@ -16,7 +16,7 @@
                                         ButtonStyle="@(schritt.Hauptschritt ? ButtonStyle.Primary : ButtonStyle.Light)"
                                         Size="ButtonSize.Small"
                                         Freigabe="@schritt.Status"
-                                        Click="@(() => Navigation.NavigateTo(schritt.Ziel))" />
+                                        Click="@(() => Navigation.NavigateTo(schritt.Ziel, forceLoad: IstDatei(schritt.Ziel)))" />
                 </span>
             }
         </div>
@@ -29,4 +29,9 @@
 
     [Parameter, EditorRequired]
     public IReadOnlyList<NaechsterSchritt> Schritte { get; set; } = [];
+
+    /// <summary>Downloads (Kalenderdatei, PDF, JSON) brauchen einen echten Seitenaufruf statt der Blazor-Navigation.</summary>
+    private static bool IstDatei(string ziel) => ziel.Split('?')[0] is var pfad
+        && (pfad.EndsWith(".ics", StringComparison.OrdinalIgnoreCase) || pfad.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
+            || pfad.EndsWith(".json", StringComparison.OrdinalIgnoreCase));
 }

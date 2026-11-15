@@ -1,0 +1,339 @@
+@page "/belegungen/{Id:guid}"
+@using VibeVHS.Application.Anmeldung
+@using VibeVHS.Application.Personen
+@using VibeVHS.Application.Programm
+@using VibeVHS.Domain.Anmeldung
+@using VibeVHS.Domain.Programm
+@inject Vorgang Vorgang
+@inject TimeProvider Uhr
+@inject NotificationService Hinweise
+
+<PageTitle>Belegung · VibeVHS</PageTitle>
+
+@if (b is null || kurs is null || verzeichnis is null)
+{
+    <h1>Belegung nicht gefunden</h1>
+    return;
+}
+
+<div class="vhs-head">
+    <div>
+        <p class="vhs-sub vhs-mono">@kurs.Kursnummer · Belegung</p>
+        <h1><a href="@($"personen/{b.PersonId}")">@name</a> in <a href="@($"kurse/{kurs.Id}")">@kurs.Titel</a></h1>
+        <p class="vhs-sub">
+            <StatusPille Stil="@Stil(b.Status)">@BelegungAnzeige.Status(b.Status)</StatusPille>
+            @if (warteplatz is { } wp) { <span> · Platz @wp auf der Warteliste</span> }
+            @if (b.AngebotBis is { } ab) { <span> · Angebot gilt bis @ab.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span> }
+        </p>
+    </div>
+    <div class="vhs-row">
+        <BegruendeterButton Text="Kalenderdatei" Icon="event" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo($"belegungen/{Id}/termine.ics", true))"
+                            Freigabe="@(b.Status != Belegungsstatus.Angemeldet ? Freigabe.Nein("Nur für angemeldete Personen.") : b.IstKontingent && b.Einbuchungen.Count == 0 ? Freigabe.Nein("Bei Kontingenten enthält die Kalenderdatei die eingebuchten Veranstaltungen; es ist noch keine eingebucht.") : Freigabe.Ja)" />
+    </div>
+</div>
+
+<NaechsteSchritte Titel="Wie geht es weiter?" Schritte="@folgeschritte" />
+
+<div class="vhs-grid-2">
+    <section class="vhs-card">
+        <h2>Wer hat wann wie gebucht?</h2>
+        <dl class="vhs-kv">
+            <dt>Gebucht am</dt><dd>@b.GebuchtAm.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</dd><dd></dd>
+            <dt>Gebucht von</dt><dd>@b.GebuchtVon@(b.GebuchtInRolle is { } r ? $" ({r})" : "")</dd><dd></dd>
+            <dt>Für</dt><dd>@name</dd><dd></dd>
+            <dt>Weg</dt><dd>@BelegungAnzeige.Weg(b.Weg)</dd><dd></dd>
+            <dt>Im Auftrag von</dt><dd>@(b.BevollmaechtigterName is { } bv ? $"{bv} (Vollmacht {(b.VollmachtId is { } vmId ? vmId.ToString()[..8] : "über Organisation")})" : "– (die Person selbst)")</dd><dd></dd>
+            <dt>Entgelt</dt><dd>@b.Entgelt@(b.Ermaessigt ? " (ermäßigt)" : "") <span class="vhs-small vhs-muted">eingefroren zum Buchungszeitpunkt</span></dd><dd></dd>
+            @if (b.ErmaessigungNachweis is { } en)
+            {
+                <dt>Ermäßigung</dt><dd>@en</dd><dd></dd>
+            }
+            <dt>Zahlart</dt><dd>@BelegungAnzeige.Zahlart(b.Zahlart)</dd><dd></dd>
+            @if (b.StorniertAm is { } sa)
+            {
+                <dt>@(b.Status == Belegungsstatus.Umgebucht ? "Umgebucht" : "Beendet")</dt>
+                <dd>@sa.ToLocalTime().ToString("dd.MM.yyyy HH:mm")@(b.StorniertVon is { } sv ? $" von {sv}" : "") · @b.StornoGrund@(b.GebuehrCent is { } g ? $" · Gebühr {new VibeVHS.Domain.Gemeinsam.Geld(g)}" : "")</dd><dd></dd>
+            }
+            @if (b.UmgebuchtNachId is { } nach)
+            {
+                <dt>Neue Belegung</dt><dd><a href="@($"belegungen/{nach}")">ansehen</a></dd><dd></dd>
+            }
+            @if (b.UmgebuchtVonId is { } von)
+            {
+                <dt>Umgebucht aus</dt><dd><a href="@($"belegungen/{von}")">vorherige Belegung</a></dd><dd></dd>
+            }
+        </dl>
+    </section>
+
+    <section class="vhs-card">
+        <h2>Ändern</h2>
+        @if (b.Status == Belegungsstatus.Nachrueckangebot)
+        {
+            <div class="vhs-row">
+                <BegruendeterButton Text="Angebot annehmen" Icon="check" Freigabe="@Buchen" Click="@(() => AktionAsync(d => d.AngebotAnnehmenAsync(Id), "Angebot angenommen"))" />
+                <BegruendeterButton Text="Angebot ablehnen" Icon="close" ButtonStyle="ButtonStyle.Light" Freigabe="@Buchen" Click="@(() => AktionAsync(d => d.AngebotAblehnenAsync(Id), "Abgelehnt; die nächste Person auf der Warteliste bekommt das Angebot"))" />
+            </div>
+        }
+        @if (b.Status == Belegungsstatus.Warteliste)
+        {
+            <BegruendeterButton Text="Sofort anmelden (überbuchen)" Icon="person_add" ButtonStyle="ButtonStyle.Light" Click="@(() => AktionAsync(d => d.AusWartelisteAnmeldenAsync(Id), "Angemeldet (überbucht)"))"
+                                Freigabe="@(Buchen.Und(() => kurs.Richtlinie.DarfUeberbuchen(AnmeldungDienst.WegFuer(rolle)) ? Freigabe.Ja : Freigabe.Nein("Die Buchungsrichtlinie erlaubt Ihrem Buchungsweg keine Überbuchung. Warten, bis ein Platz frei wird.")))" />
+        }
+        <RadzenFormField Text="Grund der Abmeldung" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="grund" /></RadzenFormField>
+        @if (storno is not null && b.Offen)
+        {
+            <p class="vhs-small">@storno.Erklaerung Gebühr: <b>@storno.Gebuehr</b></p>
+        }
+        <div class="vhs-row">
+            <BegruendeterButton Text="Abmelden (stornieren)" Icon="event_busy" ButtonStyle="ButtonStyle.Danger" Click="StornierenAsync"
+                                Freigabe="@(Buchen.Und(() => b.Offen ? Freigabe.Ja : Freigabe.Nein($"Die Belegung ist bereits {BelegungAnzeige.Status(b.Status)}.")))" />
+        </div>
+        <h3>Umbuchen</h3>
+        @if (!b.Offen)
+        {
+            <p class="vhs-small vhs-muted">Nur offene Belegungen können umgebucht werden.</p>
+        }
+        else if (vorschlaege.Count == 0)
+        {
+            <p class="vhs-small vhs-muted">Kein ähnlicher buchbarer Kurs gefunden (gleiche Kursart oder gleicher Fachbereich).</p>
+        }
+        else
+        {
+            <div class="vhs-wahl">
+                @foreach (var o in vorschlaege)
+                {
+                    <div class="vhs-option" style="cursor:default">
+                        <span class="vhs-grow"><b>@o.Kurs.Kursnummer @o.Kurs.Titel</b><br />
+                            <span class="vhs-small vhs-muted">@(o.Kurs.ErsterTermin is { } d ? $"ab {d:ddd dd.MM.yyyy HH:mm}" : "") · @(o.Entgelt?.ToString() ?? "–") · @o.Belegt/@o.Kurs.MaxTeilnehmende belegt</span>
+                        </span>
+                        <BegruendeterButton Text="Umbuchen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@Buchen" Click="@(() => UmbuchenAsync(o.Kurs.Id))" />
+                    </div>
+                }
+            </div>
+            <p class="vhs-small vhs-muted">Umbuchungsgebühr laut Richtlinie: @(new VibeVHS.Domain.Gemeinsam.Geld(kurs.Richtlinie.UmbuchungsgebuehrCent)). Das Entgelt des neuen Kurses wird neu eingefroren.</p>
+        }
+    </section>
+</div>
+
+@if (b.IstKontingent)
+{
+    var stand = b.Kontingent;
+    <section class="vhs-kpis">
+        <div class="vhs-kpi"><div class="vhs-kpi-lbl">Kontingent</div><div class="vhs-kpi-val">@stand.Anzahl</div><div class="vhs-kpi-note">@(stand.GueltigBis is { } gb ? $"gültig bis {gb:dd.MM.yyyy}" : "unbefristet")</div></div>
+        <div class="vhs-kpi"><div class="vhs-kpi-lbl">Besucht</div><div class="vhs-kpi-val">@stand.Besucht</div></div>
+        <div class="vhs-kpi"><div class="vhs-kpi-lbl">Verfallen</div><div class="vhs-kpi-val">@stand.Verfallen</div><div class="vhs-kpi-note">Nichterscheinen @(kurs.Richtlinie.NichterscheinenZaehlt ? "zählt" : "zählt nicht")</div></div>
+        <div class="vhs-kpi"><div class="vhs-kpi-lbl">Eingebucht</div><div class="vhs-kpi-val">@stand.Eingebucht</div></div>
+        <div class="vhs-kpi"><div class="vhs-kpi-lbl">Verbleibend</div><div class="vhs-kpi-val">@stand.Verbleibend</div></div>
+    </section>
+    <section class="vhs-card">
+        <h2>Veranstaltungen: Vorab-Einbuchung</h2>
+        <p class="vhs-small vhs-muted" style="margin-top:-6px">
+            Einbuchen bis @kurs.Richtlinie.EinbuchungsfristStunden Stunden vorher, Austragen bis @kurs.Richtlinie.AustragefristStunden Stunden vorher.
+            Ist ein Ort voll, ist die Warteliste für genau diese Veranstaltung möglich; wird ein Platz frei, rückt die erste Person automatisch nach.
+        </p>
+        <div class="vhs-row"><label class="vhs-small"><input type="checkbox" @bind="vergangene" /> vergangene Veranstaltungen zeigen</label></div>
+        <div class="vhs-tbl">
+            <table>
+                <thead><tr><th>Nr.</th><th>Datum</th><th>Ort(e) · reserviert</th><th>Stand</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var v in kurs.Veranstaltungen.Where(v => vergangene || v.Ende >= Jetzt.LocalDateTime).OrderBy(v => v.Beginn).Take(vergangene ? 60 : 14))
+                    {
+                        var vorbei = v.Beginn <= Jetzt.LocalDateTime;
+                        var eingebucht = b.Einbuchungen.TryGetValue(v.Id, out var ortGewaehlt);
+                        var wartet = b.WartetAuf.ContainsKey(v.Id);
+                        var abgeschlossen = b.Ereignisse.FirstOrDefault(e => e.VeranstaltungId == v.Id && e.Art is Kontingentereignisart.Besucht or Kontingentereignisart.NichtErschienen or Kontingentereignisart.NichtErschienenOhneAnrechnung);
+                        <tr class="@(v.Ausgefallen ? "vhs-ersetzt" : "")">
+                            <td class="vhs-mono">@v.Nummer</td>
+                            <td>@v.Beginn.ToString("ddd dd.MM.yyyy HH:mm")</td>
+                            <td>
+                                @foreach (var vo in v.Orte)
+                                {
+                                    var kap = Ortsplanung.KapazitaetAmOrt(vo, kurs, verzeichnis);
+                                    var belegt = lage!.Belegt(v.Id, vo.OrtId);
+                                    <div class="vhs-small">@vo.OrtName · <span class="vhs-mono">@belegt/@kap</span> @if (belegt >= kap) { <StatusPille Stil="warn">voll</StatusPille> }</div>
+                                }
+                                @if (lage!.Wartend.GetValueOrDefault(v.Id) is > 0 and var w) { <span class="vhs-small vhs-muted">@w wartend</span> }
+                            </td>
+                            <td>
+                                @if (abgeschlossen is not null) { <StatusPille Stil="@(abgeschlossen.Art == Kontingentereignisart.Besucht ? "gut" : "neutral")">@KontingentEreignis.ArtAnzeige(abgeschlossen.Art)</StatusPille> }
+                                else if (eingebucht) { <StatusPille Stil="gut">eingebucht@(v.Orte.Count > 1 ? $" ({v.Orte.FirstOrDefault(o => o.OrtId == ortGewaehlt)?.OrtName})" : "")</StatusPille> }
+                                else if (wartet) { <StatusPille Stil="warn">Warteliste</StatusPille> }
+                            </td>
+                            <td>
+                                <div class="vhs-row">
+                                    @if (vorbei)
+                                    {
+                                        @if (abgeschlossen is null && (eingebucht || !kurs.Richtlinie.VorabEinbuchung))
+                                        {
+                                            <BegruendeterButton Text="besucht" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@Buchen" Click="@(() => AktionAsync(d => d.AnwesenheitAsync(Id, v.Id, true), "Besuch verbucht"))" />
+                                            <BegruendeterButton Text="nicht erschienen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => AktionAsync(d => d.AnwesenheitAsync(Id, v.Id, false), "Nichterscheinen verbucht"))"
+                                                                Freigabe="@(Buchen.Und(() => eingebucht ? Freigabe.Ja : Freigabe.Nein("Nichterscheinen gibt es nur bei eingebuchten Veranstaltungen.")))" />
+                                        }
+                                    }
+                                    else if (eingebucht || wartet)
+                                    {
+                                        <BegruendeterButton Text="Austragen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => AktionAsync(d => d.AustragenAsync(Id, v.Id), "Ausgetragen; die Einheit ist zurück im Kontingent"))"
+                                                            Freigabe="@(Buchen.Und(() => wartet || Jetzt.LocalDateTime <= v.Beginn.AddHours(-kurs.Richtlinie.AustragefristStunden) ? Freigabe.Ja : Freigabe.Nein($"Austragen ist nur bis {kurs.Richtlinie.AustragefristStunden} Stunden vor Beginn möglich. Danach gilt die Regel für Nichterscheinen ({(kurs.Richtlinie.NichterscheinenZaehlt ? "Einheit verbraucht" : "nicht angerechnet")}).")))" />
+                                    }
+                                    else
+                                    {
+                                        @foreach (var vo in v.Orte)
+                                        {
+                                            var kap = Ortsplanung.KapazitaetAmOrt(vo, kurs, verzeichnis);
+                                            var pruefung = b.EinbuchungPruefen(v, vo.OrtId, lage!.Belegt(v.Id, vo.OrtId), kap, kurs.Richtlinie, Jetzt);
+                                            var text = pruefung.Code == Einbuchungscode.Warteliste ? "Warteliste" : v.Orte.Count > 1 ? (verzeichnis.Finden(vo.OrtId)?.Art == Ortsart.VirtuellerRaum ? "online" : "vor Ort") : "Einbuchen";
+                                            <BegruendeterButton Text="@text" Size="ButtonSize.Small" ButtonStyle="@(pruefung.Code == Einbuchungscode.Eingebucht ? ButtonStyle.Primary : ButtonStyle.Light)"
+                                                                Freigabe="@(Buchen.Und(() => pruefung.Moeglich ? Freigabe.Ja : Freigabe.Nein(pruefung.Begruendung!)))"
+                                                                Click="@(() => EinbuchenAsync(v.Id, vo.OrtId))" />
+                                        }
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <details class="vhs-card">
+        <summary><b>Kontingentereignisse</b> (unveränderlich; der Stand ist ihre Summe)</summary>
+        <div class="vhs-list">
+            @foreach (var e in b.Ereignisse.OrderByDescending(e => e.Laufnummer))
+            {
+                var v = e.VeranstaltungId is { } vid ? kurs.Veranstaltungen.FirstOrDefault(x => x.Id == vid) : null;
+                <div>
+                    <span class="vhs-mono vhs-small vhs-zeit">@e.Zeitpunkt.ToLocalTime().ToString("dd.MM.yy HH:mm")</span>
+                    <span class="vhs-grow">@KontingentEreignis.ArtAnzeige(e.Art)@(e.Anzahl > 1 ? $" ({e.Anzahl})" : "")@(v is null ? "" : $" · {v.Beginn:ddd dd.MM.yyyy HH:mm}") <span class="vhs-small vhs-muted">@e.Bemerkung</span></span>
+                    <span class="vhs-small vhs-muted">@e.Von</span>
+                </div>
+            }
+        </div>
+    </details>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
+
+    private Belegung? b;
+    private Kurs? kurs;
+    private Ortsverzeichnis? verzeichnis;
+    private Einbuchungslage? lage;
+    private string name = string.Empty;
+    private int? warteplatz;
+    private Stornoregel? storno;
+    private IReadOnlyList<KursOption> vorschlaege = [];
+    private string? grund;
+    private bool vergangene;
+    private Rolle? rolle;
+    private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
+
+    private DateTimeOffset Jetzt => Uhr.GetLocalNow();
+
+    private Freigabe Buchen => Freigabe.NurFuer(rolle, AnmeldungDienst.BuchungsRollen);
+
+    private static string Stil(Belegungsstatus s) => s switch
+    {
+        Belegungsstatus.Angemeldet => "gut",
+        Belegungsstatus.Warteliste or Belegungsstatus.Nachrueckangebot => "warn",
+        _ => "neutral",
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        folgeschritte = [];
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync()
+    {
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var dienst = d.GetRequiredService<AnmeldungDienst>();
+            b = await dienst.BelegungLadenAsync(Id);
+            if (b is null)
+            {
+                return;
+            }
+
+            var p = d.GetRequiredService<IProgrammSpeicher>();
+            kurs = await p.KursLadenAsync(b.KursId);
+            verzeichnis = await p.OrtsverzeichnisAsync();
+            var alle = await d.GetRequiredService<IAnmeldungSpeicher>().BelegungenDesKursesAsync(b.KursId);
+            lage = Einbuchungslage.Berechnen(alle);
+            warteplatz = b.Status == Belegungsstatus.Warteliste
+                ? alle.Where(x => x.Status == Belegungsstatus.Warteliste).OrderBy(x => x.WartelisteSeit).ToList().FindIndex(x => x.Id == b.Id) + 1
+                : null;
+            name = (await d.GetRequiredService<IPersonenSpeicher>().AnzeigenamenAsync([b.PersonId])).GetValueOrDefault(b.PersonId) ?? "?";
+            storno = b.Offen ? await dienst.StornoVorschauAsync(Id) : null;
+            vorschlaege = b.Offen ? await dienst.UmbuchungsvorschlaegeAsync(Id) : [];
+        });
+    }
+
+    private async Task AktionAsync(Func<AnmeldungDienst, Task> aktion, string meldung)
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => aktion(d.GetRequiredService<AnmeldungDienst>()));
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", meldung + " – protokolliert.");
+            await LadenAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task EinbuchenAsync(Guid veranstaltungId, Guid ortId)
+    {
+        try
+        {
+            var e = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AnmeldungDienst>().EinbuchenAsync(Id, veranstaltungId, ortId));
+            Hinweise.Notify(NotificationSeverity.Success, e.Code == Einbuchungscode.Eingebucht ? "Eingebucht" : "Warteliste",
+                e.Code == Einbuchungscode.Eingebucht ? "Die Einheit ist reserviert." : e.Begruendung ?? "");
+            await LadenAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task StornierenAsync()
+    {
+        try
+        {
+            var regel = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AnmeldungDienst>().StornierenAsync(Id, grund ?? "ohne Angabe"));
+            Hinweise.Notify(NotificationSeverity.Success, "Abgemeldet", $"{regel.Erklaerung} Gebühr: {regel.Gebuehr}");
+            await LadenAsync();
+            folgeschritte =
+            [
+                new("Abmeldebestätigung im Postausgang", "postausgang", Hauptschritt: true),
+                new("Teilnehmende des Kurses", $"kurse/{kurs!.Id}", "Wer von der Warteliste ein Angebot bekommen hat"),
+                new("Zur Person", $"personen/{b!.PersonId}"),
+            ];
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task UmbuchenAsync(Guid neuerKurs)
+    {
+        try
+        {
+            var neu = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AnmeldungDienst>().UmbuchenAsync(Id, neuerKurs));
+            Hinweise.Notify(NotificationSeverity.Success, "Umgebucht", $"Neue Belegung in {neu.Kursnummer}; Bestätigung mit Kalenderdatei liegt im Postausgang.");
+            Navigation.NavigateTo($"belegungen/{neu.Id}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+}

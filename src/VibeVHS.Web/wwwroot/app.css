@@ -207,3 +207,16 @@ details.vhs-card > summary { cursor: pointer; }
     .vhs-nav a, .vhs-nav-off { white-space: nowrap; }
     .vhs-top { position: static; }
 }
+
+/* Tresen-Assistent: Schritte und Auswahl */
+.vhs-schritte { display: flex; gap: 8px; flex-wrap: wrap; }
+.vhs-schritte span { border: 1px solid var(--vhs-line); border-radius: 16px; padding: 4px 12px; font-size: 13px; color: var(--vhs-muted); background: var(--vhs-surface); }
+.vhs-schritte span.on { border-color: var(--vhs-accent); background: var(--vhs-accent); color: var(--vhs-accent-fg); font-weight: 600; }
+.vhs-schritte span.fertig { border-color: var(--vhs-good); color: var(--vhs-good); background: var(--vhs-good-weak); }
+.vhs-wahl { display: flex; flex-direction: column; gap: 6px; }
+.vhs-option { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; padding: 9px 12px; border: 1px solid var(--vhs-line); border-radius: 8px; background: var(--vhs-surface); font: inherit; color: var(--vhs-fg); cursor: pointer; }
+.vhs-option:hover { border-color: var(--vhs-accent); background: var(--vhs-surface-2); }
+.vhs-option.sel { border-color: var(--vhs-accent); background: var(--vhs-accent-weak); }
+.vhs-option:disabled { cursor: not-allowed; opacity: 0.6; background: var(--vhs-bg); }
+.vhs-wahl .vhs-why { display: flex; width: 100%; }
+.vhs-belegt { font-variant-numeric: tabular-nums; white-space: nowrap; }

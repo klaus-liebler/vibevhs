@@ -95,6 +95,7 @@ else
 await using (var bereich = app.Services.CreateAsyncScope())
 {
     await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Datenschutz.DatenschutzDienst>().GrundeinstellungenAsync();
+    await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Anmeldung.VorlagenDienst>().GrundeinstellungenAsync();
 }
 
 if (app.Configuration.GetValue("Demodaten:Anlegen", false))
@@ -102,6 +103,7 @@ if (app.Configuration.GetValue("Demodaten:Anlegen", false))
     await Demodaten.AnlegenAsync(app.Services);
     await Demodaten.MassendatenAnlegenAsync(app.Services, app.Configuration.GetValue("Demodaten:Massendaten", 0));
     await ProgrammDemodaten.AnlegenAsync(app.Services);
+    await AnmeldungDemodaten.AnlegenAsync(app.Services);
 }
 
 if (hinterProxy)
@@ -173,6 +175,19 @@ app.MapGet("/personen/{id:guid}/auskunft.{format}", async (Guid id, string forma
         _ => Results.NotFound(),
     };
 }).RequireAuthorization();
+
+// Kalenderdatei (ICS) einer Belegung: alle Termine bzw. bei Kontingenten die eingebuchten.
+app.MapGet("/belegungen/{id:guid}/termine.ics", async (Guid id, VibeVHS.Application.Anmeldung.AnmeldungDienst anmeldung) =>
+{
+    var (datei, inhalt) = await anmeldung.KalenderdateiAsync(id);
+    return Results.File(System.Text.Encoding.UTF8.GetBytes(inhalt), "text/calendar", datei);
+}).RequireAuthorization();
+
+// Anhang einer Nachricht im Postausgang (z. B. Kalenderdatei der Anmeldebestätigung).
+app.MapGet("/postausgang/{id:guid}/anhang", async (Guid id, VibeVHS.Application.Postausgang.INachrichtenSpeicher speicher) =>
+    await speicher.LadenAsync(id) is { AnhangName: { } name, AnhangInhalt: { } inhalt } n
+        ? Results.File(System.Text.Encoding.UTF8.GetBytes(inhalt), n.AnhangTyp ?? "application/octet-stream", name)
+        : Results.NotFound()).RequireAuthorization();
 
 // Excel-Export der Personenliste mit den aktuellen Filtern. Jeder Export wird protokolliert (DSGVO).
 app.MapGet("/personen/export", async (string? suche, string? rolle, string? status, int? fb, bool? dubletten,

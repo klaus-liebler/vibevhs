@@ -163,6 +163,32 @@ Einwilligung, bevorzugt) und E-Mail-Adressen (Art, bevorzugt). Die Kennzeichen �
 - Hinweis zu den Demodaten: Die Massendaten enthalten viele lange inaktive Personen; ein Löschlauf mit 36 Monaten
   anonymisiert davon über tausend. Zum Ausprobieren eine eigene Datenbank verwenden.
 
+## Anmeldung (I3)
+
+- **Tresen-Assistent** `/anmeldung` in drei Schritten: Person (mit Dublettenhinweis und Wahl „wer meldet an“ aus den gültigen
+  Vollmachten) → Kurs (jede Zeile mit Buchungsprüfung; nicht buchbare Kurse sind gesperrt, der Tooltip nennt Grund und Weg) →
+  Zahlung (Zahlart, eingefrorenes Entgelt, Ermäßigung mit Nachweis). Danach: nächste sinnvolle Schritte.
+- **Buchungsprüfung** (`Domain/Anmeldung/Buchungspruefung.cs`): ein Dienst für alle Wege (Tresen, Integrationskurs-Team, online,
+  Auftraggeber) mit Begründungscode: archiviert, abgesagt, Entwurf, beendet, Person nicht aktiv, nur öffentlich (Selbstregistrierte,
+  FA-62), intern ohne Berechtigung, Weg nicht erlaubt, geschlossen/Zielgruppe, Vollmacht fehlt/abgelaufen, bereits angemeldet/wartend,
+  ausgebucht → Warteliste (am Tresen mit Überbuchungsrecht).
+- **Belegung** speichert wer für wen über welchen Weg mit welcher Vollmacht gebucht hat, das Entgelt zum Buchungszeitpunkt
+  (eingefroren) und eine Ermäßigung mit Nachweis.
+- **Warteliste**: wird ein Platz frei, bekommt die erste Person ein Nachrückangebot mit Annahmefrist (Mail). Ein stündlicher Job lässt
+  abgelaufene Angebote verfallen und bietet den Platz der nächsten Person an.
+- **Storno** nach den AGB-Fristen der Richtlinie (rechtzeitig kostenlos bzw. Bearbeitungsgebühr, danach bleibt das Entgelt fällig);
+  **Umbuchung** mit Vorschlägen (gleiche Kursart oder gleicher Fachbereich, nur buchbare Kurse).
+- **Kontingente** (z. B. Pilates 10er-Karte): Vorab-Einbuchung je Veranstaltung mit Kapazitätsprüfung je Ort (auch hybrid),
+  Warteliste je Veranstaltung mit automatischem Nachrücken, Austragen mit Frist, Nichterscheinen-Regel je Kurs. Der Kontingentstand
+  (gekauft, besucht, verfallen, eingebucht, verbleibend) ist immer die Summe unveränderlicher Ereignisse.
+- **Bestätigungsmails** in den Postausgang, mit Übersetzungslink in der bevorzugten Sprache und Kalenderdatei (ICS) als Anhang.
+  Alle Texte sind **Vorlagen** (`/vorlagen`, Pflege durch Verwaltungsleitung/Leitung) mit Platzhaltern und Vorschau.
+- Anwesenheit (besucht/nicht erschienen) kann bis zur QR-Anwesenheit (I4) auf der Belegung von Hand festgehalten werden.
+- Demodaten: Belegungen für alle veröffentlichten Kurse, Yoga am Abend voll mit Warteliste (Sabine Weber auf Platz 1),
+  Progressive Muskelentspannung mit laufendem Nachrückangebot, Spanisch A1 unter Mindestzahl, abgesagtes Französisch B1 mit
+  Teilnehmenden, Integrationskurse über das Integrationskurs-Team, Firmenkurs über die Stadtwerke, Pilates mit 23 Kontingenten.
+- Abnahme der Phase A: Klick-Drehbuch in [`abnahme-a.md`](abnahme-a.md).
+
 ## Testbenutzer der Pilot-VHS
 
 Die Startdaten liegen in [`tools/Testdaten/testbenutzer-vhs-egs.json`](../tools/Testdaten/testbenutzer-vhs-egs.json)

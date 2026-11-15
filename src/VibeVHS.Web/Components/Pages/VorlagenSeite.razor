@@ -1,0 +1,94 @@
+@page "/vorlagen"
+@using VibeVHS.Application.Anmeldung
+@using VibeVHS.Domain.Vorlagen
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+
+<PageTitle>Vorlagen · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Vorlagen</h1>
+        <p class="vhs-sub">Mails an Kundinnen und Kunden zentral pflegen. Platzhalter in geschweiften Klammern werden beim Versand ersetzt; der Übersetzungslink wird immer automatisch angehängt.</p>
+    </div>
+</div>
+
+<div class="vhs-split">
+    <section class="vhs-card">
+        <h2>Vorlagen</h2>
+        <div class="vhs-wahl">
+            @foreach (var v in vorlagen)
+            {
+                <button class="vhs-option @(gewaehlt?.Schluessel == v.Schluessel ? "sel" : "")" @onclick="@(() => Waehlen(v))">
+                    <span class="vhs-grow"><b>@v.Bezeichnung</b><br /><span class="vhs-small vhs-muted">geändert @v.GeaendertAm.ToLocalTime().ToString("dd.MM.yyyy") von @v.GeaendertVon</span></span>
+                </button>
+            }
+        </div>
+        <p class="vhs-small vhs-muted">Erlaubte Platzhalter: @string.Join(" ", Textvorlagen.BekanntePlatzhalter.Select(p => "{" + p + "}"))</p>
+    </section>
+
+    @if (gewaehlt is not null)
+    {
+        <section class="vhs-card">
+            <h2>@gewaehlt.Bezeichnung</h2>
+            <RadzenFormField Text="Betreff" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="betreff" @bind-Value:after="Vorschau" Disabled="@(!Pflegen.Erlaubt)" /></RadzenFormField>
+            <RadzenFormField Text="Text" Variant="Variant.Outlined"><RadzenTextArea @bind-Value="text" @bind-Value:after="Vorschau" Rows="12" Disabled="@(!Pflegen.Erlaubt)" /></RadzenFormField>
+            <div class="vhs-row">
+                <BegruendeterButton Text="Speichern" Icon="save" Freigabe="@Pflegen" Click="SpeichernAsync" />
+                <RadzenButton Text="Vorschau aktualisieren" Icon="visibility" ButtonStyle="ButtonStyle.Light" Click="Vorschau" />
+            </div>
+            <h3>Vorschau mit Beispielwerten</h3>
+            <pre class="vhs-code"><b>@vorschau.Betreff</b>
+
+@vorschau.Text</pre>
+        </section>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<Textvorlage> vorlagen = [];
+    private Textvorlage? gewaehlt;
+    private string betreff = string.Empty, text = string.Empty;
+    private (string Betreff, string Text) vorschau;
+    private Rolle? rolle;
+
+    private Freigabe Pflegen => Freigabe.NurFuer(rolle, VorlagenDienst.PflegeRollen);
+
+    protected override async Task OnInitializedAsync()
+    {
+        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        await LadenAsync();
+        if (vorlagen.FirstOrDefault() is { } v)
+        {
+            Waehlen(v);
+        }
+    }
+
+    private async Task LadenAsync() => vorlagen = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VorlagenDienst>().AlleAsync());
+
+    private void Waehlen(Textvorlage v)
+    {
+        gewaehlt = v;
+        betreff = v.Betreff;
+        text = v.Text;
+        Vorschau();
+    }
+
+    private void Vorschau() => vorschau = VorlagenDienst.Vorschau(betreff, text);
+
+    private async Task SpeichernAsync()
+    {
+        try
+        {
+            var schluessel = gewaehlt!.Schluessel;
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VorlagenDienst>().AendernAsync(schluessel, betreff, text));
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", "Die Vorlage gilt ab sofort für neue Mails.");
+            await LadenAsync();
+            gewaehlt = vorlagen.First(v => v.Schluessel == schluessel);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+}
