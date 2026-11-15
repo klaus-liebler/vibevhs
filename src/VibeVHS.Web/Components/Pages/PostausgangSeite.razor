@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject Vorgang Vorgang
 @inject NotificationService Hinweise
+@inject VibeVHS.Application.Dokumente.IQrCode Qr
 
 <PageTitle>Postausgang · VibeVHS</PageTitle>
 
@@ -84,6 +85,14 @@
                 <div class="vhs-alert vhs-crit">Letzter Fehler: @n.Fehler</div>
             }
             <pre class="vhs-code">@n.Inhalt</pre>
+            @if (System.Text.RegularExpressions.Regex.Match(n.Inhalt, @"https?://\S+/checkin/geraet/\S+") is { Success: true } checkinLink)
+            {
+                <details>
+                    <summary class="vhs-small">Persönlichen Check-in-Link aufs Handy holen (Test: QR-Code mit dem Handy scannen)</summary>
+                    <div style="max-width:220px">@((MarkupString)Qr.Svg(checkinLink.Value))</div>
+                    <p class="vhs-small vhs-muted">Nur zum Testen: Die Mail wird in der Entwicklung nicht wirklich versendet.</p>
+                </details>
+            }
             @if (n.Uebersetzungslink is not null)
             {
                 <div class="vhs-small">Übersetzungslink: <a href="@n.Uebersetzungslink" target="_blank" rel="noopener">@n.Uebersetzungslink</a></div>

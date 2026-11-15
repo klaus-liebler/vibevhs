@@ -54,6 +54,9 @@ builder.Services.AddScoped<BenutzerKontext>();
 builder.Services.AddScoped<IAktuellerBenutzer, AktuellerBenutzer>();
 builder.Services.AddScoped<Vorgang>();
 
+// Handy-Test im lokalen Netz (Profil "lan"): HTTPS auf allen Schnittstellen, öffentliche Adresse = LAN-IP.
+VibeVHS.Web.LanBetrieb.Einrichten(builder);
+
 var oeffentlicheAdresse = new Uri(builder.Configuration["OeffentlicheAdresse"] ?? "http://localhost:5189/");
 builder.Services
     .AddVibeVhsAnwendung(oeffentlicheAdresse)

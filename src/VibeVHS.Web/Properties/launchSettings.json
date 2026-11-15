@@ -18,6 +18,19 @@
         "environmentVariables": {
           "ASPNETCORE_ENVIRONMENT": "Development"
         }
+      },
+      "lan": {
+        "commandName": "Project",
+        "dotnetRunMessages": true,
+        "launchBrowser": false,
+        "applicationUrl": "https://localhost:7189",
+        "environmentVariables": {
+          "ASPNETCORE_ENVIRONMENT": "Development",
+          "Lan__Aktiv": "true",
+          "Lan__Port": "7189",
+          "ConnectionStrings__VibeVHS": "Data Source=data/vibevhs-lan.db",
+          "Speicher__Logs": "logs/lan"
+        }
       }
     }
   }
