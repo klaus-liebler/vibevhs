@@ -1,0 +1,49 @@
+@page "/protokoll"
+@using VibeVHS.Application.Protokoll
+@inject Vorgang Vorgang
+
+<PageTitle>Protokoll · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Protokoll</h1>
+        <p class="vhs-sub">Wer hat wann was getan. Einträge können nicht geändert oder gelöscht werden.</p>
+    </div>
+</div>
+
+<section class="vhs-card">
+    <RadzenDataGrid TItem="AuditEintrag" Data="@eintraege" AllowSorting="true" AllowPaging="true" PageSize="50"
+                    EmptyText="Noch keine Einträge." ShowPagingSummary="true" PagingSummaryFormat="Seite {0} von {1} ({2} Einträge)">
+        <Columns>
+            <RadzenDataGridColumn TItem="AuditEintrag" Property="@nameof(AuditEintrag.Zeitpunkt)" Title="Zeitpunkt" Width="160px">
+                <Template Context="e"><span class="vhs-mono">@e.Zeitpunkt.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</span></Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="AuditEintrag" Property="@nameof(AuditEintrag.Benutzer)" Title="Wer" Width="220px">
+                <Template Context="e">@e.Benutzer@(e.Rolle is null ? "" : $" ({e.Rolle})")</Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="AuditEintrag" Property="@nameof(AuditEintrag.Beschreibung)" Title="Was" />
+            <RadzenDataGridColumn TItem="AuditEintrag" Property="@nameof(AuditEintrag.Aktion)" Title="Aktion" Width="220px">
+                <Template Context="e"><span class="vhs-mono vhs-small">@e.Aktion</span></Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="AuditEintrag" Property="@nameof(AuditEintrag.Erfolgreich)" Title="Ergebnis" Width="130px">
+                <Template Context="e">
+                    @if (e.Erfolgreich)
+                    {
+                        <StatusPille Stil="gut">erledigt</StatusPille>
+                    }
+                    else
+                    {
+                        <StatusPille Stil="warn">Prüfung nötig</StatusPille>
+                    }
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</section>
+
+@code {
+    private IReadOnlyList<AuditEintrag> eintraege = [];
+
+    protected override async Task OnInitializedAsync()
+        => eintraege = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IAuditProtokoll>().NeuesteAsync(2000));
+}

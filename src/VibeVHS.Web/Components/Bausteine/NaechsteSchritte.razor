@@ -1,0 +1,32 @@
+@inject NavigationManager Navigation
+
+@*
+    "Nächste sinnvolle Schritte": nach jeder Aktion werden die naheliegenden Folgeschritte angeboten.
+*@
+@if (Schritte.Count > 0)
+{
+    <section class="vhs-next" aria-label="@Titel">
+        <h3>@Titel</h3>
+        <div class="vhs-row">
+            @foreach (var schritt in Schritte)
+            {
+                <span title="@schritt.Hinweis">
+                    <BegruendeterButton Text="@schritt.Titel"
+                                        Icon="@(schritt.Hauptschritt ? "arrow_forward" : null)"
+                                        ButtonStyle="@(schritt.Hauptschritt ? ButtonStyle.Primary : ButtonStyle.Light)"
+                                        Size="ButtonSize.Small"
+                                        Freigabe="@schritt.Status"
+                                        Click="@(() => Navigation.NavigateTo(schritt.Ziel))" />
+                </span>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter]
+    public string Titel { get; set; } = "Nächste sinnvolle Schritte";
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<NaechsterSchritt> Schritte { get; set; } = [];
+}

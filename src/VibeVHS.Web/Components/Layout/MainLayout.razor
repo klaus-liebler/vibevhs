@@ -1,0 +1,83 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+
+<RadzenComponents />
+
+<div class="vhs-app">
+    <aside class="vhs-side">
+        <div class="vhs-brand"><b>VibeVHS</b><span>VHS Musterstadt</span></div>
+        <nav class="vhs-nav" aria-label="Hauptnavigation">
+            @foreach (var gruppe in Navigationspunkte.GroupBy(n => n.Gruppe))
+            {
+                <div class="vhs-grp">@gruppe.Key</div>
+                @foreach (var punkt in gruppe)
+                {
+                    @if (punkt.Gesperrt is { } grund)
+                    {
+                        <span class="vhs-why vhs-nav-off" tabindex="0" data-why="@grund" aria-disabled="true">@punkt.Titel</span>
+                    }
+                    else
+                    {
+                        <NavLink href="@punkt.Ziel" Match="@(punkt.Ziel == "" ? NavLinkMatch.All : NavLinkMatch.Prefix)" ActiveClass="on">@punkt.Titel</NavLink>
+                    }
+                }
+            }
+        </nav>
+        <div class="vhs-foot">Iteration 0 · Fundament<br />Entwicklungsstand, Mock-Anbindungen</div>
+    </aside>
+    <div class="vhs-main">
+        <header class="vhs-top">
+            <div class="vhs-search vhs-why" tabindex="0"
+                 data-why="Die allgemeine Suche über Personen, Kurse, Kursnummern und Orte folgt in einer späteren Iteration.">
+                <RadzenIcon Icon="search" />
+                <input type="search" placeholder="Person, Kurs, Kursnummer oder Ort suchen" disabled aria-label="Suche (noch nicht verfügbar)" />
+            </div>
+            <AuthorizeView>
+                <Authorized>
+                    <div class="vhs-role">
+                        <span>Angemeldet als <b>@context.User.Identity?.Name</b>, Rolle <b>@RolleAnzeige(context.User)</b></span>
+                        <a href="anmelden" class="vhs-link" title="Andere Rolle oder anderes Testkonto wählen">Rolle wechseln</a>
+                        <form method="post" action="abmelden" class="vhs-inline">
+                            <AntiforgeryToken />
+                            <button type="submit" class="vhs-linkbutton">Abmelden</button>
+                        </form>
+                    </div>
+                </Authorized>
+            </AuthorizeView>
+            <span class="vhs-proto" title="Alle Mails und Schnittstellen werden nur simuliert; nichts verlässt das System.">Entwicklung · Mock-Anbindungen</span>
+        </header>
+        <main class="vhs-content">
+            @Body
+        </main>
+    </div>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Es ist ein unerwarteter Fehler aufgetreten.
+    <a href="." class="reload">Neu laden</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private sealed record Navigationspunkt(string Gruppe, string Titel, string Ziel, string? Gesperrt = null);
+
+    private static string Geplant(string was) => Freigabe.Geplant(was).Begruendung!;
+
+    private static readonly IReadOnlyList<Navigationspunkt> Navigationspunkte =
+    [
+        new("Übersicht", "Start", ""),
+        new("Programm", "Kurse", "kurse", Geplant("Die Kursverwaltung")),
+        new("Programm", "Raumplan", "raumplan", Geplant("Der Raumplan")),
+        new("Programm", "Orte", "orte", Geplant("Die Verwaltung von Orten und Räumen")),
+        new("Teilnahme", "Anmeldung", "anmeldung", Geplant("Die Kursanmeldung (manuell und per QR-Code)")),
+        new("Teilnahme", "Personen", "personen"),
+        new("Teilnahme", "Anwesenheit", "anwesenheit", Geplant("Die Anwesenheitserfassung (auch per QR-Code)")),
+        new("Teilnahme", "Integrationskurse", "integration", Geplant("Die Integrationskursverwaltung mit BAMF-Schnittstelle")),
+        new("Verwaltung", "Finanzen", "finanzen", Geplant("Die Finanzbuchhaltung (SEPA, Mahnwesen, Übergabe an die Kämmerei)")),
+        new("Verwaltung", "Postausgang", "postausgang"),
+        new("Verwaltung", "Protokoll", "protokoll"),
+    ];
+
+    private static string RolleAnzeige(System.Security.Claims.ClaimsPrincipal user)
+        => VibeVHS.Adapters.Mocks.MockAnmeldung.AlsBenutzer(user)?.Rolle?.Anzeigename() ?? "keine";
+}

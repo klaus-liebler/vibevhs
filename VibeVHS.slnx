@@ -1,14 +1,23 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/VibeVHS.Domain/VibeVHS.Domain.csproj" />
+    <Project Path="src/VibeVHS.Application/VibeVHS.Application.csproj" />
+    <Project Path="src/VibeVHS.Infrastructure/VibeVHS.Infrastructure.csproj" />
+    <Project Path="src/VibeVHS.Adapters.Mocks/VibeVHS.Adapters.Mocks.csproj" />
+    <Project Path="src/VibeVHS.Web/VibeVHS.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/VibeVHS.Domain.Tests/VibeVHS.Domain.Tests.csproj" />
+    <Project Path="tests/VibeVHS.Application.Tests/VibeVHS.Application.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Testdaten/VibeVHS.Testdaten.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />
     <File Path="global.json" />
+    <File Path="docs/README.md" />
   </Folder>
 </Solution>

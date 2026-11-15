@@ -1,0 +1,12 @@
+<span class="vhs-pill @Art">@ChildContent</span>
+
+@code {
+    /// <summary>"gut", "warn", "krit", "info" oder "neutral".</summary>
+    [Parameter]
+    public string Stil { get; set; } = "neutral";
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string Art => $"vhs-p-{Stil}";
+}

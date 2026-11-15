@@ -1,0 +1,80 @@
+@page "/anmelden"
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@layout LeeresLayout
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@using VibeVHS.Adapters.Mocks
+@inject NavigationManager Navigation
+
+<PageTitle>Anmelden · VibeVHS</PageTitle>
+
+<div class="vhs-login">
+    <div class="vhs-brand"><b>VibeVHS</b><span>VHS Musterstadt</span></div>
+    <h1>Anmelden</h1>
+    <div class="vhs-alert vhs-warn">
+        <b>Testanmeldung für die Entwicklung.</b> Wählen Sie ein Konto und die Rolle, in der Sie arbeiten möchten.
+        Im Betrieb ersetzt die Anmeldung über die kommunale Benutzerverwaltung (OIDC/SAML) diese Seite.
+    </div>
+
+    @if (Fehler is not null)
+    {
+        <div class="vhs-alert vhs-crit" role="alert">@Fehler</div>
+    }
+
+    <form method="post" @formname="anmelden" @onsubmit="AnmeldenAsync">
+        <AntiforgeryToken />
+        <div class="vhs-list">
+            @foreach (var konto in MockAnmeldung.Konten)
+            {
+                <div>
+                    <span class="vhs-grow"><b>@konto.Name</b><br /><span class="vhs-small vhs-muted">@konto.Kennung</span></span>
+                    <span class="vhs-row">
+                        @foreach (var rolle in konto.Rollen)
+                        {
+                            <button type="submit" name="Auswahl" value="@($"{konto.Kennung}|{rolle}")" class="vhs-btn">
+                                @rolle.Anzeigename()
+                            </button>
+                        }
+                    </span>
+                </div>
+            }
+        </div>
+    </form>
+</div>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "anmelden")]
+    private string? Auswahl { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string? Fehler { get; set; }
+
+    private async Task AnmeldenAsync()
+    {
+        var teile = (Auswahl ?? string.Empty).Split('|');
+        if (teile.Length != 2
+            || MockAnmeldung.Finden(teile[0]) is not { } konto
+            || !Enum.TryParse<Rolle>(teile[1], out var rolle)
+            || !konto.Rollen.Contains(rolle))
+        {
+            Fehler = "Diese Kombination aus Konto und Rolle gibt es nicht.";
+            return;
+        }
+
+        var principal = MockAnmeldung.Anmelden(konto, rolle, CookieAuthenticationDefaults.AuthenticationScheme);
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+        Navigation.NavigateTo(SicheresZiel(ReturnUrl));
+    }
+
+    private static string SicheresZiel(string? ziel)
+        => !string.IsNullOrEmpty(ziel) && ziel.StartsWith('/') && !ziel.StartsWith("//", StringComparison.Ordinal)
+           && !ziel.StartsWith("/anmelden", StringComparison.OrdinalIgnoreCase)
+            ? ziel
+            : "/";
+}

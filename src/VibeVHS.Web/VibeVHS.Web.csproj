@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UserSecretsId>vibevhs-web</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Radzen.Blazor" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VibeVHS.Application\VibeVHS.Application.csproj" />
+    <ProjectReference Include="..\VibeVHS.Infrastructure\VibeVHS.Infrastructure.csproj" />
+    <ProjectReference Include="..\VibeVHS.Adapters.Mocks\VibeVHS.Adapters.Mocks.csproj" />
+  </ItemGroup>
+
+</Project>

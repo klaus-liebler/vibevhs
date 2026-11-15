@@ -40,8 +40,10 @@ public sealed record Freigabe
     }
 
     /// <summary>Funktion ist geplant, aber noch nicht umgesetzt.</summary>
-    public static Freigabe Geplant(string funktion, string iteration)
-        => Nein($"{funktion} folgt in Iteration {iteration} (siehe Umsetzungsfahrplan).");
+    public static Freigabe Geplant(string funktion, string? iteration = null)
+        => Nein(iteration is null
+            ? $"{funktion} ist noch nicht umgesetzt und folgt in einer späteren Iteration (siehe Umsetzungsfahrplan)."
+            : $"{funktion} folgt in Iteration {iteration} (siehe Umsetzungsfahrplan).");
 
     /// <summary>Verknüpft mehrere Bedingungen; die erste nicht erfüllte liefert die Begründung.</summary>
     public Freigabe Und(Func<Freigabe> weitere) => Erlaubt ? weitere() : this;

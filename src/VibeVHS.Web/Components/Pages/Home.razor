@@ -1,0 +1,129 @@
+﻿@page "/"
+@using VibeVHS.Application.Personen
+@using VibeVHS.Application.Postausgang
+@using VibeVHS.Application.Protokoll
+@inject Vorgang Vorgang
+@inject TimeProvider Uhr
+@inject NavigationManager Navigation
+
+<PageTitle>Start · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Guten Tag@(Anrede is null ? "" : ", " + Anrede)</h1>
+        <p class="vhs-sub">@Uhr.GetLocalNow().ToString("dddd, d. MMMM yyyy")</p>
+    </div>
+    <div class="vhs-row">
+        <BegruendeterButton Text="Person anlegen" Icon="person_add" Click="@(() => Navigation.NavigateTo("personen?neu=1"))" />
+        <BegruendeterButton Text="Kurs anlegen" Icon="add" ButtonStyle="ButtonStyle.Light"
+                            Freigabe="@KursAnlegen" />
+    </div>
+</div>
+
+<div class="vhs-kpis">
+    <div class="vhs-kpi"><div class="vhs-kpi-lbl">Personen</div><div class="vhs-kpi-val">@anzahlPersonen</div><div class="vhs-kpi-note">in der Datenbank</div></div>
+    <div class="vhs-kpi"><div class="vhs-kpi-lbl">Postausgang wartend</div><div class="vhs-kpi-val">@wartend</div><div class="vhs-kpi-note">wird alle 15 s zugestellt</div></div>
+    <div class="vhs-kpi"><div class="vhs-kpi-lbl">Zugestellt (simuliert)</div><div class="vhs-kpi-val">@zugestellt</div><div class="vhs-kpi-note">Mails und Schnittstellen</div></div>
+    <div class="vhs-kpi"><div class="vhs-kpi-lbl">Fehlgeschlagen</div><div class="vhs-kpi-val">@fehlgeschlagen</div><div class="vhs-kpi-note">brauchen Prüfung</div></div>
+</div>
+
+<NaechsteSchritte Titel="Was steht an?" Schritte="@Schritte" />
+
+<section class="vhs-card">
+    <div class="vhs-head">
+        <h2>Letzte Aktivitäten</h2>
+        <span class="vhs-small vhs-muted">jeder Schritt, auch automatische, wird protokolliert</span>
+    </div>
+    <div class="vhs-list">
+        @if (letzte.Count == 0)
+        {
+            <div class="vhs-small vhs-muted">Noch keine Einträge.</div>
+        }
+        @foreach (var e in letzte)
+        {
+            <div>
+                <span class="vhs-mono vhs-small vhs-muted vhs-zeit">@e.Zeitpunkt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                <span class="vhs-grow">@e.Beschreibung<br /><span class="vhs-small vhs-muted">@e.Benutzer@(e.Rolle is null ? "" : $" ({e.Rolle})")</span></span>
+                @if (e.Erfolgreich)
+                {
+                    <StatusPille Stil="gut">erledigt</StatusPille>
+                }
+                else
+                {
+                    <StatusPille Stil="warn">Prüfung nötig</StatusPille>
+                }
+            </div>
+        }
+    </div>
+    <div><RadzenButton Text="Ganzes Protokoll" Variant="Variant.Text" Icon="history" Click="@(() => Navigation.NavigateTo("protokoll"))" /></div>
+</section>
+
+@code {
+    private string? Anrede;
+    private int anzahlPersonen, wartend, zugestellt, fehlgeschlagen;
+    private IReadOnlyList<AuditEintrag> letzte = [];
+    private IReadOnlyList<NaechsterSchritt> Schritte = [];
+    private Rolle? rolle;
+
+    private Freigabe KursAnlegen => Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung)
+        .Und(() => Freigabe.Geplant("Das Anlegen von Kursen"));
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? Anmeldung { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Anmeldung is not null)
+        {
+            var zustand = await Anmeldung;
+            Anrede = zustand.User.FindFirst(VibeVHS.Adapters.Mocks.MockAnmeldung.AnredeClaim)?.Value;
+        }
+
+        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var post = d.GetRequiredService<INachrichtenSpeicher>();
+            anzahlPersonen = await d.GetRequiredService<IPersonenSpeicher>().AnzahlAsync();
+            wartend = await post.AnzahlAsync(NachrichtenStatus.Wartend);
+            zugestellt = await post.AnzahlAsync(NachrichtenStatus.Zugestellt);
+            fehlgeschlagen = await post.AnzahlAsync(NachrichtenStatus.Fehlgeschlagen);
+            letzte = await d.GetRequiredService<IAuditProtokoll>().NeuesteAsync(8);
+        });
+
+        Schritte = SchritteFuer(rolle);
+    }
+
+    private IReadOnlyList<NaechsterSchritt> SchritteFuer(Rolle? r)
+    {
+        var liste = new List<NaechsterSchritt>();
+        if (fehlgeschlagen > 0)
+        {
+            liste.Add(new($"{fehlgeschlagen} fehlgeschlagene Nachricht(en) prüfen", "postausgang?status=Fehlgeschlagen",
+                "Diese Nachrichten wurden nach mehreren Versuchen nicht zugestellt.", Hauptschritt: true));
+        }
+
+        switch (r)
+        {
+            case Rolle.Teilnehmerservice:
+                liste.Add(new("Person anlegen", "personen?neu=1", "Neue Teilnehmende oder Dozierende erfassen", Hauptschritt: liste.Count == 0));
+                liste.Add(new("Anmeldung erfassen", "anmeldung", Freigabe: Freigabe.Geplant("Die Kursanmeldung")));
+                liste.Add(new("Personen durchsuchen", "personen"));
+                break;
+            case Rolle.Fachbereichsleitung:
+                liste.Add(new("Kurse unter Mindestzahl prüfen", "kurse", Freigabe: Freigabe.Geplant("Die Mindestteilnehmerprüfung")));
+                liste.Add(new("Protokoll ansehen", "protokoll", Hauptschritt: liste.Count == 0));
+                break;
+            case Rolle.Buchhaltung:
+                liste.Add(new("Mahnvorschläge freigeben", "finanzen", Freigabe: Freigabe.Geplant("Das Mahnwesen")));
+                liste.Add(new("Postausgang (Übergaben an die Kämmerei)", "postausgang", Hauptschritt: liste.Count == 0));
+                break;
+            case Rolle.IntegrationskursTeam:
+                liste.Add(new("BAMF-Meldungen prüfen", "integration", Freigabe: Freigabe.Geplant("Die BAMF-Schnittstelle")));
+                liste.Add(new("Postausgang ansehen", "postausgang", Hauptschritt: liste.Count == 0));
+                break;
+        }
+
+        liste.Add(new("Postausgang ansehen", "postausgang"));
+        return liste.DistinctBy(s => s.Ziel).ToList();
+    }
+}

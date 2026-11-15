@@ -1,0 +1,156 @@
+@page "/personen"
+@using VibeVHS.Application.Personen
+@using VibeVHS.Domain.Personen
+@inject Vorgang Vorgang
+@inject TimeProvider Uhr
+@inject NavigationManager Navigation
+@inject NotificationService Hinweise
+
+<PageTitle>Personen · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Personen</h1>
+        <p class="vhs-sub">Teilnehmende, Dozierende und Ansprechpersonen. Jede Person gibt es nur einmal.</p>
+    </div>
+    <div class="vhs-row">
+        @if (!formularOffen)
+        {
+            <BegruendeterButton Text="Person anlegen" Icon="person_add" Click="@(() => formularOffen = true)" />
+        }
+    </div>
+</div>
+
+@if (formularOffen)
+{
+    <section class="vhs-card">
+        <h2>Neue Person</h2>
+        <div class="vhs-fields">
+            <RadzenFormField Text="Vorname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="vorname" /></RadzenFormField>
+            <RadzenFormField Text="Nachname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nachname" /></RadzenFormField>
+            <RadzenFormField Text="Geburtsdatum" Variant="Variant.Outlined">
+                <RadzenDatePicker TValue="DateOnly?" @bind-Value="geburtsdatum" DateFormat="dd.MM.yyyy" ShowCalendarWeek="false" />
+            </RadzenFormField>
+            <RadzenFormField Text="E-Mail" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="eMail" /></RadzenFormField>
+            <RadzenFormField Text="Korrespondenzsprache" Variant="Variant.Outlined">
+                <RadzenDropDown TValue="string" @bind-Value="sprache" Data="@Sprachen.Alle" TextProperty="Name" ValueProperty="Code" />
+            </RadzenFormField>
+        </div>
+        @if (fehler is not null)
+        {
+            <div class="vhs-alert vhs-crit" role="alert">@fehler</div>
+        }
+        <div class="vhs-row">
+            <BegruendeterButton Text="Speichern" Icon="save" Click="SpeichernAsync" IsBusy="@speichert" Freigabe="@SpeichernFreigabe" />
+            <RadzenButton Text="Abbrechen" ButtonStyle="ButtonStyle.Light" Click="@(() => { formularOffen = false; fehler = null; })" />
+        </div>
+    </section>
+}
+
+@if (folgeschritte.Count > 0)
+{
+    <NaechsteSchritte Titel="@($"{zuletztAngelegt} wurde angelegt. Wie geht es weiter?")" Schritte="@folgeschritte" />
+}
+
+<section class="vhs-card">
+    <div class="vhs-head">
+        <RadzenTextBox @bind-Value="suche" @bind-Value:after="Filtern" Placeholder="Name, E-Mail oder Geburtsdatum filtern" style="min-width:300px" />
+        <span class="vhs-small vhs-muted">@gefiltert.Count von @alle.Count</span>
+    </div>
+    <RadzenDataGrid TItem="PersonZeile" Data="@gefiltert" AllowSorting="true" AllowPaging="true" PageSize="25"
+                    PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true"
+                    PagingSummaryFormat="Seite {0} von {1} ({2} Personen)" EmptyText="Keine Personen gefunden."
+                    RowClick="@(a => Navigation.NavigateTo($"personen/{a.Data?.Id}"))" class="vhs-klickbar">
+        <Columns>
+            <RadzenDataGridColumn TItem="PersonZeile" Property="@nameof(PersonZeile.Name)" Title="Name" />
+            <RadzenDataGridColumn TItem="PersonZeile" Property="@nameof(PersonZeile.Geburtsdatum)" Title="Geburtsdatum" FormatString="{0:dd.MM.yyyy}" Width="140px" />
+            <RadzenDataGridColumn TItem="PersonZeile" Property="@nameof(PersonZeile.EMail)" Title="E-Mail" />
+            <RadzenDataGridColumn TItem="PersonZeile" Property="@nameof(PersonZeile.SpracheName)" Title="Sprache" Width="140px" />
+            <RadzenDataGridColumn TItem="PersonZeile" Property="@nameof(PersonZeile.AngelegtAm)" Title="Angelegt" FormatString="{0:dd.MM.yyyy}" Width="130px" />
+        </Columns>
+    </RadzenDataGrid>
+</section>
+
+@code {
+    private sealed record PersonZeile(Guid Id, string Name, DateOnly? Geburtsdatum, string? EMail, string SpracheName, DateTime AngelegtAm, string Suchtext);
+
+    [SupplyParameterFromQuery(Name = "neu")]
+    private int? Neu { get; set; }
+
+    private List<PersonZeile> alle = [];
+    private List<PersonZeile> gefiltert = [];
+    private string? suche;
+
+    private bool formularOffen, speichert;
+    private string? vorname, nachname, eMail, fehler;
+    private string sprache = "de";
+    private DateOnly? geburtsdatum;
+    private string? zuletztAngelegt;
+    private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
+
+    private Freigabe SpeichernFreigabe =>
+        string.IsNullOrWhiteSpace(vorname) || string.IsNullOrWhiteSpace(nachname)
+            ? Freigabe.Nein("Bitte zuerst Vor- und Nachnamen eintragen (Pflichtfelder).")
+            : Freigabe.Ja;
+
+    protected override async Task OnInitializedAsync()
+    {
+        formularOffen = Neu == 1;
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync()
+    {
+        var jetzt = Uhr.GetLocalNow();
+        var personen = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenSpeicher>().AlleAsync());
+        alle = personen
+            .Select(p =>
+            {
+                var name = p.AktuellerName(jetzt);
+                var anzeige = $"{name.Nachname}, {name.Vorname}";
+                return new PersonZeile(p.Id, anzeige, p.Geburtsdatum, p.EMail, Sprachen.Name(p.Sprache),
+                    p.AngelegtAm.LocalDateTime, $"{anzeige} {name.Vorname} {name.Nachname} {p.EMail} {p.Geburtsdatum:dd.MM.yyyy}".ToLowerInvariant());
+            })
+            .OrderBy(z => z.Name, StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("de-DE"), true))
+            .ToList();
+        Filtern();
+    }
+
+    private void Filtern()
+    {
+        var teile = (suche ?? string.Empty).ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        gefiltert = alle.Where(z => teile.All(t => z.Suchtext.Contains(t, StringComparison.Ordinal))).ToList();
+    }
+
+    private async Task SpeichernAsync()
+    {
+        fehler = null;
+        speichert = true;
+        try
+        {
+            var person = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<PersonenDienst>()
+                .AnlegenAsync(vorname!, nachname!, geburtsdatum, eMail, sprache));
+            zuletztAngelegt = $"{vorname} {nachname}";
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", $"{zuletztAngelegt} wurde angelegt und protokolliert.");
+            folgeschritte =
+            [
+                new("Person öffnen", $"personen/{person.Id}", "Daten prüfen, Namenshistorie ansehen", Hauptschritt: true),
+                new("Kursanmeldung erfassen", "anmeldung", Freigabe: Freigabe.Geplant("Die Kursanmeldung")),
+                new("Weitere Person anlegen", "personen?neu=1"),
+            ];
+            vorname = nachname = eMail = null;
+            geburtsdatum = null;
+            sprache = "de";
+            formularOffen = false;
+            await LadenAsync();
+        }
+        catch (ArgumentException ex)
+        {
+            fehler = ex.Message;
+        }
+        finally
+        {
+            speichert = false;
+        }
+    }
+}

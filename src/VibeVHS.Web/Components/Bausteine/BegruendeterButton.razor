@@ -1,0 +1,45 @@
+@*
+    Schaltfläche, die – wenn sie gesperrt ist – immer erklärt, warum.
+    Die Begründung erscheint als Tooltip bei Maus-Hover und bei Tastaturfokus und wird Screenreadern vorgelesen.
+*@
+@if (Freigabe is { Erlaubt: false })
+{
+    <span class="vhs-why" tabindex="0" data-why="@Freigabe.Begruendung" aria-label="@($"{Text} – nicht möglich: {Freigabe.Begruendung}")">
+        <RadzenButton Text="@Text" Icon="@Icon" ButtonStyle="@ButtonStyle" Variant="@Variant" Size="@Size" Disabled="true" tabindex="-1" />
+    </span>
+}
+else
+{
+    <RadzenButton Text="@Text" Icon="@Icon" ButtonStyle="@ButtonStyle" Variant="@Variant" Size="@Size"
+                  Click="@Click" IsBusy="@IsBusy" BusyText="@(BusyText ?? Text)" />
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Icon { get; set; }
+
+    [Parameter]
+    public ButtonStyle ButtonStyle { get; set; } = ButtonStyle.Primary;
+
+    [Parameter]
+    public Variant Variant { get; set; } = Variant.Filled;
+
+    [Parameter]
+    public ButtonSize Size { get; set; } = ButtonSize.Medium;
+
+    [Parameter]
+    public EventCallback<MouseEventArgs> Click { get; set; }
+
+    /// <summary>Ist die Aktion gerade erlaubt? <c>null</c> = ja.</summary>
+    [Parameter]
+    public Freigabe? Freigabe { get; set; }
+
+    [Parameter]
+    public bool IsBusy { get; set; }
+
+    [Parameter]
+    public string? BusyText { get; set; }
+}

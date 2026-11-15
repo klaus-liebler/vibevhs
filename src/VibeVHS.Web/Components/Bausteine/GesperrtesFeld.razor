@@ -1,0 +1,24 @@
+@*
+    Nicht editierbares Feld mit Schloss-Symbol. Der Tooltip erklärt, warum es nicht änderbar ist
+    und – wenn möglich – wie man es stattdessen ändert.
+*@
+<div class="vhs-field">
+    <span class="vhs-lbl">@Bezeichnung</span>
+    <span class="vhs-why vhs-lock" tabindex="0" data-why="@Begruendung" aria-label="@($"{Bezeichnung}: {Wert}. Nicht änderbar: {Begruendung}")">
+        <span class="vhs-val vhs-ro">
+            <span>@Wert</span>
+            <RadzenIcon Icon="lock" class="vhs-lockicon" />
+        </span>
+    </span>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Bezeichnung { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Wert { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Begruendung { get; set; } = string.Empty;
+}

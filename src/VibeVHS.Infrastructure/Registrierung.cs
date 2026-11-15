@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,10 +13,17 @@ namespace VibeVHS.Infrastructure;
 
 public static class Registrierung
 {
-    public static IServiceCollection AddVibeVhsInfrastruktur(this IServiceCollection dienste, IConfiguration konfiguration)
+    /// <param name="basisVerzeichnis">Relative Datenbankpfade werden hierzu aufgelöst (Inhaltsverzeichnis der Anwendung).</param>
+    public static IServiceCollection AddVibeVhsInfrastruktur(this IServiceCollection dienste, IConfiguration konfiguration,
+        string basisVerzeichnis)
     {
-        var verbindung = konfiguration.GetConnectionString("VibeVHS") ?? "Data Source=data/vibevhs.db";
-        dienste.AddDbContext<VibeVhsDbContext>(o => o.UseSqlite(verbindung));
+        var verbindung = new SqliteConnectionStringBuilder(konfiguration.GetConnectionString("VibeVHS") ?? "Data Source=data/vibevhs.db");
+        if (!Path.IsPathRooted(verbindung.DataSource) && verbindung.DataSource != ":memory:")
+        {
+            verbindung.DataSource = Path.GetFullPath(Path.Combine(basisVerzeichnis, verbindung.DataSource));
+        }
+
+        dienste.AddDbContext<VibeVhsDbContext>(o => o.UseSqlite(verbindung.ToString()));
 
         dienste.AddScoped<IPersonenSpeicher, PersonenSpeicher>();
         dienste.AddScoped<INachrichtenSpeicher, NachrichtenSpeicher>();

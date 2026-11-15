@@ -1,0 +1,177 @@
+@page "/postausgang"
+@using VibeVHS.Application.Postausgang
+@implements IDisposable
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+
+<PageTitle>Postausgang · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Postausgang</h1>
+        <p class="vhs-sub">Alle ausgehenden Mails und Schnittstellenaufrufe. Nichts verlässt das System, ohne hier aufzutauchen.</p>
+    </div>
+    <div class="vhs-row">
+        <BegruendeterButton Text="Jetzt zustellen" Icon="send" Click="ZustellenAsync" IsBusy="@stelltZu"
+                            Freigabe="@(wartend == 0 ? Freigabe.Nein("Es warten keine Nachrichten auf Zustellung.") : Freigabe.Ja)" />
+        <BegruendeterButton Text="Test: BAMF-Meldung" Icon="account_balance" ButtonStyle="ButtonStyle.Light" Click="BamfTestAsync"
+                            Freigabe="@(Freigabe.NurFuer(rolle, Rolle.IntegrationskursTeam, Rolle.Fachbereichsleitung))" />
+    </div>
+</div>
+
+<div class="vhs-alert vhs-info">
+    <b>Entwicklungsmodus:</b> Mails und Schnittstellen sind simuliert (Mock). Sie werden alle 15 Sekunden „zugestellt“, bleiben mit vollem Text hier sichtbar und jede Zustellung steht im Protokoll.
+</div>
+
+<div class="vhs-row">
+    <RadzenSelectBar TValue="string" @bind-Value="statusFilter" @bind-Value:after="LadenAsync" Size="ButtonSize.Small">
+        <Items>
+            <RadzenSelectBarItem Text="Alle" Value="@("")" />
+            <RadzenSelectBarItem Text="Wartend" Value="@nameof(NachrichtenStatus.Wartend)" />
+            <RadzenSelectBarItem Text="Zugestellt" Value="@nameof(NachrichtenStatus.Zugestellt)" />
+            <RadzenSelectBarItem Text="Fehlgeschlagen" Value="@nameof(NachrichtenStatus.Fehlgeschlagen)" />
+        </Items>
+    </RadzenSelectBar>
+</div>
+
+<div class="vhs-split">
+    <section class="vhs-card">
+        <RadzenDataGrid TItem="AusgehendeNachricht" Data="@gefiltert" AllowSorting="true" AllowPaging="true" PageSize="20"
+                        EmptyText="Keine Nachrichten." ShowPagingSummary="true" PagingSummaryFormat="Seite {0} von {1} ({2} Nachrichten)"
+                        RowClick="@(a => ausgewaehlt = a.Data)" class="vhs-klickbar">
+            <Columns>
+                <RadzenDataGridColumn TItem="AusgehendeNachricht" Property="@nameof(AusgehendeNachricht.ErstelltAm)" Title="Erstellt" Width="140px">
+                    <Template Context="n"><span class="vhs-mono">@n.ErstelltAm.ToLocalTime().ToString("dd.MM. HH:mm")</span></Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="AusgehendeNachricht" Property="@nameof(AusgehendeNachricht.Kanal)" Title="Art" Width="120px">
+                    <Template Context="n">@(n.Kanal == Kanal.EMail ? "E-Mail" : "Schnittstelle")</Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="AusgehendeNachricht" Property="@nameof(AusgehendeNachricht.EmpfaengerAnzeige)" Title="An">
+                    <Template Context="n">@(n.EmpfaengerAnzeige ?? n.Empfaenger)</Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="AusgehendeNachricht" Property="@nameof(AusgehendeNachricht.Betreff)" Title="Betreff" />
+                <RadzenDataGridColumn TItem="AusgehendeNachricht" Property="@nameof(AusgehendeNachricht.Status)" Title="Status" Width="130px">
+                    <Template Context="n"><StatusPille Stil="@StatusStil(n.Status)">@n.Status</StatusPille></Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </section>
+
+    <section class="vhs-card">
+        @if (ausgewaehlt is null)
+        {
+            <p class="vhs-muted">Nachricht in der Liste anklicken, um den vollständigen Inhalt zu sehen.</p>
+        }
+        else
+        {
+            var n = ausgewaehlt;
+            <h2>@n.Betreff</h2>
+            <div class="vhs-small vhs-muted">
+                An: @(n.EmpfaengerAnzeige is null ? n.Empfaenger : $"{n.EmpfaengerAnzeige} <{n.Empfaenger}>")<br />
+                Ausgelöst von: @n.AusgeloestVon · @n.ErstelltAm.ToLocalTime().ToString("dd.MM.yyyy HH:mm")<br />
+                Sprache: @Sprachen.Name(n.Sprache) · Versuche: @n.Versuche
+                @if (n.ZugestelltAm is { } am)
+                {
+                    <br />@($"Zugestellt: {am.ToLocalTime():dd.MM.yyyy HH:mm:ss}")
+                }
+                @if (n.Rueckmeldung is not null)
+                {
+                    <br />@($"Rückmeldung: {n.Rueckmeldung}")
+                }
+            </div>
+            @if (n.Fehler is not null)
+            {
+                <div class="vhs-alert vhs-crit">Letzter Fehler: @n.Fehler</div>
+            }
+            <pre class="vhs-code">@n.Inhalt</pre>
+            @if (n.Uebersetzungslink is not null)
+            {
+                <div class="vhs-small">Übersetzungslink: <a href="@n.Uebersetzungslink" target="_blank" rel="noopener">@n.Uebersetzungslink</a></div>
+            }
+            <div class="vhs-row">
+                <BegruendeterButton Text="Erneut versuchen" Icon="replay" ButtonStyle="ButtonStyle.Light" Click="@(() => ErneutAsync(n.Id))"
+                                    Freigabe="@(n.Status == NachrichtenStatus.Fehlgeschlagen ? Freigabe.Ja : Freigabe.Nein("Nur fehlgeschlagene Nachrichten können erneut versendet werden. Wartende Nachrichten werden automatisch zugestellt."))" />
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "status")]
+    private string? StatusAusAdresse { get; set; }
+
+    private string statusFilter = string.Empty;
+    private List<AusgehendeNachricht> gefiltert = [];
+    private AusgehendeNachricht? ausgewaehlt;
+    private int wartend;
+    private bool stelltZu;
+    private Rolle? rolle;
+    private Timer? aktualisierung;
+
+    protected override async Task OnInitializedAsync()
+    {
+        statusFilter = StatusAusAdresse ?? string.Empty;
+        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        await LadenAsync();
+
+        // Solange Nachrichten warten, regelmäßig neu laden, damit die Zustellung durch den Hintergrundjob sichtbar wird.
+        aktualisierung = new Timer(_ => InvokeAsync(async () =>
+        {
+            if (wartend == 0)
+            {
+                return;
+            }
+
+            await LadenAsync();
+            StateHasChanged();
+        }), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+    }
+
+    private async Task LadenAsync()
+    {
+        var alle = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<INachrichtenSpeicher>().NeuesteAsync(500));
+        wartend = alle.Count(n => n.Status == NachrichtenStatus.Wartend);
+        gefiltert = alle.Where(n => statusFilter == string.Empty || n.Status.ToString() == statusFilter).ToList();
+        if (ausgewaehlt is not null)
+        {
+            ausgewaehlt = alle.FirstOrDefault(n => n.Id == ausgewaehlt.Id);
+        }
+    }
+
+    private async Task ZustellenAsync()
+    {
+        stelltZu = true;
+        var ergebnis = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<Zustellung>().WartendeZustellenAsync());
+        stelltZu = false;
+        Hinweise.Notify(ergebnis.Fehler == 0 ? NotificationSeverity.Success : NotificationSeverity.Warning, "Zustellung",
+            $"{ergebnis.Zugestellt} zugestellt, {ergebnis.Fehler} Fehler.");
+        await LadenAsync();
+    }
+
+    private async Task BamfTestAsync()
+    {
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            await d.GetRequiredService<PostausgangDienst>().SchnittstelleEinreihenAsync("BAMF (Mock)",
+                "Kursbeginnmeldung Testkurs", "Meldung: Kursbeginn\nKurs: TEST-701 (Integrationskurs allgemein)\nTeilnehmende: 19");
+            await d.GetRequiredService<INachrichtenSpeicher>().SpeichernAsync();
+        });
+        Hinweise.Notify(NotificationSeverity.Info, "Eingereiht", "Die BAMF-Testmeldung liegt im Postausgang.");
+        await LadenAsync();
+    }
+
+    private async Task ErneutAsync(Guid id)
+    {
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<PostausgangDienst>().ErneutVersuchenAsync(id));
+        await LadenAsync();
+    }
+
+    private static string StatusStil(NachrichtenStatus s) => s switch
+    {
+        NachrichtenStatus.Zugestellt => "gut",
+        NachrichtenStatus.Wartend => "info",
+        _ => "krit",
+    };
+
+    public void Dispose() => aktualisierung?.Dispose();
+}

@@ -1,0 +1,26 @@
+@page "/uebersetzen/{NachrichtId}"
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@layout LeeresLayout
+
+<PageTitle>Übersetzung · VHS Musterstadt</PageTitle>
+
+<div class="vhs-login">
+    <div class="vhs-brand"><b>VHS Musterstadt</b></div>
+    <h1>Übersetzung / Translation</h1>
+    <div class="vhs-alert vhs-info">
+        Die Übersetzung von Nachrichten wird in einer späteren Ausbaustufe angebunden.
+        Bis dahin wenden Sie sich bitte an den Teilnehmerservice.
+        <br /><br />
+        Translation of messages will be available soon. Until then, please contact our participant service.
+    </div>
+    <p class="vhs-small vhs-muted">Gewünschte Sprache / requested language: @Sprache</p>
+</div>
+
+@code {
+    [Parameter]
+    public string NachrichtId { get; set; } = string.Empty;
+
+    [SupplyParameterFromQuery(Name = "sprache")]
+    private string? Sprache { get; set; }
+}
