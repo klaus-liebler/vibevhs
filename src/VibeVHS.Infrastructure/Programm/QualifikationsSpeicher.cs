@@ -11,6 +11,19 @@ internal sealed class QualifikationsSpeicher(VibeVhsDbContext db) : IQualifikati
     public async Task<IReadOnlyDictionary<string, Merkmal>> KatalogAsync(CancellationToken abbruch = default)
         => await db.Merkmale.AsNoTracking().ToDictionaryAsync(m => m.Schluessel, abbruch);
 
+    public Task<Merkmal?> MerkmalLadenAsync(string schluessel, CancellationToken abbruch = default)
+        => db.Merkmale.FirstOrDefaultAsync(m => m.Schluessel == schluessel, abbruch);
+
+    public async Task<IReadOnlySet<string>> VerwendeteMerkmaleAsync(CancellationToken abbruch = default)
+    {
+        var orte = await db.Set<OrtMerkmal>().AsNoTracking().Select(m => m.Schluessel).Distinct().ToListAsync(abbruch);
+        var personen = await db.Set<PersonQualifikation>().AsNoTracking().Select(q => q.Schluessel).Distinct().ToListAsync(abbruch);
+        var arten = await db.Kursarten.AsNoTracking().ToListAsync(abbruch);
+        return orte.Concat(personen)
+            .Concat(arten.SelectMany(a => a.BenoetigteMerkmale.Concat(a.BenoetigteDozierendenmerkmale)).Select(Anforderung.Basis))
+            .ToHashSet();
+    }
+
     public async Task<IReadOnlyList<Qualifikationsausnahme>> AusnahmenAsync(Guid kursId, CancellationToken abbruch = default)
         => await db.Set<Qualifikationsausnahme>().AsNoTracking().Where(a => a.KursId == kursId).OrderBy(a => a.ErteiltAm).ToListAsync(abbruch);
 

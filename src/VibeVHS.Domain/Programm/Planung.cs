@@ -99,17 +99,25 @@ public static class Ortsplanung
         }
 
         var tagesliste = tage.Distinct().Order().ToList();
-        foreach (var schluessel in benoetigteMerkmale.Distinct())
+        foreach (var anforderung in benoetigteMerkmale.Distinct())
         {
-            var name = verzeichnis.Katalog.TryGetValue(schluessel, out var m) ? m.Name : schluessel;
-            var fehlend = tagesliste.Where(t => !verzeichnis.WirksameMerkmale(ort, t, bekanntAm).Any(w => w.Merkmal.Schluessel == schluessel)).ToList();
-            if (fehlend.Count == tagesliste.Count || tagesliste.Count == 0)
+            var schluessel = Anforderung.Basis(anforderung);
+            var m = verzeichnis.Katalog.GetValueOrDefault(schluessel);
+            var name = m?.Name ?? schluessel;
+            // Je Tag: fehlt das Merkmal, oder erfüllt sein Wert die Bedingung nicht (z. B. nur 8 statt mind. 12 PC-Arbeitsplätze)?
+            var proTag = tagesliste.Select(t =>
             {
-                gruende.Add($"Merkmal „{name}“ fehlt.");
+                var w = verzeichnis.WirksameMerkmale(ort, t, bekanntAm).FirstOrDefault(x => x.Merkmal.Schluessel == schluessel);
+                return (Tag: t, Fehlt: w is null, Abweichung: w is null ? null : Anforderung.Abweichung(anforderung, m, w.Eintrag.WertText));
+            }).ToList();
+            var schlecht = proTag.Where(x => x.Fehlt || x.Abweichung is not null).ToList();
+            if (tagesliste.Count == 0 || schlecht.Count == proTag.Count)
+            {
+                gruende.Add(schlecht.FirstOrDefault(x => x.Abweichung is not null).Abweichung ?? $"Merkmal „{name}“ fehlt.");
             }
-            else if (fehlend.Count > 0)
+            else if (schlecht.Count > 0)
             {
-                gruende.Add($"Merkmal „{name}“ gilt nicht an allen Terminen (zuerst fehlend am {fehlend[0]:dd.MM.yyyy}, z. B. Zulassung abgelaufen).");
+                gruende.Add($"Merkmal „{name}“ gilt nicht an allen Terminen (zuerst am {schlecht[0].Tag:dd.MM.yyyy}{(schlecht[0].Abweichung is { } a ? $": {a}" : ", z. B. Zulassung abgelaufen")}).");
             }
         }
 

@@ -145,6 +145,7 @@ if (app.Configuration.GetValue("Demodaten:Anlegen", false))
                  ("Anmeldungen", AnmeldungDemodaten.AnlegenAsync),
                  ("Qualifikationen", QualifikationsDemodaten.AnlegenAsync),
                  ("Sprachfreigaben", QualifikationsDemodaten.SprachfreigabenAnlegenAsync),
+                 ("Merkmal-Typen", MerkmalDemodaten.AnlegenAsync),
                  ("Teilnehmendenportal", TeilnehmendenDemodaten.AnlegenAsync),
                  ("Durchführung", DurchfuehrungDemodaten.AnlegenAsync),
                  ("Integration", IntegrationDemodaten.AnlegenAsync),

@@ -168,11 +168,7 @@ public sealed class Person
             throw new ArgumentException($"Für „{merkmal.Name}“ ist ein Nachweis Pflicht (Dokument oder Aktenzeichen).");
         }
 
-        var werte = merkmal.Mehrfach ? Programm.Anforderung.Werte(wert) : wert is null ? [] : [wert];
-        if (merkmal.Werte.Count > 0 && (werte.Count == 0 || werte.Any(w => !merkmal.Werte.Contains(w))))
-        {
-            throw new ArgumentException($"Bitte für „{merkmal.Name}“ einen der Werte wählen: {string.Join(", ", merkmal.Werte)}.");
-        }
+        wert = merkmal.WertPruefen(wert);
 
         if (bisEinschliesslich is { } b && b < ab)
         {
@@ -180,10 +176,6 @@ public sealed class Person
         }
 
         var erste = !_qualifikationen.Any(q => q.Schluessel == merkmal.Schluessel);
-        if (merkmal.Mehrfach)
-        {
-            wert = string.Join(", ", werte.Distinct());
-        }
 
         var neu = new PersonQualifikation(merkmal.Schluessel, merkmal.Name, wert, nachweis, ausstellendeStelle, ab, bisEinschliesslich?.AddDays(1),
             erste && erfassung.Art == Erfassungsart.AenderungAbDatum ? erfassung with { Art = Erfassungsart.Ersterfassung } : erfassung);

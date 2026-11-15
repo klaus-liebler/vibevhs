@@ -1,0 +1,74 @@
+@using VibeVHS.Domain.Programm
+
+@* Eingabefeld passend zum Werttyp des Merkmals: Ja/Nein (optionale Bemerkung), Auswahl (einfach oder mehrfach), Ganzzahl (mit Einheit und Grenzen), Text. *@
+
+@if (Merkmal is null)
+{
+    <RadzenFormField Text="Wert" Variant="Variant.Outlined"><RadzenTextBox Disabled="true" Placeholder="erst ein Merkmal wählen" /></RadzenFormField>
+}
+else
+{
+    switch (Merkmal.Typ)
+    {
+        case Merkmalstyp.JaNein:
+            <RadzenFormField Text="Bemerkung (optional)" Variant="Variant.Outlined">
+                <RadzenTextBox Value="@Wert" ValueChanged="@((string v) => WertChanged.InvokeAsync(v))" Placeholder="z. B. 1. OG ohne Aufzug" />
+            </RadzenFormField>
+            break;
+        case Merkmalstyp.Auswahl when Merkmal.Mehrfach:
+            <fieldset class="vhs-auswahl"><legend>@Merkmal.Name *</legend>
+                @foreach (var w in Merkmal.AktiveWerte)
+                {
+                    <label><input type="checkbox" checked="@Gewaehlt.Contains(w)" @onchange="@(e => Umschalten(w, e.Value is true))" /> @w</label>
+                }
+            </fieldset>
+            break;
+        case Merkmalstyp.Auswahl:
+            <RadzenFormField Text="Wert *" Variant="Variant.Outlined">
+                <RadzenDropDown TValue="string" Value="@Wert" ValueChanged="@((string v) => WertChanged.InvokeAsync(v))" Data="@Merkmal.AktiveWerte" Placeholder="bitte wählen" />
+            </RadzenFormField>
+            break;
+        case Merkmalstyp.Ganzzahl:
+            <RadzenFormField Text="@($"Anzahl{(Merkmal.Einheit is { } e ? $" ({e})" : "")} *")" Variant="Variant.Outlined">
+                <RadzenNumeric TValue="int?" Value="@Zahl" ValueChanged="@((int? v) => WertChanged.InvokeAsync(v?.ToString(System.Globalization.CultureInfo.InvariantCulture)))"
+                               Min="@Merkmal.Min" Max="@Merkmal.Max" ShowUpDown="false" />
+            </RadzenFormField>
+            @if (Merkmal.Min is not null || Merkmal.Max is not null)
+            {
+                <span class="vhs-small vhs-muted">erlaubt: @(Merkmal.Min?.ToString() ?? "…")–@(Merkmal.Max?.ToString() ?? "…")</span>
+            }
+            break;
+        default:
+            <RadzenFormField Text="@($"{Merkmal.Name} *")" Variant="Variant.Outlined" Style="min-width:320px">
+                <RadzenTextArea Value="@Wert" ValueChanged="@((string v) => WertChanged.InvokeAsync(v))" Rows="2" MaxLength="@Merkmal.TextMaxLaenge" />
+            </RadzenFormField>
+            break;
+    }
+}
+
+@code {
+    [Parameter]
+    public Merkmal? Merkmal { get; set; }
+
+    [Parameter]
+    public string? Wert { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> WertChanged { get; set; }
+
+    private IReadOnlyList<string> Gewaehlt => Anforderung.Werte(Wert);
+
+    private int? Zahl => int.TryParse(Wert, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var z) ? z : null;
+
+    private Task Umschalten(string w, bool an)
+    {
+        var liste = Gewaehlt.ToList();
+        liste.RemoveAll(x => x.Equals(w, StringComparison.OrdinalIgnoreCase));
+        if (an)
+        {
+            liste.Add(w);
+        }
+
+        return WertChanged.InvokeAsync(liste.Count == 0 ? null : string.Join(", ", liste));
+    }
+}

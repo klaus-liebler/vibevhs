@@ -29,12 +29,58 @@
         <h2>Alle Orte</h2>
         @if (verzeichnis is not null)
         {
-            <ul class="vhs-baum">
-                @foreach (var wurzel in verzeichnis.Alle.Where(o => o.ElternId is null).OrderBy(o => o.Art).ThenBy(o => o.Name))
+            var ortsmerkmale = verzeichnis.Katalog.Values.Where(k => k.Bezug == MerkmalBezug.Ort && k.AlsBedingung).OrderBy(k => k.Gruppe).ThenBy(k => k.Name).ToList();
+            <details class="vhs-filterbox" open="@(filter.Count > 0)">
+                <summary><b>Räume filtern</b> <span class="vhs-small vhs-muted">nach Merkmalen am @tag.ToString("dd.MM.yyyy")@(filter.Count > 0 ? $" · {filter.Count} Filter aktiv" : "")</span></summary>
+                <div class="vhs-filter">
+                    @foreach (var k in ortsmerkmale.Where(k => k.Typ == Merkmalstyp.JaNein))
+                    {
+                        <button class="vhs-chip @(filter.Contains(k.Schluessel) ? "on" : "")" aria-pressed="@(filter.Contains(k.Schluessel) ? "true" : "false")" @onclick="@(() => Umschalten(k.Schluessel))">@k.Name</button>
+                    }
+                </div>
+                @foreach (var k in ortsmerkmale.Where(k => k.Typ == Merkmalstyp.Auswahl))
                 {
-                    @Knoten(wurzel)
+                    <div class="vhs-filter"><span class="vhs-filter-lbl">@k.Name</span>
+                        @foreach (var w in k.AktiveWerte)
+                        {
+                            var b = Anforderung.Bilden(k.Schluessel, w);
+                            <button class="vhs-chip @(filter.Contains(b) ? "on" : "")" aria-pressed="@(filter.Contains(b) ? "true" : "false")" @onclick="@(() => Umschalten(b))">@w</button>
+                        }
+                    </div>
                 }
-            </ul>
+                @foreach (var k in ortsmerkmale.Where(k => k.Typ == Merkmalstyp.Ganzzahl))
+                {
+                    <div class="vhs-filter"><span class="vhs-filter-lbl">@k.Name ab</span>
+                        <RadzenNumeric TValue="int?" Value="@MindestAus(k.Schluessel)" ValueChanged="@((int? v) => MindestSetzen(k.Schluessel, v))" ShowUpDown="false" Style="width:90px"
+                                       aria-label="@($"{k.Name} mindestens")" />
+                        @if (k.Einheit is { } e) { <span class="vhs-small vhs-muted">@e</span> }
+                    </div>
+                }
+                @if (filter.Count > 0)
+                {
+                    <button class="vhs-linkbutton" @onclick="@(() => filter.Clear())">alle Filter zurücksetzen</button>
+                }
+            </details>
+            @if (filter.Count > 0)
+            {
+                var treffer = verzeichnis.Alle.Where(o => o.Buchbar && o.Aktiv && Passt(o)).OrderBy(o => verzeichnis.PfadAnzeige(o)).ToList();
+                <p class="vhs-small"><b>@treffer.Count</b> passende Räume: @string.Join(", ", filter.Select(f => Anforderung.Anzeige(f, verzeichnis.Katalog)))</p>
+                <ul class="vhs-baum">
+                    @foreach (var o in treffer)
+                    {
+                        <li><a href="@($"orte?id={o.Id}")" class="@(ort?.Id == o.Id ? "on" : "")">@o.Anzeige</a> <span class="vhs-small vhs-muted">@verzeichnis.PfadAnzeige(o)</span></li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <ul class="vhs-baum">
+                    @foreach (var wurzel in verzeichnis.Alle.Where(o => o.ElternId is null).OrderBy(o => o.Art).ThenBy(o => o.Name))
+                    {
+                        @Knoten(wurzel)
+                    }
+                </ul>
+            }
         }
     </section>
 
@@ -70,7 +116,7 @@
                             var bald = w.GueltigBis is { } bis && bis <= tag.AddDays(60);
                             <tr>
                                 <td>@w.Merkmal.Name <span class="vhs-small vhs-muted">(@w.Merkmal.Gruppe)</span></td>
-                                <td class="vhs-small">@w.Eintrag.Wert</td>
+                                <td class="vhs-small">@w.Merkmal.WertAnzeige(w.Eintrag.WertText)@if (w.Eintrag.Nachweis is { } nw) { <br /><span class="vhs-muted">Nachweis: @nw</span> }</td>
                                 <td class="vhs-small">@(w.Geerbt ? $"geerbt von {w.Herkunft.Name}" : "eigenes")</td>
                                 <td>@if (w.GueltigBis is { } b) { <StatusPille Stil="@(bald ? "warn" : "neutral")">@b.ToString("dd.MM.yyyy")</StatusPille> } else { <span class="vhs-muted">–</span> }</td>
                             </tr>
@@ -86,9 +132,9 @@
                 <summary><b>Merkmal eintragen</b> <span class="vhs-small vhs-muted">– mit Nachweis und Gültigkeit, die bisherige Eintragung bleibt in der Historie</span></summary>
                 <div class="vhs-fields">
                     <RadzenFormField Text="Merkmal" Variant="Variant.Outlined">
-                        <RadzenDropDown TValue="string" @bind-Value="mSchluessel" Data="@verzeichnis.Katalog.Values.Where(k => k.Bezug == MerkmalBezug.Ort).OrderBy(k => k.Gruppe).ThenBy(k => k.Name)" TextProperty="Name" ValueProperty="Schluessel" />
+                        <RadzenDropDown TValue="string" @bind-Value="mSchluessel" @bind-Value:after="@(() => mWert = null)" Data="@verzeichnis.Katalog.Values.Where(k => k.Bezug == MerkmalBezug.Ort).OrderBy(k => k.Gruppe).ThenBy(k => k.Name)" TextProperty="Name" ValueProperty="Schluessel" />
                     </RadzenFormField>
-                    <RadzenFormField Text="Wert" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="mWert" Placeholder="z. B. 12 Plätze, gemeldet" /></RadzenFormField>
+                    <MerkmalWertEingabe Merkmal="@(mSchluessel is null ? null : verzeichnis.Katalog.GetValueOrDefault(mSchluessel))" @bind-Wert="mWert" />
                     <RadzenFormField Text="Nachweis" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="mNachweis" Placeholder="z. B. BAMF-Schreiben vom …" /></RadzenFormField>
                     <RadzenFormField Text="gültig ab" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly" @bind-Value="mAb" DateFormat="dd.MM.yyyy" /></RadzenFormField>
                     <RadzenFormField Text="gültig bis (leer = unbefristet)" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly?" @bind-Value="mBis" DateFormat="dd.MM.yyyy" /></RadzenFormField>
@@ -112,28 +158,13 @@
 </div>
 
 <details class="vhs-card">
-    <summary><b>Merkmalskatalog</b> <span class="vhs-small vhs-muted">– pflegbar; vererbbare Merkmale gelten auch für Räume im Gebäude</span></summary>
-    <div class="vhs-tbl">
-        <table>
-            <thead><tr><th>Schlüssel</th><th>Name</th><th>Gruppe</th><th>vererbbar</th><th>Nachweis Pflicht</th><th>Ausschlussgruppe</th></tr></thead>
-            <tbody>
-                @foreach (var k in verzeichnis?.Katalog.Values.Where(k => k.Bezug == MerkmalBezug.Ort).OrderBy(k => k.Gruppe).ThenBy(k => k.Name) ?? Enumerable.Empty<Merkmal>())
-                {
-                    <tr><td class="vhs-mono">@k.Schluessel</td><td>@k.Name</td><td>@k.Gruppe</td><td>@(k.Vererbbar ? "ja" : "nein")</td><td>@(k.NachweisPflicht ? "ja" : "nein")</td><td>@k.Ausschlussgruppe</td></tr>
-                }
-            </tbody>
-        </table>
-    </div>
-    <div class="vhs-fields">
-        <RadzenFormField Text="Schlüssel *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="kSchluessel" /></RadzenFormField>
-        <RadzenFormField Text="Name *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="kName" /></RadzenFormField>
-        <RadzenFormField Text="Gruppe" Variant="Variant.Outlined"><RadzenDropDown TValue="string" @bind-Value="kGruppe" Data="@(new[] { "Zugänglichkeit", "Zulassung", "Ausstattung", "Organisation" })" /></RadzenFormField>
-    </div>
-    <div class="vhs-row">
-        <label><input type="checkbox" @bind="kVererbbar" /> vererbbar</label>
-        <label><input type="checkbox" @bind="kNachweis" /> Nachweis Pflicht</label>
-        <BegruendeterButton Text="Aufnehmen" Icon="add" Click="KatalogAsync" Freigabe="@KatalogFreigabe" />
-    </div>
+    <summary><b>Merkmalskatalog</b> <span class="vhs-small vhs-muted">– Werttyp je Merkmal (Ja/Nein, Auswahl, Ganzzahl, Text); vererbbare Merkmale gelten auch für Räume im Gebäude</span></summary>
+    <MerkmalKatalogPflege Bezug="MerkmalBezug.Ort" Rolle="@rolle" Geaendert="LadenAsync" />
+</details>
+
+<details class="vhs-card">
+    <summary><b>Kursarten: Anforderungen an Räume</b> <span class="vhs-small vhs-muted">– z. B. „mind. 12 PC-Arbeitsplätze“; die Raumauswahl nennt konkret, was fehlt</span></summary>
+    <KursartOrtsbedingungen Rolle="@rolle" />
 </details>
 
 @code {
@@ -146,9 +177,43 @@
     private IReadOnlyList<PlanTermin> belegungen = [];
     private IReadOnlyList<Aufgabe> aufgaben = [];
     private Rolle? rolle;
-    private string? mSchluessel, mWert, mNachweis, kSchluessel, kName;
-    private string kGruppe = "Ausstattung";
-    private bool kVererbbar = true, kNachweis;
+    private string? mSchluessel, mWert, mNachweis;
+
+    /// <summary>Aktive Filter als Bedingungen („beamer“, „tafel=Smartboard“, „pc&gt;=12“).</summary>
+    private readonly List<string> filter = [];
+
+    private void Umschalten(string bedingung)
+    {
+        if (!filter.Remove(bedingung))
+        {
+            filter.Add(bedingung);
+        }
+    }
+
+    private int? MindestAus(string schluessel)
+        => filter.Select(Anforderung.Lesen).FirstOrDefault(b => b.Schluessel == schluessel && b.Vergleich == Vergleich.Mindestens) is { } b
+           && int.TryParse(b.Wert, out var n) ? n : null;
+
+    private void MindestSetzen(string schluessel, int? wert)
+    {
+        filter.RemoveAll(f => Anforderung.Lesen(f) is { Vergleich: Vergleich.Mindestens } b && b.Schluessel == schluessel);
+        if (wert is { } n)
+        {
+            filter.Add(Anforderung.Mindestens(schluessel, n));
+        }
+    }
+
+    /// <summary>Erfüllt der Ort am Stichtag alle Filterbedingungen (auch geerbte Merkmale zählen)?</summary>
+    private bool Passt(Ort o)
+    {
+        var wirksam = verzeichnis!.WirksameMerkmale(o, tag, Uhr.GetLocalNow());
+        return filter.All(f =>
+        {
+            var s = Anforderung.Basis(f);
+            var w = wirksam.FirstOrDefault(x => x.Merkmal.Schluessel == s);
+            return w is not null && Anforderung.Abweichung(f, w.Merkmal, w.Eintrag.WertText) is null;
+        });
+    }
     private DateOnly mAb = DateOnly.FromDateTime(DateTime.Today);
     private DateOnly? mBis;
 
@@ -159,9 +224,6 @@
         : !ort!.Buchbar && ort.Art != Ortsart.Gebaeude && ort.Art != Ortsart.Liegenschaft ? Freigabe.Nein("Für diesen Ort können keine Merkmale gepflegt werden.")
         : Freigabe.Ja);
 
-    private Freigabe KatalogFreigabe => Freigabe.NurFuer(rolle, Rolle.Systemverwaltung, Rolle.Verwaltungsleitung)
-        .Und(() => string.IsNullOrWhiteSpace(kSchluessel) || string.IsNullOrWhiteSpace(kName) ? Freigabe.Nein("Bitte Schlüssel und Namen angeben.")
-            : verzeichnis!.Katalog.ContainsKey(kSchluessel.Trim().ToLowerInvariant()) ? Freigabe.Nein("Diesen Schlüssel gibt es schon.") : Freigabe.Ja);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -227,10 +289,4 @@
         }
     }
 
-    private async Task KatalogAsync()
-    {
-        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().MerkmalKatalogErgaenzenAsync(new Merkmal(kSchluessel!, kName!, kGruppe, kVererbbar, kNachweis)));
-        kSchluessel = kName = null;
-        await LadenAsync();
-    }
 }

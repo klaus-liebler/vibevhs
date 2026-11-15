@@ -235,6 +235,13 @@ public sealed class Kursart
         BenoetigteDozierendenmerkmale = schluessel.Distinct().ToList();
         return this;
     }
+
+    /// <summary>Bedingungen an Orte: „bamf“, „tafel=Smartboard“, „pc&gt;=12“ (siehe <see cref="Anforderung"/>).</summary>
+    public Kursart MitOrtsanforderungen(IEnumerable<string> bedingungen)
+    {
+        BenoetigteMerkmale = bedingungen.Select(b => b.Trim()).Where(b => b.Length > 0).DistinctBy(Anforderung.Basis).ToList();
+        return this;
+    }
 }
 
 public sealed record KursDozent(Guid PersonId, string Name, bool Leitung);
@@ -435,6 +442,12 @@ public sealed class Kurs
     public Kurs MitDozierendenmerkmalen(IEnumerable<string> schluessel)
     {
         BenoetigteDozierendenmerkmale = schluessel.Distinct().ToList();
+        return this;
+    }
+
+    public Kurs MitOrtsanforderungen(IEnumerable<string> bedingungen)
+    {
+        BenoetigteMerkmale = bedingungen.Distinct().ToList();
         return this;
     }
 

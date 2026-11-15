@@ -284,3 +284,8 @@ details.vhs-card > summary { cursor: pointer; }
 .vhs-auswahl label { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; }
 .vhs-einschub { border-color: var(--vhs-accent); }
 a.vhs-chip { text-decoration: none; display: inline-flex; align-items: center; }
+
+/* Merkmale: Filter der Orte, deaktivierte Auswahlwerte */
+.vhs-filterbox { margin-bottom: 10px; }
+.vhs-filterbox summary { cursor: pointer; min-height: 32px; }
+.vhs-chip.vhs-aus { text-decoration: line-through; opacity: 0.6; }

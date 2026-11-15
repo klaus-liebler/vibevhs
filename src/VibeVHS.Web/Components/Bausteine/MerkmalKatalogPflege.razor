@@ -1,0 +1,224 @@
+@using VibeVHS.Application.Programm
+@using VibeVHS.Domain.Programm
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+
+@* Gemeinsamer Merkmalskatalog (für Orte bzw. Personen): Werttyp, Auswahlwerte, Einheit und Grenzen. Der Typ ist nach der ersten Verwendung gesperrt. *@
+
+<div class="vhs-tbl">
+    <table>
+        <thead><tr><th>Merkmal</th><th>Typ</th><th>Werte / Einheit</th><th>@(Bezug == MerkmalBezug.Ort ? "vererbbar" : "gesetzlich")</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var m in katalog)
+            {
+                var verwendet = verwendete.Contains(m.Schluessel);
+                <tr>
+                    <td><b>@m.Name</b><br /><span class="vhs-small vhs-muted vhs-mono">@m.Schluessel</span> <span class="vhs-small vhs-muted">· @m.Gruppe@(m.NachweisPflicht ? " · Nachweis Pflicht" : "")</span></td>
+                    <td><StatusPille Stil="info">@MerkmalstypAnzeige.Text(m.Typ)</StatusPille>@if (m.Mehrfach) { <br /><span class="vhs-small vhs-muted">Mehrfachauswahl</span> }</td>
+                    <td class="vhs-small">
+                        @if (m.Typ == Merkmalstyp.Auswahl)
+                        {
+                            <div class="vhs-chips">
+                                @foreach (var w in m.Werte)
+                                {
+                                    var aktiv = !m.InaktiveWerte.Contains(w);
+                                    <button class="vhs-chip @(aktiv ? "" : "vhs-aus")" disabled="@(!Recht.Erlaubt)" aria-pressed="@(aktiv ? "true" : "false")"
+                                            title="@(aktiv ? "Klicken: deaktivieren (nicht mehr wählbar, bestehende Einträge bleiben)" : "Klicken: wieder aktivieren")"
+                                            @onclick="@(() => WertUmschaltenAsync(m, w, aktiv))">@w</button>
+                                }
+                            </div>
+                        }
+                        else if (m.Typ == Merkmalstyp.Ganzzahl)
+                        {
+                            <span>@(m.Einheit ?? "ohne Einheit")@(m.Min is null && m.Max is null ? "" : $" · {m.Min?.ToString() ?? "…"}–{m.Max?.ToString() ?? "…"}")</span>
+                        }
+                    </td>
+                    <td>@((Bezug == MerkmalBezug.Ort ? m.Vererbbar : m.Gesetzlich) ? "ja" : "nein")</td>
+                    <td>
+                        <div class="vhs-row">
+                            <BegruendeterButton Text="Typ" Icon="tune" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Light" Click="@(() => TypBearbeiten(m))"
+                                                Freigabe="@Recht" />
+                            @if (m.Typ == Merkmalstyp.Auswahl)
+                            {
+                                <BegruendeterButton Text="Wert +" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Light" Click="@(() => { neuerWertFuer = m.Schluessel; neuerWert = null; })" Freigabe="@Recht" />
+                            }
+                        </div>
+                        @if (neuerWertFuer == m.Schluessel)
+                        {
+                            <div class="vhs-row" style="margin-top:6px">
+                                <RadzenTextBox @bind-Value="neuerWert" Placeholder="neuer Wert" aria-label="Neuer Auswahlwert" />
+                                <BegruendeterButton Text="Ergänzen" Size="ButtonSize.ExtraSmall" Click="@(() => WertErgaenzenAsync(m))"
+                                                    Freigabe="@(string.IsNullOrWhiteSpace(neuerWert) ? Freigabe.Nein("Bitte einen Wert eingeben.") : Freigabe.Ja)" />
+                            </div>
+                        }
+                        @if (bearbeitet == m.Schluessel)
+                        {
+                            <div class="vhs-einschub" style="margin-top:6px">
+                                @TypFelder(verwendet)
+                                <div class="vhs-row">
+                                    <BegruendeterButton Text="Speichern" Size="ButtonSize.Small" Freigabe="@TypFreigabe(m, verwendet)" Click="@(() => TypSpeichernAsync(m))" />
+                                    <RadzenButton Text="Abbrechen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => bearbeitet = null)" />
+                                </div>
+                            </div>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<h3>Merkmal aufnehmen</h3>
+<div class="vhs-fields">
+    <RadzenFormField Text="Schlüssel *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nSchluessel" Placeholder="@(Bezug == MerkmalBezug.Ort ? "z. B. tafel" : "z. B. pruefer-dsd")" /></RadzenFormField>
+    <RadzenFormField Text="Name *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nName" /></RadzenFormField>
+    <RadzenFormField Text="Gruppe" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nGruppe" /></RadzenFormField>
+</div>
+@if (bearbeitet is null)
+{
+    @TypFelder(false)
+}
+<div class="vhs-row">
+    <label><input type="checkbox" @bind="nNachweis" /> Nachweis Pflicht</label>
+    @if (Bezug == MerkmalBezug.Ort)
+    {
+        <label><input type="checkbox" @bind="nVererbbar" /> vererbbar (gilt auch für Räume im Gebäude)</label>
+    }
+    else
+    {
+        <label><input type="checkbox" @bind="nGesetzlich" /> gesetzlich vorgeschrieben (keine Ausnahme)</label>
+    }
+    <BegruendeterButton Text="Aufnehmen" Icon="add" Click="AufnehmenAsync" Freigabe="@NeuFreigabe" />
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public MerkmalBezug Bezug { get; set; }
+
+    [Parameter, EditorRequired]
+    public Rolle? Rolle { get; set; }
+
+    /// <summary>Nach jeder Änderung (z. B. damit die Seite ihr Ortsverzeichnis neu lädt).</summary>
+    [Parameter]
+    public EventCallback Geaendert { get; set; }
+
+    private IReadOnlyList<Merkmal> katalog = [];
+    private IReadOnlySet<string> verwendete = new HashSet<string>();
+    private string? bearbeitet, neuerWertFuer, neuerWert;
+    private string? nSchluessel, nName;
+    private string nGruppe = "";
+    private bool nNachweis, nVererbbar = true, nGesetzlich;
+
+    // Typfelder (für „aufnehmen“ und „Typ bearbeiten“ gemeinsam)
+    private Merkmalstyp tTyp = Merkmalstyp.JaNein;
+    private string? tWerte, tEinheit;
+    private bool tMehrfach;
+    private int? tMin, tMax;
+
+    private static readonly Merkmalstyp[] Typen = Enum.GetValues<Merkmalstyp>();
+
+    private Freigabe Recht => Freigabe.NurFuer(Rolle, MerkmalKatalogDienst.KatalogRollen);
+
+    private Freigabe NeuFreigabe => Recht.Und(() =>
+        string.IsNullOrWhiteSpace(nSchluessel) || string.IsNullOrWhiteSpace(nName) ? Freigabe.Nein("Schlüssel und Name sind Pflicht.")
+        : katalog.Any(k => k.Schluessel == nSchluessel.Trim().ToLowerInvariant()) ? Freigabe.Nein("Diesen Schlüssel gibt es schon.")
+        : tTyp == Merkmalstyp.Auswahl && WerteListe.Count == 0 ? Freigabe.Nein("Für eine Auswahl bitte die Werte angeben (mit / getrennt).")
+        : Freigabe.Ja);
+
+    private Freigabe TypFreigabe(Merkmal m, bool verwendet) => Recht.Und(() =>
+        verwendet && tTyp != m.Typ ? Freigabe.Nein("Der Typ ist nicht mehr änderbar, weil das Merkmal schon an Orten/Personen eingetragen oder von einer Kursart verlangt wird. Möglich: Auswahlwerte ergänzen oder deaktivieren.")
+        : tTyp == Merkmalstyp.Auswahl && WerteListe.Count == 0 ? Freigabe.Nein("Für eine Auswahl bitte die Werte angeben (mit / getrennt).")
+        : Freigabe.Ja);
+
+    private IReadOnlyList<string> WerteListe => (tWerte ?? "").Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private RenderFragment TypFelder(bool verwendet) => __builder =>
+    {
+        <div class="vhs-fields">
+            <RadzenFormField Text="Werttyp" Variant="Variant.Outlined">
+                <span class="@(verwendet ? "vhs-why" : null)" tabindex="@(verwendet ? "0" : null)" data-why="@(verwendet ? "Schon verwendet: Der Typ ist gesperrt, nur Auswahlwerte können ergänzt oder deaktiviert werden." : null)">
+                    <RadzenDropDown TValue="Merkmalstyp" @bind-Value="tTyp" Data="@Typen" Disabled="@verwendet" Style="min-width:160px">
+                        <Template Context="t">@MerkmalstypAnzeige.Text((Merkmalstyp)t)</Template>
+                    </RadzenDropDown>
+                </span>
+            </RadzenFormField>
+            @if (tTyp == Merkmalstyp.Auswahl)
+            {
+                <RadzenFormField Text="Werte (mit / getrennt) *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="tWerte" Placeholder="Kreide / Whiteboard / Smartboard" /></RadzenFormField>
+                <label class="vhs-row"><input type="checkbox" @bind="tMehrfach" /> Mehrfachauswahl</label>
+            }
+            else if (tTyp == Merkmalstyp.Ganzzahl)
+            {
+                <RadzenFormField Text="Einheit" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="tEinheit" Placeholder="z. B. Plätze, m²" /></RadzenFormField>
+                <RadzenFormField Text="Minimum" Variant="Variant.Outlined"><RadzenNumeric TValue="int?" @bind-Value="tMin" ShowUpDown="false" /></RadzenFormField>
+                <RadzenFormField Text="Maximum" Variant="Variant.Outlined"><RadzenNumeric TValue="int?" @bind-Value="tMax" ShowUpDown="false" /></RadzenFormField>
+            }
+            else if (tTyp == Merkmalstyp.Text)
+            {
+                <span class="vhs-small vhs-muted">Freitext (z. B. Hinweise zum Zugang); Kursarten können darauf keine Bedingung stellen.</span>
+            }
+        </div>
+    };
+
+    protected override async Task OnInitializedAsync() => await LadenAsync();
+
+    private async Task LadenAsync()
+    {
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var dienst = d.GetRequiredService<MerkmalKatalogDienst>();
+            katalog = await dienst.KatalogAsync(Bezug);
+            verwendete = await dienst.VerwendeteAsync();
+        });
+    }
+
+    private void TypBearbeiten(Merkmal m)
+    {
+        bearbeitet = bearbeitet == m.Schluessel ? null : m.Schluessel;
+        tTyp = m.Typ;
+        tWerte = string.Join(" / ", m.Werte);
+        tMehrfach = m.Mehrfach;
+        tEinheit = m.Einheit;
+        tMin = m.Min;
+        tMax = m.Max;
+    }
+
+    private Task TypSpeichernAsync(Merkmal m)
+        => AusfuehrenAsync(d => d.TypFestlegenAsync(m.Schluessel, tTyp, WerteListe, tMehrfach, tEinheit, tMin, tMax), $"„{m.Name}“ gespeichert.", () => bearbeitet = null);
+
+    private Task WertErgaenzenAsync(Merkmal m)
+        => AusfuehrenAsync(d => d.WertErgaenzenAsync(m.Schluessel, neuerWert!), $"Wert „{neuerWert}“ ergänzt.", () => neuerWertFuer = null);
+
+    private Task WertUmschaltenAsync(Merkmal m, string w, bool aktiv)
+        => AusfuehrenAsync(d => aktiv ? d.WertDeaktivierenAsync(m.Schluessel, w) : d.WertErgaenzenAsync(m.Schluessel, w),
+            aktiv ? $"„{w}“ deaktiviert – bestehende Einträge bleiben gültig." : $"„{w}“ wieder aktiv.", () => { });
+
+    private Task AufnehmenAsync()
+    {
+        var m = new Merkmal(nSchluessel!, nName!, string.IsNullOrWhiteSpace(nGruppe) ? (Bezug == MerkmalBezug.Ort ? "Ausstattung" : "Qualifikation") : nGruppe,
+            Bezug == MerkmalBezug.Ort && nVererbbar, nNachweis, null, Bezug, Bezug == MerkmalBezug.Person && nGesetzlich, tTyp == Merkmalstyp.Auswahl ? WerteListe : null,
+            mehrfach: tMehrfach, typ: tTyp, einheit: tEinheit, min: tMin, max: tMax);
+        return AusfuehrenAsync(d => d.AufnehmenAsync(m), $"„{m.Name}“ aufgenommen.", () =>
+        {
+            nSchluessel = nName = tWerte = tEinheit = null;
+            tMin = tMax = null;
+            tTyp = Merkmalstyp.JaNein;
+        });
+    }
+
+    private async Task AusfuehrenAsync(Func<MerkmalKatalogDienst, Task> aktion, string meldung, Action danach)
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => aktion(d.GetRequiredService<MerkmalKatalogDienst>()));
+            Hinweise.Notify(NotificationSeverity.Success, "Merkmalskatalog", meldung);
+            danach();
+            await LadenAsync();
+            await Geaendert.InvokeAsync();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+}
