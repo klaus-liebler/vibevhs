@@ -30,7 +30,7 @@ public sealed class Zustellung(
                 nachricht.AlsZugestelltMarkieren(uhr.GetUtcNow(), rueckmeldung);
                 zugestellt++;
                 await protokoll.ProtokollierenAsync("Postausgang.Zugestellt",
-                    $"„{nachricht.Betreff}“ an {nachricht.EmpfaengerAnzeige ?? nachricht.Empfaenger} zugestellt" +
+                    $"{Bezeichnung(nachricht)} zugestellt" +
                     (rueckmeldung is null ? string.Empty : $" ({rueckmeldung})"),
                     nameof(AusgehendeNachricht), nachricht.Id, abbruch: abbruch);
             }
@@ -39,7 +39,7 @@ public sealed class Zustellung(
                 nachricht.FehlversuchVermerken(ex.Message);
                 fehler++;
                 await protokoll.ProtokollierenAsync("Postausgang.Fehler",
-                    $"„{nachricht.Betreff}“ konnte nicht zugestellt werden (Versuch {nachricht.Versuche}): {ex.Message}",
+                    $"{Bezeichnung(nachricht)} konnte nicht zugestellt werden (Versuch {nachricht.Versuche}): {ex.Message}",
                     nameof(AusgehendeNachricht), nachricht.Id, erfolgreich: false, abbruch: abbruch);
             }
         }
@@ -51,6 +51,11 @@ public sealed class Zustellung(
 
         return new ZustellErgebnis(zugestellt, fehler);
     }
+
+    /// <summary>Protokolltext ohne Klarnamen: Mails mit Pseudonym, Schnittstellen mit Name und Betreff.</summary>
+    private static string Bezeichnung(AusgehendeNachricht n) => n.Kanal == Kanal.EMail
+        ? $"Mail an {(n.PersonId is { } p ? Domain.Datenschutz.Pseudonym.Person(p) : "externe Adresse")}"
+        : $"„{n.Betreff}“ an {n.Empfaenger}";
 }
 
 public readonly record struct ZustellErgebnis(int Zugestellt, int Fehler);

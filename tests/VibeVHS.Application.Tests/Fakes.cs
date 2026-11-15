@@ -80,6 +80,9 @@ internal sealed class SpeicherPersonen : IPersonenSpeicher
 
     public Task<int> AnzahlAsync(CancellationToken abbruch = default) => Task.FromResult(Personen.Count);
 
+    public Task<IReadOnlyDictionary<Guid, string>> AnzeigenamenAsync(IEnumerable<Guid> ids, CancellationToken abbruch = default)
+        => Task.FromResult<IReadOnlyDictionary<Guid, string>>(Personen.Where(p => ids.Contains(p.Id)).ToDictionary(p => p.Id, p => p.Anzeigename));
+
     public Task SpeichernAsync(CancellationToken abbruch = default)
     {
         Speichervorgaenge++;

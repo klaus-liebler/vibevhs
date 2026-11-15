@@ -8,9 +8,10 @@ public sealed record PersonenFilter(
     Personenrolle? Rolle = null,
     Personenstatus? Status = null,
     int? Fachbereich = null,
-    bool NurDublettenHinweise = false)
+    bool NurDublettenHinweise = false,
+    Domain.Datenschutz.Datenschutzstatus? Datenschutz = null)
 {
-    public bool IstLeer => string.IsNullOrWhiteSpace(Suche) && Rolle is null && Status is null && Fachbereich is null && !NurDublettenHinweise;
+    public bool IstLeer => string.IsNullOrWhiteSpace(Suche) && Rolle is null && Status is null && Fachbereich is null && !NurDublettenHinweise && Datenschutz is null;
 }
 
 /// <summary>Eine Zeile der Personenliste (aus den Zwischenstands-Spalten, ohne die Historie zu laden).</summary>
@@ -38,7 +39,8 @@ public sealed record Filterzahlen(
     IReadOnlyDictionary<Personenrolle, int> Rollen,
     IReadOnlyDictionary<Personenstatus, int> Status,
     IReadOnlyDictionary<int, int> Fachbereiche,
-    int DublettenHinweise);
+    int DublettenHinweise,
+    IReadOnlyDictionary<Domain.Datenschutz.Datenschutzstatus, int>? Datenschutz = null);
 
 /// <summary>Lesende Abfragen über viele Personen (Liste, Zählen, Export, Massenaktionen).</summary>
 public interface IPersonenAbfrage

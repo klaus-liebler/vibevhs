@@ -37,6 +37,15 @@ public sealed class Semester
     public DateOnly Beginn { get; private set; }
 
     public DateOnly Ende { get; private set; }
+
+    /// <summary>Archiviert: schreibgeschützt und aus Standardlisten ausgeblendet; rückgängig machbar.</summary>
+    public DateTimeOffset? ArchiviertAm { get; private set; }
+
+    public bool Archiviert => ArchiviertAm is not null;
+
+    public void Archivieren(DateTimeOffset jetzt) => ArchiviertAm ??= jetzt;
+
+    public void Wiederherstellen() => ArchiviertAm = null;
 }
 
 public enum Sichtbarkeit
@@ -284,6 +293,14 @@ public sealed class Veranstaltung
     }
 
     internal void Nummerieren(int nummer) => Nummer = nummer;
+
+    internal void DozentUmbenennen(Guid personId, string name)
+    {
+        if (DozentId == personId)
+        {
+            DozentName = name;
+        }
+    }
 }
 
 /// <summary>Kurs mit Team, Sichtbarkeit, Richtlinie, Entgelt (versioniert) und Veranstaltungen.</summary>
@@ -374,6 +391,28 @@ public sealed class Kurs
     public IReadOnlyCollection<Veranstaltung> Veranstaltungen => _veranstaltungen;
 
     public string Suchtext { get; private set; }
+
+    /// <summary>Archiviert: schreibgeschützt und aus Standardlisten ausgeblendet; rückgängig machbar.</summary>
+    public DateTimeOffset? ArchiviertAm { get; private set; }
+
+    public bool Archiviert => ArchiviertAm is not null;
+
+    public void Archivieren(DateTimeOffset jetzt) => ArchiviertAm ??= jetzt;
+
+    public void Wiederherstellen() => ArchiviertAm = null;
+
+    /// <summary>Letzter Termin (für die Suche "Kursende vor …").</summary>
+    public DateOnly? Kursende => _veranstaltungen.Count == 0 ? null : DateOnly.FromDateTime(_veranstaltungen.Max(v => v.Ende));
+
+    /// <summary>Nach Anonymisierung einer Dozentin: Platzhalter statt Name im Team und an den Terminen; die Verknüpfung bleibt.</summary>
+    public void DozentAnonymisieren(Guid personId, string platzhalter)
+    {
+        Team = Team.Select(d => d.PersonId == personId ? d with { Name = platzhalter } : d).ToList();
+        foreach (var v in _veranstaltungen)
+        {
+            v.DozentUmbenennen(personId, platzhalter);
+        }
+    }
 
     public KursDozent? Leitung => Team.FirstOrDefault(d => d.Leitung) ?? Team.FirstOrDefault();
 

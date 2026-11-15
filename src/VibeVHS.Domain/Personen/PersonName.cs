@@ -32,6 +32,12 @@ public sealed class PersonName : BitemporaleVersion<PersonName>
 
     public string Anzeige => $"{Vorname} {Nachname}";
 
+    internal void Anonymisieren(string vorname, string nachname)
+    {
+        Vorname = vorname;
+        Nachname = nachname;
+    }
+
     public override string Datenart => "Name";
 
     public override string Feld => "Name";

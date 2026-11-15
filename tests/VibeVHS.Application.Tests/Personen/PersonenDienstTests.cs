@@ -27,7 +27,8 @@ public class PersonenDienstTests
 
         _speicher.Speichervorgaenge.ShouldBe(2);
         _protokoll.Eintraege.Select(e => e.Aktion).ShouldBe(["Person.Angelegt", "Person.NameGeaendert"]);
-        _protokoll.Eintraege[1].Beschreibung.ShouldBe("Name von Anna Schmidt ab 14.06.2025 geändert in Anna Becker. Grund: Heirat");
+        _protokoll.Eintraege[1].Beschreibung.ShouldBe($"Name von Person #{anna.Id.ToString("N")[..8].ToUpperInvariant()} ab 14.06.2025 geändert (Änderung ab Datum, Details in der Datenhistorie)");
+        _protokoll.Eintraege.ShouldAllBe(e => !e.Beschreibung.Contains("Anna") && !e.Beschreibung.Contains("Schmidt") && !e.Beschreibung.Contains("Becker"));
         _protokoll.Eintraege[1].ObjektId.ShouldBe(anna.Id);
     }
 

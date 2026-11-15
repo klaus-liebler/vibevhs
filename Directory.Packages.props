@@ -1,4 +1,8 @@
 <Project>
+  <PropertyGroup>
+    <!-- Transitive Abhängigkeiten (z. B. von PDFsharp) auf die hier genannten, sicheren Versionen heben. -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
   <!-- Zentrale Paketversionen. Erlaubt: Radzen.Blazor, EF Core + SQLite, Serilog, Quartz.NET, xUnit, Shouldly, Bogus, Verify, ClosedXML.
        Nicht verwenden: QuestPDF, Nager.Date, MediatR, AutoMapper, FluentAssertions. -->
   <ItemGroup>
@@ -12,6 +16,8 @@
     <PackageVersion Include="Quartz.Extensions.Hosting" Version="4.7.3" />
     <PackageVersion Include="Bogus" Version="35.6.5" />
     <PackageVersion Include="ClosedXML" Version="0.105.1" />
+    <PackageVersion Include="PDFsharp-MigraDoc" Version="6.2.4" />
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="11.0.0" />
     <PackageVersion Include="xunit.v3" Version="4.0.3" />
     <PackageVersion Include="Shouldly" Version="4.3.0" />
     <PackageVersion Include="Verify.XunitV3" Version="33.4.0" />

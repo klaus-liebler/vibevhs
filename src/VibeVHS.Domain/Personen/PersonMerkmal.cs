@@ -56,6 +56,8 @@ public sealed class PersonMerkmal : BitemporaleVersion<PersonMerkmal>
         _ => Inhalt,
     };
 
+    internal void InhaltLeeren() => Inhalt = string.Empty;
+
     public DateOnly? AlsDatum() => DateOnly.TryParseExact(Inhalt, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
 
     public Personenrolle AlsRollen() => int.TryParse(Inhalt, CultureInfo.InvariantCulture, out var r) ? (Personenrolle)r : Personenrolle.Keine;

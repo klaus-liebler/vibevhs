@@ -18,9 +18,10 @@ public sealed record KursZeile(
     int Termine,
     string? Ort,
     string? Leitung,
-    int MaxTeilnehmende);
+    int MaxTeilnehmende,
+    bool Archiviert = false);
 
-public sealed record KursFilter(Guid? SemesterId = null, int? Fachbereich = null, Kursstatus? Status = null, string? Suche = null);
+public sealed record KursFilter(Guid? SemesterId = null, int? Fachbereich = null, Kursstatus? Status = null, string? Suche = null, bool Archivierte = false);
 
 /// <summary>Termin mit Kurs- und Ortsangaben für Raumplan und Konfliktprüfung.</summary>
 public sealed record PlanTermin(Termin Termin, string Kursnummer, IReadOnlyList<string> OrtNamen, string Dozent, int Fachbereich);

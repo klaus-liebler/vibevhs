@@ -41,6 +41,14 @@ public sealed class Postadresse : BitemporaleVersion<Postadresse>
 
     public string Land { get; private set; }
 
+    internal void Anonymisieren()
+    {
+        Zusatz = null;
+        Strasse = "–";
+        Postleitzahl = string.Empty;
+        Ort = "–";
+    }
+
     public string Anzeige => string.Join(", ", new[] { Zusatz, Strasse, $"{Postleitzahl} {Ort}", Land == "DE" ? null : Land }
         .Where(t => !string.IsNullOrWhiteSpace(t)));
 
@@ -90,6 +98,8 @@ public sealed class AdressKennzeichen : BitemporaleVersion<AdressKennzeichen>
     public Guid AdressId { get; private set; }
 
     public string AdressAnzeige { get; private set; }
+
+    internal void Anonymisieren() => AdressAnzeige = "–";
 
     public override string Datenart => "Adressen";
 
@@ -155,6 +165,8 @@ public sealed class Rufnummer : BitemporaleVersion<Rufnummer>
     /// <summary>Einwilligung zur Kontaktaufnahme über Messaging-Dienste liegt vor.</summary>
     public bool Einwilligung { get; private set; }
 
+    internal void Anonymisieren() => Nummer = "–";
+
     public bool Bevorzugt { get; private set; }
 
     public string DiensteAnzeige => Dienste == Messagingdienst.Keiner
@@ -212,6 +224,8 @@ public sealed class EMailAdresse : BitemporaleVersion<EMailAdresse>
     public EMailArt Art { get; private set; }
 
     public string Adresse { get; private set; }
+
+    internal void Anonymisieren() => Adresse = "–";
 
     public bool Bevorzugt { get; private set; }
 

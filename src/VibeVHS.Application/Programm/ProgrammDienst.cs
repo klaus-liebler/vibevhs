@@ -324,5 +324,8 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
     }
 
     private async Task<Kurs> KursAsync(Guid id, CancellationToken abbruch)
-        => await speicher.KursLadenAsync(id, abbruch) ?? throw new InvalidOperationException("Kurs nicht gefunden.");
+    {
+        var kurs = await speicher.KursLadenAsync(id, abbruch) ?? throw new InvalidOperationException("Kurs nicht gefunden.");
+        return kurs.Archiviert ? throw new InvalidOperationException("Der Kurs ist archiviert und schreibgeschützt. Bitte zuerst wiederherstellen.") : kurs;
+    }
 }

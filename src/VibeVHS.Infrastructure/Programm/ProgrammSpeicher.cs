@@ -18,7 +18,7 @@ internal sealed class ProgrammSpeicher(VibeVhsDbContext db) : IProgrammSpeicher
 
     public async Task<IReadOnlyList<KursZeile>> KurseAsync(KursFilter filter, CancellationToken abbruch = default)
     {
-        var q = db.Kurse.AsNoTracking().IgnoreAutoIncludes();
+        var q = db.Kurse.AsNoTracking().IgnoreAutoIncludes().Where(k => (k.ArchiviertAm != null) == filter.Archivierte);
         if (filter.SemesterId is { } s)
         {
             q = q.Where(k => k.SemesterId == s);
@@ -57,7 +57,7 @@ internal sealed class ProgrammSpeicher(VibeVhsDbContext db) : IProgrammSpeicher
         {
             termine.TryGetValue(k.Id, out var t);
             return new KursZeile(k.Id, k.Kursnummer, k.Titel, k.Fachbereich, k.Status, k.Sichtbarkeit, k.Umfang, k.SemesterId,
-                t?.Erster, t?.Letzter, t?.Anzahl ?? 0, orte.GetValueOrDefault(k.Id), k.Leitung?.Name, k.MaxTeilnehmende);
+                t?.Erster, t?.Letzter, t?.Anzahl ?? 0, orte.GetValueOrDefault(k.Id), k.Leitung?.Name, k.MaxTeilnehmende, k.Archiviert);
         }).ToList();
     }
 

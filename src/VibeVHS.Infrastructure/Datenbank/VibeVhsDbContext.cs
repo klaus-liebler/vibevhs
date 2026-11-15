@@ -80,6 +80,12 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.HasIndex(p => p.Sortierschluessel).IsUnique();
             b.HasIndex(p => p.Geburtsdatum);
             b.HasIndex(p => p.Status);
+            b.Property(p => p.Datenschutz).HasMaxLength(20);
+            b.HasIndex(p => p.Datenschutz);
+            b.Property(p => p.Sperrgrund).HasMaxLength(2000);
+            b.Property(p => p.StatistikAltersgruppe).HasMaxLength(30);
+            b.Property(p => p.StatistikGebiet).HasMaxLength(100);
+            b.Property(p => p.StatistikGeschlecht).HasMaxLength(30);
             Unterliste(b, p => p.Namen, "_namen");
             Unterliste(b, p => p.Merkmale, "_merkmale");
             Unterliste(b, p => p.Adressen, "_adressen");
@@ -145,6 +151,30 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
         });
 
         ProgrammMapping.Anwenden(modelBuilder);
+
+        modelBuilder.Entity<VibeVHS.Domain.Datenschutz.Aufbewahrungsfrist>(b =>
+        {
+            b.ToTable("Aufbewahrungsfristen");
+            b.HasKey(f => f.Schluessel);
+            b.Property(f => f.Schluessel).HasMaxLength(40);
+            b.Property(f => f.Bezeichnung).HasMaxLength(200);
+            b.Property(f => f.Rechtsgrundlage).HasMaxLength(300);
+            b.Property(f => f.Hinweis).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<VibeVHS.Domain.Datenschutz.Loeschlauf>(b =>
+        {
+            b.ToTable("Loeschlaeufe");
+            b.HasKey(l => l.Id);
+            b.Property(l => l.Id).ValueGeneratedNever();
+            b.Property(l => l.Regel).HasMaxLength(300);
+            b.Property(l => l.ErstelltVon).HasMaxLength(200);
+            b.Property(l => l.Freigabe1Name).HasMaxLength(200);
+            b.Property(l => l.Freigabe2Name).HasMaxLength(200);
+            b.Property(l => l.Freigabe1Kennung).HasMaxLength(100);
+            b.Property(l => l.Freigabe2Kennung).HasMaxLength(100);
+            b.PrimitiveCollection(l => l.PersonIds);
+        });
         Version<VibeVHS.Domain.Programm.KursEntgelt>(modelBuilder, "KursEntgelte", _ => { }, "KursId");
         Version<VibeVHS.Domain.Programm.OrtMerkmal>(modelBuilder, "OrtMerkmale", b => b.Property(m => m.Schluessel).HasMaxLength(40), "OrtId");
 

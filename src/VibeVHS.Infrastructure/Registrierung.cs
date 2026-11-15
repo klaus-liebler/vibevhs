@@ -45,6 +45,8 @@ public static class Registrierung
         dienste.AddScoped<IOrganisationen, OrganisationenSpeicher>();
         dienste.AddScoped<Application.Programm.IProgrammSpeicher, Programm.ProgrammSpeicher>();
         dienste.AddScoped<Application.Programm.IGlobaleSuche, Programm.GlobaleSuche>();
+        dienste.AddScoped<Application.Datenschutz.IDatenschutzSpeicher, Datenschutz.DatenschutzSpeicher>();
+        dienste.AddSingleton<Application.Datenschutz.IAuskunftPdf, Datenschutz.AuskunftPdf>();
 
         var takt = konfiguration.GetValue("Postausgang:TaktSekunden", 15);
         dienste.AddQuartz(q =>
@@ -59,6 +61,8 @@ public static class Registrierung
             // Täglich nachts sowie einmal kurz nach dem Start.
             q.AddJob<TermineFortschreibenJob>(j => j.WithIdentity(TermineFortschreibenJob.Schluessel));
             q.AddJob<MerkmalAblaufJob>(j => j.WithIdentity(MerkmalAblaufJob.Schluessel));
+            q.AddJob<LoeschlaufJob>(j => j.WithIdentity(LoeschlaufJob.Schluessel));
+            q.AddTrigger(t => t.ForJob(LoeschlaufJob.Schluessel).WithIdentity("loeschlauf-monatlich", "automatik").WithCronSchedule("0 0 3 1 * ?"));
             foreach (var schluessel in new[] { TermineFortschreibenJob.Schluessel, MerkmalAblaufJob.Schluessel })
             {
                 q.AddTrigger(t => t.ForJob(schluessel).WithIdentity(schluessel.Name + "-nacht", "automatik").WithCronSchedule("0 15 2 * * ?"));

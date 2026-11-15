@@ -106,6 +106,21 @@ public sealed class AusgehendeNachricht
         }
     }
 
+    /// <summary>Anonymisierung (Löschung der Person): Inhalt, Betreff und Adresse werden überschrieben, die Zeile bleibt.</summary>
+    public void Anonymisieren(string platzhalter)
+    {
+        Empfaenger = "anonymisiert";
+        EmpfaengerAnzeige = platzhalter;
+        Betreff = "[anonymisiert]";
+        Inhalt = "[Inhalt anonymisiert]";
+        Uebersetzungslink = null;
+        if (Status == NachrichtenStatus.Wartend)
+        {
+            Status = NachrichtenStatus.Fehlgeschlagen;
+            Fehler = "Empfänger wurde anonymisiert; Nachricht wird nicht mehr zugestellt.";
+        }
+    }
+
     /// <summary>Fehlgeschlagene Nachricht nach Prüfung erneut in die Warteschlange stellen.</summary>
     public void ErneutVersuchen()
     {

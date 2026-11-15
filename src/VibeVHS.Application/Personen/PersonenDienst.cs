@@ -1,5 +1,6 @@
 using VibeVHS.Application.Protokoll;
 using VibeVHS.Application.Sicherheit;
+using VibeVHS.Domain.Datenschutz;
 using VibeVHS.Domain.Personen;
 
 namespace VibeVHS.Application.Personen;
@@ -18,6 +19,9 @@ public interface IPersonenSpeicher
 
     Task<int> AnzahlAsync(CancellationToken abbruch = default);
 
+    /// <summary>Aktuelle Anzeigenamen (für die Anzeige des Protokolls, das nur Pseudonyme speichert).</summary>
+    Task<IReadOnlyDictionary<Guid, string>> AnzeigenamenAsync(IEnumerable<Guid> ids, CancellationToken abbruch = default);
+
     Task SpeichernAsync(CancellationToken abbruch = default);
 }
 
@@ -31,7 +35,7 @@ public sealed class PersonenDienst(IPersonenSpeicher speicher, IAuditProtokoll p
         var von = (await benutzer.ErmittelnAsync(abbruch)).Anzeige;
         var person = Person.Anlegen(vorname, nachname, DateOnly.FromDateTime(jetzt.Date), jetzt, geburtsdatum, eMail, sprache, von);
         speicher.Hinzufuegen(person);
-        await protokoll.ProtokollierenAsync("Person.Angelegt", $"Person {vorname} {nachname} angelegt",
+        await protokoll.ProtokollierenAsync("Person.Angelegt", $"{Pseudonym.Person(person.Id)} angelegt",
             nameof(Person), person.Id, abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
         return person;
@@ -45,7 +49,7 @@ public sealed class PersonenDienst(IPersonenSpeicher speicher, IAuditProtokoll p
         var alt = person.AktuellerName(jetzt).Anzeige;
         var neu = person.NameAendernAb(vorname, nachname, ab, grund, jetzt, (await benutzer.ErmittelnAsync(abbruch)).Anzeige);
         await protokoll.ProtokollierenAsync("Person.NameGeaendert",
-            $"Name von {alt} ab {ab:dd.MM.yyyy} geändert in {neu.Anzeige}. Grund: {grund}", nameof(Person), personId,
+            $"Name von {Pseudonym.Person(personId)} ab {ab:dd.MM.yyyy} geändert (Änderung ab Datum, Details in der Datenhistorie)", nameof(Person), personId,
             abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
         return neu;
@@ -59,7 +63,7 @@ public sealed class PersonenDienst(IPersonenSpeicher speicher, IAuditProtokoll p
         var alt = person.NameAm(betroffenAm, jetzt)?.Anzeige ?? "(unbekannt)";
         var neu = person.NameKorrigieren(vorname, nachname, betroffenAm, grund, jetzt, (await benutzer.ErmittelnAsync(abbruch)).Anzeige);
         await protokoll.ProtokollierenAsync("Person.NameKorrigiert",
-            $"Name {alt} korrigiert in {neu.Anzeige} (gilt rückwirkend ab {neu.GueltigVon:dd.MM.yyyy}). Grund: {grund}",
+            $"Name von {Pseudonym.Person(personId)} korrigiert (gilt rückwirkend ab {neu.GueltigVon:dd.MM.yyyy}, Details in der Datenhistorie)",
             nameof(Person), personId, abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
         return neu;
@@ -75,10 +79,10 @@ public sealed class PersonenDienst(IPersonenSpeicher speicher, IAuditProtokoll p
         ziel.DubletteUebernehmen(dublette, Domain.Gemeinsam.Erfassung.Aenderung(jetzt,
             $"Übernommen aus Dublette {dublette.Anzeigename} ({dublette.Id.ToString()[..8]})", wer.Anzeige));
         await protokoll.ProtokollierenAsync("Person.Zusammengefuehrt",
-            $"Dublette {dublette.Anzeigename} in {ziel.Anzeigename} zusammengeführt; die Dublette bleibt mit Historie erhalten",
+            $"Dublette {Pseudonym.Person(dubletteId)} in {Pseudonym.Person(zielId)} zusammengeführt; die Dublette bleibt mit Historie erhalten",
             nameof(Person), zielId, abbruch: abbruch);
         await protokoll.ProtokollierenAsync("Person.AlsDubletteMarkiert",
-            $"Zusammengeführt in {ziel.Anzeigename}", nameof(Person), dubletteId, abbruch: abbruch);
+            $"Zusammengeführt in {Pseudonym.Person(zielId)}", nameof(Person), dubletteId, abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
     }
 
@@ -99,7 +103,7 @@ public sealed class PersonenDienst(IPersonenSpeicher speicher, IAuditProtokoll p
         var wer = await benutzer.ErmittelnAsync(abbruch);
         person.EinwilligungSetzenAb(kanal, zweck, erteilt, ab, Domain.Gemeinsam.Erfassung.Aenderung(uhr.GetLocalNow(), nachweis, wer.Anzeige));
         await protokoll.ProtokollierenAsync("Person.Einwilligung",
-            $"Einwilligung {Einwilligung.KanalAnzeige(kanal)} · {Einwilligung.ZweckAnzeige(zweck)} ab {ab:dd.MM.yyyy}: {(erteilt ? "erteilt" : "nicht erteilt")}. Nachweis: {nachweis}",
+            $"Einwilligung {Einwilligung.KanalAnzeige(kanal)} · {Einwilligung.ZweckAnzeige(zweck)} ab {ab:dd.MM.yyyy}: {(erteilt ? "erteilt" : "nicht erteilt")} (Nachweis in der Datenhistorie)",
             nameof(Person), personId, abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
     }
@@ -112,7 +116,7 @@ public sealed class PersonenDienst(IPersonenSpeicher speicher, IAuditProtokoll p
         person.VollmachtErteilen(art, bevollmaechtigterId, bevollmaechtigterName, nachweis, von, bis,
             Domain.Gemeinsam.Erfassung.Aenderung(uhr.GetLocalNow(), $"Vollmacht erteilt, Nachweis: {nachweis}", wer.Anzeige));
         await protokoll.ProtokollierenAsync("Person.Vollmacht",
-            $"Buchungsvollmacht für {bevollmaechtigterName} ab {von:dd.MM.yyyy}{(bis is { } b ? $" bis {b.AddDays(-1):dd.MM.yyyy}" : "")}. Nachweis: {nachweis}",
+            $"Buchungsvollmacht für {(art == Bevollmaechtigtenart.Person ? Pseudonym.Person(bevollmaechtigterId) : bevollmaechtigterName)} ab {von:dd.MM.yyyy}{(bis is { } b ? $" bis {b.AddDays(-1):dd.MM.yyyy}" : "")}",
             nameof(Person), personId, abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
     }
@@ -122,7 +126,7 @@ public sealed class PersonenDienst(IPersonenSpeicher speicher, IAuditProtokoll p
         var person = await PersonLadenAsync(personId, abbruch);
         var wer = await benutzer.ErmittelnAsync(abbruch);
         person.VollmachtWiderrufenAb(vollmachtId, ab, Domain.Gemeinsam.Erfassung.Ende(uhr.GetLocalNow(), grund, wer.Anzeige));
-        await protokoll.ProtokollierenAsync("Person.VollmachtWiderrufen", $"Buchungsvollmacht widerrufen ab {ab:dd.MM.yyyy}. Grund: {grund}",
+        await protokoll.ProtokollierenAsync("Person.VollmachtWiderrufen", $"Buchungsvollmacht widerrufen ab {ab:dd.MM.yyyy}",
             nameof(Person), personId, abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
     }

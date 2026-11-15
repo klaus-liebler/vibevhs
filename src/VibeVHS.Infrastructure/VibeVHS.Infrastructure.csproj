@@ -9,6 +9,7 @@
     </PackageReference>
     <PackageReference Include="Quartz.Extensions.Hosting" />
     <PackageReference Include="ClosedXML" />
+    <PackageReference Include="PDFsharp-MigraDoc" />
   </ItemGroup>
 
   <ItemGroup>

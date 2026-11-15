@@ -51,7 +51,13 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
         }
 
         var hinweise = await (await BasisAsync(filter with { NurDublettenHinweise = true }, abbruch)).CountAsync(abbruch);
-        return new Filterzahlen(gesamt, rollen, status, fachbereiche, hinweise);
+        var datenschutz = new Dictionary<Domain.Datenschutz.Datenschutzstatus, int>();
+        foreach (var d in Enum.GetValues<Domain.Datenschutz.Datenschutzstatus>().Where(d => d != Domain.Datenschutz.Datenschutzstatus.Aktiv))
+        {
+            datenschutz[d] = await (await BasisAsync(filter with { Datenschutz = d, Suche = filter.Suche }, abbruch)).CountAsync(abbruch);
+        }
+
+        return new Filterzahlen(gesamt, rollen, status, fachbereiche, hinweise, datenschutz);
     }
 
     public async IAsyncEnumerable<PersonZeile> AlleAsync(PersonenFilter filter, [EnumeratorCancellation] CancellationToken abbruch = default)
@@ -117,6 +123,8 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
     private async Task<IQueryable<Person>> BasisAsync(PersonenFilter filter, CancellationToken abbruch)
     {
         var q = db.Personen.IgnoreAutoIncludes().AsNoTracking();
+        var ds = filter.Datenschutz ?? Domain.Datenschutz.Datenschutzstatus.Aktiv;
+        q = q.Where(p => p.Datenschutz == ds);
         q = filter.Status is { } s
             ? q.Where(p => p.Status == s)
             : q.Where(p => p.Status != Personenstatus.Zusammengefuehrt);
@@ -169,7 +177,7 @@ internal sealed class DublettenSuche(VibeVhsDbContext db) : IDublettenSuche
 
         var form = Dublettenregel.Normalform(vorname, nachname);
         var gleicherTag = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
-            .Where(p => p.Geburtsdatum == geburtsdatum && p.Status != Personenstatus.Zusammengefuehrt && p.Id != ausser)
+            .Where(p => p.Geburtsdatum == geburtsdatum && p.Status != Personenstatus.Zusammengefuehrt && p.Id != ausser && p.Datenschutz == Domain.Datenschutz.Datenschutzstatus.Aktiv)
             .Select(p => new { p.Id, p.Anzeigename, p.Sortiername, p.Geburtsdatum, p.Wohnort })
             .ToListAsync(abbruch);
         var ausgeschlossen = ausser is { } a ? await AusschluesseAsync(a, abbruch) : [];
@@ -185,7 +193,7 @@ internal sealed class DublettenSuche(VibeVhsDbContext db) : IDublettenSuche
     public async Task<IReadOnlyList<DublettenPaar>> PaareAsync(CancellationToken abbruch = default)
     {
         var alle = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
-            .Where(p => p.Geburtsdatum != null && p.Status != Personenstatus.Zusammengefuehrt)
+            .Where(p => p.Geburtsdatum != null && p.Status != Personenstatus.Zusammengefuehrt && p.Datenschutz == Domain.Datenschutz.Datenschutzstatus.Aktiv)
             .Select(p => new { p.Id, p.Geburtsdatum, p.Sortiername })
             .ToListAsync(abbruch);
         var ausschluesse = (await db.DublettenAusschluesse.AsNoTracking().Select(d => new { d.PersonA, d.PersonB }).ToListAsync(abbruch))

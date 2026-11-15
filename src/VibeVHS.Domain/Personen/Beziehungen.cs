@@ -68,6 +68,8 @@ public sealed class Organisationszugehoerigkeit : BitemporaleVersion<Organisatio
 
     public string? Funktion { get; private set; }
 
+    internal void Anonymisieren() => Funktion = null;
+
     public override string Datenart => "Organisationen";
 
     public override string Feld => "Zugehörigkeit";
@@ -120,6 +122,14 @@ public sealed class Buchungsvollmacht : BitemporaleVersion<Buchungsvollmacht>
 
     /// <summary>z. B. "Sorgerecht, Geburtsurkunde" oder "Betreuerausweis AG Steinfurt".</summary>
     public string Nachweis { get; private set; }
+
+    internal void Anonymisieren()
+    {
+        BevollmaechtigterName = "–";
+        Nachweis = "–";
+    }
+
+    internal void BevollmaechtigtenUmbenennen(string name) => BevollmaechtigterName = name;
 
     public override string Datenart => "Vollmachten";
 

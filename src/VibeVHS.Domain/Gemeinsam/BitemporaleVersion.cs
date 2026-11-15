@@ -79,6 +79,9 @@ public abstract class BitemporaleVersion<TSelf> : IHistorienwert
     /// <summary>Gleicher fachlicher Wert mit anderer Gültigkeit und neuer Erfassung.</summary>
     protected internal abstract TSelf KopieMit(DateOnly gueltigVon, DateOnly? gueltigBis, Erfassung erfassung);
 
+    /// <summary>Anonymisierung: Grund/Nachweis kann Personendaten enthalten und wird überschrieben.</summary>
+    internal void GrundAnonymisieren() => Grund = "anonymisiert";
+
     internal void Ersetzen(DateTimeOffset zeitpunkt)
     {
         if (ErsetztAm is not null)

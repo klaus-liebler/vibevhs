@@ -32,7 +32,7 @@ public sealed class PostausgangDienst(
             uhr.GetUtcNow(), wer.Anzeige, personId, link, id);
         speicher.Hinzufuegen(nachricht);
         await protokoll.ProtokollierenAsync("Postausgang.MailEingereiht",
-            $"Mail „{betreff}“ an {anzeigename ?? eMail} in den Postausgang gelegt", nameof(AusgehendeNachricht), nachricht.Id,
+            $"Mail an {(personId is { } p ? Domain.Datenschutz.Pseudonym.Person(p) : "externe Adresse")} in den Postausgang gelegt", nameof(AusgehendeNachricht), nachricht.Id,
             abbruch: abbruch);
         return nachricht;
     }
@@ -58,7 +58,7 @@ public sealed class PostausgangDienst(
             ?? throw new InvalidOperationException("Nachricht nicht gefunden.");
         nachricht.ErneutVersuchen();
         await protokoll.ProtokollierenAsync("Postausgang.ErneutVersuchen",
-            $"„{nachricht.Betreff}“ erneut zur Zustellung freigegeben", nameof(AusgehendeNachricht), id, abbruch: abbruch);
+            "Nachricht erneut zur Zustellung freigegeben", nameof(AusgehendeNachricht), id, abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
     }
 }

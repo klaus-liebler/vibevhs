@@ -15,7 +15,7 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261115071138_FerienQuelleUndKursartFerien";
+    public override string LastMigrationId => "20261115071848_Datenschutz";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -253,6 +253,109 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .IsUnique();
 
                 b.ToTable("Aufgaben");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Datenschutz.Aufbewahrungsfrist", b =>
+            {
+                b.Property<string>("Schluessel")
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<bool>("AbJahresende")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Bezeichnung")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Hinweis")
+                    .HasMaxLength(500)
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("Jahre")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Rechtsgrundlage")
+                    .IsRequired()
+                    .HasMaxLength(300)
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Schluessel");
+
+                b.ToTable("Aufbewahrungsfristen");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Datenschutz.Loeschlauf", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("Anonymisiert")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long?>("AusgefuehrtAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long>("ErstelltAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("ErstelltVon")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("Freigabe1Am")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Freigabe1Kennung")
+                    .HasMaxLength(100)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Freigabe1Name")
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("Freigabe2Am")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Freigabe2Kennung")
+                    .HasMaxLength(100)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Freigabe2Name")
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("Gesperrt")
+                    .HasColumnType("INTEGER");
+
+                b.PrimitiveCollection<string>("PersonIds")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Regel")
+                    .IsRequired()
+                    .HasMaxLength(300)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("Uebersprungen")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("ZuAnonymisieren")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("ZuSperren")
+                    .HasColumnType("INTEGER");
+
+                b.HasKey("Id");
+
+                b.ToTable("Loeschlaeufe");
             });
 
         modelBuilder.Entity("VibeVHS.Domain.Personen.AdressKennzeichen", b =>
@@ -578,13 +681,24 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.Property<long>("AngelegtAm")
                     .HasColumnType("INTEGER");
 
+                b.Property<long?>("AnonymisiertAm")
+                    .HasColumnType("INTEGER");
+
                 b.Property<string>("Anzeigename")
                     .IsRequired()
                     .HasMaxLength(300)
                     .HasColumnType("TEXT");
 
+                b.Property<long?>("ArchiviertAm")
+                    .HasColumnType("INTEGER");
+
                 b.Property<string>("Benutzerkennung")
                     .HasMaxLength(100)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Datenschutz")
+                    .IsRequired()
+                    .HasMaxLength(20)
                     .HasColumnType("TEXT");
 
                 b.Property<string>("EMail")
@@ -596,6 +710,12 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("TEXT");
 
                 b.Property<DateOnly?>("Geburtsdatum")
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("GesperrtAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<DateOnly?>("GesperrtBis")
                     .HasColumnType("TEXT");
 
                 b.Property<int>("Rollen")
@@ -612,9 +732,26 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(340)
                     .HasColumnType("TEXT");
 
+                b.Property<string>("Sperrgrund")
+                    .HasMaxLength(2000)
+                    .HasColumnType("TEXT");
+
                 b.Property<string>("Sprache")
                     .IsRequired()
                     .HasMaxLength(10)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("StatistikAltersgruppe")
+                    .HasMaxLength(30)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("StatistikGebiet")
+                    .HasMaxLength(100)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("StatistikGeschlecht")
+                    .IsRequired()
+                    .HasMaxLength(30)
                     .HasColumnType("TEXT");
 
                 b.Property<string>("Status")
@@ -637,6 +774,8 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
 
                 b.HasIndex("Benutzerkennung")
                     .IsUnique();
+
+                b.HasIndex("Datenschutz");
 
                 b.HasIndex("Geburtsdatum");
 
@@ -925,6 +1064,9 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
             {
                 b.Property<Guid>("Id")
                     .HasColumnType("TEXT");
+
+                b.Property<long?>("ArchiviertAm")
+                    .HasColumnType("INTEGER");
 
                 b.Property<Guid?>("AuftraggeberId")
                     .HasColumnType("TEXT");
@@ -1253,6 +1395,9 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
             {
                 b.Property<Guid>("Id")
                     .HasColumnType("TEXT");
+
+                b.Property<long?>("ArchiviertAm")
+                    .HasColumnType("INTEGER");
 
                 b.Property<DateOnly>("Beginn")
                     .HasColumnType("TEXT");

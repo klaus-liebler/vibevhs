@@ -1,3 +1,4 @@
+using Datenschutz_ = VibeVHS.Domain.Datenschutz;
 using VibeVHS.Domain.Gemeinsam;
 
 namespace VibeVHS.Domain.Personen;
@@ -349,6 +350,184 @@ public sealed class Person
     public bool EinwilligungAm(Kontaktkanal kanal, Kontaktzweck zweck, DateOnly am, DateTimeOffset bekanntAm)
         => _einwilligungen.Where(e => e.Kanal == kanal && e.Zweck == zweck).AlsStichtag(am, bekanntAm)?.Erteilt ?? false;
 
+    // ---------- Datenschutz: archivieren, sperren, anonymisieren ----------
+
+    public Datenschutz.Datenschutzstatus Datenschutz { get; private set; }
+
+    public DateTimeOffset? ArchiviertAm { get; private set; }
+
+    public DateTimeOffset? GesperrtAm { get; private set; }
+
+    /// <summary>Ende der Aufbewahrungsfrist; danach wird anonymisiert.</summary>
+    public DateOnly? GesperrtBis { get; private set; }
+
+    public string? Sperrgrund { get; private set; }
+
+    public DateTimeOffset? AnonymisiertAm { get; private set; }
+
+    /// <summary>Statistikmerkmale, die nach der Anonymisierung bleiben.</summary>
+    public string? StatistikAltersgruppe { get; private set; }
+
+    public string? StatistikGebiet { get; private set; }
+
+    public string StatistikGeschlecht { get; private set; } = "nicht erfasst";
+
+    public bool IstAnonymisiert => Datenschutz == VibeVHS.Domain.Datenschutz.Datenschutzstatus.Anonymisiert;
+
+    /// <summary>Archivieren: aus Standardlisten ausgeblendet, schreibgeschützt, rückgängig machbar.</summary>
+    public void Archivieren(DateTimeOffset jetzt)
+    {
+        if (Datenschutz != VibeVHS.Domain.Datenschutz.Datenschutzstatus.Aktiv)
+        {
+            throw new InvalidOperationException($"Nur aktive Personen können archiviert werden (Status: {VibeVHS.Domain.Datenschutz.DatenschutzAnzeige.Text(Datenschutz)}).");
+        }
+
+        Datenschutz = VibeVHS.Domain.Datenschutz.Datenschutzstatus.Archiviert;
+        ArchiviertAm = jetzt;
+    }
+
+    /// <summary>Archivierung oder Sperre aufheben (z. B. Person meldet sich wieder an, Sperrgrund entfallen).</summary>
+    public void Reaktivieren()
+    {
+        if (IstAnonymisiert)
+        {
+            throw new InvalidOperationException("Anonymisierte Personen können nicht reaktiviert werden.");
+        }
+
+        Datenschutz = VibeVHS.Domain.Datenschutz.Datenschutzstatus.Aktiv;
+        ArchiviertAm = null;
+        GesperrtAm = null;
+        GesperrtBis = null;
+        Sperrgrund = null;
+    }
+
+    /// <summary>Sperre (Art. 18 DSGVO): Daten bleiben bis Fristende, Zugriff nur für berechtigte Rollen und protokolliert.</summary>
+    public void Sperren(DateOnly bis, string grund, DateTimeOffset jetzt)
+    {
+        if (IstAnonymisiert)
+        {
+            throw new InvalidOperationException("Die Person ist bereits anonymisiert.");
+        }
+
+        Datenschutz = VibeVHS.Domain.Datenschutz.Datenschutzstatus.Gesperrt;
+        GesperrtAm ??= jetzt;
+        GesperrtBis = GesperrtBis is { } alt && alt > bis ? alt : bis;
+        Sperrgrund = grund;
+    }
+
+    /// <summary>
+    /// Kontaktdaten löschen, die für keine Aufbewahrungspflicht gebraucht werden (Rufnummern, E-Mail, Einwilligungsnachweise,
+    /// Vollmachten). Name, Anschrift und Geburtsdatum bleiben für die laufende Frist.
+    /// </summary>
+    public void KontaktdatenLoeschen(DateTimeOffset jetzt)
+    {
+        foreach (var r in _rufnummern)
+        {
+            r.Anonymisieren();
+            r.GrundAnonymisieren();
+        }
+
+        foreach (var e in _emails)
+        {
+            e.Anonymisieren();
+            e.GrundAnonymisieren();
+        }
+
+        foreach (var v in _vollmachten)
+        {
+            v.Anonymisieren();
+            v.GrundAnonymisieren();
+        }
+
+        foreach (var w in _einwilligungen)
+        {
+            w.GrundAnonymisieren();
+        }
+
+        ZwischenstandAktualisieren(jetzt);
+        EMail = null;
+    }
+
+    /// <summary>
+    /// Anonymisierung an Ort und Stelle: Die Zeile bleibt (andere Daten zeigen auf sie), alle Versionen werden überschrieben.
+    /// Übrig bleiben ein eigener Platzhalter, Rollen und Statistikmerkmale (Altersgruppe, Gebiet, Geschlecht).
+    /// </summary>
+    public string Anonymisieren(DateTimeOffset jetzt)
+    {
+        if (IstAnonymisiert)
+        {
+            throw new InvalidOperationException("Die Person ist bereits anonymisiert.");
+        }
+
+        var heute = DateOnly.FromDateTime(jetzt.Date);
+        var stand = StandAm(heute, jetzt);
+        StatistikAltersgruppe = Datenschutz_.Statistik.Altersgruppe(Geburtsdatum ?? stand.Geburtsdatum, heute);
+        StatistikGebiet = Datenschutz_.Statistik.Gebiet(stand.Aufenthaltsort?.Postleitzahl ?? _adressen.LastOrDefault()?.Postleitzahl);
+        var kurz = Datenschutz_.Pseudonym.Kurz(Id);
+
+        foreach (var n in _namen)
+        {
+            n.Anonymisieren("Gelöschte", $"Person {kurz}");
+        }
+
+        foreach (var m in _merkmale.Where(m => m.Art != MerkmalArt.Rollen))
+        {
+            m.InhaltLeeren();
+        }
+
+        foreach (var a in _adressen)
+        {
+            a.Anonymisieren();
+        }
+
+        foreach (var k in _kennzeichen)
+        {
+            k.Anonymisieren();
+        }
+
+        foreach (var o in _organisationen)
+        {
+            o.Anonymisieren();
+        }
+
+        KontaktdatenLoeschen(jetzt);
+        foreach (var v in AlleVersionen.Cast<object>())
+        {
+            switch (v)
+            {
+                case PersonName x: x.GrundAnonymisieren(); break;
+                case PersonMerkmal x: x.GrundAnonymisieren(); break;
+                case Postadresse x: x.GrundAnonymisieren(); break;
+                case AdressKennzeichen x: x.GrundAnonymisieren(); break;
+                case Organisationszugehoerigkeit x: x.GrundAnonymisieren(); break;
+            }
+        }
+
+        Titel = null;
+        Benutzerkennung = null;
+        Geburtsdatum = null;
+        EMail = null;
+        Sprache = string.Empty;
+        Wohnort = StatistikGebiet;
+        Anzeigename = $"Gelöschte Person {kurz} · anonymisiert am {heute:dd.MM.yyyy}";
+        Sortiername = $"~ geloschte person {kurz.ToLowerInvariant()}";
+        Sortierschluessel = $"{Sortiername}|{Id:N}";
+        Datenschutz = VibeVHS.Domain.Datenschutz.Datenschutzstatus.Anonymisiert;
+        AnonymisiertAm = jetzt;
+        GesperrtBis = null;
+        Sperrgrund = null;
+        return Anzeigename;
+    }
+
+    /// <summary>Wurde ein Bevollmächtigter anonymisiert, erscheint auch in fremden Vollmachten nur noch sein Platzhalter.</summary>
+    public void BevollmaechtigtenAnonymisieren(Guid bevollmaechtigterId, string platzhalter)
+    {
+        foreach (var v in _vollmachten.Where(v => v.BevollmaechtigterId == bevollmaechtigterId))
+        {
+            v.BevollmaechtigtenUmbenennen(platzhalter);
+        }
+    }
+
     // ---------- Status und Zuordnung ----------
 
     public void StatusSetzen(Personenstatus status) => Status = status;
@@ -449,6 +628,11 @@ public sealed class Person
 
     private void ZwischenstandAktualisieren(DateTimeOffset jetzt)
     {
+        if (IstAnonymisiert)
+        {
+            return;
+        }
+
         // Rückdatierte Erfassungen (z. B. Datenübernahme) dürfen den Zwischenstand nicht auf einen alten Stand zurücksetzen:
         // maßgeblich ist der jüngste bekannte Stand.
         var juengste = AlleVersionen.Select(v => v.ErfasstAm).DefaultIfEmpty(jetzt).Max();
@@ -473,7 +657,7 @@ public sealed class Person
 
         if (_emails.Count > 0)
         {
-            EMail = (stand.EMails.FirstOrDefault(e => e.Bevorzugt) ?? stand.EMails.FirstOrDefault())?.Adresse;
+            EMail = (stand.EMails.Where(e => e.Adresse != "–").FirstOrDefault(e => e.Bevorzugt) ?? stand.EMails.FirstOrDefault(e => e.Adresse != "–"))?.Adresse;
         }
         var name = stand.Name ?? _namen.AktuellerVerlauf().LastOrDefault();
         if (name is not null)

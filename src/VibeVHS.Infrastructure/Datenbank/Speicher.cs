@@ -27,6 +27,13 @@ internal sealed class PersonenSpeicher(VibeVhsDbContext db) : IPersonenSpeicher
 
     public Task<int> AnzahlAsync(CancellationToken abbruch = default) => db.Personen.CountAsync(abbruch);
 
+    public async Task<IReadOnlyDictionary<Guid, string>> AnzeigenamenAsync(IEnumerable<Guid> ids, CancellationToken abbruch = default)
+    {
+        var liste = ids.Distinct().ToList();
+        return await db.Personen.IgnoreAutoIncludes().AsNoTracking().Where(p => liste.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => p.Anzeigename, abbruch);
+    }
+
     public Task SpeichernAsync(CancellationToken abbruch = default) => db.SaveChangesAsync(abbruch);
 }
 

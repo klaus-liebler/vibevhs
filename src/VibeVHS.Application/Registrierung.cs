@@ -15,6 +15,7 @@ public static class Registrierung
         dienste.AddScoped<PersonenDienst>();
         dienste.AddScoped<Rundschreiben>();
         dienste.AddScoped<Programm.ProgrammDienst>();
+        dienste.AddScoped<Datenschutz.DatenschutzDienst>();
         return dienste;
     }
 }
