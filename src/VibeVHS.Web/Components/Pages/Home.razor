@@ -34,7 +34,7 @@
     @if (u.UeberfaelligJeGruppe.Count > 0 || u.Eskaliert.Count > 0)
     {
         <section class="vhs-card" aria-labelledby="h-leitung">
-            <div class="vhs-head"><h2 id="h-leitung">Überfällig in den Körben<span class="vhs-zahl">@u.UeberfaelligJeGruppe.Sum(g => g.Ueberfaellig)</span></h2>
+            <div class="vhs-head"><h2 id="h-leitung">Überfällig in den Körben <span class="vhs-zahl">@u.UeberfaelligJeGruppe.Sum(g => g.Ueberfaellig)</span></h2>
                 <span class="vhs-small vhs-muted">Überblick für die Leitung; eskalierte Aufgaben kann die Leitung übernehmen oder zuweisen</span></div>
             <div class="vhs-list">
                 @foreach (var g in u.UeberfaelligJeGruppe)
@@ -60,7 +60,7 @@
     @if (u.InVertretung is { Count: > 0 } iv)
     {
         <section class="vhs-card" aria-labelledby="h-vertretung">
-            <div class="vhs-head"><h2 id="h-vertretung">In Vertretung<span class="vhs-zahl">@iv.Count</span></h2>
+            <div class="vhs-head"><h2 id="h-vertretung">In Vertretung <span class="vhs-zahl">@iv.Count</span></h2>
                 <span class="vhs-small vhs-muted">Aufgaben abwesender Kolleg:innen, die Sie vertreten</span></div>
             <AufgabenListe Aufgaben="@iv" Benutzer="@benutzer" Geaendert="LadenAsync" />
         </section>
@@ -68,22 +68,22 @@
 
     <div class="vhs-wsa">
         <section class="vhs-card" aria-labelledby="h-meine">
-            <div class="vhs-head"><h2 id="h-meine">Meine Aufgaben<span class="vhs-zahl">@u.Meine.Count</span></h2></div>
+            <div class="vhs-head"><h2 id="h-meine">Meine Aufgaben <span class="vhs-zahl">@u.Meine.Count</span></h2></div>
             <AufgabenListe Aufgaben="@u.Meine" Benutzer="@benutzer" Geaendert="LadenAsync"
                            Leertext="Keine Aufgaben in Ihrer Liste. Übernehmen Sie eine aus dem Gruppenkorb." />
         </section>
         <section class="vhs-card" aria-labelledby="h-korb">
-            <div class="vhs-head"><h2 id="h-korb">Gruppenkorb<span class="vhs-zahl">@u.Gruppenkorb.Count</span></h2>
+            <div class="vhs-head"><h2 id="h-korb">Gruppenkorb <span class="vhs-zahl">@u.Gruppenkorb.Count</span></h2>
                 <span class="vhs-small vhs-muted vhs-why" tabindex="0" data-why="Aufgaben der aktiven Rolle (bei Fachbereichsleitungen nur der eigenen Fachbereiche), die noch niemand übernommen hat. Rolle oben rechts wechseln, um andere Körbe zu sehen.">@u.Korbname</span></div>
             <AufgabenListe Aufgaben="@u.Gruppenkorb" Benutzer="@benutzer" Geaendert="LadenAsync" Leertext="Der Korb ist leer." />
         </section>
         <section class="vhs-card" aria-labelledby="h-kollegen">
-            <div class="vhs-head"><h2 id="h-kollegen">Bei Kolleg:innen<span class="vhs-zahl">@u.BeiKollegen.Count</span></h2>
+            <div class="vhs-head"><h2 id="h-kollegen">Bei Kolleg:innen <span class="vhs-zahl">@u.BeiKollegen.Count</span></h2>
                 <span class="vhs-small vhs-muted">übernommen oder zugewiesen</span></div>
             <AufgabenListe Aufgaben="@u.BeiKollegen" Benutzer="@benutzer" Geaendert="LadenAsync" Leertext="Niemand aus Ihrem Korb bearbeitet gerade etwas." />
         </section>
         <section class="vhs-card" aria-labelledby="h-auto">
-            <div class="vhs-head"><h2 id="h-auto">Heute automatisch erledigt<span class="vhs-zahl">@(u.HeuteGeschlossen.Count + u.HeuteAutomatisch.Count)</span></h2>
+            <div class="vhs-head"><h2 id="h-auto">Heute automatisch erledigt <span class="vhs-zahl">@(u.HeuteGeschlossen.Count + u.HeuteAutomatisch.Count)</span></h2>
                 <a class="vhs-small" href="protokoll">Protokoll</a></div>
             @if (u.HeuteGeschlossen.Count + u.HeuteAutomatisch.Count == 0)
             {

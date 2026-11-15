@@ -228,7 +228,8 @@ details.vhs-card > summary { cursor: pointer; }
 .vhs-aufgabe-titel { font-weight: 600; }
 .vhs-aufgabe-panel { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--vhs-surface-2); border-radius: 8px; padding: 8px 10px; }
 .vhs-wsa { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
-.vhs-wsa h2 .vhs-zahl { font-weight: 500; color: var(--vhs-muted); margin-left: 6px; }
+/* Zähler hinter Bereichsüberschriften als Badge (Startseite, Dashboard, Finanzen) */
+.vhs-zahl { display: inline-flex; align-items: center; justify-content: center; min-width: 1.7em; margin-left: 8px; padding: 1px 8px; border-radius: 12px; border: 1px solid var(--vhs-line); background: var(--vhs-bg); color: var(--vhs-muted); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; vertical-align: middle; line-height: 1.5; }
 @media (max-width: 600px) { .vhs-wsa { grid-template-columns: 1fr; } }
 .vhs-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 12px; }
 
