@@ -344,6 +344,12 @@ public sealed class DatenschutzDienst(
             }
         }
 
+        // Aufgaben nennen die Person im Titel: Text ersetzen, offene Aufgaben schließen.
+        foreach (var aufgabe in await speicher.AufgabenZuPersonAsync(person.Id, abbruch))
+        {
+            aufgabe.Anonymisieren(platzhalter, jetzt);
+        }
+
         if (protokollieren)
         {
             await protokoll.ProtokollierenAsync("Datenschutz.Anonymisiert", $"{Pseudonym.Person(person.Id)} anonymisiert ({anlass})", nameof(Person), person.Id,

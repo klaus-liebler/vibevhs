@@ -15,7 +15,7 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261115084305_Durchfuehrung";
+    public override string LastMigrationId => "20261115090847_Aufgaben";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -249,6 +249,9 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.Property<long>("EntgeltCent")
                     .HasColumnType("INTEGER");
 
+                b.Property<long?>("ErinnertAm")
+                    .HasColumnType("INTEGER");
+
                 b.Property<bool>("Ermaessigt")
                     .HasColumnType("INTEGER");
 
@@ -437,10 +440,33 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.Property<long>("AngelegtAm")
                     .HasColumnType("INTEGER");
 
+                b.Property<string>("BearbeiterKennung")
+                    .HasMaxLength(100)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("BearbeiterName")
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
                 b.Property<string>("Beschreibung")
                     .HasColumnType("TEXT");
 
+                b.Property<string>("Dringlichkeit")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
                 b.Property<long?>("ErledigtAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("ErledigtVon")
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("EskaliertAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int?>("Fachbereich")
                     .HasColumnType("INTEGER");
 
                 b.Property<DateOnly>("Faellig")
@@ -456,9 +482,26 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(200)
                     .HasColumnType("TEXT");
 
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
                 b.Property<string>("Titel")
                     .IsRequired()
                     .HasMaxLength(300)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Typ")
+                    .IsRequired()
+                    .HasMaxLength(60)
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("UebernommenAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Vermerk")
+                    .HasMaxLength(1000)
                     .HasColumnType("TEXT");
 
                 b.Property<string>("Ziel")
@@ -470,7 +513,49 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.HasIndex("Schluessel")
                     .IsUnique();
 
+                b.HasIndex("Status", "Gruppe");
+
                 b.ToTable("Aufgaben");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Aufgaben.Aufgabentyp", b =>
+            {
+                b.Property<string>("Schluessel")
+                    .HasMaxLength(60)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Beschreibung")
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("EskalationNachTagen")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("FestePerson")
+                    .HasMaxLength(100)
+                    .HasColumnType("TEXT");
+
+                b.Property<bool>("JeFachbereich")
+                    .HasColumnType("INTEGER");
+
+                b.Property<bool?>("MenschGibtFrei")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Name")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Rolle")
+                    .IsRequired()
+                    .HasMaxLength(60)
+                    .HasColumnType("TEXT");
+
+                b.Property<int?>("VorlaufTage")
+                    .HasColumnType("INTEGER");
+
+                b.HasKey("Schluessel");
+
+                b.ToTable("Aufgabentypen");
             });
 
         modelBuilder.Entity("VibeVHS.Domain.Datenschutz.Aufbewahrungsfrist", b =>

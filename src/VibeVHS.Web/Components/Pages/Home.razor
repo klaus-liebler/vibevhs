@@ -1,4 +1,5 @@
 @page "/"
+@using VibeVHS.Application.Aufgaben
 @using VibeVHS.Application.Personen
 @using VibeVHS.Application.Postausgang
 @using VibeVHS.Application.Protokoll
@@ -26,6 +27,69 @@
     </div>
 </div>
 
+<h2 style="margin:8px 0 0">Was steht an?</h2>
+
+@if (uebersicht is { } u)
+{
+    @if (u.UeberfaelligJeGruppe.Count > 0 || u.Eskaliert.Count > 0)
+    {
+        <section class="vhs-card" aria-labelledby="h-leitung">
+            <div class="vhs-head"><h2 id="h-leitung">Überfällig in den Körben<span class="vhs-zahl">@u.UeberfaelligJeGruppe.Sum(g => g.Ueberfaellig)</span></h2>
+                <span class="vhs-small vhs-muted">Überblick für die Leitung; eskalierte Aufgaben kann die Leitung übernehmen oder zuweisen</span></div>
+            <div class="vhs-list">
+                @foreach (var g in u.UeberfaelligJeGruppe)
+                {
+                    <div><span class="vhs-grow">@KorbAnzeige(g)</span><StatusPille Stil="krit">@g.Ueberfaellig überfällig</StatusPille>
+                        @if (g.Eskaliert > 0) { <StatusPille Stil="warn">@g.Eskaliert eskaliert</StatusPille> }
+                        <span class="vhs-small vhs-muted">@g.Offen offen</span></div>
+                }
+            </div>
+            @if (u.Eskaliert.Count > 0)
+            {
+                <h3 style="margin:4px 0 0">Eskaliert</h3>
+                <AufgabenListe Aufgaben="@u.Eskaliert" Benutzer="@benutzer" Geaendert="LadenAsync" />
+            }
+        </section>
+    }
+
+    <div class="vhs-wsa">
+        <section class="vhs-card" aria-labelledby="h-meine">
+            <div class="vhs-head"><h2 id="h-meine">Meine Aufgaben<span class="vhs-zahl">@u.Meine.Count</span></h2></div>
+            <AufgabenListe Aufgaben="@u.Meine" Benutzer="@benutzer" Geaendert="LadenAsync"
+                           Leertext="Keine Aufgaben in Ihrer Liste. Übernehmen Sie eine aus dem Gruppenkorb." />
+        </section>
+        <section class="vhs-card" aria-labelledby="h-korb">
+            <div class="vhs-head"><h2 id="h-korb">Gruppenkorb<span class="vhs-zahl">@u.Gruppenkorb.Count</span></h2>
+                <span class="vhs-small vhs-muted vhs-why" tabindex="0" data-why="Aufgaben der aktiven Rolle (bei Fachbereichsleitungen nur der eigenen Fachbereiche), die noch niemand übernommen hat. Rolle oben rechts wechseln, um andere Körbe zu sehen.">@u.Korbname</span></div>
+            <AufgabenListe Aufgaben="@u.Gruppenkorb" Benutzer="@benutzer" Geaendert="LadenAsync" Leertext="Der Korb ist leer." />
+        </section>
+        <section class="vhs-card" aria-labelledby="h-kollegen">
+            <div class="vhs-head"><h2 id="h-kollegen">Bei Kolleg:innen<span class="vhs-zahl">@u.BeiKollegen.Count</span></h2>
+                <span class="vhs-small vhs-muted">übernommen oder zugewiesen</span></div>
+            <AufgabenListe Aufgaben="@u.BeiKollegen" Benutzer="@benutzer" Geaendert="LadenAsync" Leertext="Niemand aus Ihrem Korb bearbeitet gerade etwas." />
+        </section>
+        <section class="vhs-card" aria-labelledby="h-auto">
+            <div class="vhs-head"><h2 id="h-auto">Heute automatisch erledigt<span class="vhs-zahl">@(u.HeuteGeschlossen.Count + u.HeuteAutomatisch.Count)</span></h2>
+                <a class="vhs-small" href="protokoll">Protokoll</a></div>
+            @if (u.HeuteGeschlossen.Count + u.HeuteAutomatisch.Count == 0)
+            {
+                <div class="vhs-small vhs-muted">Heute hat die Automatik noch nichts erledigt.</div>
+            }
+            <div class="vhs-list">
+                @foreach (var a in u.HeuteGeschlossen.Take(8))
+                {
+                    <div><StatusPille Stil="gut">geschlossen</StatusPille><span class="vhs-grow">@a.Titel<br /><span class="vhs-small vhs-muted">@a.Vermerk</span></span></div>
+                }
+                @foreach (var e in u.HeuteAutomatisch.Take(8))
+                {
+                    <div><span class="vhs-mono vhs-small vhs-muted vhs-zeit">@e.Zeitpunkt.ToLocalTime().ToString("HH:mm")</span><span class="vhs-grow">@e.Beschreibung</span>
+                        <StatusPille Stil="@(e.Erfolgreich ? "gut" : "warn")">@(e.Erfolgreich ? "erledigt" : "Prüfung nötig")</StatusPille></div>
+                }
+            </div>
+        </section>
+    </div>
+}
+
 <div class="vhs-kpis">
     <div class="vhs-kpi"><div class="vhs-kpi-lbl">Personen</div><div class="vhs-kpi-val">@anzahlPersonen</div><div class="vhs-kpi-note">in der Datenbank</div></div>
     <div class="vhs-kpi"><div class="vhs-kpi-lbl">Postausgang wartend</div><div class="vhs-kpi-val">@wartend</div><div class="vhs-kpi-note">wird alle 15 s zugestellt</div></div>
@@ -33,20 +97,7 @@
     <div class="vhs-kpi"><div class="vhs-kpi-lbl">Fehlgeschlagen</div><div class="vhs-kpi-val">@fehlgeschlagen</div><div class="vhs-kpi-note">brauchen Prüfung</div></div>
 </div>
 
-<NaechsteSchritte Titel="Was steht an?" Schritte="@Schritte" />
-
-@if (aufgaben.Count > 0)
-{
-    <section class="vhs-card">
-        <div class="vhs-head"><h2>Aufgaben</h2><span class="vhs-small vhs-muted">aus automatischen Prüfungen; Gruppenkörbe und Zuweisen folgen in Iteration I5</span></div>
-        <div class="vhs-list">
-            @foreach (var a in aufgaben)
-            {
-                <div><StatusPille Stil="@(a.Faellig <= DateOnly.FromDateTime(DateTime.Today) ? "krit" : "warn")">fällig @a.Faellig.ToString("dd.MM.")</StatusPille><span class="vhs-grow">@a.Titel</span>@if (a.Ziel is not null) { <a href="@a.Ziel">öffnen</a> }</div>
-            }
-        </div>
-    </section>
-}
+<NaechsteSchritte Titel="Schnellzugriff" Schritte="@Schritte" />
 
 <section class="vhs-card">
     <div class="vhs-head">
@@ -83,8 +134,10 @@
     private IReadOnlyList<AuditEintrag> letzte = [];
     private IReadOnlyList<NaechsterSchritt> Schritte = [];
     private Rolle? rolle;
+    private Benutzer benutzer = Benutzer.Automatik;
     private Einrichtung? einrichtung;
-    private IReadOnlyList<VibeVHS.Domain.Aufgaben.Aufgabe> aufgaben = [];
+    private Aufgabenuebersicht? uebersicht;
+    private IReadOnlyList<Fachbereich> fachbereiche = [];
     private IReadOnlyList<Fachbereich> eigeneFachbereiche = [];
 
     private Freigabe KursAnlegen => Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Leitung)
@@ -101,9 +154,15 @@
             Anrede = zustand.User.FindFirst(VibeVHS.Adapters.Mocks.MockAnmeldung.AnredeClaim)?.Value;
         }
 
-        var benutzer = await Vorgang.BenutzerAsync();
+        benutzer = await Vorgang.BenutzerAsync();
         rolle = benutzer.Rolle;
-        IReadOnlyList<Fachbereich> fachbereiche = [];
+        await LadenAsync();
+        Schritte = WasStehtAn.Fuer(benutzer, fachbereiche, new WasStehtAn.Lage(fehlgeschlagen));
+        eigeneFachbereiche = benutzer.Rolle == Rolle.Fachbereichsleitung ? WasStehtAn.EigeneFachbereiche(benutzer, fachbereiche) : [];
+    }
+
+    private async Task LadenAsync()
+    {
         await Vorgang.AusfuehrenAsync(async d =>
         {
             var post = d.GetRequiredService<INachrichtenSpeicher>();
@@ -115,11 +174,13 @@
             var stammdaten = d.GetRequiredService<IStammdaten>();
             einrichtung = await stammdaten.EinrichtungAsync();
             fachbereiche = await stammdaten.FachbereicheAsync();
-            aufgaben = await d.GetRequiredService<VibeVHS.Application.Programm.IProgrammSpeicher>()
-                .OffeneAufgabenAsync(benutzer.Rolle is Rolle.Leitung or null ? null : benutzer.Rolle.ToString());
+            uebersicht = await d.GetRequiredService<AufgabenDienst>().UebersichtAsync();
         });
+    }
 
-        Schritte = WasStehtAn.Fuer(benutzer, fachbereiche, new WasStehtAn.Lage(fehlgeschlagen));
-        eigeneFachbereiche = benutzer.Rolle == Rolle.Fachbereichsleitung ? WasStehtAn.EigeneFachbereiche(benutzer, fachbereiche) : [];
+    private string KorbAnzeige(UeberfaelligeGruppe g)
+    {
+        var rolleText = RollenExtensions.TryParse(g.Gruppe, out var r) ? r.Anzeigename() : g.Gruppe;
+        return g.Fachbereich is { } nr ? $"{rolleText} · {fachbereiche.FirstOrDefault(f => f.Nr == nr)?.Anzeige ?? "FB " + nr}" : rolleText;
     }
 }

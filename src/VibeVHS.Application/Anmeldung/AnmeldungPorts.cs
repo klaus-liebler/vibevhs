@@ -34,6 +34,9 @@ public interface IAnmeldungSpeicher
 
     Task<IReadOnlyList<Belegung>> KontingenteMitAblaufVorAsync(DateOnly tag, CancellationToken abbruch = default);
 
+    /// <summary>Kurse, in denen jemand auf der Warteliste steht.</summary>
+    Task<IReadOnlyList<Guid>> KurseMitWartelisteAsync(CancellationToken abbruch = default);
+
     void Hinzufuegen(object eintrag);
 
     Task SpeichernAsync(CancellationToken abbruch = default);

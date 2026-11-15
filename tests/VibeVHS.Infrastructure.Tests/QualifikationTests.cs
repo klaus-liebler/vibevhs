@@ -22,8 +22,10 @@ public class QualifikationTests
     private static QualifikationsDienst Dienst(TestDatenbank t, VibeVhsDbContext db, Benutzer? wer = null)
     {
         var benutzer = new TestBenutzer(wer ?? Fbl);
+        var protokoll = new AuditProtokoll(db, benutzer, t.Uhr);
         return new QualifikationsDienst(new QualifikationsSpeicher(db), new ProgrammSpeicher(db), new PersonenSpeicher(db),
-            new PersonenAbfrage(db, new DublettenSuche(db)), new AuditProtokoll(db, benutzer, t.Uhr), benutzer, t.Uhr);
+            new PersonenAbfrage(db, new DublettenSuche(db)), protokoll, benutzer, t.Uhr,
+            new Application.Aufgaben.AufgabenDienst(new Aufgaben.AufgabenSpeicher(db), new StammdatenSpeicher(db), protokoll, benutzer, t.Uhr));
     }
 
     /// <summary>Integrationskurs mit 12 Terminen ab 17.11.2026; Lehrkraft mit BAMF-Zulassung bis 31.12.2026; zweite Lehrkraft ohne.</summary>
@@ -74,12 +76,12 @@ public class QualifikationTests
         betroffen.Count.ShouldBe(5); // Termine ab 05.01.2027
         betroffen.Values.ShouldAllBe(e => e.Code == Eignungscode.Abgelaufen);
 
-        (await dienst.AufgabenErzeugenAsync(abbruch: ct)).ShouldBe(2); // Ablauf in 46 Tagen + betroffener Einsatz
+        (await dienst.AufgabenErzeugenAsync(abbruch: ct)).Neu.ShouldBe(2); // Ablauf in 46 Tagen + betroffener Einsatz
         var aufgaben = await db.Aufgaben.ToListAsync(ct);
         aufgaben.ShouldContain(a => a.Schluessel.StartsWith("qualifikation-ablauf:") && a.Titel.Contains("31.12.2026"));
         aufgaben.ShouldContain(a => a.Schluessel.StartsWith("qualifikation-einsatz:") && a.Titel.Contains("5 Veranstaltung(en) ab 05.01.2027"));
         aufgaben.ShouldAllBe(a => a.Gruppe == nameof(Rolle.Fachbereichsleitung));
-        (await dienst.AufgabenErzeugenAsync(abbruch: ct)).ShouldBe(0); // nicht doppelt
+        (await dienst.AufgabenErzeugenAsync(abbruch: ct)).ShouldBe(Application.Aufgaben.Abgleichergebnis.Leer); // nicht doppelt
         (await db.Protokoll.AnyAsync(e => e.Beschreibung.Contains("Maria"), ct)).ShouldBeFalse();
         _ = mit;
     }

@@ -77,6 +77,8 @@ public static class Textvorlagen
     public const string Stornobestaetigung = "storno.bestaetigung";
     public const string Umbuchungsbestaetigung = "umbuchung.bestaetigung";
     public const string Einbuchungsbestaetigung = "einbuchung.nachgerueckt";
+    public const string Kursabsage = "kurs.absage";
+    public const string Kurserinnerung = "kurs.erinnerung";
 
     public static IReadOnlyList<string> BekanntePlatzhalter { get; } =
     [
@@ -98,6 +100,10 @@ public static class Textvorlagen
             "Guten Tag {Name},\n\nwir haben Sie vom Kurs {Kursnummer} auf den Kurs {NeuerKurs} umgebucht.\n\nBeginn: {Beginn}\nOrt: {Ort}\nEntgelt: {Entgelt}\nUmbuchungsgebühr: {Gebuehr}\n\nAlle Termine finden Sie als Kalenderdatei im Anhang.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
         (Einbuchungsbestaetigung, "Nachgerückt in eine Veranstaltung", "Platz frei: {Kurstitel} am {Veranstaltung}",
             "Guten Tag {Name},\n\nfür {Kurstitel} am {Veranstaltung} ist ein Platz frei geworden. Wir haben Sie von der Warteliste eingebucht.\n\nStand Ihres Kontingents: {Kontingent}\n\nFalls Sie nicht kommen können, tragen Sie sich bitte rechtzeitig aus.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
+        (Kursabsage, "Kursabsage", "Absage: {Kursnummer} {Kurstitel}",
+            "Guten Tag {Name},\n\nleider müssen wir den Kurs „{Kurstitel}“ ({Kursnummer}) absagen.\nGrund: {Regel}\n\nIhre Anmeldung ist damit aufgehoben; es fallen keine Kosten an. Bereits gezahlte Entgelte erstatten wir vollständig.\nGern buchen wir Sie auf einen ähnlichen Kurs um – sprechen Sie uns einfach an.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
+        (Kurserinnerung, "Erinnerung vor Kursbeginn", "Bald geht es los: {Kursnummer} {Kurstitel}",
+            "Guten Tag {Name},\n\nwir freuen uns auf Sie! Ihr Kurs „{Kurstitel}“ ({Kursnummer}) beginnt bald.\n\nBeginn: {Beginn}\nOrt: {Ort}\n\nFalls Sie nicht teilnehmen können, sagen Sie uns bitte Bescheid – dann kann jemand von der Warteliste nachrücken.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
     ];
 
     /// <summary>Beispielwerte für die Vorschau.</summary>

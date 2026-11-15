@@ -58,6 +58,10 @@ internal sealed class AnmeldungSpeicher(VibeVhsDbContext db) : IAnmeldungSpeiche
     public async Task<IReadOnlyList<Ermaessigung>> ErmaessigungenAsync(Guid personId, CancellationToken abbruch = default)
         => await db.Ermaessigungen.AsNoTracking().Where(e => e.PersonId == personId).OrderByDescending(e => e.GueltigBis).ToListAsync(abbruch);
 
+    public async Task<IReadOnlyList<Guid>> KurseMitWartelisteAsync(CancellationToken abbruch = default)
+        => await db.Belegungen.IgnoreAutoIncludes().AsNoTracking().Where(b => b.Status == Belegungsstatus.Warteliste)
+            .Select(b => b.KursId).Distinct().ToListAsync(abbruch);
+
     public async Task<IReadOnlyList<Belegung>> AbgelaufeneAngeboteAsync(DateTimeOffset jetzt, CancellationToken abbruch = default)
     {
         // DateTimeOffset liegt als sortierbare Zahl vor; Vergleich deshalb im Speicher (wenige offene Angebote).

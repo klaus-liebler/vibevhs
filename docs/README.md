@@ -130,7 +130,7 @@ Einwilligung, bevorzugt) und E-Mail-Adressen (Art, bevorzugt). Die Kennzeichen �
 - **Orte** `/orte`: Liegenschaft › Gebäude › Raum, Treffpunkte, virtuelle Räume; Kapazität je Nutzungsart; pflegbarer
   Merkmalskatalog mit Vererbung, Ausschlussgruppen (barrierefrei/nicht barrierefrei), Nachweis und Gültigkeit;
   automatische Wegbeschreibung mit Kartenlink. Läuft eine befristete Zulassung in 60 Tagen ab, legt ein täglicher Job
-  eine Aufgabe an (Aufgabenmodul mit Körben folgt in I5).
+  eine Aufgabe an (siehe Aufgaben, I5).
 - **Hybride Veranstaltungen**: mehrere Orte je Termin, Kapazität = Summe (Ort/Nutzungsart oder eigene Höchstzahl),
   höchstens die Höchstzahl des Kurses.
 - **Raumplan** `/raumplan`: Wochenansicht je Standort, Konflikte rot mit Erklärung.
@@ -238,6 +238,44 @@ Einwilligung, bevorzugt) und E-Mail-Adressen (Art, bevorzugt). Die Kennzeichen �
 - Demodaten: Anwesenheiten aller vergangenen Termine (Listen abgeschlossen), Testkonto der Pilates-Kursleitung mit Rolle
   „Dozierende“, Kurs 25F-501 (Frühjahr 2025, Kursleitung damals Anna Schmidt) mit archivierter Bescheinigung für Olena Kovalenko,
   Zwischenbescheinigung für Mehmet Yılmaz, Bildungsurlaub 26H-602.
+
+## Aufgaben (I5): Gruppenkörbe, Fristen, Eskalation, Routinen
+
+- **Aufgabenregeln** `/aufgaben?ansicht=regeln` (ändern: Leitung, Systemverwaltung): je Aufgabentyp zuständige Rolle,
+  Einschränkung auf den Fachbereich des Anlasses, optional eine feste Person (bekommt die Aufgabe direkt zugewiesen),
+  Eskalation an die Leitung *n* Tage nach Fälligkeit, Vorlauf für Prüfregeln und – nur bei kritischen Automatismen –
+  „ein Mensch gibt frei“ oder „Automatik handelt bei Fälligkeit selbst“ (QA-32).
+- **Gruppenkorb** = aktive Rolle (Fachbereichsleitungen nur ihre Fachbereiche). **Übernehmen** legt die Aufgabe in die
+  persönliche Liste, die Kolleg:innen sehen unter „Bei Kolleg:innen“, wer sie bearbeitet. **Zuweisen** an Personen mit der
+  zuständigen Rolle, **Zurück in den Korb**, **Erledigt** mit Vermerk. Gesperrte Schaltflächen erklären per Tooltip, warum.
+- **Regeln gleichen ab**: Jede Regel liefert ihre aktuellen Anlässe; neue werden angelegt, bestehende aktualisiert,
+  entfallene **automatisch geschlossen** (mit Grund), wiederkehrende wieder geöffnet. Von Menschen Erledigtes kommt nicht wieder.
+  Abgelaufene, aber nicht verlängerte Zulassungen/Qualifikationen bleiben offen.
+- Aufgabentypen: Mindestteilnehmerzahl (FA-07), Qualifikation läuft ab / Nachweis fehlt / Einsatz ohne Qualifikation,
+  Merkmal bzw. BAMF-Zulassung eines Orts läuft ab, Löschlauf freigeben, fehlgeschlagene Nachrichten.
+- **Mindestteilnehmerzahl**: X Tage (Standard 10) vor Kursbeginn; Aufgabe „absagen oder durchführen?“ im Korb des
+  Fachbereichs, fällig 3 Tage vor Beginn. „Kurs absagen“ storniert alle Belegungen ohne Gebühr, lässt künftige Termine
+  ausfallen und schickt die Absage (Vorlage `kurs.absage`, mit Übersetzungslink).
+- **Zeitplaner (Quartz)**: stündlich Mindestzahl, Wartelisten-Nachrücken, Postausgang, Löschläufe, Eskalation; täglich 7 Uhr
+  Erinnerung vor Kursbeginn (`Automatik:ErinnerungTageVorher`, Standard 2; Vorlage `kurs.erinnerung`, je Belegung einmal);
+  nachts Qualifikationen und Ortsmerkmale.
+- **Startseite „Was steht an?“**: Meine Aufgaben, Gruppenkorb, Bei Kolleg:innen, Heute automatisch erledigt; für die
+  Leitung zusätzlich „Überfällig in den Körben“ und eskalierte Aufgaben. Ein Klick auf den Titel führt zur passenden Seite.
+- **Protokoll**: Anlegen, Übernahme, Zuweisung, Erledigung, Eskalation und automatisches Schließen. Es nennt nur Aufgabentyp
+  und Kurzkennung (`[A-1234abcd]`), weil Titel Namen enthalten können. Bei der Anonymisierung einer Person werden ihre
+  Aufgaben neutralisiert und geschlossen.
+- Noch offen: Abwesenheit mit Vertretung (QA-44, Soll), Lastschrift- und Mahnvorschläge (kommen mit I6).
+
+## Vermerk für I6 Finanzen: GoBD (FA-126 bis FA-133)
+
+- Festgeschriebene Belege nur per Storno/Neubeleg korrigierbar; lückenlose Nummernkreise je Belegart; Hash-Kette im
+  Änderungsprotokoll für Finanzdaten; Rolle „Prüfung“ nur lesend mit CSV-Export plus `index.xml`; generierte
+  Bausteine der Verfahrensdokumentation.
+- Aufbewahrung: Buchungsbelege 8 Jahre, Geschäftsbriefe 6 Jahre, jeweils ab Jahresende (einstellbar).
+- **Löschlauf (FA-131)**: Personen mit Belegen in laufender Frist werden nur gesperrt, nicht anonymisiert; der Lauf nennt
+  die längste Frist und anonymisiert nach deren Ende. Andockpunkt existiert bereits: `Aufbewahrungsgrund` und
+  `Loeschentscheidung.Entscheiden` (Domain/Datenschutz) mit einstellbaren `Aufbewahrungsfrist`en (auch „ab Jahresende“) –
+  in I6 Belege als weitere Gründe einspeisen.
 
 ## Testbenutzer der Pilot-VHS
 

@@ -56,7 +56,8 @@ public sealed class QualifikationsDienst(
     IPersonenAbfrage abfrage,
     IAuditProtokoll protokoll,
     IAktuellerBenutzer benutzer,
-    TimeProvider uhr) : IDozenteneinsatz
+    TimeProvider uhr,
+    Aufgaben.AufgabenDienst aufgaben) : IDozenteneinsatz
 {
     /// <summary>Wer Qualifikationen und Beschäftigungsart pflegt.</summary>
     public static readonly Rolle[] PflegeRollen = [Rolle.Fachbereichsleitung, Rolle.Verwaltungsleitung, Rolle.Leitung];
@@ -350,13 +351,14 @@ public sealed class QualifikationsDienst(
     /// Aufgaben für die Fachbereichsleitung: Qualifikation läuft bald ab, Nachweis fehlt, künftige Veranstaltungen mit ungeeigneter
     /// Dozentin / ungeeignetem Dozenten (je Kurs und Person einmal).
     /// </summary>
-    public async Task<int> AufgabenErzeugenAsync(int tageVoraus = 180, CancellationToken abbruch = default)
+    public async Task<Aufgaben.Abgleichergebnis> AufgabenErzeugenAsync(int tageVoraus = 180, CancellationToken abbruch = default)
     {
         var jetzt = uhr.GetLocalNow();
         var heute = Heute;
         var katalog = await speicher.KatalogAsync(abbruch);
-        var neu = 0;
-        const string Gruppe = nameof(Rolle.Fachbereichsleitung);
+        var ablauf = new List<Aufgaben.AufgabenAnlass>();
+        var nachweis = new List<Aufgaben.AufgabenAnlass>();
+        var einsatz = new List<Aufgaben.AufgabenAnlass>();
 
         foreach (var p in await speicher.PersonenMitAblaufendenQualifikationenAsync(heute.AddDays(katalog.Values.Select(m => m.VorlaufTage).DefaultIfEmpty(60).Max()), abbruch))
         {
@@ -364,28 +366,14 @@ public sealed class QualifikationsDienst(
                          && b <= heute.AddDays(katalog.GetValueOrDefault(q.Schluessel)?.VorlaufTage ?? 60)))
             {
                 var bis = q.GueltigBisEinschliesslich!.Value;
-                var schluessel = $"qualifikation-ablauf:{p.Id:N}:{q.Schluessel}:{bis:yyyyMMdd}";
-                if (await programm.AufgabeExistiertAsync(schluessel, abbruch))
-                {
-                    continue;
-                }
-
-                speicher.Hinzufuegen(new Aufgabe(schluessel, $"{p.Anzeigename}: „{q.Bezeichnung}“ läuft am {bis:dd.MM.yyyy} ab",
-                    "Neuen Nachweis anfordern und eintragen; sonst sind die betroffenen Veranstaltungen umzuplanen.", bis.AddDays(-14), Gruppe, $"personen/{p.Id}", jetzt));
-                await protokoll.ProtokollierenAsync("Qualifikation.LaeuftAb", $"Aufgabe angelegt: Qualifikation „{q.Bezeichnung}“ von {Pseudonym.Person(p.Id)} läuft am {bis:dd.MM.yyyy} ab",
-                    nameof(Person), p.Id, erfolgreich: false, abbruch: abbruch);
-                neu++;
+                ablauf.Add(new($"qualifikation-ablauf:{p.Id:N}:{q.Schluessel}:{bis:yyyyMMdd}", $"{p.Anzeigename}: „{q.Bezeichnung}“ läuft am {bis:dd.MM.yyyy} ab",
+                    "Neuen Nachweis anfordern und eintragen; sonst sind die betroffenen Veranstaltungen umzuplanen.", bis.AddDays(-14), $"personen/{p.Id}"));
             }
 
             foreach (var q in p.Qualifikationen.AlleAmStichtag(heute, jetzt).Where(q => q.Nachweis is null && katalog.GetValueOrDefault(q.Schluessel) is { NachweisPflicht: true }))
             {
-                var schluessel = $"qualifikation-nachweis:{p.Id:N}:{q.Schluessel}";
-                if (!await programm.AufgabeExistiertAsync(schluessel, abbruch))
-                {
-                    speicher.Hinzufuegen(new Aufgabe(schluessel, $"{p.Anzeigename}: Nachweis für „{q.Bezeichnung}“ fehlt", "Nachweis (Dokument oder Aktenzeichen) eintragen.",
-                        heute.AddDays(14), Gruppe, $"personen/{p.Id}", jetzt));
-                    neu++;
-                }
+                nachweis.Add(new($"qualifikation-nachweis:{p.Id:N}:{q.Schluessel}", $"{p.Anzeigename}: Nachweis für „{q.Bezeichnung}“ fehlt",
+                    "Nachweis (Dokument oder Aktenzeichen) eintragen.", DateOnly.FromDateTime(q.ErfasstAm.LocalDateTime.Date).AddDays(14), $"personen/{p.Id}"));
             }
         }
 
@@ -402,26 +390,32 @@ public sealed class QualifikationsDienst(
                          .GroupBy(x => x.V.DozentId!.Value))
             {
                 var erster = gruppe.OrderBy(x => x.V.Beginn).First();
-                var schluessel = $"qualifikation-einsatz:{kurs.Id:N}:{gruppe.Key:N}:{erster.V.Datum:yyyyMMdd}";
-                if (await programm.AufgabeExistiertAsync(schluessel, abbruch))
-                {
-                    continue;
-                }
-
-                speicher.Hinzufuegen(new Aufgabe(schluessel,
+                einsatz.Add(new($"qualifikation-einsatz:{kurs.Id:N}:{gruppe.Key:N}",
                     $"{kurs.Kursnummer}: {gruppe.Count()} Veranstaltung(en) ab {erster.V.Datum:dd.MM.yyyy} mit {erster.V.DozentName} – {erster.E.Begruendung}",
                     erster.E.AusnahmeMoeglich ? "Nachweis eintragen, andere Person einplanen oder Ausnahme mit Begründung erteilen."
                         : "Nachweis eintragen oder eine andere, zugelassene Person einplanen (keine Ausnahme möglich).",
-                    erster.V.Datum.AddDays(-14) < heute ? heute : erster.V.Datum.AddDays(-14), Gruppe, $"kurse/{kurs.Id}", jetzt));
-                await protokoll.ProtokollierenAsync("Qualifikation.EinsatzBetroffen",
-                    $"Aufgabe angelegt: {kurs.Kursnummer}, {gruppe.Count()} künftige Veranstaltung(en) mit {Pseudonym.Person(gruppe.Key)} betroffen",
-                    nameof(Kurs), kurs.Id, erfolgreich: false, abbruch: abbruch);
-                neu++;
+                    erster.V.Datum.AddDays(-14), $"kurse/{kurs.Id}", kurs.Fachbereich,
+                    erster.V.Datum <= heute.AddDays(14) ? Dringlichkeit.Hoch : Dringlichkeit.Normal));
             }
         }
 
-        await speicher.SpeichernAsync(abbruch);
-        return neu;
+        // Abgelaufen, aber nicht erneuert: Die Aufgabe bleibt offen.
+        async Task<bool> NochAbgelaufen(Aufgabe a)
+        {
+            var teile = a.Schluessel.Split(':');
+            if (teile.Length != 4 || !DateOnly.TryParseExact(teile[3], "yyyyMMdd", out var bis) || bis >= heute
+                || !Guid.TryParseExact(teile[1], "N", out var personId) || await personen.LadenAsync(personId, abbruch) is not { } person)
+            {
+                return false;
+            }
+
+            return !person.Qualifikationen.AlleAmStichtag(heute, jetzt).Any(q => q.Schluessel == teile[2]);
+        }
+
+        return await aufgaben.AbgleichenAsync(Aufgaben.Aufgabentypen.QualifikationAblauf, ablauf, NochAbgelaufen, _ => "Qualifikation erneuert oder geändert", abbruch)
+               + await aufgaben.AbgleichenAsync(Aufgaben.Aufgabentypen.QualifikationNachweis, nachweis, grund: _ => "Nachweis eingetragen", abbruch: abbruch)
+               + await aufgaben.AbgleichenAsync(Aufgaben.Aufgabentypen.QualifikationEinsatz, einsatz,
+                   grund: _ => "Einsatz geklärt (Nachweis, andere Kursleitung, Ausnahme oder Termine vorbei)", abbruch: abbruch);
     }
 
     // ---------- Hilfen ----------

@@ -25,6 +25,8 @@ public static class Registrierung
         dienste.AddScoped<Durchfuehrung.AnwesenheitDienst>();
         dienste.AddScoped<Dokumente.DokumentDienst>();
         dienste.AddScoped<Anmeldung.VorlagenDienst>();
+        dienste.AddScoped<Aufgaben.AufgabenDienst>();
+        dienste.AddScoped<Aufgaben.Routinen>();
         return dienste;
     }
 }

@@ -38,7 +38,7 @@ public sealed record KursVorschau(
 
 /// <summary>Anwendungsfälle der Programmplanung. Jede Änderung wird protokolliert.</summary>
 public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll protokoll, IAktuellerBenutzer benutzer, TimeProvider uhr,
-    IDozenteneinsatz einsatz)
+    IDozenteneinsatz einsatz, Aufgaben.AufgabenDienst aufgaben)
 {
     public const int HorizontWochen = 12;
 
@@ -348,36 +348,46 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
         return neu;
     }
 
-    /// <summary>Automatik: Aufgabe anlegen, wenn eine befristete Zulassung (Merkmal mit Ende) in den nächsten 60 Tagen abläuft.</summary>
-    public async Task<int> AblaufendeMerkmalePruefenAsync(int tageVorlauf = 60, CancellationToken abbruch = default)
+    /// <summary>
+    /// Automatik: Aufgabe anlegen, wenn ein befristetes Merkmal (z. B. BAMF-Zulassung) eines Orts in den nächsten 60 Tagen abläuft.
+    /// Wird es verlängert, schließt sich die Aufgabe selbst; ist es abgelaufen, ohne dass etwas geschah, bleibt sie offen.
+    /// </summary>
+    public async Task<Aufgaben.Abgleichergebnis> AblaufendeMerkmalePruefenAsync(int tageVorlauf = 60, CancellationToken abbruch = default)
     {
         var verzeichnis = await speicher.OrtsverzeichnisAsync(abbruch);
         var jetzt = uhr.GetLocalNow();
         var heute = DateOnly.FromDateTime(jetzt.Date);
-        var angelegt = 0;
+        var merkmale = new List<Aufgaben.AufgabenAnlass>();
+        var zulassungen = new List<Aufgaben.AufgabenAnlass>();
         foreach (var ort in verzeichnis.Alle)
         {
             foreach (var eintrag in ort.Merkmale.AlleAmStichtag(heute, jetzt).Where(m => m.GueltigBis is { } bis && bis.AddDays(-1) <= heute.AddDays(tageVorlauf)))
             {
                 var bis = eintrag.GueltigBis!.Value.AddDays(-1);
-                var schluessel = $"merkmal-ablauf:{ort.Id:N}:{eintrag.Schluessel}:{bis:yyyyMMdd}";
-                if (await speicher.AufgabeExistiertAsync(schluessel, abbruch))
-                {
-                    continue;
-                }
-
                 var name = verzeichnis.Katalog.GetValueOrDefault(eintrag.Schluessel)?.Name ?? eintrag.Schluessel;
-                var gruppe = eintrag.Schluessel == "bamf" ? nameof(Rolle.IntegrationskursTeam) : nameof(Rolle.Verwaltungsleitung);
-                speicher.Hinzufuegen(new Aufgabe(schluessel, $"{ort.Anzeige}: „{name}“ läuft am {bis:dd.MM.yyyy} ab",
-                    "Zulassung verlängern oder den Ort für betroffene Kurse ersetzen.", bis.AddDays(-14), gruppe, $"orte?id={ort.Id}", jetzt));
-                await protokoll.ProtokollierenAsync("Ort.MerkmalLaeuftAb", $"Aufgabe angelegt: {ort.Anzeige} – „{name}“ läuft am {bis:dd.MM.yyyy} ab",
-                    nameof(Ort), ort.Id, erfolgreich: false, abbruch: abbruch);
-                angelegt++;
+                var anlass = new Aufgaben.AufgabenAnlass($"merkmal-ablauf:{ort.Id:N}:{eintrag.Schluessel}:{bis:yyyyMMdd}",
+                    $"{ort.Anzeige}: „{name}“ läuft am {bis:dd.MM.yyyy} ab", "Zulassung verlängern oder den Ort für betroffene Kurse ersetzen.",
+                    bis.AddDays(-14), $"orte?id={ort.Id}", Dringlichkeit: bis < heute.AddDays(14) ? Dringlichkeit.Hoch : Dringlichkeit.Normal);
+                (eintrag.Schluessel == "bamf" ? zulassungen : merkmale).Add(anlass);
             }
         }
 
-        await speicher.SpeichernAsync(abbruch);
-        return angelegt;
+        // Abgelaufen und nicht verlängert: Aufgabe bleibt offen. Sonst wurde verlängert, geändert oder entfernt.
+        Task<bool> NochAktuell(Aufgabe a)
+        {
+            var teile = a.Schluessel.Split(':');
+            if (teile.Length != 4 || !DateOnly.TryParseExact(teile[3], "yyyyMMdd", out var bis) || bis >= heute
+                || !Guid.TryParseExact(teile[1], "N", out var ortId) || verzeichnis.Finden(ortId) is not { } ort)
+            {
+                return Task.FromResult(false);
+            }
+
+            return Task.FromResult(!ort.Merkmale.AlleAmStichtag(heute, jetzt).Any(m => m.Schluessel == teile[2]));
+        }
+
+        const string Grund = "Merkmal verlängert, geändert oder entfernt";
+        return await aufgaben.AbgleichenAsync(Aufgaben.Aufgabentypen.MerkmalAblauf, merkmale, NochAktuell, _ => Grund, abbruch)
+               + await aufgaben.AbgleichenAsync(Aufgaben.Aufgabentypen.ZulassungAblauf, zulassungen, NochAktuell, _ => Grund, abbruch);
     }
 
     private async Task<(Kursart, Semester)> GrundlagenAsync(KursEntwurf entwurf, CancellationToken abbruch)

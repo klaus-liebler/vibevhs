@@ -1,0 +1,224 @@
+@page "/aufgaben"
+@using VibeVHS.Application.Aufgaben
+@using VibeVHS.Domain.Aufgaben
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+@inject TimeProvider Uhr
+
+<PageTitle>Aufgaben · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Aufgaben</h1>
+        <p class="vhs-sub">Gruppenkörbe je Rolle und Fachbereich, persönliche Liste, Fristen und Eskalation. Jeder Schritt steht im Protokoll.</p>
+    </div>
+    <div class="vhs-row">
+        <BegruendeterButton Text="Regeln jetzt prüfen" Icon="autorenew" ButtonStyle="ButtonStyle.Light" IsBusy="@prueft" Click="PruefenAsync"
+                            Freigabe="@Freigabe.NurFuer(benutzer.Rolle, AufgabenDienst.RegelRollen)" />
+    </div>
+</div>
+
+<div class="vhs-row">
+    <RadzenSelectBar TValue="string" @bind-Value="ansicht" Size="ButtonSize.Small" aria-label="Ansicht">
+        <Items>
+            <RadzenSelectBarItem Text="@($"Meine ({uebersicht?.Meine.Count ?? 0})")" Value="@("meine")" />
+            <RadzenSelectBarItem Text="@($"Gruppenkorb ({uebersicht?.Gruppenkorb.Count ?? 0})")" Value="@("korb")" />
+            <RadzenSelectBarItem Text="@($"Bei Kolleg:innen ({uebersicht?.BeiKollegen.Count ?? 0})")" Value="@("kollegen")" />
+            @if (benutzer.Rolle == Rolle.Leitung)
+            {
+                <RadzenSelectBarItem Text="@($"Alle offenen ({alleOffenen.Count})")" Value="@("alle")" />
+            }
+            <RadzenSelectBarItem Text="Erledigt (14 Tage)" Value="@("erledigt")" />
+            <RadzenSelectBarItem Text="Regeln" Value="@("regeln")" />
+        </Items>
+    </RadzenSelectBar>
+    @if (uebersicht is not null)
+    {
+        <span class="vhs-small vhs-muted">Ihr Korb: <b>@uebersicht.Korbname</b> (Rolle oben rechts wechseln, um andere Körbe zu sehen)</span>
+    }
+</div>
+
+@if (uebersicht is { } u)
+{
+    <section class="vhs-card">
+        @switch (ansicht)
+        {
+            case "meine":
+                <AufgabenListe Aufgaben="@u.Meine" Benutzer="@benutzer" Geaendert="LadenAsync" Leertext="Keine Aufgaben in Ihrer Liste." />
+                break;
+            case "korb":
+                <AufgabenListe Aufgaben="@u.Gruppenkorb" Benutzer="@benutzer" Geaendert="LadenAsync" Leertext="Der Korb ist leer." />
+                break;
+            case "kollegen":
+                <AufgabenListe Aufgaben="@u.BeiKollegen" Benutzer="@benutzer" Geaendert="LadenAsync" Leertext="Niemand aus Ihrem Korb bearbeitet gerade etwas." />
+                break;
+            case "alle":
+                <AufgabenListe Aufgaben="@alleOffenen" Benutzer="@benutzer" Geaendert="LadenAsync" Leertext="Keine offenen Aufgaben." />
+                break;
+            case "erledigt":
+                <AufgabenListe Aufgaben="@erledigt" Benutzer="@benutzer" NurLesen="true" Leertext="In den letzten 14 Tagen wurde in Ihrem Bereich nichts abgeschlossen." />
+                break;
+            case "regeln":
+                <p class="vhs-small vhs-muted" style="margin:0">
+                    Je Aufgabentyp: zuständige Rolle (Gruppenkorb), Einschränkung auf den Fachbereich des Anlasses, optional eine feste Person,
+                    Eskalation an die Leitung nach Fälligkeit und – bei kritischen Automatismen – ob ein Mensch freigibt.
+                </p>
+                @if (!regelnAenderbar.Erlaubt)
+                {
+                    <div class="vhs-alert vhs-info">@regelnAenderbar.Begruendung</div>
+                }
+                <div class="vhs-tbl">
+                    <table>
+                        <thead>
+                            <tr><th>Aufgabentyp</th><th>Zuständig</th><th>je Fachbereich</th><th>feste Person (Login)</th><th>Eskalation nach Tagen</th><th>Vorlauf (Tage)</th><th>Freigabe</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var e in entwuerfe)
+                            {
+                                <tr>
+                                    <td><b>@e.Typ.Name</b><br /><span class="vhs-small vhs-muted">@e.Typ.Beschreibung</span></td>
+                                    <td>
+                                        <RadzenDropDown TValue="Rolle" Data="@rollen" @bind-Value="e.Rolle" TextProperty="Text" ValueProperty="Wert" Disabled="@(!regelnAenderbar.Erlaubt)"
+                                                        aria-label="@($"Zuständige Rolle für {e.Typ.Name}")" Style="min-width:190px" />
+                                    </td>
+                                    <td><RadzenCheckBox @bind-Value="e.JeFachbereich" Disabled="@(!regelnAenderbar.Erlaubt)" aria-label="je Fachbereich" /></td>
+                                    <td><RadzenTextBox @bind-Value="e.FestePerson" Disabled="@(!regelnAenderbar.Erlaubt)" Placeholder="niemand" Style="width:130px" aria-label="feste Person" /></td>
+                                    <td><RadzenNumeric TValue="int" @bind-Value="e.Eskalation" Min="0" Max="365" Disabled="@(!regelnAenderbar.Erlaubt)" Style="width:90px" aria-label="Eskalation nach Tagen" /></td>
+                                    <td>
+                                        @if (e.Typ.VorlaufTage is not null)
+                                        {
+                                            <RadzenNumeric TValue="int?" @bind-Value="e.Vorlauf" Min="0" Max="120" Disabled="@(!regelnAenderbar.Erlaubt)" Style="width:90px" aria-label="Vorlauf in Tagen" />
+                                        }
+                                        else
+                                        {
+                                            <span class="vhs-muted">–</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (e.Typ.MenschGibtFrei is not null)
+                                        {
+                                            <RadzenDropDown TValue="bool" Data="@freigabeArten" @bind-Value="e.MenschGibtFrei" TextProperty="Text" ValueProperty="Wert"
+                                                            Disabled="@(!regelnAenderbar.Erlaubt)" Style="min-width:200px" aria-label="Freigabe" />
+                                        }
+                                        else
+                                        {
+                                            <span class="vhs-why vhs-muted" tabindex="0" data-why="Diese Regel legt nur Aufgaben an und handelt nie selbst – eine Freigabe ist nicht nötig.">nicht nötig</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <BegruendeterButton Text="Speichern" Size="ButtonSize.Small" Freigabe="@(regelnAenderbar.Und(() => e.Geaendert ? Freigabe.Ja : Freigabe.Nein("Keine Änderung.")))"
+                                                            Click="@(() => RegelSpeichernAsync(e))" />
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                break;
+        }
+    </section>
+}
+
+@code {
+    private sealed record Auswahl<T>(string Text, T Wert);
+
+    private sealed class Entwurf(Aufgabentyp typ)
+    {
+        public Aufgabentyp Typ { get; } = typ;
+        public Rolle Rolle { get; set; } = RollenExtensions.TryParse(typ.Rolle, out var r) ? r : Rolle.Leitung;
+        public bool JeFachbereich { get; set; } = typ.JeFachbereich;
+        public string? FestePerson { get; set; } = typ.FestePerson;
+        public int Eskalation { get; set; } = typ.EskalationNachTagen;
+        public int? Vorlauf { get; set; } = typ.VorlaufTage;
+        public bool MenschGibtFrei { get; set; } = typ.MenschGibtFrei ?? true;
+
+        public bool Geaendert => Rolle.ToString() != Typ.Rolle || JeFachbereich != Typ.JeFachbereich || (FestePerson ?? "") != (Typ.FestePerson ?? "")
+                                 || Eskalation != Typ.EskalationNachTagen || Vorlauf != Typ.VorlaufTage || (Typ.MenschGibtFrei is { } m && m != MenschGibtFrei);
+    }
+
+    [SupplyParameterFromQuery(Name = "ansicht")]
+    private string? AnsichtAusAdresse { get; set; }
+
+    private string ansicht = "meine";
+    private Benutzer benutzer = Benutzer.Automatik;
+    private Aufgabenuebersicht? uebersicht;
+    private IReadOnlyList<Aufgabe> alleOffenen = [];
+    private IReadOnlyList<Aufgabe> erledigt = [];
+    private List<Entwurf> entwuerfe = [];
+    private Freigabe regelnAenderbar = Freigabe.Ja;
+    private bool prueft;
+
+    private static readonly IReadOnlyList<Auswahl<Rolle>> rollen = Enum.GetValues<Rolle>().Select(r => new Auswahl<Rolle>(r.Anzeigename(), r)).ToList();
+
+    private static readonly IReadOnlyList<Auswahl<bool>> freigabeArten =
+    [
+        new("Vorschlag – ein Mensch gibt frei", true),
+        new("Automatik handelt bei Fälligkeit selbst", false),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        ansicht = AnsichtAusAdresse ?? "meine";
+        benutzer = await Vorgang.BenutzerAsync();
+        regelnAenderbar = Freigabe.NurFuer(benutzer.Rolle, AufgabenDienst.RegelRollen);
+        await LadenAsync();
+        if (AnsichtAusAdresse is null && uebersicht is { Meine.Count: 0, Gruppenkorb.Count: > 0 })
+        {
+            ansicht = "korb";
+        }
+    }
+
+    private async Task LadenAsync()
+    {
+        var seit = new DateTimeOffset(Uhr.GetLocalNow().Date.AddDays(-14), Uhr.GetLocalNow().Offset);
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var dienst = d.GetRequiredService<AufgabenDienst>();
+            var speicher = d.GetRequiredService<IAufgabenSpeicher>();
+            uebersicht = await dienst.UebersichtAsync();
+            alleOffenen = benutzer.Rolle == Rolle.Leitung
+                ? (await speicher.OffeneAsync()).OrderByDescending(a => a.EskaliertAm is not null).ThenBy(a => a.Faellig).ToList()
+                : [];
+            erledigt = (await speicher.AbgeschlossenSeitAsync(seit))
+                .Where(a => benutzer.Rolle == Rolle.Leitung || AufgabenDienst.ImKorb(benutzer, a) || a.BearbeiterKennung == benutzer.Kennung)
+                .OrderByDescending(a => a.ErledigtAm).ToList();
+            entwuerfe = (await dienst.TypenAsync()).Select(t => new Entwurf(t)).ToList();
+        });
+    }
+
+    private async Task RegelSpeichernAsync(Entwurf e)
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AufgabenDienst>().TypAendernAsync(e.Typ.Schluessel, e.Rolle, e.JeFachbereich, e.FestePerson,
+                e.Eskalation, e.Typ.VorlaufTage is null ? null : e.Vorlauf ?? 0, e.Typ.MenschGibtFrei is null ? null : e.MenschGibtFrei));
+            Hinweise.Notify(NotificationSeverity.Success, e.Typ.Name, "Regel gespeichert. Sie gilt für neue Aufgaben und den nächsten Prüflauf.");
+            await LadenAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Warning, "Nicht gespeichert", ex.Message);
+        }
+    }
+
+    private async Task PruefenAsync()
+    {
+        prueft = true;
+        try
+        {
+            var ergebnis = await Vorgang.AusfuehrenAsync(async d =>
+            {
+                var lauf = await d.GetRequiredService<Routinen>().StuendlichAsync();
+                var merkmale = await d.GetRequiredService<VibeVHS.Application.Programm.ProgrammDienst>().AblaufendeMerkmalePruefenAsync();
+                var quali = await d.GetRequiredService<VibeVHS.Application.Programm.QualifikationsDienst>().AufgabenErzeugenAsync();
+                return lauf.Aufgaben + merkmale + quali;
+            });
+            Hinweise.Notify(NotificationSeverity.Info, "Regeln geprüft", ergebnis.ToString());
+            await LadenAsync();
+        }
+        finally
+        {
+            prueft = false;
+        }
+    }
+}

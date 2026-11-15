@@ -49,6 +49,9 @@ public interface IDatenschutzSpeicher
     /// <summary>Archivierte Dokumente der Person, verfolgt.</summary>
     Task<IReadOnlyList<Domain.Dokumente.Dokument>> DokumenteAsync(Guid personId, CancellationToken abbruch = default);
 
+    /// <summary>Aufgaben, die die Person betreffen (Ziel oder Schlüssel enthält ihre ID), verfolgt.</summary>
+    Task<IReadOnlyList<Domain.Aufgaben.Aufgabe>> AufgabenZuPersonAsync(Guid personId, CancellationToken abbruch = default);
+
     /// <summary>Kursnummer und Titel je Kurs-ID (für die Auskunft).</summary>
     Task<IReadOnlyDictionary<Guid, string>> KurstitelAsync(IEnumerable<Guid> kursIds, CancellationToken abbruch = default);
 

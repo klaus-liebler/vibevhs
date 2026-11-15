@@ -185,6 +185,9 @@ public sealed class Belegung
 
     public int? KontingentAnzahl { get; private set; }
 
+    /// <summary>Wann die Erinnerung vor Kursbeginn verschickt wurde (nur einmal je Belegung).</summary>
+    public DateTimeOffset? ErinnertAm { get; private set; }
+
     public DateOnly? KontingentGueltigBis { get; private set; }
 
     public IReadOnlyCollection<KontingentEreignis> Ereignisse => _ereignisse;
@@ -254,6 +257,8 @@ public sealed class Belegung
         AngebotBis = null;
         KontingentEroeffnen(richtlinie, jetzt, von);
     }
+
+    public void Erinnern(DateTimeOffset jetzt) => ErinnertAm ??= jetzt;
 
     public void Stornieren(long gebuehrCent, string grund, string von, DateTimeOffset jetzt)
     {

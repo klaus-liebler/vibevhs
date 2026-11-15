@@ -139,11 +139,29 @@ internal static class ProgrammMapping
             b.ToTable("Aufgaben");
             b.HasKey(a => a.Id);
             b.Property(a => a.Id).ValueGeneratedNever();
+            b.Property(a => a.Typ).HasMaxLength(60);
             b.Property(a => a.Schluessel).HasMaxLength(200);
             b.HasIndex(a => a.Schluessel).IsUnique();
+            b.HasIndex(a => new { a.Status, a.Gruppe });
             b.Property(a => a.Titel).HasMaxLength(300);
             b.Property(a => a.Gruppe).HasMaxLength(60);
             b.Property(a => a.Ziel).HasMaxLength(300);
+            b.Property(a => a.Status).HasConversion<string>().HasMaxLength(40);
+            b.Property(a => a.Dringlichkeit).HasConversion<string>().HasMaxLength(40);
+            b.Property(a => a.BearbeiterKennung).HasMaxLength(100);
+            b.Property(a => a.BearbeiterName).HasMaxLength(200);
+            b.Property(a => a.ErledigtVon).HasMaxLength(200);
+            b.Property(a => a.Vermerk).HasMaxLength(1000);
+        });
+
+        mb.Entity<Aufgabentyp>(b =>
+        {
+            b.ToTable("Aufgabentypen");
+            b.HasKey(t => t.Schluessel);
+            b.Property(t => t.Schluessel).HasMaxLength(60);
+            b.Property(t => t.Name).HasMaxLength(200);
+            b.Property(t => t.Rolle).HasMaxLength(60);
+            b.Property(t => t.FestePerson).HasMaxLength(100);
         });
     }
 }

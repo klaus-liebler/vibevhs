@@ -53,6 +53,7 @@ public static class Registrierung
         dienste.AddSingleton<Application.Dokumente.IBriefPdf, Durchfuehrung.BriefPdf>();
         dienste.AddScoped<Application.Datenschutz.IDatenschutzSpeicher, Datenschutz.DatenschutzSpeicher>();
         dienste.AddSingleton<Application.Datenschutz.IAuskunftPdf, Datenschutz.AuskunftPdf>();
+        dienste.AddScoped<Application.Aufgaben.IAufgabenSpeicher, Aufgaben.AufgabenSpeicher>();
         dienste.AddScoped<Anmeldung.AnmeldungSpeicher>();
         dienste.AddScoped<Application.Anmeldung.IAnmeldungSpeicher>(d => d.GetRequiredService<Anmeldung.AnmeldungSpeicher>());
         dienste.AddScoped<Application.Anmeldung.IVorlagenSpeicher>(d => d.GetRequiredService<Anmeldung.AnmeldungSpeicher>());
@@ -81,6 +82,13 @@ public static class Registrierung
                 q.AddTrigger(t => t.ForJob(schluessel).WithIdentity(schluessel.Name + "-nacht", "automatik").WithCronSchedule("0 15 2 * * ?"));
                 q.AddTrigger(t => t.ForJob(schluessel).WithIdentity(schluessel.Name + "-start", "automatik").StartAt(DateTimeOffset.UtcNow.AddSeconds(20)));
             }
+
+            // Aufgaben-Routinen stündlich und kurz nach dem Start (nach den nächtlichen Prüfungen), Erinnerungen morgens.
+            q.AddJob<AufgabenJob>(j => j.WithIdentity(AufgabenJob.Schluessel));
+            q.AddTrigger(t => t.ForJob(AufgabenJob.Schluessel).WithIdentity("aufgaben-stuendlich", "automatik").WithCronSchedule("0 10 * * * ?"));
+            q.AddTrigger(t => t.ForJob(AufgabenJob.Schluessel).WithIdentity("aufgaben-start", "automatik").StartAt(DateTimeOffset.UtcNow.AddSeconds(40)));
+            q.AddJob<ErinnerungJob>(j => j.WithIdentity(ErinnerungJob.Schluessel));
+            q.AddTrigger(t => t.ForJob(ErinnerungJob.Schluessel).WithIdentity("erinnerung-morgens", "automatik").WithCronSchedule("0 0 7 * * ?"));
         });
         dienste.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
         return dienste;

@@ -1,0 +1,194 @@
+@*
+    Liste von Aufgaben mit den passenden Aktionen: Übernehmen, Zuweisen, Zurückgeben, Erledigen und – bei der
+    Mindestteilnehmerprüfung – „Durchführen“ oder „Kurs absagen“. Gesperrte Aktionen erklären per Tooltip, warum.
+    Ein Klick auf den Titel führt zur passenden Seite.
+*@
+@using VibeVHS.Application.Aufgaben
+@using VibeVHS.Domain.Aufgaben
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+@inject TimeProvider Uhr
+
+@if (Aufgaben.Count == 0)
+{
+    <div class="vhs-small vhs-muted">@Leertext</div>
+}
+else
+{
+    <div class="vhs-aufgaben">
+        @foreach (var a in Aufgaben)
+        {
+            var heute = DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+            <div class="vhs-aufgabe @(a.EskaliertAm is not null ? "eskaliert" : "")" data-aufgabe="@a.Id">
+                <div class="vhs-row">
+                    <StatusPille Stil="@FaelligStil(a, heute)">@FaelligText(a, heute)</StatusPille>
+                    @if (a.EskaliertAm is not null)
+                    {
+                        <StatusPille Stil="krit">an die Leitung eskaliert</StatusPille>
+                    }
+                    else if (a.Dringlichkeit != Dringlichkeit.Normal)
+                    {
+                        <StatusPille Stil="warn">@(a.Dringlichkeit == Dringlichkeit.Kritisch ? "kritisch" : "dringend")</StatusPille>
+                    }
+                    @if (a.Ziel is not null)
+                    {
+                        <a class="vhs-grow vhs-aufgabe-titel" href="@a.Ziel">@a.Titel</a>
+                    }
+                    else
+                    {
+                        <span class="vhs-grow vhs-aufgabe-titel">@a.Titel</span>
+                    }
+                </div>
+                <div class="vhs-small vhs-muted">
+                    @AufgabenDienst.Korb(a)
+                    @if (a.BearbeiterName is not null)
+                    {
+                        <span> · bearbeitet von <b>@a.BearbeiterName</b> seit @a.UebernommenAm?.ToLocalTime().ToString("dd.MM. HH:mm")</span>
+                    }
+                    @if (!a.Offen)
+                    {
+                        <span> · @(a.Status == Aufgabenstatus.Geschlossen ? "automatisch geschlossen" : "erledigt") @a.ErledigtAm?.ToLocalTime().ToString("dd.MM. HH:mm")@(a.Vermerk is null ? "" : ": " + a.Vermerk)</span>
+                    }
+                </div>
+                @if (a.Beschreibung is not null && a.Offen)
+                {
+                    <div class="vhs-small">@a.Beschreibung</div>
+                }
+                @if (a.Offen && !NurLesen)
+                {
+                    <div class="vhs-row">
+                        @if (a.BearbeiterKennung != Benutzer.Kennung)
+                        {
+                            <BegruendeterButton Text="Übernehmen" Icon="pan_tool" Size="ButtonSize.Small" Freigabe="@AufgabenDienst.KannUebernehmen(Benutzer, a)"
+                                                Click="@(() => AusfuehrenAsync(a, d => d.GetRequiredService<AufgabenDienst>().UebernehmenAsync(a.Id), "Übernommen – die Aufgabe steht jetzt in Ihrer Liste."))" />
+                        }
+                        <BegruendeterButton Text="Zuweisen …" Icon="person_add" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                            Freigabe="@AufgabenDienst.KannZuweisen(Benutzer, a)" Click="@(() => ZuweisenOeffnenAsync(a))" />
+                        @if (a.BearbeiterKennung is not null)
+                        {
+                            <BegruendeterButton Text="Zurück in den Korb" Icon="undo" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                                Freigabe="@AufgabenDienst.KannZurueckgeben(Benutzer, a)"
+                                                Click="@(() => AusfuehrenAsync(a, d => d.GetRequiredService<AufgabenDienst>().ZurueckgebenAsync(a.Id), "Zurück im Gruppenkorb."))" />
+                        }
+                        @if (a.Typ == Aufgabentypen.Mindestteilnehmer)
+                        {
+                            <BegruendeterButton Text="Durchführen" Icon="check" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Success"
+                                                Freigabe="@AufgabenDienst.KannErledigen(Benutzer, a)" Click="@(() => Oeffnen(a, Modus.Durchfuehren))" />
+                            <BegruendeterButton Text="Kurs absagen …" Icon="event_busy" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger"
+                                                Freigabe="@(AufgabenDienst.KannErledigen(Benutzer, a).Und(() => Freigabe.NurFuer(Benutzer.Rolle, VibeVHS.Application.Anmeldung.AnmeldungDienst.AbsageRollen)))"
+                                                Click="@(() => Oeffnen(a, Modus.Absagen))" />
+                        }
+                        else
+                        {
+                            <BegruendeterButton Text="Erledigt …" Icon="task_alt" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Success"
+                                                Freigabe="@AufgabenDienst.KannErledigen(Benutzer, a)" Click="@(() => Oeffnen(a, Modus.Erledigen))" />
+                        }
+                    </div>
+                    @if (offen == a.Id)
+                    {
+                        <div class="vhs-aufgabe-panel">
+                            @switch (modus)
+                            {
+                                case Modus.Zuweisen:
+                                    @if (kandidaten.Count == 0)
+                                    {
+                                        <span class="vhs-small vhs-muted">Niemand sonst hat die zuständige Rolle „@AufgabenDienst.Korb(a)“.</span>
+                                    }
+                                    else
+                                    {
+                                        <RadzenDropDown TValue="string" Data="@kandidaten" TextProperty="@nameof(Kollegin.Name)" ValueProperty="@nameof(Kollegin.Login)"
+                                                        @bind-Value="zuweisenAn" Placeholder="Person wählen" Style="min-width:240px" aria-label="Zuweisen an" />
+                                        <BegruendeterButton Text="Zuweisen" Size="ButtonSize.Small"
+                                                            Freigabe="@(zuweisenAn is null ? Freigabe.Nein("Bitte zuerst eine Person wählen.") : Freigabe.Ja)"
+                                                            Click="@(() => AusfuehrenAsync(a, d => d.GetRequiredService<AufgabenDienst>().ZuweisenAsync(a.Id, zuweisenAn!), "Zugewiesen."))" />
+                                    }
+                                    break;
+                                case Modus.Erledigen:
+                                    <RadzenTextBox @bind-Value="vermerk" Placeholder="Was wurde getan? (optional)" Style="min-width:320px" aria-label="Vermerk" />
+                                    <BegruendeterButton Text="Als erledigt markieren" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Success"
+                                                        Click="@(() => AusfuehrenAsync(a, d => d.GetRequiredService<AufgabenDienst>().ErledigenAsync(a.Id, vermerk), "Erledigt – steht im Protokoll."))" />
+                                    break;
+                                case Modus.Durchfuehren:
+                                    <RadzenTextBox @bind-Value="vermerk" Placeholder="Begründung, z. B. „mit 5 Personen, Entgelt bleibt“" Style="min-width:320px" aria-label="Begründung" />
+                                    <BegruendeterButton Text="Trotz Unterbelegung durchführen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Success"
+                                                        Click="@(() => AusfuehrenAsync(a, d => d.GetRequiredService<Routinen>().MindestzahlEntscheidenAsync(a.Id, false, vermerk), "Entscheidung gespeichert: Der Kurs findet statt."))" />
+                                    break;
+                                case Modus.Absagen:
+                                    <RadzenTextBox @bind-Value="vermerk" Placeholder="Grund für die Teilnehmenden (Standard: Mindestteilnehmerzahl nicht erreicht)" Style="min-width:360px" aria-label="Grund der Absage" />
+                                    <BegruendeterButton Text="Absagen und Teilnehmende benachrichtigen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger"
+                                                        Click="@(() => AusfuehrenAsync(a, d => d.GetRequiredService<Routinen>().MindestzahlEntscheidenAsync(a.Id, true, vermerk), "Kurs abgesagt. Die Absagen liegen im Postausgang."))" />
+                                    <span class="vhs-small vhs-muted">Alle Belegungen werden ohne Gebühr aufgehoben; künftige Termine fallen aus.</span>
+                                    break;
+                            }
+                            <RadzenButton Text="Abbrechen" Variant="Variant.Text" Size="ButtonSize.Small" Click="@(() => offen = null)" />
+                        </div>
+                    }
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private enum Modus { Zuweisen, Erledigen, Durchfuehren, Absagen }
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<Aufgabe> Aufgaben { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public Benutzer Benutzer { get; set; } = Benutzer.Automatik;
+
+    [Parameter]
+    public string Leertext { get; set; } = "Nichts zu tun.";
+
+    /// <summary>Ohne Aktionen (z. B. erledigte Aufgaben).</summary>
+    [Parameter]
+    public bool NurLesen { get; set; }
+
+    [Parameter]
+    public EventCallback Geaendert { get; set; }
+
+    private Guid? offen;
+    private Modus modus;
+    private string? vermerk;
+    private string? zuweisenAn;
+    private IReadOnlyList<Kollegin> kandidaten = [];
+
+    private void Oeffnen(Aufgabe a, Modus m)
+    {
+        offen = a.Id;
+        modus = m;
+        vermerk = null;
+    }
+
+    private async Task ZuweisenOeffnenAsync(Aufgabe a)
+    {
+        kandidaten = (await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AufgabenDienst>().KandidatenAsync(a.Id)))
+            .Where(k => k.Login != a.BearbeiterKennung).ToList();
+        zuweisenAn = null;
+        Oeffnen(a, Modus.Zuweisen);
+    }
+
+    private async Task AusfuehrenAsync(Aufgabe a, Func<IServiceProvider, Task> arbeit, string erfolg)
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(arbeit);
+            Hinweise.Notify(NotificationSeverity.Success, a.Titel, erfolg);
+            offen = null;
+            await Geaendert.InvokeAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Warning, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private static string FaelligStil(Aufgabe a, DateOnly heute)
+        => !a.Offen ? "neutral" : a.Faellig < heute ? "krit" : a.Faellig <= heute.AddDays(2) ? "warn" : "info";
+
+    private static string FaelligText(Aufgabe a, DateOnly heute)
+        => !a.Offen ? (a.Status == Aufgabenstatus.Geschlossen ? "geschlossen" : "erledigt")
+            : a.Faellig < heute ? $"überfällig seit {a.Faellig:dd.MM.}"
+            : a.Faellig == heute ? "heute fällig" : $"fällig {a.Faellig:dd.MM.}";
+}

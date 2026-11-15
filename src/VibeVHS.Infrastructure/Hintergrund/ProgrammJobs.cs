@@ -25,7 +25,7 @@ internal sealed class MerkmalAblaufJob(ProgrammDienst programm, ILogger<MerkmalA
 
     public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
     {
-        var neu = await programm.AblaufendeMerkmalePruefenAsync(abbruch: cancellationToken);
-        log.LogInformation("Ablaufende Merkmale: {Anzahl} neue Aufgaben", neu);
+        var ergebnis = await programm.AblaufendeMerkmalePruefenAsync(abbruch: cancellationToken);
+        log.LogInformation("Ablaufende Merkmale: {Ergebnis}", ergebnis);
     }
 }

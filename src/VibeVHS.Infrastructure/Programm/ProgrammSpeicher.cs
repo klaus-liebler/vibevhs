@@ -96,12 +96,16 @@ internal sealed class ProgrammSpeicher(VibeVhsDbContext db) : IProgrammSpeicher
             .ToList();
     }
 
-    public Task<bool> AufgabeExistiertAsync(string schluessel, CancellationToken abbruch = default)
-        => db.Aufgaben.AnyAsync(a => a.Schluessel == schluessel, abbruch);
+    public async Task<IReadOnlyList<Kurs>> KurseMitBeginnZwischenAsync(DateTime von, DateTime bis, CancellationToken abbruch = default)
+    {
+        var ids = await db.Veranstaltungen.AsNoTracking().Where(v => v.Beginn >= von && v.Beginn < bis)
+            .Select(v => v.KursId).Distinct().ToListAsync(abbruch);
+        var kurse = await db.Kurse.AsNoTracking().Include(k => k.Veranstaltungen)
+            .Where(k => ids.Contains(k.Id) && k.ArchiviertAm == null).ToListAsync(abbruch);
 
-    public async Task<IReadOnlyList<Aufgabe>> OffeneAufgabenAsync(string? gruppe, CancellationToken abbruch = default)
-        => await db.Aufgaben.AsNoTracking().Where(a => a.ErledigtAm == null && (gruppe == null || a.Gruppe == gruppe))
-            .OrderBy(a => a.Faellig).ToListAsync(abbruch);
+        // Abgesagte Kurse haben keine stattfindenden Termine mehr: dann zählt der erste geplante.
+        return kurse.Where(k => (k.ErsterTermin ?? k.Veranstaltungen.Select(v => (DateTime?)v.Beginn).Min()) is { } b && b >= von && b < bis).ToList();
+    }
 
     public void Hinzufuegen(object eintrag)
     {

@@ -54,9 +54,8 @@ public interface IProgrammSpeicher
 
     Task<IReadOnlyList<PlanTermin>> TermineAsync(DateTime von, DateTime bis, CancellationToken abbruch = default);
 
-    Task<bool> AufgabeExistiertAsync(string schluessel, CancellationToken abbruch = default);
-
-    Task<IReadOnlyList<Aufgabe>> OffeneAufgabenAsync(string? gruppe, CancellationToken abbruch = default);
+    /// <summary>Nicht archivierte Kurse (jeder Status), deren erster stattfindender Termin im Zeitraum liegt; ohne Verfolgung.</summary>
+    Task<IReadOnlyList<Kurs>> KurseMitBeginnZwischenAsync(DateTime von, DateTime bis, CancellationToken abbruch = default);
 
     void Hinzufuegen(object eintrag);
 

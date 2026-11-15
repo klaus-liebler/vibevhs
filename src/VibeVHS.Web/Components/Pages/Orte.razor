@@ -175,7 +175,8 @@
         {
             var p = d.GetRequiredService<IProgrammSpeicher>();
             verzeichnis = await p.OrtsverzeichnisAsync();
-            aufgaben = (await p.OffeneAufgabenAsync(null)).Where(a => a.Ziel?.StartsWith("orte", StringComparison.Ordinal) == true).ToList();
+            aufgaben = (await d.GetRequiredService<VibeVHS.Application.Aufgaben.IAufgabenSpeicher>().OffeneAsync())
+                .Where(a => a.Ziel?.StartsWith("orte", StringComparison.Ordinal) == true).OrderBy(a => a.Faellig).ToList();
             ort = OrtId is { } id ? verzeichnis.Finden(id) : null;
             if (ort is not null)
             {

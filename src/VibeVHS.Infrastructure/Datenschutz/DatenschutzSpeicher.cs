@@ -181,6 +181,13 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
     public async Task<IReadOnlyList<Domain.Dokumente.Dokument>> DokumenteAsync(Guid personId, CancellationToken abbruch = default)
         => await db.Set<Domain.Dokumente.Dokument>().Where(d => d.PersonId == personId).ToListAsync(abbruch);
 
+    public async Task<IReadOnlyList<Domain.Aufgaben.Aufgabe>> AufgabenZuPersonAsync(Guid personId, CancellationToken abbruch = default)
+    {
+        var ziel = $"personen/{personId}";
+        var teil = personId.ToString("N");
+        return await db.Aufgaben.Where(a => a.Ziel == ziel || a.Schluessel.Contains(teil)).ToListAsync(abbruch);
+    }
+
     public async Task<IReadOnlyDictionary<Guid, string>> KurstitelAsync(IEnumerable<Guid> kursIds, CancellationToken abbruch = default)
     {
         var ids = kursIds.ToList();

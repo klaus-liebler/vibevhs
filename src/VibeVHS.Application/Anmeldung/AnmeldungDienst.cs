@@ -249,6 +249,95 @@ public sealed class AnmeldungDienst(
         return abgelaufen.Count;
     }
 
+    /// <summary>Automatik: In allen Kursen mit Warteliste freie Plätze anbieten (falls ein Storno ohne Nachrücken blieb).</summary>
+    public async Task<int> WartelistenNachrueckenAsync(CancellationToken abbruch = default)
+    {
+        var angeboten = 0;
+        foreach (var kursId in await speicher.KurseMitWartelisteAsync(abbruch))
+        {
+            angeboten += await NachrueckenAsync(await KursAsync(kursId, abbruch), await speicher.BelegungenDesKursesAsync(kursId, abbruch), abbruch);
+        }
+
+        await speicher.SpeichernAsync(abbruch);
+        return angeboten;
+    }
+
+    // ---------- Kursabsage und Erinnerung ----------
+
+    /// <summary>Wer einen Kurs absagen darf (Automatik nur, wenn die Aufgabenregel es erlaubt).</summary>
+    public static readonly Rolle[] AbsageRollen = [Rolle.Fachbereichsleitung, Rolle.Verwaltungsleitung, Rolle.Leitung];
+
+    /// <summary>
+    /// Sagt den Kurs ab: künftige Veranstaltungen fallen aus, alle offenen Belegungen werden ohne Gebühr storniert
+    /// und die Teilnehmenden per Mail (mit Übersetzungslink) benachrichtigt.
+    /// </summary>
+    /// <returns>Anzahl der aufgehobenen Belegungen.</returns>
+    public async Task<int> KursAbsagenAsync(Guid kursId, string grund, CancellationToken abbruch = default)
+    {
+        var wer = await benutzer.ErmittelnAsync(abbruch);
+        if (!wer.IstAutomatik && (wer.Rolle is not { } r || !AbsageRollen.Contains(r)))
+        {
+            throw new InvalidOperationException(Oberflaeche.Freigabe.NurFuer(wer.Rolle, AbsageRollen).Begruendung);
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(grund);
+        var kurs = await KursAsync(kursId, abbruch);
+        if (kurs.Status == Kursstatus.Abgesagt)
+        {
+            throw new InvalidOperationException("Der Kurs ist bereits abgesagt.");
+        }
+
+        var jetzt = uhr.GetLocalNow();
+        kurs.StatusSetzen(Kursstatus.Abgesagt);
+        foreach (var v in kurs.Veranstaltungen.Where(v => !v.Ausgefallen && v.Beginn >= jetzt.DateTime))
+        {
+            v.Ausfallen($"Kurs abgesagt: {grund}");
+        }
+
+        var anzahl = 0;
+        foreach (var b in (await speicher.BelegungenDesKursesAsync(kursId, abbruch)).Where(b => b.Offen))
+        {
+            b.Stornieren(0, $"Kurs abgesagt: {grund}", wer.Anzeige, jetzt);
+            anzahl++;
+            var person = await personen.LadenAsync(b.PersonId, abbruch);
+            if (person is not null)
+            {
+                await MailAsync(person, Textvorlagen.Kursabsage, Werte(person, kurs, b, ("Regel", grund)), null, abbruch);
+            }
+        }
+
+        await protokoll.ProtokollierenAsync("Kurs.Abgesagt", $"{kurs.Kursnummer} abgesagt ({grund}); {anzahl} Belegung(en) ohne Gebühr aufgehoben und benachrichtigt",
+            nameof(Kurs), kurs.Id, abbruch: abbruch);
+        await speicher.SpeichernAsync(abbruch);
+        return anzahl;
+    }
+
+    /// <summary>Erinnerung vor Kursbeginn an alle Angemeldeten, die noch keine bekommen haben.</summary>
+    public async Task<int> ErinnernAsync(Guid kursId, CancellationToken abbruch = default)
+    {
+        var kurs = await KursAsync(kursId, abbruch);
+        var jetzt = uhr.GetLocalNow();
+        var anzahl = 0;
+        foreach (var b in (await speicher.BelegungenDesKursesAsync(kursId, abbruch)).Where(b => b.Status == Belegungsstatus.Angemeldet && b.ErinnertAm is null))
+        {
+            b.Erinnern(jetzt);
+            var person = await personen.LadenAsync(b.PersonId, abbruch);
+            if (person is not null && await MailAsync(person, Textvorlagen.Kurserinnerung, Werte(person, kurs, b), null, abbruch) is not null)
+            {
+                anzahl++;
+            }
+        }
+
+        if (anzahl > 0)
+        {
+            await protokoll.ProtokollierenAsync("Kurs.Erinnerung", $"{kurs.Kursnummer}: Erinnerung vor Kursbeginn an {anzahl} Teilnehmende verschickt", nameof(Kurs), kurs.Id,
+                abbruch: abbruch);
+        }
+
+        await speicher.SpeichernAsync(abbruch);
+        return anzahl;
+    }
+
     private async Task<int> NachrueckenAsync(Kurs kurs, IReadOnlyList<Belegung> belegungen, CancellationToken abbruch)
     {
         if (kurs.Status != Kursstatus.Veroeffentlicht || kurs.Richtlinie.Belegung == Belegungsart.Kontingent)

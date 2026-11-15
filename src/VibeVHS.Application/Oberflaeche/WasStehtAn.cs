@@ -29,7 +29,7 @@ public static class WasStehtAn
                 liste.Add(new("Protokoll ansehen", "protokoll", "Was ist heute passiert?", Hauptschritt: liste.Count == 0));
                 break;
             case Rolle.Verwaltungsleitung:
-                liste.Add(new("Aufgaben der Verwaltung verteilen", "", Freigabe: Freigabe.Geplant("Die Aufgabenkörbe")));
+                liste.Add(new("Aufgaben der Verwaltung verteilen", "aufgaben", "Gruppenkorb ansehen und Aufgaben zuweisen"));
                 liste.Add(new("Postausgang ansehen", "postausgang", Hauptschritt: liste.Count == 0));
                 break;
             case Rolle.Fachbereichsleitung:

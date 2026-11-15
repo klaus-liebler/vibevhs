@@ -220,3 +220,13 @@ details.vhs-card > summary { cursor: pointer; }
 .vhs-option:disabled { cursor: not-allowed; opacity: 0.6; background: var(--vhs-bg); }
 .vhs-wahl .vhs-why { display: flex; width: 100%; }
 .vhs-belegt { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Aufgaben (I5) */
+.vhs-aufgaben { display: flex; flex-direction: column; }
+.vhs-aufgabe { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--vhs-line); }
+.vhs-aufgabe:last-child { border-bottom: 0; }
+.vhs-aufgabe.eskaliert { border-left: 3px solid var(--vhs-crit); padding-left: 10px; }
+.vhs-aufgabe-titel { font-weight: 600; }
+.vhs-aufgabe-panel { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--vhs-surface-2); border-radius: 8px; padding: 8px 10px; }
+.vhs-wsa { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
+.vhs-wsa h2 .vhs-zahl { font-weight: 500; color: var(--vhs-muted); margin-left: 6px; }
+@media (max-width: 600px) { .vhs-wsa { grid-template-columns: 1fr; } }
