@@ -277,3 +277,10 @@ details.vhs-card > summary { cursor: pointer; }
 /* Einstellungen: Logo-Vorschau */
 .vhs-logo-vorschau { padding: 12px; border: 1px dashed var(--vhs-line); border-radius: 8px; background: #fff; align-self: flex-start; }
 .vhs-logo-vorschau img { display: block; max-height: 64px; max-width: 100%; }
+
+/* Benutzerverwaltung: Mehrfachauswahl Rollen/Fachbereiche */
+.vhs-auswahl { border: 1px solid var(--vhs-line); border-radius: 8px; padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0; }
+.vhs-auswahl legend { font-weight: 600; padding: 0 4px; }
+.vhs-auswahl label { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; }
+.vhs-einschub { border-color: var(--vhs-accent); }
+a.vhs-chip { text-decoration: none; display: inline-flex; align-items: center; }

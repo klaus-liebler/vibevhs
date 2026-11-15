@@ -1,0 +1,160 @@
+@using VibeVHS.Application.Sicherheit
+@using VibeVHS.Application.Stammdaten
+@using VibeVHS.Domain.Stammdaten
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+
+@* Benutzerverwaltung für den Testbetrieb: Konten der Mitarbeitenden mit Rollen und Fachbereichen. Wirkt ab der nächsten Anmeldung. *@
+
+<section class="vhs-card" aria-labelledby="h-konten">
+    <div class="vhs-head">
+        <h2 id="h-konten">Benutzerkonten <span class="vhs-zahl">@konten.Count(k => k.Aktiv)</span></h2>
+        <BegruendeterButton Text="Neues Konto" Icon="person_add" Size="ButtonSize.Small" Freigabe="@recht" Click="@(() => Bearbeiten(null))" />
+    </div>
+    <p class="vhs-small vhs-muted" style="margin-top:-6px">Bis zur kommunalen Anmeldung (OIDC/SAML) werden Konten hier gepflegt. Änderungen an Rollen und Fachbereichen wirken ab der nächsten Anmeldung. Konten der Portale (Teilnehmende, Kursleitungen) entstehen dort und erscheinen hier nicht.</p>
+
+    @if (formular)
+    {
+        <div class="vhs-card vhs-einschub" aria-label="Konto bearbeiten">
+            <b>@(bearbeitetId is null ? "Neues Konto" : $"Konto {login} bearbeiten")</b>
+            <div class="vhs-fields">
+                <RadzenFormField Text="Login *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="login" Disabled="@(bearbeitetId is not null)" Placeholder="vorname.nachname" /></RadzenFormField>
+                <RadzenFormField Text="Name *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="name" /></RadzenFormField>
+                <RadzenFormField Text="Funktion" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="funktion" /></RadzenFormField>
+            </div>
+            <fieldset class="vhs-auswahl"><legend>Rollen * <span class="vhs-small vhs-muted">(die erste ist beim Anmelden aktiv)</span></legend>
+                @foreach (var r in Benutzerverwaltung.VergebbareRollen)
+                {
+                    <label><input type="checkbox" checked="@rollen.Contains(r)" @onchange="@(e => Umschalten(rollen, r, e))" /> @r.Anzeigename()</label>
+                }
+            </fieldset>
+            <fieldset class="vhs-auswahl"><legend>Fachbereiche <span class="vhs-small vhs-muted">(für Fachbereichsleitungen und Körbe)</span></legend>
+                @foreach (var fb in fachbereiche)
+                {
+                    <label><input type="checkbox" checked="@fbs.Contains(fb.Nr)" @onchange="@(e => Umschalten(fbs, fb.Nr, e))" /> @fb.Anzeige</label>
+                }
+            </fieldset>
+            <div class="vhs-row">
+                <BegruendeterButton Text="Speichern" Icon="save" Freigabe="@SpeichernFreigabe" Click="SpeichernAsync" />
+                <RadzenButton Text="Abbrechen" ButtonStyle="ButtonStyle.Light" Click="@(() => formular = false)" />
+            </div>
+        </div>
+    }
+
+    <div class="vhs-tbl">
+        <table>
+            <thead><tr><th>Name</th><th>Login</th><th>Rollen</th><th>FB</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var k in konten)
+                {
+                    <tr class="@(k.Aktiv ? null : "vhs-ersetzt")">
+                        <td><b>@k.Name</b>@if (k.Funktion is { } f) { <br /><span class="vhs-small vhs-muted">@f</span> }</td>
+                        <td class="vhs-mono vhs-small">@k.Login</td>
+                        <td class="vhs-small">@string.Join(", ", k.Rollen.Select(r => r.Anzeigename()))</td>
+                        <td class="vhs-small">@string.Join(", ", k.Fachbereiche)</td>
+                        <td><StatusPille Stil="@(k.Aktiv ? "gut" : "neutral")">@(k.Aktiv ? "aktiv" : "deaktiviert")</StatusPille></td>
+                        <td><div class="vhs-row">
+                            <BegruendeterButton Text="Bearbeiten" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Light" Freigabe="@recht" Click="@(() => Bearbeiten(k))" />
+                            <BegruendeterButton Text="@(k.Aktiv ? "Deaktivieren" : "Aktivieren")" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Light"
+                                                Freigabe="@(recht.Und(() => k.Aktiv && k.Login == ich ? Freigabe.Nein("Das eigene Konto kann man nicht deaktivieren.") : Freigabe.Ja))"
+                                                Click="@(() => AktivAsync(k, !k.Aktiv))" />
+                        </div></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    private IReadOnlyList<Benutzerkonto> konten = [];
+    private IReadOnlyList<Fachbereich> fachbereiche = [];
+    private Freigabe recht = Freigabe.Ja;
+    private string? ich;
+    private bool formular;
+    private Guid? bearbeitetId;
+    private string? login, name, funktion;
+    private List<Rolle> rollen = [];
+    private List<int> fbs = [];
+
+    private Freigabe SpeichernFreigabe => recht.Und(() =>
+        string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(name) ? Freigabe.Nein("Bitte Login und Name eingeben.")
+        : rollen.Count == 0 ? Freigabe.Nein("Bitte mindestens eine Rolle wählen.")
+        : rollen.Contains(Rolle.Fachbereichsleitung) && fbs.Count == 0 ? Freigabe.Nein("Eine Fachbereichsleitung braucht mindestens einen Fachbereich.")
+        : Freigabe.Ja);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var wer = await Vorgang.BenutzerAsync();
+        ich = wer.Kennung;
+        recht = Freigabe.NurFuer(wer.Rolle, Benutzerverwaltung.Rollen);
+        fachbereiche = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IStammdaten>().FachbereicheAsync());
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync() => konten = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<Benutzerverwaltung>().KontenAsync());
+
+    private void Bearbeiten(Benutzerkonto? k)
+    {
+        formular = true;
+        bearbeitetId = k?.Id;
+        login = k?.Login;
+        name = k?.Name;
+        funktion = k?.Funktion;
+        rollen = k?.Rollen.ToList() ?? [];
+        fbs = k?.Fachbereiche.ToList() ?? [];
+    }
+
+    private static void Umschalten<T>(List<T> liste, T wert, ChangeEventArgs e)
+    {
+        if (e.Value is true)
+        {
+            if (!liste.Contains(wert))
+            {
+                liste.Add(wert);
+            }
+        }
+        else
+        {
+            liste.Remove(wert);
+        }
+    }
+
+    private async Task SpeichernAsync()
+    {
+        var eingabe = new KontoEingabe(login!, name!, funktion, rollen, fbs);
+        try
+        {
+            if (bearbeitetId is { } id)
+            {
+                await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<Benutzerverwaltung>().AendernAsync(id, eingabe));
+            }
+            else
+            {
+                await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<Benutzerverwaltung>().AnlegenAsync(eingabe));
+            }
+
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", $"Konto {login} gespeichert – wirkt ab der nächsten Anmeldung.");
+            formular = false;
+            await LadenAsync();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht gespeichert", ex.Message);
+        }
+    }
+
+    private async Task AktivAsync(Benutzerkonto k, bool aktiv)
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<Benutzerverwaltung>().AktivSetzenAsync(k.Id, aktiv));
+            Hinweise.Notify(NotificationSeverity.Success, aktiv ? "Aktiviert" : "Deaktiviert", $"Konto {k.Login} {(aktiv ? "aktiviert" : "deaktiviert")}.");
+            await LadenAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+}

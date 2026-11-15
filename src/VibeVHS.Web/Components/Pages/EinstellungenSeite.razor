@@ -11,9 +11,21 @@
 <div class="vhs-head">
     <div>
         <h1>Einstellungen</h1>
-        <p class="vhs-sub">Briefkopf der Einrichtung: Logo und Website erscheinen auf Briefen, Bescheinigungen, Rechnungen und dem Kurs-QR-Bogen.</p>
+        <p class="vhs-sub">Briefkopf der Einrichtung und Benutzerkonten für den Testbetrieb.</p>
     </div>
 </div>
+
+<nav class="vhs-chips" aria-label="Bereiche der Einstellungen">
+    <a class="vhs-chip @(Tab != "benutzer" ? "on" : "")" href="einstellungen" aria-current="@(Tab != "benutzer" ? "page" : null)">Einrichtung</a>
+    <a class="vhs-chip @(Tab == "benutzer" ? "on" : "")" href="einstellungen?tab=benutzer" aria-current="@(Tab == "benutzer" ? "page" : null)">Benutzer</a>
+</nav>
+
+@if (Tab == "benutzer")
+{
+    <BenutzerPflege />
+}
+else
+{
 
 @if (einrichtung is null)
 {
@@ -57,8 +69,12 @@ else
 
     <NaechsteSchritte Schritte="@folgeschritte" />
 }
+}
 
 @code {
+    [SupplyParameterFromQuery(Name = "tab")]
+    private string? Tab { get; set; }
+
     private Einrichtung? einrichtung;
     private string? website;
     private Freigabe recht = Freigabe.Ja;

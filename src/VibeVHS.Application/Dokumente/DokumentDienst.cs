@@ -280,6 +280,31 @@ public sealed class DokumentDienst(
         return dok;
     }
 
+    // ---------- Antwortbrief zum Löschverlangen ----------
+
+    /// <summary>
+    /// Antwortbrief für Personen ohne E-Mail-Adresse. Das Druckstück mit Anschrift wird nur zurückgegeben (zum Drucken), nicht
+    /// gespeichert; archiviert wird der Brief ohne Anschrift und ohne Personenbezug – mit Übersetzungs-QR wie jeder Brief.
+    /// </summary>
+    public async Task<(Dokument Archiv, byte[] Druck)> DatenschutzantwortAsync(IReadOnlyList<string> anschrift, string? sprache, string titel,
+        IReadOnlyList<string> absaetze, CancellationToken abbruch = default)
+    {
+        var wer = await benutzer.ErmittelnAsync(abbruch);
+        var einrichtung = (await stammdaten.EinrichtungAsync(abbruch))?.Name ?? "Volkshochschule";
+        var token = NeuesToken();
+        var link = links.FuerBrief(token, sprache);
+        var datum = uhr.GetLocalNow().ToString("dd.MM.yyyy", De);
+        Brief Brief(IReadOnlyList<string> an) => new(einrichtung, "Volkshochschule · Datenschutz", an, datum, titel, ["Guten Tag,", .. absaetze], [], null, null,
+            $"Mit freundlichen Grüßen\n{einrichtung}", "Aus Datenschutzgründen ist im Archiv der Volkshochschule nur dieser Text ohne Anschrift hinterlegt.", link);
+        var archiv = Brief(["An die antragstellende Person"]);
+        var dok = new Dokument(Ids.Neu(), Dokumentart.Datenschutzantwort, Guid.Empty, null, null, titel, briefPdf.Erzeugen(archiv), "{}", archiv.Klartext(), token,
+            uhr.GetUtcNow(), wer.Anzeige, Uebersetzbar);
+        speicher.Hinzufuegen(dok);
+        await protokoll.ProtokollierenAsync("Dokument.Erstellt", $"„{titel}“ als Brief erstellt; archiviert ohne Anschrift (SHA-256 {dok.Sha256[..12]}…)", abbruch: abbruch);
+        await speicher.SpeichernAsync(abbruch);
+        return (dok, briefPdf.Erzeugen(Brief(anschrift)));
+    }
+
     // ---------- Archiv ----------
 
     public Task<IReadOnlyList<Dokument>> DerPersonAsync(Guid personId, CancellationToken abbruch = default) => speicher.DerPersonAsync(personId, abbruch);

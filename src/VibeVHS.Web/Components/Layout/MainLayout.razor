@@ -83,7 +83,6 @@
 @code {
     private sealed record Navigationspunkt(string Gruppe, string Titel, string Ziel, string? Gesperrt = null);
 
-    private static string Geplant(string was) => Freigabe.Geplant(was).Begruendung!;
 
     private static readonly IReadOnlyList<Navigationspunkt> Navigationspunkte =
     [

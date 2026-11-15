@@ -62,7 +62,7 @@ public static class WasStehtAn
                 break;
             case Rolle.Systemverwaltung:
                 liste.Add(new("Protokoll prüfen", "protokoll", "Automatische Abläufe und Fehler im Blick behalten", Hauptschritt: liste.Count == 0));
-                liste.Add(new("Benutzer und Rollen pflegen", "", Freigabe: Freigabe.Geplant("Die Benutzerverwaltung")));
+                liste.Add(new("Benutzer und Rollen pflegen", "einstellungen?tab=benutzer", "Konten, Rollen und Fachbereiche für den Testbetrieb"));
                 break;
         }
 

@@ -12,6 +12,9 @@ public enum Dokumentart
 
     /// <summary>Druckstück eines Finanzbelegs (Rechnung, Mahnung, Honorarabrechnung, Gutschrift, Storno).</summary>
     Finanzbeleg,
+
+    /// <summary>Antwortbrief zum Löschverlangen (Art. 17 DSGVO): im Archiv nur der Text ohne Anschrift und ohne Personenbezug.</summary>
+    Datenschutzantwort,
 }
 
 public static class DokumentAnzeige
@@ -22,6 +25,7 @@ public static class DokumentAnzeige
         Dokumentart.Bildungsurlaub => "Bescheinigung Bildungsurlaub (AWbG)",
         Dokumentart.Teilnehmerausweis => "Teilnehmerausweis",
         Dokumentart.Finanzbeleg => "Finanzbeleg",
+        Dokumentart.Datenschutzantwort => "Antwort zum Löschverlangen (Art. 17 DSGVO)",
         _ => "Auskunft nach Art. 15 DSGVO",
     };
 }

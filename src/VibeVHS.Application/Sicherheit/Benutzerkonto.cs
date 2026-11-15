@@ -52,6 +52,31 @@ public sealed class Benutzerkonto
 
     public bool Aktiv { get; private set; } = true;
 
+    /// <summary>Rollen der Portale; diese Konten entstehen über Shop- bzw. Portal-Anmeldung, nicht in der Benutzerverwaltung.</summary>
+    public static readonly Rolle[] PortalRollen = [Rolle.Teilnehmende, Rolle.Dozierende];
+
+    public bool IstPortalkonto => Rollen.All(r => PortalRollen.Contains(r));
+
+    /// <summary>Name, Funktion, Rollen und Fachbereiche ändern (Benutzerverwaltung). Wirkt ab der nächsten Anmeldung.</summary>
+    public void Aendern(string name, string? funktion, IEnumerable<Rolle> rollen, IEnumerable<int> fachbereiche)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var neu = rollen.Distinct().ToList();
+        if (neu.Count == 0)
+        {
+            throw new ArgumentException("Ein Konto braucht mindestens eine Rolle.", nameof(rollen));
+        }
+
+        Name = name.Trim();
+        Funktion = string.IsNullOrWhiteSpace(funktion) ? null : funktion.Trim();
+        Rollen = neu;
+        Fachbereiche = fachbereiche.Distinct().Order().ToList();
+    }
+
+    public void Deaktivieren() => Aktiv = false;
+
+    public void Aktivieren() => Aktiv = true;
+
     /// <summary>Benutzer mit der ersten Rolle als aktiver Rolle (Wechsel danach oben rechts).</summary>
     public Benutzer AlsBenutzer(Rolle? aktiveRolle = null)
     {
@@ -65,4 +90,18 @@ public interface IBenutzerkonten
     Task<IReadOnlyList<Benutzerkonto>> AlleAsync(CancellationToken abbruch = default);
 
     Task<Benutzerkonto?> FindenAsync(string login, CancellationToken abbruch = default);
+}
+
+/// <summary>Speicher für die Benutzerverwaltung: auch inaktive Konten, verfolgt zum Ändern.</summary>
+public interface IBenutzerkontenPflege
+{
+    Task<IReadOnlyList<Benutzerkonto>> AlleMitInaktivenAsync(CancellationToken abbruch = default);
+
+    Task<Benutzerkonto?> ZumAendernAsync(Guid id, CancellationToken abbruch = default);
+
+    Task<bool> LoginVergebenAsync(string login, CancellationToken abbruch = default);
+
+    void Hinzufuegen(Benutzerkonto konto);
+
+    Task SpeichernAsync(CancellationToken abbruch = default);
 }

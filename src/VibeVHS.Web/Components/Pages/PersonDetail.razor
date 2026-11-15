@@ -11,6 +11,16 @@
 
 <PageTitle>@(stand?.NameMitTitel ?? "Person") · VibeVHS</PageTitle>
 
+@if (antwortbrief is { } ab)
+{
+    <div class="vhs-alert vhs-info" id="antwortbrief" role="status">
+        <b>Antwortbrief zum Löschverlangen</b> – die Person hat keine E-Mail-Adresse.
+        <a download="antwort-loeschverlangen.pdf" href="@($"data:application/pdf;base64,{Convert.ToBase64String(ab)}")">PDF herunterladen</a>, drucken und per Post versenden.
+        <span class="vhs-small vhs-muted">Das Druckstück mit Anschrift wird nicht gespeichert; im Archiv steht nur der Text ohne Anschrift (mit Übersetzungs-QR).</span>
+    </div>
+}
+
+
 @if (person is null || stand is null)
 {
     <h1>Person nicht gefunden</h1>
@@ -72,7 +82,8 @@ else if (dubletten.Count > 0)
         <BegruendeterButton Text="Testmail" Icon="mail" ButtonStyle="ButtonStyle.Light"
                             Freigabe="@MailFreigabe" Click="TestmailAsync" />
         <BegruendeterButton Text="Bescheinigung drucken" Icon="print" ButtonStyle="ButtonStyle.Light"
-                            Freigabe="@(Freigabe.Geplant("Der Druck von Bescheinigungen (mit QR-Code „Translate this letter“)"))" />
+                            Freigabe="@(Freigabe.NurFuer(rolle, VibeVHS.Application.Dokumente.DokumentDienst.AusstellRollen).Und(() => belegungen.Count == 0 ? Freigabe.Nein("Die Person hat keine Kursanmeldungen; Bescheinigungen gibt es je Belegung.") : Freigabe.Ja))"
+                            Click="@(() => Navigation.NavigateTo($"personen/{Id}#anmeldungen"))" />
     </div>
 </div>
 
@@ -163,7 +174,7 @@ else if (dubletten.Count > 0)
     </section>
 }
 
-<section class="vhs-card">
+<section class="vhs-card" id="anmeldungen">
     <div class="vhs-head">
         <h2>Kurse und Anmeldungen</h2>
         <BegruendeterButton Text="Neue Anmeldung" Icon="add" Size="ButtonSize.Small" Click="@(() => Navigation.NavigateTo($"anmeldung?person={Id}"))"
@@ -184,6 +195,12 @@ else if (dubletten.Count > 0)
                         <br /><span class="vhs-small vhs-muted">@(pb.Beginn is { } bg ? $"ab {bg:dd.MM.yyyy}" : "") · gebucht @bl.GebuchtAm.ToLocalTime().ToString("dd.MM.yyyy") (@VibeVHS.Domain.Anmeldung.BelegungAnzeige.Weg(bl.Weg)) · @bl.Entgelt@(bl.IstKontingent && bl.KontingentAnzahl is not null ? $" · Kontingent: {bl.Kontingent.Verbleibend} von {bl.Kontingent.Anzahl} übrig" : "")</span>
                     </span>
                     @if (pb.KursAbgesagt && bl.Offen) { <StatusPille Stil="krit">Kurs abgesagt</StatusPille> }
+                    @if (bl.Status == VibeVHS.Domain.Anmeldung.Belegungsstatus.Angemeldet)
+                    {
+                        <BegruendeterButton Text="Bescheinigung" Icon="print" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Light"
+                                            Freigabe="@(Freigabe.NurFuer(rolle, VibeVHS.Application.Dokumente.DokumentDienst.AusstellRollen))"
+                                            Click="@(() => BescheinigungAsync(bl.Id))" />
+                    }
                     <StatusPille Stil="@(bl.Status == VibeVHS.Domain.Anmeldung.Belegungsstatus.Angemeldet ? "gut" : bl.Offen ? "warn" : "neutral")">@VibeVHS.Domain.Anmeldung.BelegungAnzeige.Status(bl.Status)</StatusPille>
                 </div>
             }
@@ -197,7 +214,7 @@ else if (dubletten.Count > 0)
 
 <VibeVHS.Web.Components.Finanzen.PersonFinanzen @key="@Id" PersonId="@Id" Dozierend="@(stand.Rollen.HasFlag(Personenrolle.Dozierende) || stand.Beschaeftigung is not null)" Name="@stand.NameMitTitel" />
 
-<section class="vhs-card">
+<section class="vhs-card" id="dokumente">
     <div class="vhs-head">
         <h2>Dokumente</h2>
         <div class="vhs-row">
@@ -221,6 +238,11 @@ else if (dubletten.Count > 0)
                     </span>
                     @if (dok.ErsetztDurch is not null) { <StatusPille Stil="neutral">ersetzt</StatusPille> }
                     @if (dok.BelegungId is { } bid) { <a class="vhs-small" href="@($"belegungen/{bid}")">Belegung</a> }
+                    @if (dok.ErsetztDurch is null && !dok.IstAnonymisiert && dok.Art is VibeVHS.Domain.Dokumente.Dokumentart.Teilnahmebescheinigung or VibeVHS.Domain.Dokumente.Dokumentart.Bildungsurlaub)
+                    {
+                        <BegruendeterButton Text="Neu ausstellen" Icon="autorenew" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => NeuAusstellenAsync(dok.Id))"
+                                            Freigabe="@(Freigabe.NurFuer(rolle, VibeVHS.Application.Dokumente.DokumentDienst.NeuausstellRollen))" />
+                    }
                     <BegruendeterButton Text="Nachdruck" Icon="print" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo($"dokumente/{dok.Id}.pdf", true))"
                                         Freigabe="@(dok.IstAnonymisiert ? Freigabe.Nein("Der Inhalt wurde bei der Anonymisierung gelöscht.") : rolle is null or Rolle.Dozierende ? Freigabe.Nein("Archivdokumente drucken Verwaltung und Leitung.") : Freigabe.Ja)" />
                 </div>
@@ -413,6 +435,44 @@ else if (dubletten.Count > 0)
         await LadenAsync();
     }
 
+    private async Task BescheinigungAsync(Guid belegungId)
+    {
+        try
+        {
+            var dok = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Dokumente.DokumentDienst>()
+                .BescheinigungErstellenAsync(belegungId, VibeVHS.Domain.Dokumente.Dokumentart.Teilnahmebescheinigung));
+            Hinweise.Notify(NotificationSeverity.Success, "Archiviert", $"{dok.Titel} erstellt.");
+            await LadenAsync();
+            Navigation.NavigateTo($"dokumente/{dok.Id}.pdf", true);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // z. B. noch keine Anwesenheit erfasst oder bereits ausgestellt (dann im Archiv nachdrucken)
+            Hinweise.Notify(NotificationSeverity.Warning, "Keine neue Bescheinigung", ex.Message);
+        }
+    }
+
+    /// <summary>Grund der Neuausstellung; nach einer Namensänderung mit deren Begründung vorbelegt.</summary>
+    private string neuausstellGrund = "Angaben aktualisiert";
+
+    /// <summary>Druckstück des Antwortbriefs zum Löschverlangen (nur im Speicher dieser Seite, nicht archiviert).</summary>
+    private byte[]? antwortbrief;
+
+    private async Task NeuAusstellenAsync(Guid dokumentId)
+    {
+        try
+        {
+            var dok = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Dokumente.DokumentDienst>().NeuAusstellenAsync(dokumentId, neuausstellGrund));
+            Hinweise.Notify(NotificationSeverity.Success, "Neu ausgestellt", $"{dok.Titel} – die frühere Ausfertigung ist als ersetzt markiert.");
+            await LadenAsync();
+            Navigation.NavigateTo($"dokumente/{dok.Id}.pdf", true);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
     private async Task AusweisAsync()
     {
         try
@@ -509,9 +569,14 @@ else if (dubletten.Count > 0)
             Hinweise.Notify(NotificationSeverity.Success, "Löschverlangen bearbeitet",
                 ergebnis.Entscheidung.Aktion == Loeschaktion.Anonymisieren ? "Die Person wurde anonymisiert." : $"Kontaktdaten gelöscht, Rest gesperrt bis {ergebnis.Entscheidung.GesperrtBis:dd.MM.yyyy}.");
             pruefung = null;
+            antwortbrief = ergebnis.Antwortbrief;
             folgeschritte = ergebnis.AntwortEingereiht
                 ? [new("Antwortschreiben im Postausgang ansehen", "postausgang", Hauptschritt: true), new("Protokoll ansehen", "protokoll")]
-                : [new("Antwort per Brief", "#", Freigabe: Freigabe.Geplant("Der Briefdruck", "I4"), Hauptschritt: true), new("Protokoll ansehen", "protokoll")];
+                : ergebnis.Antwortbrief is { } brief
+                    ? [new("Antwortbrief herunterladen und versenden", $"personen/{Id}#antwortbrief",
+                        "Druckstück mit Anschrift – wird nicht gespeichert; im Archiv steht nur der Text ohne Anschrift", Hauptschritt: true), new("Protokoll ansehen", "protokoll")]
+                    : [new("Antwort per Brief", "#", Freigabe: Freigabe.Nein("Für die Person ist weder eine E-Mail-Adresse noch eine Anschrift hinterlegt."), Hauptschritt: true),
+                        new("Protokoll ansehen", "protokoll")];
             sperrzugriff = true;
             await LadenAsync();
         }
@@ -629,13 +694,16 @@ else if (dubletten.Count > 0)
                 : await Vorgang.AusfuehrenAsync(d => dienst(d).NameAendernAbAsync(Id, neuVorname!, neuNachname!, aenderungsdatum!.Value, grund!));
             Hinweise.Notify(NotificationSeverity.Success, "Gespeichert",
                 istKorrektur ? $"Name korrigiert in {neu.Anzeige}." : $"{neu.Anzeige} gilt ab {neu.GueltigVon:dd.MM.yyyy}.");
+            neuausstellGrund = $"Namensänderung: {grund}";
             grund = null;
             nameOffen = false;
             await LadenAsync();
             folgeschritte =
             [
                 new("Änderung in der Datenhistorie ansehen", $"personen/{Id}/historie?art=Name", Hauptschritt: true),
-                new("Bescheinigungen neu drucken", "#", Freigabe: Freigabe.Geplant("Der Druck von Bescheinigungen")),
+                new("Bescheinigungen neu ausstellen", $"personen/{Id}#dokumente", "Unten bei den Dokumenten „Neu ausstellen“ – mit dem neuen Namen",
+                    Freigabe: dokumente.Any(x => x.ErsetztDurch is null && x.Art is VibeVHS.Domain.Dokumente.Dokumentart.Teilnahmebescheinigung or VibeVHS.Domain.Dokumente.Dokumentart.Bildungsurlaub)
+                        ? Freigabe.Ja : Freigabe.Nein("Es gibt keine Bescheinigungen, die neu ausgestellt werden müssten.")),
                 new("Zur Personenliste", "personen"),
             ];
         }
