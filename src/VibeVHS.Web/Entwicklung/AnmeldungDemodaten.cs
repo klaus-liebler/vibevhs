@@ -49,6 +49,11 @@ internal static class AnmeldungDemodaten
         var nadia = PersonNamens("Nadia Haddad");
         var reserviert = new HashSet<Guid?> { mehmet, olena, sabine, nadia };
         var pool = teilnehmende.Where(p => !reserviert.Contains(p.Id)).Select(p => p.Id).OrderBy(_ => zufall.Next()).ToList();
+        if (pool.Count == 0)
+        {
+            // Ohne Massendaten (z. B. Testsystem) nur die benannten Demopersonen; keine Füllbuchungen.
+            pool = teilnehmende.Select(p => p.Id).ToList();
+        }
         var zeiger = 0;
         Guid Naechste() => pool[zeiger++ % pool.Count];
 

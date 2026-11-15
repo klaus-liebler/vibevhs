@@ -24,6 +24,12 @@ var deutsch = CultureInfo.GetCultureInfo("de-DE");
 CultureInfo.DefaultThreadCurrentCulture = deutsch;
 CultureInfo.DefaultThreadCurrentUICulture = deutsch;
 
+// Healthcheck im Container (das aspnet-Image hat kein curl): „dotnet VibeVHS.Web.dll --gesundheit“ fragt /gesund ab.
+if (args.Contains("--gesundheit"))
+{
+    return await VibeVHS.Web.Betrieb.Gesundheit.PruefenAsync(Environment.GetEnvironmentVariable("GESUNDHEIT_URL") ?? "http://127.0.0.1:8080/gesund");
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSerilog((dienste, log) => log
@@ -94,8 +100,22 @@ builder.Services.AddDataProtection()
 var hinterProxy = builder.Configuration.GetValue("ReverseProxy:Aktiv", false);
 if (hinterProxy)
 {
+    // Vertraut werden nur Proxys aus Loopback und den konfigurierten Netzen (Docker: Netz des Proxy-Containers).
+    var netze = builder.Configuration.GetSection("ReverseProxy:VertrauteNetze").Get<string[]>() ?? [];
     builder.Services.Configure<ForwardedHeadersOptions>(o =>
-        o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost);
+    {
+        o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+        foreach (var netz in netze)
+        {
+            o.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(netz));
+        }
+
+        // Nur der eigene Hostname wird als X-Forwarded-Host übernommen.
+        if (builder.Configuration["ReverseProxy:Host"] is { Length: > 0 } host)
+        {
+            o.AllowedHosts = [host];
+        }
+    });
 }
 
 var app = builder.Build();
@@ -184,6 +204,10 @@ VibeVHS.Web.Sicherheit.DozierendenBereich.UseDozierendenBereich(app);
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+// Lebenszeichen für Container-Healthcheck und Proxy: Datenbank erreichbar? Ohne Anmeldung, ohne Inhalte.
+app.MapGet("/gesund", async (VibeVhsDbContext db) => await db.Database.CanConnectAsync()
+    ? Results.Text("ok")
+    : Results.Text("Datenbank nicht erreichbar", statusCode: StatusCodes.Status503ServiceUnavailable)).DisableRateLimiting();
 app.MapPost("/abmelden", async (HttpContext http) =>
 {
     await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
@@ -349,3 +373,4 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 await app.RunAsync();
+return 0;

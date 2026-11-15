@@ -3,10 +3,12 @@
 @using VibeVHS.Domain.Stammdaten
 @inject NavigationManager Navigation
 @inject Vorgang Vorgang
+@inject IConfiguration Konfiguration
 
 <RadzenComponents />
 
 <div class="vhs-app">
+    <Testsystemhinweis />
     <aside class="vhs-side">
         <div class="vhs-brand" title="@einrichtung?.Name"><b>VibeVHS</b><span>@(einrichtung?.Kurzname ?? "Volkshochschule")</span></div>
         <nav class="vhs-nav" aria-label="Hauptnavigation">
@@ -66,7 +68,7 @@
                     </div>
                 </Authorized>
             </AuthorizeView>
-            <span class="vhs-proto" title="Alle Mails und Schnittstellen werden nur simuliert; nichts verlässt das System.">Entwicklung · Mock-Anbindungen</span>
+            <span class="vhs-proto" title="Alle Mails und Schnittstellen werden nur simuliert; nichts verlässt das System.">@(Konfiguration.GetValue("Testsystem:Aktiv", false) ? "Testsystem" : "Entwicklung") · Mock-Anbindungen</span>
         </header>
         <main class="vhs-content">
             @Body

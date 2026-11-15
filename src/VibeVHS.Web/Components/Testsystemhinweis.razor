@@ -1,0 +1,9 @@
+@inject IConfiguration Konfiguration
+
+@* Deutlicher Hinweis auf dem Testsystem (Testsystem:Aktiv): Testdaten, Mails bleiben im Postausgang. *@
+@if (Konfiguration.GetValue("Testsystem:Aktiv", false))
+{
+    <div class="vhs-testsystem" role="note">
+        <b>Testsystem</b> – nur Testdaten. Mails und Briefe bleiben im Postausgang, Schnittstellen sind simuliert.
+    </div>
+}

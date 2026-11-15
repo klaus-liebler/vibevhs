@@ -134,12 +134,24 @@
         var principal = MockAnmeldung.Anmelden(konto.AlsBenutzer(), CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
         Log.LogInformation("Testanmeldung: {Login}", konto.Login);
-        Navigation.NavigateTo(SicheresZiel(ReturnUrl));
+        Navigation.NavigateTo(SicheresZiel(ReturnUrl, new Uri(Navigation.BaseUri).AbsolutePath));
     }
 
-    private static string SicheresZiel(string? ziel)
-        => !string.IsNullOrEmpty(ziel) && ziel.StartsWith('/') && !ziel.StartsWith("//", StringComparison.Ordinal)
-           && !ziel.StartsWith("/anmelden", StringComparison.OrdinalIgnoreCase)
-            ? ziel.TrimStart('/')
-            : "./";
+    /// <summary>Nur lokale Ziele; eine enthaltene Pfad-Basis (z. B. /vibevhs, vom Cookie-Login angehängt) wird entfernt,
+    /// weil das Ziel relativ zu &lt;base href&gt; aufgelöst wird.</summary>
+    internal static string SicheresZiel(string? ziel, string basis = "/")
+    {
+        if (string.IsNullOrEmpty(ziel) || !ziel.StartsWith('/') || ziel.StartsWith("//", StringComparison.Ordinal) || ziel.Contains('\\'))
+        {
+            return "./";
+        }
+
+        var b = "/" + basis.Trim('/');
+        if (b.Length > 1 && (ziel.Equals(b, StringComparison.OrdinalIgnoreCase) || ziel.StartsWith(b + "/", StringComparison.OrdinalIgnoreCase)))
+        {
+            ziel = ziel[b.Length..];
+        }
+
+        return ziel.Length == 0 || ziel.StartsWith("/anmelden", StringComparison.OrdinalIgnoreCase) ? "./" : ziel.TrimStart('/');
+    }
 }

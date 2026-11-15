@@ -195,7 +195,7 @@ public static class ShopApi
             try
             {
                 await dienste.GetRequiredService<ShopDienst>().BestaetigenAsync(token);
-                return Seite("Kundenkonto bestätigt", "<p role=\"status\">Vielen Dank! Ihr Kundenkonto ist bestätigt. Sie können sich jetzt anmelden und Kurse buchen – Ihre Buchungen finden Sie unter <a href=\"/portal/teilnehmende\">Meine vhs</a>.</p>");
+                return Seite("Kundenkonto bestätigt", "<p role=\"status\">Vielen Dank! Ihr Kundenkonto ist bestätigt. Sie können sich jetzt anmelden und Kurse buchen – Ihre Buchungen finden Sie unter <a href=\"../portal/teilnehmende\">Meine vhs</a>.</p>");
             }
             catch (ShopFehler f)
             {
@@ -227,11 +227,7 @@ public static class ShopApi
     }
 
     private static IResult Seite(string titel, string inhalt, int status = 200)
-        => Results.Content($"""
-            <!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>{titel}</title><link rel="stylesheet" href="/shop/seite.css"></head>
-            <body><main><h1>{titel}</h1>{inhalt}</main></body></html>
-            """, "text/html; charset=utf-8", Encoding.UTF8, status);
+        => new HtmlSeite(titel, inhalt, status);
 
     public sealed record WarenkorbEingabe(IReadOnlyList<string>? Kursnummern);
 

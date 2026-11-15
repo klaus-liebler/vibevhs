@@ -268,3 +268,7 @@ details.vhs-card > summary { cursor: pointer; }
 .vhs-portal button, .vhs-portal .vhs-btn { min-height: 44px; justify-content: center; }
 .vhs-portal button[disabled] { opacity: .6; cursor: not-allowed; }
 .vhs-portal details summary { cursor: pointer; padding: 8px 0; font-weight: 600; min-height: 32px; }
+
+/* Testsystem-Banner (Testsystem:Aktiv) */
+.vhs-testsystem { background: var(--vhs-warn-weak); color: var(--vhs-warn); border-bottom: 2px solid var(--vhs-warn); padding: 6px 16px; font-size: 13px; text-align: center; }
+.vhs-app > .vhs-testsystem { grid-column: 1 / -1; }
