@@ -1,0 +1,112 @@
+@* Abwesenheit und Vertretung (QA-44): eigene Abwesenheit eintragen, laufende/geplante sehen, vorzeitig beenden. *@
+@using VibeVHS.Application.Aufgaben
+@using VibeVHS.Application.Sicherheit
+@using VibeVHS.Domain.Aufgaben
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+@inject TimeProvider Uhr
+
+<div class="vhs-grid2">
+    <section>
+        <h3>Abwesenheit eintragen</h3>
+        <p class="vhs-small vhs-muted">Während Ihrer Abwesenheit sieht die Vertretung Ihre persönlichen Aufgaben („In Vertretung“); neue Zuweisungen an Sie gehen an die Vertretung.
+            Ohne Vertretung landen neue Aufgaben im Gruppenkorb. Bitte keinen Krankheitsgrund eintragen.</p>
+        <div class="vhs-fields">
+            @if (Benutzer.Rolle == Rolle.Leitung)
+            {
+                <RadzenFormField Text="Für (nur Leitung)" Variant="Variant.Outlined">
+                    <RadzenDropDown TValue="string" @bind-Value="fuer" Data="@konten" TextProperty="Name" ValueProperty="Login" AllowClear="true" Placeholder="mich selbst" />
+                </RadzenFormField>
+            }
+            <RadzenFormField Text="Von" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly?" @bind-Value="von" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+            <RadzenFormField Text="Bis (einschließlich)" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly?" @bind-Value="bis" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+            <RadzenFormField Text="Vertretung" Variant="Variant.Outlined">
+                <RadzenDropDown TValue="string" @bind-Value="vertretung" Data="@MoeglicheVertretungen" TextProperty="Name" ValueProperty="Login" AllowClear="true" Placeholder="keine (Gruppenkorb)" />
+            </RadzenFormField>
+            <RadzenFormField Text="Hinweis (optional, z. B. „Urlaub“)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="grund" /></RadzenFormField>
+        </div>
+        <BegruendeterButton Text="Abwesenheit eintragen" Icon="event_busy" Click="EintragenAsync"
+                            Freigabe="@(von is null || bis is null ? Freigabe.Nein("Bitte Beginn und Ende angeben.") : bis < von ? Freigabe.Nein("Das Ende liegt vor dem Beginn.") : Freigabe.Ja)" />
+    </section>
+    <section>
+        <h3>Laufend und geplant</h3>
+        <div class="vhs-list">
+            @if (abwesenheiten.Count == 0) { <div class="vhs-small vhs-muted">Niemand ist abwesend gemeldet.</div> }
+            @foreach (var a in abwesenheiten)
+            {
+                var heute = DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+                <div>
+                    <span class="vhs-grow"><b>@a.Name</b> · @a.Von.ToString("dd.MM.") – @a.Bis.ToString("dd.MM.yyyy") · Vertretung: @(a.VertretungName ?? "keine")@(a.Grund is null ? "" : $" · {a.Grund}")</span>
+                    @if (a.Aktiv(heute)) { <StatusPille Stil="warn">abwesend</StatusPille> } else { <StatusPille Stil="neutral">geplant</StatusPille> }
+                    <BegruendeterButton Text="@(a.Aktiv(heute) ? "Wieder da" : "Löschen")" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                        Freigabe="@(a.Login == Benutzer.Kennung || Benutzer.Rolle == Rolle.Leitung ? Freigabe.Ja : Freigabe.Nein("Nur die Person selbst oder die Leitung kann das ändern."))"
+                                        Click="@(() => BeendenAsync(a.Id))" />
+                </div>
+            }
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public Benutzer Benutzer { get; set; } = Benutzer.Automatik;
+
+    [Parameter]
+    public EventCallback Geaendert { get; set; }
+
+    private IReadOnlyList<Abwesenheit> abwesenheiten = [];
+    private IReadOnlyList<Benutzerkonto> konten = [];
+    private DateOnly? von, bis;
+    private string? vertretung, grund, fuer;
+
+    /// <summary>Kolleg:innen mit mindestens einer gemeinsamen Rolle (sonst könnten sie die Aufgaben nicht bearbeiten).</summary>
+    private IEnumerable<Benutzerkonto> MoeglicheVertretungen
+    {
+        get
+        {
+            var basis = konten.FirstOrDefault(k => k.Login == (fuer ?? Benutzer.Kennung));
+            return konten.Where(k => k.Login != (fuer ?? Benutzer.Kennung) && (basis is null || k.Rollen.Intersect(basis.Rollen).Any())
+                                     && !(k.Rollen.Count == 1 && k.Rollen[0] is Rolle.Teilnehmende or Rolle.Dozierende));
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        von = DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync()
+        => (abwesenheiten, konten) = await Vorgang.AusfuehrenAsync(async d =>
+            (await d.GetRequiredService<AufgabenDienst>().AbwesenheitenAsync(), await d.GetRequiredService<IBenutzerkonten>().AlleAsync()));
+
+    private async Task EintragenAsync()
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AufgabenDienst>().AbwesenheitEintragenAsync(fuer, von!.Value, bis!.Value, vertretung, grund));
+            Hinweise.Notify(NotificationSeverity.Success, "Eingetragen", vertretung is null ? "Neue Aufgaben bleiben im Gruppenkorb." : "Die Vertretung sieht Ihre Aufgaben unter „In Vertretung“.");
+            grund = null;
+            await LadenAsync();
+            await Geaendert.InvokeAsync();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            Hinweise.Notify(NotificationSeverity.Warning, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task BeendenAsync(Guid id)
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(async d => { await d.GetRequiredService<AufgabenDienst>().AbwesenheitBeendenAsync(id); return 0; });
+            await LadenAsync();
+            await Geaendert.InvokeAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Warning, "Nicht möglich", ex.Message);
+        }
+    }
+}

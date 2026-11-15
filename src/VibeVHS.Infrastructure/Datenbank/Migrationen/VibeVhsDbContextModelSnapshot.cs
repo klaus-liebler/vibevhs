@@ -15,7 +15,7 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261115114756_Portal";
+    public override string LastMigrationId => "20261115122027_Abwesenheit";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -430,6 +430,51 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .IsUnique();
 
                 b.ToTable("KontingentEreignisse");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Aufgaben.Abwesenheit", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("BeendetAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<DateOnly>("Bis")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErfasstAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("ErfasstVon")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Grund")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Login")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Name")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("VertretungLogin")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("VertretungName")
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly>("Von")
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("Login");
+
+                b.ToTable("Abwesenheiten");
             });
 
         modelBuilder.Entity("VibeVHS.Domain.Aufgaben.Aufgabe", b =>

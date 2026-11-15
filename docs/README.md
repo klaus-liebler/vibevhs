@@ -270,7 +270,11 @@ Einwilligung, bevorzugt) und E-Mail-Adressen (Art, bevorzugt). Die Kennzeichen �
 - **Protokoll**: Anlegen, Übernahme, Zuweisung, Erledigung, Eskalation und automatisches Schließen. Es nennt nur Aufgabentyp
   und Kurzkennung (`[A-1234abcd]`), weil Titel Namen enthalten können. Bei der Anonymisierung einer Person werden ihre
   Aufgaben neutralisiert und geschlossen.
-- Noch offen: Abwesenheit mit Vertretung (QA-44, Soll), Lastschrift- und Mahnvorschläge (kommen mit I6).
+- **Abwesenheit und Vertretung (QA-44)** `/aufgaben?ansicht=abwesenheit`: Zeitraum, Vertretung (muss eine gemeinsame Rolle haben und
+  darf nicht selbst abwesend sein), optionaler Hinweis ohne Gesundheitsdaten. Während der Abwesenheit sieht die Vertretung die
+  persönlichen Aufgaben unter „In Vertretung“ (Startseite und Aufgaben), Zuweisungen an die abwesende Person und Aufgaben einer
+  festen Person gehen an die Vertretung; ohne Vertretung bleiben neue Aufgaben im Gruppenkorb. Die Auswahl beim Zuweisen zeigt
+  Abwesenheiten. „Wieder da“ beendet die Vertretung. Alles protokolliert.
 
 ## Finanzen (I6) und GoBD (FA-30 bis FA-35, FA-126 bis FA-133)
 

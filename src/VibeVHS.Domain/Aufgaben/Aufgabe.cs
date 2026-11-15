@@ -285,3 +285,73 @@ public sealed class Aufgabentyp
 
     public Zustaendigkeit Fuer(int? fachbereich) => new(Rolle, JeFachbereich ? fachbereich : null);
 }
+
+/// <summary>
+/// Abwesenheit einer Mitarbeiterin bzw. eines Mitarbeiters (Urlaub, Krankheit) mit Vertretung (QA-44). Während der Abwesenheit
+/// sieht die Vertretung die persönlichen Aufgaben der abwesenden Person; neue Zuweisungen gehen an die Vertretung.
+/// </summary>
+public sealed class Abwesenheit
+{
+    private Abwesenheit()
+    {
+        Login = string.Empty;
+        Name = string.Empty;
+        ErfasstVon = string.Empty;
+    }
+
+    public Abwesenheit(string login, string name, DateOnly von, DateOnly bis, string? vertretungLogin, string? vertretungName, string? grund, DateTimeOffset jetzt,
+        string erfasstVon)
+    {
+        if (bis < von)
+        {
+            throw new ArgumentException("Das Ende der Abwesenheit liegt vor dem Beginn.");
+        }
+
+        if (vertretungLogin is not null && vertretungLogin == login)
+        {
+            throw new ArgumentException("Man kann sich nicht selbst vertreten.");
+        }
+
+        Id = Gemeinsam.Ids.Neu();
+        Login = login;
+        Name = name;
+        Von = von;
+        Bis = bis;
+        VertretungLogin = vertretungLogin;
+        VertretungName = vertretungName;
+        Grund = string.IsNullOrWhiteSpace(grund) ? null : grund.Trim();
+        ErfasstAm = jetzt;
+        ErfasstVon = erfasstVon;
+    }
+
+    public Guid Id { get; private set; }
+
+    public string Login { get; private set; }
+
+    public string Name { get; private set; }
+
+    public DateOnly Von { get; private set; }
+
+    /// <summary>Letzter Tag der Abwesenheit (einschließlich).</summary>
+    public DateOnly Bis { get; private set; }
+
+    public string? VertretungLogin { get; private set; }
+
+    public string? VertretungName { get; private set; }
+
+    /// <summary>Freiwillige Angabe; keine Gesundheitsdaten eintragen (nur „abwesend“).</summary>
+    public string? Grund { get; private set; }
+
+    public DateTimeOffset ErfasstAm { get; private set; }
+
+    public string ErfasstVon { get; private set; }
+
+    public DateTimeOffset? BeendetAm { get; private set; }
+
+    public bool Aktiv(DateOnly tag) => BeendetAm is null && Von <= tag && tag <= Bis;
+
+    public bool Ueberschneidet(DateOnly von, DateOnly bis) => BeendetAm is null && Von <= bis && von <= Bis;
+
+    /// <summary>Vorzeitig zurück: endet gestern.</summary>
+    public void Beenden(DateTimeOffset jetzt) => BeendetAm ??= jetzt;
+}

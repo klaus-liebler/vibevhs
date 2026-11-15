@@ -52,6 +52,20 @@
         </section>
     }
 
+    @if (u.EigeneAbwesenheit is { } ea)
+    {
+        <div class="vhs-alert vhs-info">Sie sind @(ea.Von <= DateOnly.FromDateTime(DateTime.Today) ? "abwesend gemeldet" : "ab " + ea.Von.ToString("dd.MM.") + " abwesend gemeldet") bis @ea.Bis.ToString("dd.MM.yyyy")
+            · Vertretung: @(ea.VertretungName ?? "keine") · <a href="aufgaben?ansicht=abwesenheit">ändern</a></div>
+    }
+    @if (u.InVertretung is { Count: > 0 } iv)
+    {
+        <section class="vhs-card" aria-labelledby="h-vertretung">
+            <div class="vhs-head"><h2 id="h-vertretung">In Vertretung<span class="vhs-zahl">@iv.Count</span></h2>
+                <span class="vhs-small vhs-muted">Aufgaben abwesender Kolleg:innen, die Sie vertreten</span></div>
+            <AufgabenListe Aufgaben="@iv" Benutzer="@benutzer" Geaendert="LadenAsync" />
+        </section>
+    }
+
     <div class="vhs-wsa">
         <section class="vhs-card" aria-labelledby="h-meine">
             <div class="vhs-head"><h2 id="h-meine">Meine Aufgaben<span class="vhs-zahl">@u.Meine.Count</span></h2></div>

@@ -134,6 +134,13 @@ internal static class ProgrammMapping
             b.Property(f => f.Bundesland).HasMaxLength(10);
         });
 
+        mb.Entity<Abwesenheit>(b =>
+        {
+            b.ToTable("Abwesenheiten");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.HasIndex(x => x.Login);
+        });
         mb.Entity<Aufgabe>(b =>
         {
             b.ToTable("Aufgaben");

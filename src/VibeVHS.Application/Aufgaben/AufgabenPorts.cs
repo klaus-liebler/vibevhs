@@ -23,6 +23,12 @@ public interface IAufgabenSpeicher
     /// <summary>Seit dem Zeitpunkt erledigte oder automatisch geschlossene Aufgaben (nur lesen).</summary>
     Task<IReadOnlyList<Aufgabe>> AbgeschlossenSeitAsync(DateTimeOffset seit, CancellationToken abbruch = default);
 
+    Task<IReadOnlyList<Abwesenheit>> AbwesenheitenAsync(CancellationToken abbruch = default);
+
+    Task<Abwesenheit?> AbwesenheitAsync(Guid id, CancellationToken abbruch = default);
+
+    void Hinzufuegen(Abwesenheit abwesenheit);
+
     Task SpeichernAsync(CancellationToken abbruch = default);
 }
 
@@ -119,7 +125,9 @@ public sealed record Aufgabenuebersicht(
     IReadOnlyList<Aufgabe> HeuteGeschlossen,
     IReadOnlyList<Protokoll.AuditEintrag> HeuteAutomatisch,
     IReadOnlyList<UeberfaelligeGruppe> UeberfaelligJeGruppe,
-    string Korbname);
+    string Korbname,
+    IReadOnlyList<Aufgabe>? InVertretung = null,
+    Abwesenheit? EigeneAbwesenheit = null);
 
 public sealed record UeberfaelligeGruppe(string Gruppe, int? Fachbereich, int Offen, int Ueberfaellig, int Eskaliert);
 

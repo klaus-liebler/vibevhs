@@ -12,6 +12,13 @@ internal sealed class AufgabenSpeicher(VibeVhsDbContext db) : IAufgabenSpeicher
 
     public void Hinzufuegen(Aufgabentyp typ) => db.Set<Aufgabentyp>().Add(typ);
 
+    public async Task<IReadOnlyList<Abwesenheit>> AbwesenheitenAsync(CancellationToken abbruch = default)
+        => (await db.Set<Abwesenheit>().ToListAsync(abbruch)).OrderBy(a => a.Von).ToList();
+
+    public Task<Abwesenheit?> AbwesenheitAsync(Guid id, CancellationToken abbruch = default) => db.Set<Abwesenheit>().FirstOrDefaultAsync(a => a.Id == id, abbruch);
+
+    public void Hinzufuegen(Abwesenheit abwesenheit) => db.Set<Abwesenheit>().Add(abwesenheit);
+
     public void Hinzufuegen(Aufgabe aufgabe) => db.Aufgaben.Add(aufgabe);
 
     public Task<Aufgabe?> LadenAsync(Guid id, CancellationToken abbruch = default)

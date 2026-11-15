@@ -92,6 +92,12 @@ public sealed class AufgabenDienst(
         var jetzt = uhr.GetLocalNow();
         var vorhanden = (await speicher.ZumTypAsync(typ.Schluessel, abbruch)).ToDictionary(a => a.Schluessel);
         Benutzerkonto? fest = typ.FestePerson is { } login ? await konten.FindenAsync(login, abbruch) : null;
+        if (fest is not null && (await AktiveAbwesenheitenAsync(abbruch)).FirstOrDefault(x => x.Login == fest.Login) is { } weg)
+        {
+            // QA-44: Die feste Person ist abwesend – neue Aufgaben gehen an die Vertretung, sonst in den Gruppenkorb.
+            fest = weg.VertretungLogin is { } v ? await konten.FindenAsync(v, abbruch) : null;
+        }
+
         int neu = 0, geschlossen = 0, wieder = 0;
 
         foreach (var anlass in anlaesse.DistinctBy(a => a.Schluessel))
@@ -201,7 +207,80 @@ public sealed class AufgabenDienst(
                 .OrderByDescending(g => g.Ueberfaellig).ToList()
             : [];
 
-        return new(Sortiert(meine), Sortiert(korb), Sortiert(kollegen), Sortiert(eskaliert), geschlossen, automatisch, ueberfaellig, KorbName(wer));
+        var abwesenheiten = await speicher.AbwesenheitenAsync(abbruch);
+        var vertrete = abwesenheiten.Where(x => x.Aktiv(Heute) && x.VertretungLogin == wer.Kennung).Select(x => x.Login).ToHashSet();
+        var inVertretung = offene.Where(a => a.BearbeiterKennung is { } k && vertrete.Contains(k));
+        var eigene = abwesenheiten.Where(x => x.Login == wer.Kennung && x.BeendetAm is null && x.Bis >= Heute).OrderBy(x => x.Von).FirstOrDefault();
+        return new(Sortiert(meine), Sortiert(korb), Sortiert(kollegen), Sortiert(eskaliert), geschlossen, automatisch, ueberfaellig, KorbName(wer),
+            Sortiert(inVertretung), eigene);
+    }
+
+    // ---------- Abwesenheit und Vertretung (QA-44) ----------
+
+    public async Task<IReadOnlyList<Abwesenheit>> AktiveAbwesenheitenAsync(CancellationToken abbruch = default)
+        => (await speicher.AbwesenheitenAsync(abbruch)).Where(a => a.Aktiv(Heute)).ToList();
+
+    /// <summary>Laufende und künftige Abwesenheiten (für die Übersicht und die Auswahl beim Zuweisen).</summary>
+    public async Task<IReadOnlyList<Abwesenheit>> AbwesenheitenAsync(CancellationToken abbruch = default)
+        => (await speicher.AbwesenheitenAsync(abbruch)).Where(a => a.BeendetAm is null && a.Bis >= Heute).ToList();
+
+    /// <summary>Abwesenheit eintragen: für sich selbst, die Leitung auch für andere. Die Vertretung braucht eine gemeinsame Rolle und darf nicht selbst abwesend sein.</summary>
+    public async Task<Abwesenheit> AbwesenheitEintragenAsync(string? login, DateOnly von, DateOnly bis, string? vertretungLogin, string? grund, CancellationToken abbruch = default)
+    {
+        var wer = await benutzer.ErmittelnAsync(abbruch);
+        var fuer = string.IsNullOrWhiteSpace(login) ? wer.Kennung : login;
+        if (fuer != wer.Kennung && wer.Rolle != Rolle.Leitung)
+        {
+            throw new InvalidOperationException("Abwesenheiten anderer trägt die Leitung ein.");
+        }
+
+        var konto = await konten.FindenAsync(fuer, abbruch) ?? throw new InvalidOperationException("Benutzerkonto nicht gefunden.");
+        if (bis < Heute)
+        {
+            throw new InvalidOperationException("Die Abwesenheit liegt in der Vergangenheit.");
+        }
+
+        var alle = await speicher.AbwesenheitenAsync(abbruch);
+        if (alle.Any(a => a.Login == konto.Login && a.Ueberschneidet(von, bis)))
+        {
+            throw new InvalidOperationException("In diesem Zeitraum ist bereits eine Abwesenheit eingetragen.");
+        }
+
+        Benutzerkonto? vertretung = null;
+        if (!string.IsNullOrWhiteSpace(vertretungLogin))
+        {
+            vertretung = await konten.FindenAsync(vertretungLogin, abbruch) ?? throw new InvalidOperationException("Die Vertretung hat kein aktives Benutzerkonto.");
+            if (!vertretung.Rollen.Intersect(konto.Rollen).Any())
+            {
+                throw new InvalidOperationException($"{vertretung.Name} hat keine der Rollen von {konto.Name} und kann die Aufgaben nicht bearbeiten.");
+            }
+
+            if (alle.Any(a => a.Login == vertretung.Login && a.Ueberschneidet(von, bis)))
+            {
+                throw new InvalidOperationException($"{vertretung.Name} ist in dieser Zeit selbst abwesend.");
+            }
+        }
+
+        var abwesenheit = new Abwesenheit(konto.Login, konto.Name, von, bis, vertretung?.Login, vertretung?.Name, grund, uhr.GetLocalNow(), wer.Anzeige);
+        speicher.Hinzufuegen(abwesenheit);
+        await protokoll.ProtokollierenAsync("Abwesenheit.Eingetragen",
+            $"Abwesenheit {konto.Name} {von:dd.MM.yyyy}–{bis:dd.MM.yyyy}, Vertretung: {vertretung?.Name ?? "keine (Aufgaben bleiben im Gruppenkorb)"}", abbruch: abbruch);
+        await speicher.SpeichernAsync(abbruch);
+        return abwesenheit;
+    }
+
+    public async Task AbwesenheitBeendenAsync(Guid id, CancellationToken abbruch = default)
+    {
+        var wer = await benutzer.ErmittelnAsync(abbruch);
+        var a = await speicher.AbwesenheitAsync(id, abbruch) ?? throw new InvalidOperationException("Abwesenheit nicht gefunden.");
+        if (a.Login != wer.Kennung && wer.Rolle != Rolle.Leitung)
+        {
+            throw new InvalidOperationException("Nur die Person selbst oder die Leitung kann die Abwesenheit beenden.");
+        }
+
+        a.Beenden(uhr.GetLocalNow());
+        await protokoll.ProtokollierenAsync("Abwesenheit.Beendet", $"Abwesenheit {a.Name} beendet (wieder da)", abbruch: abbruch);
+        await speicher.SpeichernAsync(abbruch);
     }
 
     /// <summary>Liegt die Aufgabe im Gruppenkorb dieses Benutzers (aktive Rolle, ggf. eigener Fachbereich)?</summary>
@@ -324,9 +403,12 @@ public sealed class AufgabenDienst(
             return [];
         }
 
+        var weg = (await AktiveAbwesenheitenAsync(abbruch)).ToDictionary(x => x.Login);
         return (await konten.AlleAsync(abbruch))
             .Where(k => k.Rollen.Contains(rolle) && ImKorb(k.AlsBenutzer(rolle), a))
-            .Select(k => new Kollegin(k.Login, k.Name, k.Funktion))
+            .Select(k => new Kollegin(k.Login, k.Name, weg.TryGetValue(k.Login, out var x)
+                ? $"abwesend bis {x.Bis:dd.MM.yyyy}{(x.VertretungName is null ? ", keine Vertretung" : $" → geht an {x.VertretungName}")}"
+                : k.Funktion))
             .ToList();
     }
 
@@ -353,8 +435,22 @@ public sealed class AufgabenDienst(
             throw new InvalidOperationException($"{konto.Name} hat nicht die zuständige Rolle „{Korb(a)}“.");
         }
 
+        var hinweis = "";
+        if ((await AktiveAbwesenheitenAsync(abbruch)).FirstOrDefault(x => x.Login == konto.Login) is { } weg)
+        {
+            // QA-44: Zuweisung an eine abwesende Person geht an die Vertretung.
+            var vertretung = weg.VertretungLogin is { } v ? await konten.FindenAsync(v, abbruch) : null;
+            if (vertretung is null || !vertretung.Rollen.Contains(rolle))
+            {
+                throw new InvalidOperationException($"{konto.Name} ist bis {weg.Bis:dd.MM.yyyy} abwesend und hat keine passende Vertretung. Bitte jemand anderem zuweisen oder im Korb lassen.");
+            }
+
+            hinweis = $" (in Vertretung für {konto.Name}, abwesend bis {weg.Bis:dd.MM.yyyy})";
+            konto = vertretung;
+        }
+
         a.Uebernehmen(konto.Login, konto.Name, uhr.GetLocalNow());
-        await protokoll.ProtokollierenAsync("Aufgabe.Zugewiesen", $"Aufgabe {konto.Name} zugewiesen: {await BezugAsync(a, abbruch)}", Objekt, a.Id, abbruch: abbruch);
+        await protokoll.ProtokollierenAsync("Aufgabe.Zugewiesen", $"Aufgabe {konto.Name} zugewiesen{hinweis}: {await BezugAsync(a, abbruch)}", Objekt, a.Id, abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
     }
 

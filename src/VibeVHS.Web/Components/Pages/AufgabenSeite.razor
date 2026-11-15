@@ -30,6 +30,7 @@
             }
             <RadzenSelectBarItem Text="Erledigt (14 Tage)" Value="@("erledigt")" />
             <RadzenSelectBarItem Text="Regeln" Value="@("regeln")" />
+            <RadzenSelectBarItem Text="Abwesenheit & Vertretung" Value="@("abwesenheit")" />
         </Items>
     </RadzenSelectBar>
     @if (uebersicht is not null)
@@ -45,6 +46,15 @@
         {
             case "meine":
                 <AufgabenListe Aufgaben="@u.Meine" Benutzer="@benutzer" Geaendert="LadenAsync" Leertext="Keine Aufgaben in Ihrer Liste." />
+                @if (u.InVertretung is { Count: > 0 } iv)
+                {
+                    <h3 style="margin-top:16px">In Vertretung</h3>
+                    <p class="vhs-small vhs-muted">Aufgaben abwesender Kolleg:innen, die Sie vertreten. Übernehmen Sie eine Aufgabe, um sie abzuschließen.</p>
+                    <AufgabenListe Aufgaben="@iv" Benutzer="@benutzer" Geaendert="LadenAsync" />
+                }
+                break;
+            case "abwesenheit":
+                <AbwesenheitVerwaltung Benutzer="@benutzer" Geaendert="LadenAsync" />
                 break;
             case "korb":
                 <AufgabenListe Aufgaben="@u.Gruppenkorb" Benutzer="@benutzer" Geaendert="LadenAsync" Leertext="Der Korb ist leer." />
