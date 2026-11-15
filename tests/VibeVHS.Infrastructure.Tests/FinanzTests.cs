@@ -60,7 +60,8 @@ public class FinanzTests
         var finanzen = new FinanzDienst(speicher, fp, new PersonenSpeicher(db), new ProgrammSpeicher(db), new StammdatenSpeicher(db), dokumente, post, protokoll, benutzer, t.Uhr);
         var zahlungen = new ZahlungsDienst(speicher, fp, finanzen, new PersonenSpeicher(db), new StammdatenSpeicher(db), post, protokoll, benutzer, t.Uhr);
         var mahnungen = new MahnDienst(speicher, fp, finanzen, protokoll, benutzer, t.Uhr);
-        var honorare = new HonorarDienst(speicher, fp, finanzen, new HonorarModelle([new HonorarProUe(), new HonorarBasisUeTeilnehmende()]), new PersonenSpeicher(db), protokoll, t.Uhr);
+        var honorare = new HonorarDienst(speicher, fp, finanzen, new HonorarModelle([new HonorarProUe(), new HonorarBasisUeTeilnehmende()]), new PersonenSpeicher(db),
+            new VibeVHS.Application.Programm.Entfernungen(new ProgrammSpeicher(db), new VibeVHS.Adapters.Mocks.MockGeokodierer(), t.Uhr), protokoll, t.Uhr);
         var gobd = new GobdDienst(speicher, fp, finanzen, new DatenschutzSpeicher(db), new StammdatenSpeicher(db), post, protokoll, t.Uhr);
         var aufgaben = new AufgabenDienst(new AufgabenSpeicher(db), new StammdatenSpeicher(db), protokoll, benutzer, t.Uhr);
         var routinen = new FinanzRoutinen(finanzen, zahlungen, mahnungen, honorare, speicher, aufgaben, t.Uhr);

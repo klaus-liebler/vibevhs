@@ -26,7 +26,10 @@ public enum Terminstatus
     KurzfristigAbgesagt,
 }
 
-/// <summary>Ein Termin der Kursleitung – nur anonyme Teilnahmedaten, keine Namen oder IDs von Teilnehmenden.</summary>
+/// <summary>
+/// Ein Termin der Kursleitung – nur anonyme Teilnahmedaten, keine Namen oder IDs von Teilnehmenden.
+/// <see cref="EntfernungKm"/> ist Hin- und Rückweg vom Wohnort zum Kursort (leer, wenn unbekannt).
+/// </summary>
 public sealed record HonorarTermin(Guid TerminId, Guid KursId, string Kursnummer, string Kursart, int Fachbereich, DateOnly Datum, DateTime Beginn, DateTime Ende,
     decimal Ue, Terminstatus Status, string? Ausfallgrund, string Ort, decimal? EntfernungKm, int Angemeldet, int? Anwesend, int Ermaessigt);
 

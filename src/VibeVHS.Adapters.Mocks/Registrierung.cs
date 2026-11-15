@@ -14,6 +14,8 @@ public static class Registrierung
         dienste.AddSingleton<IZustellKanal, MockMailKanal>();
         dienste.AddSingleton<IZustellKanal, MockSchnittstellenKanal>();
         dienste.AddSingleton<VibeVHS.Application.Dokumente.IUebersetzer, MockUebersetzer>();
+        dienste.AddSingleton<VibeVHS.Application.Programm.IGeokodierer, MockGeokodierer>();
+        dienste.AddScoped<VibeVHS.Application.Integration.IBamfSchnittstelle, MockBamf>();
         return dienste;
     }
 }

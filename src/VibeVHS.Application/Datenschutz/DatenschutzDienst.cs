@@ -363,6 +363,23 @@ public sealed class DatenschutzDienst(
         }
 
         finanz.Konto?.Anonymisieren(platzhalter);
+
+        // Integrationskurs: Lichtbilder löschen, Aktenzeichen und Bemerkungen entfernen.
+        var ik = await speicher.IntegrationsdatenAsync(person.Id, abbruch);
+        foreach (var b in ik.Berechtigungen)
+        {
+            b.Anonymisieren();
+        }
+
+        foreach (var p in ik.Pruefungen)
+        {
+            p.Anonymisieren();
+        }
+
+        foreach (var l in ik.Lichtbilder)
+        {
+            l.Loeschen(jetzt);
+        }
         foreach (var u in finanz.Umsaetze)
         {
             u.Anonymisieren();

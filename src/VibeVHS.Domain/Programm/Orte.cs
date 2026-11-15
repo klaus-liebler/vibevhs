@@ -287,6 +287,12 @@ public sealed class Ortsverzeichnis(IEnumerable<Ort> orte, IEnumerable<Merkmal> 
         return pfad;
     }
 
+    /// <summary>Koordinaten des Orts oder seines nächsten übergeordneten Orts mit Koordinaten (Raum → Gebäude → Liegenschaft).</summary>
+    public (double Breite, double Laenge)? Koordinaten(Guid id)
+        => Finden(id) is { } ort && Pfad(ort).LastOrDefault(o => o.Breitengrad is not null && o.Laengengrad is not null) is { } mit
+            ? (mit.Breitengrad!.Value, mit.Laengengrad!.Value)
+            : null;
+
     public IEnumerable<Ort> Kinder(Guid id) => _orte.Values.Where(o => o.ElternId == id).OrderBy(o => o.Name, StringComparer.Create(CultureInfo.GetCultureInfo("de-DE"), true));
 
     /// <summary>

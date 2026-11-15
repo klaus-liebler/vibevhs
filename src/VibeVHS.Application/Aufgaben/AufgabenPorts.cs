@@ -55,6 +55,8 @@ public static class Aufgabentypen
     public const string HonorarFreigabe = "honorar-freigabe";
     public const string KontoauszugZuordnung = "kontoauszug-zuordnung";
     public const string Ruecklastschrift = "ruecklastschrift";
+    public const string Ausweiskontrolle = "ausweiskontrolle";
+    public const string IkKursbeginn = "ik-kursbeginn";
 
     public static IReadOnlyList<Aufgabentyp> Vorschlaege() =>
     [
@@ -83,6 +85,10 @@ public static class Aufgabentypen
             nameof(Rolle.Buchhaltung), jeFachbereich: false, eskalationNachTagen: 5),
         new(KontoauszugZuordnung, "Kontoauszug zuordnen", "Umsätze ohne sichere Zuordnung klären.",
             nameof(Rolle.Buchhaltung), jeFachbereich: false, eskalationNachTagen: 2),
+        new(Ausweiskontrolle, "Ausweiskontrolle", "Beim Sichtvergleich gab es Zweifel an der Identität: Ausweis im Original prüfen. Bis dahin ist die Anwesenheit vorläufig und wird nicht beim BAMF abgerechnet.",
+            nameof(Rolle.IntegrationskursTeam), jeFachbereich: false, eskalationNachTagen: 3),
+        new(IkKursbeginn, "Integrationskurs: Kursbeginn vorbereiten", "Berechtigungen und Ausweise prüfen, dann den Kursbeginn an das BAMF melden.",
+            nameof(Rolle.IntegrationskursTeam), jeFachbereich: false, eskalationNachTagen: 1),
         new(Ruecklastschrift, "Rücklastschrift klären", "Nach einer Rücklastschrift ist die Rechnung wieder offen: Kontakt aufnehmen, neues Mandat oder Überweisung.",
             nameof(Rolle.Buchhaltung), jeFachbereich: false, eskalationNachTagen: 7),
     ];

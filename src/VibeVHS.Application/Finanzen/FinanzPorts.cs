@@ -68,6 +68,8 @@ public interface IFinanzSpeicher
 
     Task<IReadOnlyList<Domain.Personen.Organisation>> AuftraggeberAsync(CancellationToken abbruch = default);
 
+    Task<Domain.Personen.Organisation?> OrganisationNachNameAsync(string name, CancellationToken abbruch = default);
+
     void Hinzufuegen(object eintrag);
 
     void Entfernen(object eintrag);
@@ -76,7 +78,7 @@ public interface IFinanzSpeicher
 }
 
 public sealed record Dozententermin(Guid DozentId, Guid Id, Guid KursId, string Kursnummer, string Kursart, int Fachbereich, DateTime Beginn, DateTime Ende,
-    bool Ausgefallen, DateTimeOffset? AusgefallenAm, string? Bemerkung, string Ort, int Angemeldet, int? Anwesend, int Ermaessigt);
+    bool Ausgefallen, DateTimeOffset? AusgefallenAm, string? Bemerkung, string Ort, int Angemeldet, int? Anwesend, int Ermaessigt, Guid? OrtId = null);
 
 /// <summary>Manipulationsgeschütztes Änderungsprotokoll für Finanzdaten (Hash-Kette, FA-128).</summary>
 public interface IFinanzprotokoll
@@ -123,9 +125,9 @@ public static class Offenposten
         ArgumentNullException.ThrowIfNull(belege);
         var aktiv = belege.Where(b => b.Festgeschrieben && !b.Storniert && b.Art != Belegart.Storno).ToList();
         var ergebnis = new Dictionary<Guid, long>();
-        foreach (var f in aktiv.Where(b => b.Art is Belegart.Rechnung or Belegart.Mahnung or Belegart.Honorarabrechnung))
+        foreach (var f in aktiv.Where(b => b.Art is Belegart.Rechnung or Belegart.Mahnung or Belegart.Honorarabrechnung || (b.Art == Belegart.Gutschrift && b.BezugBelegId is null)))
         {
-            var ausgleich = f.Art == Belegart.Honorarabrechnung
+            var ausgleich = f.Art is Belegart.Honorarabrechnung or Belegart.Gutschrift
                 ? aktiv.Where(z => z.BezugBelegId == f.Id && z.Art == Belegart.Zahlungsausgang).Sum(z => z.BetragCent)
                 : aktiv.Where(z => z.BezugBelegId == f.Id && z.Art is Belegart.Zahlungseingang or Belegart.Gutschrift).Sum(z => z.BetragCent)
                   - aktiv.Where(z => z.BezugBelegId == f.Id && z.Art == Belegart.Zahlungsausgang).Sum(z => z.BetragCent);

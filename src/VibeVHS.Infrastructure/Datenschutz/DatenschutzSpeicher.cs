@@ -56,6 +56,13 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
             gruende.Add(new Aufbewahrungsgrund(Domain.Finanzen.BelegartInfo.Frist(b.Art), $"{Domain.Finanzen.BelegartInfo.Name(b.Art)} {b.Nummer}", b.Belegdatum));
         }
 
+        // Integrationskurs: Teilnahme- und Abrechnungsunterlagen (Berechtigung ab Ausstellung)
+        foreach (var b in await db.Set<Domain.Integration.Teilnahmeberechtigung>().AsNoTracking().Where(b => b.PersonId == personId && b.Aktenzeichen != "anonymisiert")
+                     .Select(b => new { b.Art, b.Ausgestellt }).ToListAsync(abbruch))
+        {
+            gruende.Add(new Aufbewahrungsgrund("integrationskurs", $"Integrationskurs: {b.Art} vom {b.Ausgestellt:dd.MM.yyyy}", b.Ausgestellt));
+        }
+
         // Ausgestellte Bescheinigungen (Nachweis für Teilnehmende, Arbeitgeber, Kostenträger)
         foreach (var d in await db.Set<Domain.Dokumente.Dokument>().AsNoTracking()
                      .Where(d => d.PersonId == personId && d.AnonymisiertAm == null
@@ -205,6 +212,12 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
         return (belege, await db.Set<Domain.Finanzen.SepaMandat>().Where(m => m.PersonId == personId).ToListAsync(abbruch),
             await db.Set<Domain.Finanzen.Bankverbindung>().FirstOrDefaultAsync(b => b.PersonId == personId, abbruch), umsaetze);
     }
+
+    public async Task<(IReadOnlyList<Domain.Integration.Teilnahmeberechtigung> Berechtigungen, IReadOnlyList<Domain.Integration.Identitaetspruefung> Pruefungen,
+        IReadOnlyList<Domain.Integration.Lichtbild> Lichtbilder)> IntegrationsdatenAsync(Guid personId, CancellationToken abbruch = default)
+        => (await db.Set<Domain.Integration.Teilnahmeberechtigung>().Where(b => b.PersonId == personId).ToListAsync(abbruch),
+            await db.Set<Domain.Integration.Identitaetspruefung>().Where(b => b.PersonId == personId).ToListAsync(abbruch),
+            await db.Set<Domain.Integration.Lichtbild>().Where(b => b.PersonId == personId && b.GeloeschtAm == null).ToListAsync(abbruch));
 
     public async Task<IReadOnlyDictionary<Guid, string>> KurstitelAsync(IEnumerable<Guid> kursIds, CancellationToken abbruch = default)
     {

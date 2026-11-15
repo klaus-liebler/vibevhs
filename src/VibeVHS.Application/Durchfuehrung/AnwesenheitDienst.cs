@@ -400,6 +400,26 @@ public sealed class AnwesenheitDienst(
         return await CheckinAsync(liste, b, null, Erfassungsweg.Ausweis, wer.Anzeige, abbruch);
     }
 
+    /// <summary>Check-in Weg B für eine bereits erkannte Person (z. B. nach dem Sichtvergleich im Integrationskurs).</summary>
+    public async Task<CheckinAntwort> AusweisCheckinPersonAsync(Guid veranstaltungId, Guid personId, CancellationToken abbruch = default)
+    {
+        var liste = await ListeAsync(veranstaltungId, abbruch) ?? throw new InvalidOperationException("Veranstaltung nicht gefunden.");
+        if (await ZugriffVerweigertAsync(liste.Kurs, liste.Veranstaltung, abbruch) is { } grund)
+        {
+            throw new InvalidOperationException(grund);
+        }
+
+        var b = (await anmeldungen.BelegungenDesKursesAsync(liste.Kurs.Id, abbruch)).Where(x => x.PersonId == personId).OrderBy(x => x.Status).FirstOrDefault();
+        if (b is null)
+        {
+            var name = (await personen.AnzeigenamenAsync([personId], abbruch)).GetValueOrDefault(personId);
+            return new(new Checkinergebnis(Checkincode.NichtAngemeldet, $"{name} ist in diesem Kurs nicht angemeldet."), liste.Kurs.Kursnummer, name);
+        }
+
+        var wer = await benutzer.ErmittelnAsync(abbruch);
+        return await CheckinAsync(liste, b, null, Erfassungsweg.Ausweis, wer.Anzeige, abbruch);
+    }
+
     private async Task<CheckinAntwort> CheckinAsync(Anwesenheitsliste liste, Belegung b, Guid? ortId, Erfassungsweg weg, string von, CancellationToken abbruch,
         bool nurVormerken = false)
     {

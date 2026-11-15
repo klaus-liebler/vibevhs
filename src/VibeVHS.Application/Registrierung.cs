@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using VibeVHS.Application.Personen;
 using VibeVHS.Application.Postausgang;
 
@@ -27,6 +28,10 @@ public static class Registrierung
         dienste.AddScoped<Anmeldung.VorlagenDienst>();
         dienste.AddScoped<Aufgaben.AufgabenDienst>();
         dienste.AddScoped<Aufgaben.Routinen>();
+        dienste.AddScoped<Programm.Entfernungen>();
+        dienste.TryAddSingleton(new Integration.IntegrationOptionen());
+        dienste.AddScoped<Integration.IntegrationDienst>();
+        dienste.AddScoped<Integration.IntegrationRoutinen>();
         dienste.AddScoped<Finanzen.FinanzDienst>();
         dienste.AddScoped<Finanzen.ZahlungsDienst>();
         dienste.AddScoped<Finanzen.MahnDienst>();

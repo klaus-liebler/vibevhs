@@ -221,7 +221,8 @@ internal sealed class FinanzSpeicher(VibeVhsDbContext db) : IFinanzSpeicher
             var k = kurse[v.KursId];
             return new Dozententermin(v.DozentId!.Value, v.Id, v.KursId, k.Kursnummer, arten.GetValueOrDefault(k.KursartId, "?"), k.Fachbereich, v.Beginn, v.Ende,
                 v.Ausgefallen, v.AusgefallenAm, v.Bemerkung, string.Join(" + ", v.Orte.Select(o => o.OrtName)), belegungen.Count(b => b.KursId == v.KursId),
-                anwesend.TryGetValue(v.Id, out var n) ? n : zu.Contains(v.Id) ? 0 : null, belegungen.Count(b => b.KursId == v.KursId && b.Ermaessigt));
+                anwesend.TryGetValue(v.Id, out var n) ? n : zu.Contains(v.Id) ? 0 : null, belegungen.Count(b => b.KursId == v.KursId && b.Ermaessigt),
+                v.Orte.FirstOrDefault()?.OrtId);
         }).ToList();
     }
 
@@ -281,6 +282,9 @@ internal sealed class FinanzSpeicher(VibeVhsDbContext db) : IFinanzSpeicher
         var ids = await db.Kurse.IgnoreAutoIncludes().Where(k => k.AuftraggeberId != null).Select(k => k.AuftraggeberId!.Value).Distinct().ToListAsync(abbruch);
         return await db.Set<Organisation>().AsNoTracking().Where(o => ids.Contains(o.Id)).OrderBy(o => o.Name).ToListAsync(abbruch);
     }
+
+    public Task<Organisation?> OrganisationNachNameAsync(string name, CancellationToken abbruch = default)
+        => db.Set<Organisation>().FirstOrDefaultAsync(o => o.Name == name, abbruch);
 
     public void Hinzufuegen(object eintrag) => db.Add(eintrag);
 

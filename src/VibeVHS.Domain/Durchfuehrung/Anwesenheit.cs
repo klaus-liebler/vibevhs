@@ -111,6 +111,27 @@ public sealed class Anwesenheit
 
     public string? Bemerkung { get; private set; }
 
+    /// <summary>
+    /// Vorläufig, solange die Identität nicht geklärt ist (Zweifel beim Sichtvergleich oder fehlende Ausweisprüfung):
+    /// zählt nicht für die BAMF-Abrechnung (FA-137).
+    /// </summary>
+    public bool Vorlaeufig { get; private set; }
+
+    public string? VorlaeufigGrund { get; private set; }
+
+    public void VorlaeufigSetzen(string grund)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(grund);
+        Vorlaeufig = true;
+        VorlaeufigGrund = grund;
+    }
+
+    public void Klaeren()
+    {
+        Vorlaeufig = false;
+        VorlaeufigGrund = null;
+    }
+
     public void Aendern(Guid? ortId, Anwesenheitsstatus status, int minuten, Erfassungsweg weg, string von, DateTimeOffset jetzt, string? bemerkung, int dauer)
         => Setzen(ortId, status, minuten, weg, von, jetzt, bemerkung, dauer);
 

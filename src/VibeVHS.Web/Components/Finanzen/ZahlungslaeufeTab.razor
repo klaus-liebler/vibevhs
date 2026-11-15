@@ -5,7 +5,7 @@
 <div class="vhs-row">
     <BegruendeterButton Text="Lastschriftvorschlag erstellen" Icon="playlist_add" Freigabe="@Buchen" IsBusy="@Beschaeftigt"
                         Click="@(() => AusfuehrenAsync(async d => await d.GetRequiredService<ZahlungsDienst>().LastschriftVorschlagAsync() is { } l ? $"Vorschlag mit {l.Aktiv.Count()} Posten ({Euro(l.SummeCent)})." : "Keine offenen Rechnungen mit gültigem Mandat.", "Lastschrift"))" />
-    <BegruendeterButton Text="Überweisungsvorschlag (Honorare)" Icon="payments" ButtonStyle="ButtonStyle.Light" Freigabe="@Buchen" IsBusy="@Beschaeftigt"
+    <BegruendeterButton Text="Überweisungsvorschlag (Honorare, Erstattungen)" Icon="payments" ButtonStyle="ButtonStyle.Light" Freigabe="@Buchen" IsBusy="@Beschaeftigt"
                         Click="@(() => AusfuehrenAsync(async d => await d.GetRequiredService<ZahlungsDienst>().UeberweisungVorschlagAsync() is var (l, ohne) ? (l is null ? "Keine offenen Honorare mit Bankverbindung." : $"Vorschlag mit {l.Aktiv.Count()} Posten.") + (ohne > 0 ? $" {ohne} Honorar(e) ohne Bankverbindung – bitte an der Person hinterlegen." : "") : null, "Überweisung"))" />
 </div>
 

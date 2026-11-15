@@ -47,3 +47,16 @@ internal sealed class FinanzJob(VibeVHS.Application.Finanzen.FinanzRoutinen rout
         log.LogInformation("Finanzroutinen: {Lauf}", lauf);
     }
 }
+
+/// <summary>Täglich: Lichtbilder nach Kursende plus Frist löschen, Integrationskurs-Aufgaben abgleichen.</summary>
+[DisallowConcurrentExecution]
+internal sealed class IntegrationJob(VibeVHS.Application.Integration.IntegrationRoutinen routinen, ILogger<IntegrationJob> log) : IJob
+{
+    public static readonly JobKey Schluessel = new("integration-routinen", "automatik");
+
+    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
+    {
+        var (geloescht, aufgaben) = await routinen.TaeglichAsync(cancellationToken);
+        log.LogInformation("Integrationskurse: {Geloescht} Lichtbilder gelöscht; Aufgaben {Aufgaben}", geloescht, aufgaben);
+    }
+}

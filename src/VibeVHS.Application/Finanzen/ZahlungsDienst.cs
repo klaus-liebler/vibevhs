@@ -109,7 +109,8 @@ public sealed partial class ZahlungsDienst(
         var konten = (await speicher.BankverbindungenAsync(abbruch)).ToDictionary(b => b.PersonId);
         var posten = new List<Zahlungsposten>();
         var ohneKonto = 0;
-        foreach (var h in belege.Where(b => b.Art == Belegart.Honorarabrechnung && b.Festgeschrieben && !b.Storniert && offen.GetValueOrDefault(b.Id) > 0 && !inLauf.Contains(b.Id)))
+        foreach (var h in belege.Where(b => (b.Art == Belegart.Honorarabrechnung || (b.Art == Belegart.Gutschrift && b.BezugBelegId is null))
+                                          && b.Festgeschrieben && !b.Storniert && offen.GetValueOrDefault(b.Id) > 0 && !inLauf.Contains(b.Id)))
         {
             if (h.PersonId is not { } pid || !konten.TryGetValue(pid, out var k))
             {
@@ -117,7 +118,8 @@ public sealed partial class ZahlungsDienst(
                 continue;
             }
 
-            posten.Add(new Zahlungsposten(h.Id, h.Nummer!, pid, k.Kontoinhaber, k.Iban, k.Bic, offen[h.Id], $"Honorar {h.Nummer}", $"{h.Nummer}-{Guid.NewGuid().ToString("N")[..4]}"));
+            posten.Add(new Zahlungsposten(h.Id, h.Nummer!, pid, k.Kontoinhaber, k.Iban, k.Bic, offen[h.Id], $"{(h.Art == Belegart.Gutschrift ? "Erstattung" : "Honorar")} {h.Nummer}",
+                $"{h.Nummer}-{Guid.NewGuid().ToString("N")[..4]}"));
         }
 
         if (posten.Count == 0)
@@ -369,9 +371,9 @@ public sealed partial class ZahlungsDienst(
         }
         else
         {
-            if (ziel.Art != Belegart.Honorarabrechnung || ziel.Storniert)
+            if (ziel.Art is not (Belegart.Honorarabrechnung or Belegart.Gutschrift) || ziel.Storniert)
             {
-                throw new InvalidOperationException("Belastungen werden einer Honorarabrechnung (Auszahlung) oder einer Rücklastschrift zugeordnet.");
+                throw new InvalidOperationException("Belastungen werden einer Honorarabrechnung oder Gutschrift (Auszahlung) oder einer Rücklastschrift zugeordnet.");
             }
 
             erzeugt = new Beleg(Belegart.Zahlungsausgang, u.Buchungstag, ziel.PersonId, null, ziel.EmpfaengerName, null,

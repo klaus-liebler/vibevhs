@@ -365,7 +365,7 @@ public sealed class FinanzDienst(
     {
         ArgumentNullException.ThrowIfNull(person);
         var stand = person.StandAm(DateOnly.FromDateTime(jetzt.Date), jetzt);
-        var anschrift = stand.BriefAn is { } a
+        var anschrift = (stand.BriefAn ?? stand.Adressen.FirstOrDefault()) is { } a
             ? new[] { a.Zusatz, a.Strasse, $"{a.Postleitzahl} {a.Ort}" }.Where(z => !string.IsNullOrWhiteSpace(z)).Select(z => z!).ToList()
             : [];
         return new Belegempfaenger(person.Id, null, stand.NameMitTitel, [stand.NameMitTitel, .. anschrift], person.EMail, person.Sprache);

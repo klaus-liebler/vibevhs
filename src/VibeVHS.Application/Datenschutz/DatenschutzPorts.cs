@@ -56,6 +56,10 @@ public interface IDatenschutzSpeicher
     Task<(IReadOnlyList<Domain.Finanzen.Beleg> Belege, IReadOnlyList<Domain.Finanzen.SepaMandat> Mandate, Domain.Finanzen.Bankverbindung? Konto,
         IReadOnlyList<Domain.Finanzen.Umsatz> Umsaetze)> FinanzdatenAsync(Guid personId, CancellationToken abbruch = default);
 
+    /// <summary>Integrationskursdaten der Person (Berechtigungen, Ausweisprüfungen, Lichtbilder), verfolgt.</summary>
+    Task<(IReadOnlyList<Domain.Integration.Teilnahmeberechtigung> Berechtigungen, IReadOnlyList<Domain.Integration.Identitaetspruefung> Pruefungen,
+        IReadOnlyList<Domain.Integration.Lichtbild> Lichtbilder)> IntegrationsdatenAsync(Guid personId, CancellationToken abbruch = default);
+
     /// <summary>Kursnummer und Titel je Kurs-ID (für die Auskunft).</summary>
     Task<IReadOnlyDictionary<Guid, string>> KurstitelAsync(IEnumerable<Guid> kursIds, CancellationToken abbruch = default);
 

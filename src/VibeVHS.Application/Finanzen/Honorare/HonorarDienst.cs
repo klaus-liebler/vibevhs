@@ -30,6 +30,7 @@ public sealed class HonorarDienst(
     FinanzDienst finanzen,
     HonorarModelle modelle,
     IPersonenSpeicher personen,
+    Programm.Entfernungen entfernungen,
     IAuditProtokoll protokoll,
     TimeProvider uhr)
 {
@@ -124,7 +125,9 @@ public sealed class HonorarDienst(
         var vertraege = await speicher.HonorarvertraegeAsync(personId, abbruch);
         var frueher = await FruehereAsync(personId, abbruch);
         var schonAbgerechnet = frueher.Where(f => f.TerminId is not null).Select(f => f.TerminId!.Value).ToHashSet();
-        var termine = roh.Where(t => t.Ausgefallen || t.Ende <= jetzt.DateTime).Select(t => Abbilden(t)).ToList();
+        // Entfernung Wohnort → Kursort (Mock: Postleitzahl, Luftlinie × Umwegfaktor), als Hin- und Rückweg.
+        var km = await personen.LadenAsync(personId, abbruch) is { } person ? await entfernungen.FuerPersonAsync(person, abbruch) : _ => null;
+        var termine = roh.Where(t => t.Ausgefallen || t.Ende <= jetzt.DateTime).Select(t => Abbilden(t, km(t.OrtId) * 2)).ToList();
         var hinweise = new List<string>();
         var ohne = new List<HonorarTermin>();
         var berechnungen = new List<Honorarberechnung>();
@@ -168,14 +171,14 @@ public sealed class HonorarDienst(
         return new(personId, von, bis, berechnungen, ohne, hinweise);
     }
 
-    private static HonorarTermin Abbilden(Dozententermin t)
+    private static HonorarTermin Abbilden(Dozententermin t, decimal? entfernungKm)
     {
         var status = !t.Ausgefallen ? Terminstatus.Stattgefunden
             : t.AusgefallenAm is { } am && am.LocalDateTime >= t.Beginn.AddHours(-KurzfristigStunden) ? Terminstatus.KurzfristigAbgesagt
             : Terminstatus.Ausgefallen;
         var ue = Math.Round((decimal)(t.Ende - t.Beginn).TotalMinutes / 45m, 2);
         return new HonorarTermin(t.Id, t.KursId, t.Kursnummer, t.Kursart, t.Fachbereich, DateOnly.FromDateTime(t.Beginn), t.Beginn, t.Ende, ue, status,
-            t.Ausgefallen ? t.Bemerkung : null, t.Ort, null, t.Angemeldet, t.Anwesend, t.Ermaessigt);
+            t.Ausgefallen ? t.Bemerkung : null, t.Ort, entfernungKm, t.Angemeldet, t.Anwesend, t.Ermaessigt);
     }
 
     private async Task<IReadOnlyList<FruehereHonorarposition>> FruehereAsync(Guid personId, CancellationToken abbruch)
