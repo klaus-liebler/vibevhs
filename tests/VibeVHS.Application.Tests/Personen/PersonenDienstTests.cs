@@ -13,7 +13,7 @@ public class PersonenDienstTests
     public PersonenDienstTests()
     {
         _protokoll = new SpeicherProtokoll(FesterBenutzer.Krueger, _uhr);
-        _dienst = new PersonenDienst(_speicher, _protokoll, _uhr);
+        _dienst = new PersonenDienst(_speicher, _protokoll, FesterBenutzer.Krueger, _uhr);
     }
 
     [Fact]

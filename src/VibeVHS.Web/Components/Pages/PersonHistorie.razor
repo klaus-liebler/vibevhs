@@ -1,0 +1,176 @@
+@page "/personen/{Id:guid}/historie"
+@using VibeVHS.Application.Personen
+@using VibeVHS.Domain.Gemeinsam
+@using VibeVHS.Domain.Personen
+@inject Vorgang Vorgang
+@inject TimeProvider Uhr
+@inject NavigationManager Navigation
+
+<PageTitle>Datenhistorie · VibeVHS</PageTitle>
+
+@if (person is null)
+{
+    <h1>Person nicht gefunden</h1>
+    <NaechsteSchritte Schritte="@([new NaechsterSchritt("Zur Personenliste", "personen", Hauptschritt: true)])" />
+    return;
+}
+
+<div class="vhs-head">
+    <div>
+        <h1>Datenhistorie</h1>
+        <p class="vhs-sub">@heute?.NameMitTitel · alle Stammdaten, neueste Erfassung oben. Nichts wird gelöscht oder überschrieben.</p>
+    </div>
+    <div class="vhs-row">
+        <RadzenButton Text="Zurück zur Person" Icon="arrow_back" ButtonStyle="ButtonStyle.Light"
+                      Click="@(() => Navigation.NavigateTo($"personen/{Id}"))" />
+    </div>
+</div>
+
+<section class="vhs-card">
+    <h2>Stichtag</h2>
+    <p class="vhs-small vhs-muted" style="margin:-6px 0 0">
+        Wie war der Stand am …, und was war dazu am … bekannt? So arbeitet z. B. der Nachdruck eines alten Briefs.
+    </p>
+    <div class="vhs-fields">
+        <RadzenFormField Text="Wie war der Stand am" Variant="Variant.Outlined">
+            <RadzenDatePicker TValue="DateOnly?" @bind-Value="stichtag" DateFormat="dd.MM.yyyy" />
+        </RadzenFormField>
+        <RadzenFormField Text="Was war bekannt am" Variant="Variant.Outlined">
+            <RadzenDatePicker TValue="DateTime?" @bind-Value="wissensstand" DateFormat="dd.MM.yyyy HH:mm" ShowTime="true" />
+        </RadzenFormField>
+    </div>
+    @if (StandAmStichtag is { } s)
+    {
+        @if (s.Name is null)
+        {
+            <div class="vhs-alert vhs-info">Zu diesem Stichtag und Wissensstand war die Person noch nicht erfasst.</div>
+        }
+        else
+        {
+            <StammdatenKompakt Stand="@s" />
+        }
+    }
+</section>
+
+<section class="vhs-card">
+    <div class="vhs-head">
+        <h2>Zeitleiste</h2>
+        <label class="vhs-small"><input type="checkbox" @bind="ersetzteZeigen" /> ersetzte Erfassungen anzeigen</label>
+    </div>
+    <div class="vhs-chips" role="group" aria-label="Nach Datenart filtern">
+        <button class="vhs-chip @(filter.Count == 0 ? "on" : "")" @onclick="@(() => filter.Clear())">Alle (@Sichtbar(alle: true).Count)</button>
+        @foreach (var art in Datenhistorie.Datenarten)
+        {
+            var anzahl = eintraege.Count(e => e.Datenart == art && (ersetzteZeigen || !e.Ersetzt));
+            <button class="vhs-chip @(filter.Contains(art) ? "on" : "")" disabled="@(anzahl == 0)"
+                    title="@(anzahl == 0 ? $"Keine Einträge zu {art}" : null)"
+                    @onclick="@(() => Umschalten(art))">@art (@anzahl)</button>
+        }
+    </div>
+
+    <ol class="vhs-timeline">
+        @foreach (var e in Sichtbar())
+        {
+            <li class="@(e.Ersetzt ? "vhs-tl-ersetzt" : "")">
+                <div class="vhs-tl-kopf">
+                    <span class="vhs-mono vhs-small">@e.ErfasstAm.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                    <span class="vhs-pill vhs-p-neutral">@e.Feld</span>
+                    <StatusPille Stil="@ArtStil(e.Art)">@e.ArtAnzeige</StatusPille>
+                    @if (e.Ersetzt)
+                    {
+                        <span class="vhs-small vhs-muted vhs-why" tabindex="0"
+                              data-why="Diese Erfassung wurde später ersetzt (z. B. durch eine Korrektur). Sie bleibt sichtbar, damit alte Ausdrucke nachvollziehbar sind.">ersetzt am @e.ErsetztAm!.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                    }
+                </div>
+                <div class="vhs-tl-wert">
+                    @if (e.AlterWert is not null)
+                    {
+                        <span class="vhs-alt">@Anzeige(e, e.AlterWert)</span>
+                        <span aria-label="wird zu"> → </span>
+                    }
+                    <b>@Anzeige(e, e.NeuerWert)</b>
+                </div>
+                <div class="vhs-small vhs-muted">
+                    gültig @Zeitraum(e.GueltigVon, e.GueltigBis) · erfasst von @e.ErfasstVon · @e.Grund
+                </div>
+            </li>
+        }
+    </ol>
+</section>
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    [SupplyParameterFromQuery(Name = "art")]
+    private string? ArtAusAdresse { get; set; }
+
+    private Person? person;
+    private PersonenStand? heute;
+    private IReadOnlyList<HistorienEintrag> eintraege = [];
+    private readonly HashSet<string> filter = [];
+    private bool ersetzteZeigen = true;
+    private DateOnly? stichtag;
+    private DateTime? wissensstand;
+
+    private PersonenStand? StandAmStichtag
+    {
+        get
+        {
+            if (person is null || stichtag is null || wissensstand is null)
+            {
+                return null;
+            }
+
+            var bekannt = new DateTimeOffset(wissensstand.Value, TimeZoneInfo.Local.GetUtcOffset(wissensstand.Value));
+            return person.StandAm(stichtag.Value, bekannt);
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        person = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenSpeicher>().LadenAsync(Id));
+        var jetzt = Uhr.GetLocalNow();
+        if (person is not null)
+        {
+            heute = person.StandAm(DateOnly.FromDateTime(jetzt.Date), jetzt);
+            eintraege = Datenhistorie.Erstellen(person);
+        }
+
+        stichtag ??= DateOnly.FromDateTime(jetzt.Date);
+        wissensstand ??= jetzt.DateTime;
+        filter.Clear();
+        if (!string.IsNullOrEmpty(ArtAusAdresse) && Datenhistorie.Datenarten.Contains(ArtAusAdresse))
+        {
+            filter.Add(ArtAusAdresse);
+        }
+    }
+
+    private List<HistorienEintrag> Sichtbar(bool alle = false)
+        => eintraege.Where(e => (ersetzteZeigen || !e.Ersetzt) && (alle || filter.Count == 0 || filter.Contains(e.Datenart))).ToList();
+
+    private void Umschalten(string art)
+    {
+        if (!filter.Remove(art))
+        {
+            filter.Add(art);
+        }
+    }
+
+    private static string Zeitraum(DateOnly von, DateOnly? bis)
+    {
+        var ab = von == DateOnly.MinValue ? "immer" : $"ab {von:dd.MM.yyyy}";
+        return bis is { } b ? $"{ab} bis {b.AddDays(-1):dd.MM.yyyy}" : ab;
+    }
+
+    private static string? Anzeige(HistorienEintrag e, string? wert)
+        => e.Datenart == "Sprache" && wert is { Length: <= 3 } ? Sprachen.Name(wert) : wert;
+
+    private static string ArtStil(Erfassungsart art) => art switch
+    {
+        Erfassungsart.Korrektur => "warn",
+        Erfassungsart.Beendet => "neutral",
+        Erfassungsart.Ersterfassung => "gut",
+        _ => "info",
+    };
+}

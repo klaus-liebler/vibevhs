@@ -1,0 +1,103 @@
+@using VibeVHS.Domain.Personen
+@*
+    Kompakte Darstellung des Datensatzes einer Person zu einem Stand (heute oder Stichtag).
+    Mit PersonId erscheint je Feld ein Uhr-Symbol, das in die Datenhistorie springt.
+*@
+<dl class="vhs-kv">
+    @Zeile("Name", Stand.NameMitTitel, "Name")
+    @Zeile("Geburtsdatum", Stand.Geburtsdatum?.ToString("dd.MM.yyyy") ?? "–", "Geburtsdatum")
+    @Zeile("Rollen", PersonMerkmal.RollenAnzeige(Stand.Rollen), "Rollen")
+    @Zeile("Sprache", Stand.Sprache is null ? "–" : Sprachen.Name(Stand.Sprache), "Sprache")
+
+    <dt>Postadressen</dt>
+    <dd>
+        @if (Stand.Adressen.Count == 0)
+        {
+            <span class="vhs-muted">–</span>
+        }
+        @foreach (var a in Stand.Adressen.OrderByDescending(a => a.AdressId == Stand.AufenthaltsortId))
+        {
+            <div class="vhs-kv-wert">
+                <span>@a.Anzeige</span>
+                @if (a.AdressId == Stand.AufenthaltsortId)
+                {
+                    <StatusPille Stil="info">üblicher Aufenthaltsort</StatusPille>
+                }
+                @if (a.AdressId == Stand.KorrespondenzadresseId)
+                {
+                    <StatusPille Stil="gut">Korrespondenz</StatusPille>
+                }
+                else if (Stand.KorrespondenzadresseId is null && a.AdressId == Stand.AufenthaltsortId)
+                {
+                    <span class="vhs-small vhs-muted" title="Keine eigene Korrespondenzadresse: Briefe gehen an den üblichen Aufenthaltsort.">(auch Korrespondenz)</span>
+                }
+            </div>
+        }
+    </dd>
+    <dd class="vhs-kv-uhr">@Uhr("Adressen")</dd>
+
+    <dt>Telefon / Messaging</dt>
+    <dd>
+        @if (Stand.Rufnummern.Count == 0)
+        {
+            <span class="vhs-muted">–</span>
+        }
+        @foreach (var r in Stand.Rufnummern.OrderByDescending(r => r.Bevorzugt))
+        {
+            <div class="vhs-kv-wert">
+                <span class="vhs-mono">@r.Nummer</span>
+                <span class="vhs-small vhs-muted">@r.Art · @r.DiensteAnzeige</span>
+                @if (r.Bevorzugt) { <StatusPille Stil="info">bevorzugt</StatusPille> }
+                @if (!r.Einwilligung)
+                {
+                    <span class="vhs-why" tabindex="0" data-why="Ohne Einwilligung darf die Nummer nicht für Messaging-Dienste genutzt werden (DSGVO).">
+                        <StatusPille Stil="warn">ohne Einwilligung</StatusPille>
+                    </span>
+                }
+            </div>
+        }
+    </dd>
+    <dd class="vhs-kv-uhr">@Uhr("Telefon")</dd>
+
+    <dt>E-Mail</dt>
+    <dd>
+        @if (Stand.EMails.Count == 0)
+        {
+            <span class="vhs-muted">–</span>
+        }
+        @foreach (var e in Stand.EMails.OrderByDescending(e => e.Bevorzugt))
+        {
+            <div class="vhs-kv-wert">
+                <span>@e.Adresse</span>
+                <span class="vhs-small vhs-muted">@(e.Art == EMailArt.Privat ? "privat" : "dienstlich")</span>
+                @if (e.Bevorzugt) { <StatusPille Stil="info">bevorzugt</StatusPille> }
+            </div>
+        }
+    </dd>
+    <dd class="vhs-kv-uhr">@Uhr("E-Mail")</dd>
+</dl>
+
+@code {
+    [Parameter, EditorRequired]
+    public PersonenStand Stand { get; set; } = default!;
+
+    /// <summary>Mit Id: Uhr-Symbole verlinken in die Datenhistorie.</summary>
+    [Parameter]
+    public Guid? PersonId { get; set; }
+
+    private RenderFragment Zeile(string feld, string wert, string datenart) => __builder =>
+    {
+        <dt>@feld</dt>
+        <dd>@wert</dd>
+        <dd class="vhs-kv-uhr">@Uhr(datenart)</dd>
+    };
+
+    private RenderFragment Uhr(string datenart) => __builder =>
+    {
+        if (PersonId is { } id)
+        {
+            <a href="@($"personen/{id}/historie?art={Uri.EscapeDataString(datenart)}")" class="vhs-uhr" title="@($"Historie: {datenart}")"
+               aria-label="@($"Historie: {datenart}")"><RadzenIcon Icon="history" /></a>
+        }
+    };
+}

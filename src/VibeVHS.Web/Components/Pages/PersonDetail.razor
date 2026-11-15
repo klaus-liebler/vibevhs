@@ -5,10 +5,11 @@
 @inject Vorgang Vorgang
 @inject TimeProvider Uhr
 @inject NotificationService Hinweise
+@inject NavigationManager Navigation
 
-<PageTitle>@(aktuell?.Anzeige ?? "Person") · VibeVHS</PageTitle>
+<PageTitle>@(stand?.NameMitTitel ?? "Person") · VibeVHS</PageTitle>
 
-@if (person is null)
+@if (person is null || stand is null)
 {
     <h1>Person nicht gefunden</h1>
     <NaechsteSchritte Schritte="@([new NaechsterSchritt("Zur Personenliste", "personen", Hauptschritt: true)])" />
@@ -17,11 +18,13 @@
 
 <div class="vhs-head">
     <div>
-        <h1>@aktuell!.Anzeige</h1>
-        <p class="vhs-sub">Korrespondenzsprache: @Sprachen.Name(person.Sprache)</p>
+        <h1>@stand.NameMitTitel</h1>
+        <p class="vhs-sub">@PersonMerkmal.RollenAnzeige(stand.Rollen) · Korrespondenz auf @Sprachen.Name(stand.Sprache ?? "de")</p>
     </div>
     <div class="vhs-row">
-        <BegruendeterButton Text="Testmail in den Postausgang" Icon="mail" ButtonStyle="ButtonStyle.Light"
+        <RadzenButton Text="Datenhistorie" Icon="history" ButtonStyle="ButtonStyle.Light"
+                      Click="@(() => Navigation.NavigateTo($"personen/{Id}/historie"))" />
+        <BegruendeterButton Text="Testmail" Icon="mail" ButtonStyle="ButtonStyle.Light"
                             Freigabe="@MailFreigabe" Click="TestmailAsync" />
         <BegruendeterButton Text="Bescheinigung drucken" Icon="print" ButtonStyle="ButtonStyle.Light"
                             Freigabe="@(Freigabe.Geplant("Der Druck von Bescheinigungen (mit QR-Code „Translate this letter“)"))" />
@@ -29,87 +32,42 @@
 </div>
 
 <section class="vhs-card">
-    <h2>Stammdaten</h2>
-    <div class="vhs-fields">
-        <GesperrtesFeld Bezeichnung="Name" Wert="@aktuell.Anzeige"
-                        Begruendung="Namen werden nie überschrieben, damit ältere Bescheinigungen den damals gültigen Namen behalten. Nutzen Sie unten „Name ändern ab Datum“ (z. B. Heirat) oder „Korrigieren“ (Tippfehler)." />
-        <GesperrtesFeld Bezeichnung="Geburtsdatum" Wert="@(person.Geburtsdatum?.ToString("dd.MM.yyyy") ?? "–")"
-                        Begruendung="Das Bearbeiten der Stammdaten folgt in einer späteren Iteration." />
-        <GesperrtesFeld Bezeichnung="E-Mail" Wert="@(person.EMail ?? "–")"
-                        Begruendung="Das Bearbeiten der Stammdaten folgt in einer späteren Iteration." />
-        <GesperrtesFeld Bezeichnung="Angelegt am" Wert="@person.AngelegtAm.ToLocalTime().ToString("dd.MM.yyyy HH:mm")"
-                        Begruendung="Der Erfassungszeitpunkt wird vom System gesetzt und ist Teil der Nachvollziehbarkeit." />
-        <GesperrtesFeld Bezeichnung="Personen-ID" Wert="@person.Id.ToString()"
-                        Begruendung="Die ID vergibt das System. Sie ändert sich nie und verknüpft alle Daten dieser Person." />
+    <div class="vhs-head">
+        <h2>Stammdaten</h2>
+        <span class="vhs-small vhs-muted">Stand heute · <span class="vhs-why" tabindex="0"
+            data-why="Die ID vergibt das System; sie ändert sich nie. Der Erfassungszeitpunkt ist Teil der Nachvollziehbarkeit.">angelegt
+            @person.AngelegtAm.ToLocalTime().ToString("dd.MM.yyyy") · ID @person.Id.ToString()[..8]…</span></span>
     </div>
+    <StammdatenKompakt Stand="@stand" PersonId="@Id" />
 </section>
 
-<div class="vhs-grid-2">
-    <section class="vhs-card">
-        <h2>Namenshistorie</h2>
-        <p class="vhs-small vhs-muted">Versionen werden nie gelöscht. Durchgestrichene Zeilen sind durch eine spätere Erfassung ersetzt (z. B. Korrektur) und bleiben für alte Ausdrucke nachvollziehbar.</p>
-        <div class="vhs-tbl">
-            <table>
-                <thead>
-                    <tr><th>Name</th><th>gültig ab</th><th>gültig bis</th><th>erfasst</th><th>ersetzt</th><th>Grund</th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var n in person.Namen.OrderBy(n => n.ErfasstAm).ThenBy(n => n.GueltigVon))
-                    {
-                        <tr class="@(n.IstAktuellerWissensstand ? "" : "vhs-ersetzt")">
-                            <td>@n.Anzeige</td>
-                            <td class="vhs-mono">@n.GueltigVon.ToString("dd.MM.yyyy")</td>
-                            <td class="vhs-mono">@(n.GueltigBis?.ToString("dd.MM.yyyy") ?? "offen")</td>
-                            <td class="vhs-mono">@n.ErfasstAm.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
-                            <td class="vhs-mono">@(n.ErsetztAm?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "–")</td>
-                            <td>@n.Grund</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-
-        <h3>Stichtagsabfrage</h3>
-        <p class="vhs-small vhs-muted">So arbeitet z. B. der Nachdruck einer Bescheinigung: Name, der am Stichtag galt, nach dem Wissensstand zum Zeitpunkt des Originaldrucks.</p>
-        <div class="vhs-fields">
-            <RadzenFormField Text="Gültig am" Variant="Variant.Outlined">
-                <RadzenDatePicker TValue="DateOnly?" @bind-Value="stichtag" DateFormat="dd.MM.yyyy" />
-            </RadzenFormField>
-            <RadzenFormField Text="Wissensstand vom" Variant="Variant.Outlined">
-                <RadzenDatePicker TValue="DateTime?" @bind-Value="wissensstand" DateFormat="dd.MM.yyyy HH:mm" ShowTime="true" />
-            </RadzenFormField>
-        </div>
-        <div class="vhs-alert vhs-info">@StichtagErgebnis</div>
-    </section>
-
-    <section class="vhs-card">
-        <h2>Namen ändern</h2>
-        <RadzenRadioButtonList TValue="bool" @bind-Value="istKorrektur" Orientation="Orientation.Vertical">
-            <Items>
-                <RadzenRadioButtonListItem Text="Änderung ab einem Datum (z. B. Heirat): ältere Dokumente behalten den alten Namen" Value="false" />
-                <RadzenRadioButtonListItem Text="Korrektur (Tippfehler): der Name war schon immer falsch erfasst" Value="true" />
-            </Items>
-        </RadzenRadioButtonList>
-        <div class="vhs-fields">
-            <RadzenFormField Text="Vorname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="neuVorname" /></RadzenFormField>
-            <RadzenFormField Text="Nachname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="neuNachname" /></RadzenFormField>
-            <RadzenFormField Text="@(istKorrektur ? "Betroffene Version gültig am *" : "Gültig ab *")" Variant="Variant.Outlined">
-                <RadzenDatePicker TValue="DateOnly?" @bind-Value="aenderungsdatum" DateFormat="dd.MM.yyyy" />
-            </RadzenFormField>
-        </div>
-        <RadzenFormField Text="Grund / Nachweis *" Variant="Variant.Outlined" Style="width:100%">
+<details class="vhs-card" open="@nameOffen">
+    <summary><b>Namen ändern</b> <span class="vhs-small vhs-muted">– Namen werden nie überschrieben, ältere Dokumente behalten den damals gültigen Namen</span></summary>
+    <RadzenRadioButtonList TValue="bool" @bind-Value="istKorrektur" Orientation="Orientation.Vertical">
+        <Items>
+            <RadzenRadioButtonListItem Text="Änderung ab einem Datum (z. B. Heirat): ältere Dokumente behalten den alten Namen" Value="false" />
+            <RadzenRadioButtonListItem Text="Korrektur (Tippfehler): der Name war schon immer falsch erfasst" Value="true" />
+        </Items>
+    </RadzenRadioButtonList>
+    <div class="vhs-fields">
+        <RadzenFormField Text="Vorname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="neuVorname" /></RadzenFormField>
+        <RadzenFormField Text="Nachname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="neuNachname" /></RadzenFormField>
+        <RadzenFormField Text="@(istKorrektur ? "Betroffene Version gültig am *" : "Gültig ab *")" Variant="Variant.Outlined">
+            <RadzenDatePicker TValue="DateOnly?" @bind-Value="aenderungsdatum" DateFormat="dd.MM.yyyy" />
+        </RadzenFormField>
+        <RadzenFormField Text="Grund / Nachweis *" Variant="Variant.Outlined">
             <RadzenTextBox @bind-Value="grund" Placeholder="z. B. Heirat, Nachweis: Heiratsurkunde" />
         </RadzenFormField>
-        @if (fehler is not null)
-        {
-            <div class="vhs-alert vhs-crit" role="alert">@fehler</div>
-        }
-        <div class="vhs-row">
-            <BegruendeterButton Text="@(istKorrektur ? "Korrektur speichern" : "Änderung speichern")" Icon="save"
-                                Freigabe="@AenderungFreigabe" Click="NameSpeichernAsync" IsBusy="@speichert" />
-        </div>
-    </section>
-</div>
+    </div>
+    @if (fehler is not null)
+    {
+        <div class="vhs-alert vhs-crit" role="alert">@fehler</div>
+    }
+    <div class="vhs-row">
+        <BegruendeterButton Text="@(istKorrektur ? "Korrektur speichern" : "Änderung speichern")" Icon="save"
+                            Freigabe="@AenderungFreigabe" Click="NameSpeichernAsync" IsBusy="@speichert" />
+    </div>
+</details>
 
 <NaechsteSchritte Schritte="@folgeschritte" />
 
@@ -118,14 +76,12 @@
     public Guid Id { get; set; }
 
     private Person? person;
-    private PersonName? aktuell;
-    private DateOnly? stichtag;
-    private DateTime? wissensstand;
+    private PersonenStand? stand;
 
-    private bool istKorrektur, speichert;
+    private bool istKorrektur, speichert, nameOffen;
     private string? neuVorname, neuNachname, grund, fehler;
     private DateOnly? aenderungsdatum;
-    private IReadOnlyList<NaechsterSchritt> folgeschritte = [new("Zur Personenliste", "personen")];
+    private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
 
     private Freigabe MailFreigabe => string.IsNullOrWhiteSpace(person?.EMail)
         ? Freigabe.Nein("Für diese Person ist keine E-Mail-Adresse hinterlegt.")
@@ -140,39 +96,22 @@
                     ? Freigabe.Nein("Ein Grund ist Pflicht, damit die Änderung später nachvollziehbar ist.")
                     : Freigabe.Ja;
 
-    private string StichtagErgebnis
-    {
-        get
-        {
-            if (person is null || stichtag is null || wissensstand is null)
-            {
-                return "Bitte Stichtag und Wissensstand wählen.";
-            }
-
-            var bekannt = new DateTimeOffset(wissensstand.Value, TimeZoneInfo.Local.GetUtcOffset(wissensstand.Value));
-            var name = person.NameAm(stichtag.Value, bekannt);
-            return name is null
-                ? $"Für den {stichtag:dd.MM.yyyy} war am {wissensstand:dd.MM.yyyy HH:mm} kein Name erfasst."
-                : $"Am {stichtag:dd.MM.yyyy} hieß die Person nach Wissensstand vom {wissensstand:dd.MM.yyyy HH:mm}: {name.Anzeige}";
-        }
-    }
-
     protected override async Task OnParametersSetAsync()
     {
         await LadenAsync();
-        stichtag ??= DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
-        wissensstand ??= Uhr.GetLocalNow().DateTime;
         aenderungsdatum ??= DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+        folgeschritte = [new("Datenhistorie ansehen", $"personen/{Id}/historie"), new("Zur Personenliste", "personen")];
     }
 
     private async Task LadenAsync()
     {
         person = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenSpeicher>().LadenAsync(Id));
-        aktuell = person?.AktuellerName(Uhr.GetLocalNow());
-        if (aktuell is not null)
+        var jetzt = Uhr.GetLocalNow();
+        stand = person?.StandAm(DateOnly.FromDateTime(jetzt.Date), jetzt);
+        if (stand?.Name is { } name)
         {
-            neuVorname ??= aktuell.Vorname;
-            neuNachname ??= aktuell.Nachname;
+            neuVorname ??= name.Vorname;
+            neuNachname ??= name.Nachname;
         }
     }
 
@@ -189,10 +128,11 @@
             Hinweise.Notify(NotificationSeverity.Success, "Gespeichert",
                 istKorrektur ? $"Name korrigiert in {neu.Anzeige}." : $"{neu.Anzeige} gilt ab {neu.GueltigVon:dd.MM.yyyy}.");
             grund = null;
+            nameOffen = false;
             await LadenAsync();
             folgeschritte =
             [
-                new("Änderung im Protokoll ansehen", "protokoll", Hauptschritt: true),
+                new("Änderung in der Datenhistorie ansehen", $"personen/{Id}/historie?art=Name", Hauptschritt: true),
                 new("Bescheinigungen neu drucken", "#", Freigabe: Freigabe.Geplant("Der Druck von Bescheinigungen")),
                 new("Zur Personenliste", "personen"),
             ];
@@ -200,6 +140,7 @@
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
             fehler = ex.Message;
+            nameOffen = true;
         }
         finally
         {
@@ -209,16 +150,16 @@
 
     private async Task TestmailAsync()
     {
-        if (person?.EMail is null || aktuell is null)
+        if (person?.EMail is null || stand is null)
         {
             return;
         }
 
         await Vorgang.AusfuehrenAsync(async d =>
         {
-            await d.GetRequiredService<PostausgangDienst>().KundenmailEinreihenAsync(person.EMail, aktuell.Anzeige,
-                "Testnachricht der VHS Musterstadt",
-                $"Guten Tag {aktuell.Anzeige},\n\ndies ist eine Testnachricht aus VibeVHS.\n\nIhre VHS Musterstadt",
+            await d.GetRequiredService<PostausgangDienst>().KundenmailEinreihenAsync(person.EMail, stand.NameMitTitel,
+                "Testnachricht Ihrer Volkshochschule",
+                $"Guten Tag {stand.NameMitTitel},\n\ndies ist eine Testnachricht aus VibeVHS.\n\nIhre Volkshochschule",
                 person.Sprache, person.Id);
             await d.GetRequiredService<INachrichtenSpeicher>().SpeichernAsync();
         });

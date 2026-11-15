@@ -117,6 +117,30 @@ pre.vhs-code { background: var(--vhs-surface-2); border: 1px solid var(--vhs-lin
 /* Anmeldung und schlichte Seiten */
 .vhs-leer { min-height: 100vh; display: flex; justify-content: center; padding: 48px 16px; }
 .vhs-login { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 16px; background: var(--vhs-surface); border: 1px solid var(--vhs-line); border-radius: 12px; padding: 24px; align-self: flex-start; }
+/* Kompakte Stammdaten: Feld | Wert | Uhr */
+.vhs-kv { display: grid; grid-template-columns: minmax(120px, 180px) minmax(0, 1fr) 28px; gap: 6px 12px; margin: 0; align-items: start; }
+.vhs-kv dt { color: var(--vhs-muted); font-size: 12.5px; padding-top: 2px; }
+.vhs-kv dd { margin: 0; min-width: 0; }
+.vhs-kv-wert { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 1px 0; }
+.vhs-kv-uhr { text-align: right; }
+.vhs-uhr { color: var(--vhs-muted); display: inline-flex; border-radius: 4px; }
+.vhs-uhr:hover, .vhs-uhr:focus-visible { color: var(--vhs-accent); }
+.vhs-uhr .rzi { font-size: 17px; }
+details.vhs-card > summary { cursor: pointer; }
+/* Datenhistorie */
+.vhs-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.vhs-chip { border: 1px solid var(--vhs-line); background: var(--vhs-surface); border-radius: 16px; padding: 4px 12px; cursor: pointer; font: inherit; font-size: 13px; color: var(--vhs-fg); }
+.vhs-chip.on { background: var(--vhs-accent); border-color: var(--vhs-accent); color: var(--vhs-accent-fg); }
+.vhs-chip:disabled { opacity: 0.45; cursor: not-allowed; }
+.vhs-timeline { list-style: none; margin: 0; padding: 0 0 0 16px; border-left: 2px solid var(--vhs-line); display: flex; flex-direction: column; gap: 14px; }
+.vhs-timeline li { position: relative; display: flex; flex-direction: column; gap: 3px; }
+.vhs-timeline li::before { content: ""; position: absolute; left: -23px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: var(--vhs-surface); border: 2px solid var(--vhs-accent); }
+.vhs-tl-kopf { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.vhs-tl-wert { overflow-wrap: anywhere; }
+.vhs-alt { color: var(--vhs-muted); text-decoration: line-through; }
+.vhs-tl-ersetzt { opacity: 0.5; }
+.vhs-tl-ersetzt::before { border-color: var(--vhs-muted) !important; }
+@media (max-width: 640px) { .vhs-kv { grid-template-columns: minmax(0, 1fr) 28px; } .vhs-kv dt { grid-column: 1 / -1; } }
 .vhs-select { padding: 5px 8px; border: 1px solid var(--vhs-line); border-radius: 6px; background: var(--vhs-surface); font: inherit; font-size: 13px; color: var(--vhs-fg); margin-left: 4px; }
 .vhs-input { padding: 8px 10px; border: 1px solid var(--vhs-line); border-radius: 7px; font: inherit; background: var(--vhs-surface); }
 .vhs-btn { display: inline-flex; align-items: center; padding: 7px 12px; border-radius: 7px; border: 1px solid var(--vhs-accent); background: var(--vhs-surface); color: var(--vhs-accent); cursor: pointer; font: inherit; font-weight: 500; }

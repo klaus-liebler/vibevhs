@@ -84,6 +84,20 @@ Erlaubt: Radzen.Blazor, EF Core + SQLite, Serilog, Quartz.NET, xUnit, Shouldly, 
 Nicht verwenden: QuestPDF, Nager.Date, MediatR, AutoMapper, FluentAssertions.
 Versionen zentral in `Directory.Packages.props`.
 
+## Personen: Stammdaten und Datenhistorie
+
+Alle Stammdaten einer Person sind bitemporal versioniert: Name, Geburtsdatum, Rollen (Teilnehmende, Dozierende,
+Mitarbeitende), bevorzugte Sprache, Postadressen, Telefon-/Messaging-Nummern (Art, Dienste wie SMS/Signal/WhatsApp,
+Einwilligung, bevorzugt) und E-Mail-Adressen (Art, bevorzugt). Die Kennzeichen „üblicher Aufenthaltsort“ und
+„Standard-Korrespondenzadresse“ sind selbst zeitlich gültig und wechseln unabhängig voneinander (z. B. c/o-Adresse).
+
+- **Detailseite** `/personen/{id}`: kompakter Stand heute, je Feld ein Uhr-Symbol in die Historie, Namensänderung.
+- **Datenhistorie** `/personen/{id}/historie`: Zeitleiste über alle Felder (neueste Erfassung oben) mit Filter-Chips je
+  Datenart; je Eintrag alt → neu, gültig ab/bis, erfasst am/von, Art (Ersterfassung, Änderung ab Datum, Korrektur,
+  Beendet) und Grund/Nachweis; ersetzte Erfassungen blass. Dazu die Stichtagsabfrage „Wie war der Stand am … / was war
+  bekannt am …“ für den gesamten Datensatz.
+- Demodaten: Olena Kovalenko (Umzug, c/o-Korrespondenzadresse, Signal-Einwilligung), Anna Becker (Korrektur, Heirat).
+
 ## Testbenutzer der Pilot-VHS
 
 Die Startdaten liegen in [`tools/Testdaten/testbenutzer-vhs-egs.json`](../tools/Testdaten/testbenutzer-vhs-egs.json)

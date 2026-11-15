@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using VibeVHS.Application.Protokoll;
 using VibeVHS.Application.Sicherheit;
+using VibeVHS.Domain.Gemeinsam;
 using VibeVHS.Domain.Personen;
 using VibeVHS.Domain.Stammdaten;
 using VibeVHS.Infrastructure.Datenbank;
@@ -71,9 +72,9 @@ public sealed class StartdatenLader(VibeVhsDbContext db, IAuditProtokoll protoko
             if (person is null)
             {
                 var (titel, vorname, nachname) = NameZerlegen(b.Name);
-                person = Person.Anlegen(vorname, nachname, heute, jetzt);
+                person = Person.Anlegen(vorname, nachname, heute, jetzt, von: "Startdaten");
                 person.TitelSetzen(titel);
-                person.AlsMitarbeitendeVerknuepfen(login);
+                person.AlsMitarbeitendeVerknuepfen(login, heute, Erfassung.Erst(jetzt, "Startdaten", "Benutzerkonto aus den Startdaten"));
                 db.Personen.Add(person);
                 neuePersonen++;
             }

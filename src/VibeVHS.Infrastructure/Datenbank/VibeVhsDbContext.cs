@@ -1,4 +1,7 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using VibeVHS.Domain.Gemeinsam;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VibeVHS.Application.Postausgang;
 using VibeVHS.Application.Protokoll;
@@ -44,20 +47,41 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(p => p.Rollen).HasConversion<int>();
             b.Property(p => p.Benutzerkennung).HasMaxLength(100);
             b.HasIndex(p => p.Benutzerkennung).IsUnique();
-            b.HasMany(p => p.Namen).WithOne().HasForeignKey("PersonId").IsRequired().OnDelete(DeleteBehavior.Restrict);
-            b.Navigation(p => p.Namen).HasField("_namen").UsePropertyAccessMode(PropertyAccessMode.Field).AutoInclude();
+            Unterliste(b, p => p.Namen, "_namen");
+            Unterliste(b, p => p.Merkmale, "_merkmale");
+            Unterliste(b, p => p.Adressen, "_adressen");
+            Unterliste(b, p => p.AdressKennzeichen, "_kennzeichen");
+            Unterliste(b, p => p.Rufnummern, "_rufnummern");
+            Unterliste(b, p => p.EMailAdressen, "_emails");
         });
 
-        modelBuilder.Entity<PersonName>(b =>
+        Version<PersonName>(modelBuilder, "PersonNamen", b =>
         {
-            b.ToTable("PersonNamen");
-            b.HasKey(n => n.Id);
-            b.Property(n => n.Id).ValueGeneratedNever();
             b.Property(n => n.Vorname).HasMaxLength(200);
             b.Property(n => n.Nachname).HasMaxLength(200);
-            b.Property(n => n.Grund).HasMaxLength(500);
-            b.HasIndex("PersonId", nameof(PersonName.GueltigVon));
             b.HasIndex(n => n.Nachname);
+        });
+        Version<PersonMerkmal>(modelBuilder, "PersonMerkmale", b => b.Property(m => m.Inhalt).HasMaxLength(200));
+        Version<Postadresse>(modelBuilder, "PersonAdressen", b =>
+        {
+            b.Property(a => a.Zusatz).HasMaxLength(200);
+            b.Property(a => a.Strasse).HasMaxLength(200);
+            b.Property(a => a.Postleitzahl).HasMaxLength(20);
+            b.Property(a => a.Ort).HasMaxLength(200);
+            b.Property(a => a.Land).HasMaxLength(2);
+            b.HasIndex(a => a.AdressId);
+        });
+        Version<AdressKennzeichen>(modelBuilder, "PersonAdressKennzeichen", b => b.Property(k => k.AdressAnzeige).HasMaxLength(500));
+        Version<Rufnummer>(modelBuilder, "PersonRufnummern", b =>
+        {
+            b.Property(r => r.Nummer).HasMaxLength(50);
+            b.Property(r => r.Dienste).HasConversion<int>();
+            b.HasIndex(r => r.NummerId);
+        });
+        Version<EMailAdresse>(modelBuilder, "PersonEMails", b =>
+        {
+            b.Property(e => e.Adresse).HasMaxLength(320);
+            b.HasIndex(e => e.AdressId);
         });
 
         modelBuilder.Entity<AuditEintrag>(b =>
@@ -122,6 +146,29 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
         });
     }
 
+    private static void Unterliste<T>(EntityTypeBuilder<Person> b, Expression<Func<Person, IEnumerable<T>?>> navigation, string feld)
+        where T : class
+    {
+        b.HasMany(navigation).WithOne().HasForeignKey("PersonId").IsRequired().OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(navigation).HasField(feld).UsePropertyAccessMode(PropertyAccessMode.Field).AutoInclude();
+    }
+
+    /// <summary>Gemeinsame Abbildung aller bitemporalen Versionen.</summary>
+    private static void Version<T>(ModelBuilder modelBuilder, string tabelle, Action<EntityTypeBuilder<T>> weiter)
+        where T : BitemporaleVersion<T>
+    {
+        modelBuilder.Entity<T>(b =>
+        {
+            b.ToTable(tabelle);
+            b.HasKey(v => v.Id);
+            b.Property(v => v.Id).ValueGeneratedNever();
+            b.Property(v => v.Grund).HasMaxLength(500);
+            b.Property(v => v.ErfasstVon).HasMaxLength(200);
+            b.HasIndex("PersonId", nameof(BitemporaleVersion<T>.GueltigVon));
+            weiter(b);
+        });
+    }
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         NurAnfuegenPruefen();
@@ -138,7 +185,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
     private void NurAnfuegenPruefen()
     {
         var verboten = ChangeTracker.Entries()
-            .Where(e => e.State == EntityState.Deleted && e.Entity is AuditEintrag or PersonName
+            .Where(e => e.State == EntityState.Deleted && e.Entity is AuditEintrag or IHistorienwert
                         || e.State == EntityState.Modified && e.Entity is AuditEintrag)
             .Select(e => e.Entity.GetType().Name)
             .ToList();
