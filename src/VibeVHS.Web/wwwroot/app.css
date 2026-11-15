@@ -269,3 +269,7 @@ details.vhs-card > summary { cursor: pointer; }
 .vhs-portal button, .vhs-portal .vhs-btn { min-height: 44px; justify-content: center; }
 .vhs-portal button[disabled] { opacity: .6; cursor: not-allowed; }
 .vhs-portal details summary { cursor: pointer; padding: 8px 0; font-weight: 600; min-height: 32px; }
+
+/* Rücksprung zur Liste (ZurueckZurListe) und zuletzt angesehene Zeile */
+.vhs-zurueck { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; font-size: 14px; color: var(--vhs-muted); text-decoration: none; align-self: flex-start; }
+.vhs-zurueck:hover, .vhs-zurueck:focus-visible { color: var(--vhs-fg); text-decoration: underline; }

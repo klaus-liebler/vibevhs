@@ -60,6 +60,7 @@ else if (dubletten.Count > 0)
     </div>
 }
 
+<ZurueckZurListe Liste="personen" />
 <div class="vhs-head">
     <div>
         <h1>@stand.NameMitTitel</h1>
@@ -179,7 +180,7 @@ else if (dubletten.Count > 0)
             {
                 var bl = pb.Belegung;
                 <div>
-                    <span class="vhs-grow"><a href="@($"belegungen/{bl.Id}")"><b>@bl.Kursnummer</b> @pb.Kurstitel</a>
+                    <span class="vhs-grow"><a href="@Ruecksprung.Detail($"belegungen/{bl.Id}", Ruecksprung.Aktuell(Navigation))"><b>@bl.Kursnummer</b> @pb.Kurstitel</a>
                         <br /><span class="vhs-small vhs-muted">@(pb.Beginn is { } bg ? $"ab {bg:dd.MM.yyyy}" : "") · gebucht @bl.GebuchtAm.ToLocalTime().ToString("dd.MM.yyyy") (@VibeVHS.Domain.Anmeldung.BelegungAnzeige.Weg(bl.Weg)) · @bl.Entgelt@(bl.IstKontingent && bl.KontingentAnzahl is not null ? $" · Kontingent: {bl.Kontingent.Verbleibend} von {bl.Kontingent.Anzahl} übrig" : "")</span>
                     </span>
                     @if (pb.KursAbgesagt && bl.Offen) { <StatusPille Stil="krit">Kurs abgesagt</StatusPille> }

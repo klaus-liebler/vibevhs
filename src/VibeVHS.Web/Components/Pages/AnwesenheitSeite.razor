@@ -39,15 +39,15 @@
     }
     else
     {
-        <div class="vhs-tbl">
+        <div class="vhs-tbl" data-liste="anwesenheit">
             <table>
                 <thead><tr><th>Zeit</th><th>Kurs</th><th>Ort</th><th>Kursleitung</th><th>Liste</th></tr></thead>
                 <tbody>
                     @foreach (var t in termine)
                     {
-                        <tr class="vhs-klickzeile" @onclick="@(() => Navigation.NavigateTo($"anwesenheit/{t.VeranstaltungId}"))">
+                        <tr class="vhs-klickzeile" data-zeile="@t.VeranstaltungId" @onclick="@(() => Navigation.NavigateTo(DetailLink(t.VeranstaltungId)))">
                             <td class="vhs-mono">@t.Beginn.ToString("HH:mm")–@t.Ende.ToString("HH:mm")</td>
-                            <td><a href="@($"anwesenheit/{t.VeranstaltungId}")"><b>@t.Kursnummer</b> @t.Titel</a></td>
+                            <td><a href="@DetailLink(t.VeranstaltungId)" @onclick:stopPropagation="true"><b>@t.Kursnummer</b> @t.Titel</a></td>
                             <td class="vhs-small">@t.Orte</td>
                             <td class="vhs-small">@t.Dozent @if (t.Eigene) { <StatusPille Stil="info">eigene</StatusPille> }</td>
                             <td>
@@ -68,6 +68,25 @@
     [SupplyParameterFromQuery(Name = "tag")]
     private string? TagAusAdresse { get; set; }
 
+    [SupplyParameterFromQuery(Name = "eigene")]
+    private bool? EigeneAusAdresse { get; set; }
+
+    private bool zustandSchreiben;
+
+    private string ListenUrl => Ruecksprung.Url("anwesenheit",
+        ("tag", tag.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)), ("eigene", nurEigene ? "true" : null));
+
+    private string DetailLink(Guid id) => Ruecksprung.Detail($"anwesenheit/{id}", ListenUrl);
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && RendererInfo.IsInteractive)
+        {
+            zustandSchreiben = true;
+            Ruecksprung.ZustandSetzen(Navigation, ListenUrl);
+        }
+    }
+
     private DateOnly tag;
     private bool nurEigene;
     private Rolle? rolle;
@@ -78,7 +97,7 @@
     protected override async Task OnInitializedAsync()
     {
         rolle = (await Vorgang.BenutzerAsync()).Rolle;
-        nurEigene = rolle == Rolle.Dozierende;
+        nurEigene = EigeneAusAdresse ?? rolle == Rolle.Dozierende;
         tag = TagAusAdresse is { } t && DateOnly.TryParse(t, System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
         await LadenAsync();
     }
@@ -90,5 +109,11 @@
     }
 
     private async Task LadenAsync()
-        => termine = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AnwesenheitDienst>().TermineAsync(tag, nurEigene || rolle == Rolle.Dozierende));
+    {
+        termine = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AnwesenheitDienst>().TermineAsync(tag, nurEigene || rolle == Rolle.Dozierende));
+        if (zustandSchreiben)
+        {
+            Ruecksprung.ZustandSetzen(Navigation, ListenUrl);
+        }
+    }
 }

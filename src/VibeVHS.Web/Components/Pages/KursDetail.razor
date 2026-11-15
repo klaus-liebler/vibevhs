@@ -1,4 +1,4 @@
-@page "/kurse/{Id:guid}"
+﻿@page "/kurse/{Id:guid}"
 @using VibeVHS.Application.Programm
 @using VibeVHS.Domain.Programm
 @inject Vorgang Vorgang
@@ -14,6 +14,7 @@
     return;
 }
 
+<ZurueckZurListe Liste="kurse" />
 <div class="vhs-head">
     <div>
         <h1>@kurs.Kursnummer @kurs.Titel</h1>
@@ -221,7 +222,7 @@
                 {
                     var konflikt = konflikte.FirstOrDefault(k => k.A.VeranstaltungId == v.Id || k.B.VeranstaltungId == v.Id);
                     <tr class="vhs-klickzeile @(gewaehlt?.Id == v.Id ? "vhs-gewaehlt" : "") @(v.Ausgefallen ? "vhs-ersetzt" : "")" @onclick="@(() => Waehlen(v))">
-                        <td class="vhs-mono"><a href="@($"anwesenheit/{v.Id}")" title="Anwesenheitsliste" @onclick:stopPropagation="true">@v.Nummer</a></td>
+                        <td class="vhs-mono"><a href="@Ruecksprung.Detail($"anwesenheit/{v.Id}", Ruecksprung.Aktuell(Navigation))" title="Anwesenheitsliste" @onclick:stopPropagation="true">@v.Nummer</a></td>
                         <td>@v.Beginn.ToString("ddd dd.MM.yyyy")</td>
                         <td class="vhs-mono">@v.Beginn.ToString("HH:mm")–@v.Ende.ToString("HH:mm")</td>
                         <td>@string.Join(" + ", v.Orte.Select(o => o.OrtName))</td>
@@ -295,8 +296,8 @@
                     @foreach (var t in teilnehmende.Where(t => alleBelegungen || t.Belegung.Offen))
                     {
                         var bl = t.Belegung;
-                        <tr class="vhs-klickzeile" @onclick="@(() => Navigation.NavigateTo($"belegungen/{bl.Id}"))">
-                            <td><a href="@($"belegungen/{bl.Id}")">@t.Name</a></td>
+                        <tr class="vhs-klickzeile" @onclick="@(() => Navigation.NavigateTo(Ruecksprung.Detail($"belegungen/{bl.Id}", Ruecksprung.Aktuell(Navigation))))">
+                            <td><a href="@Ruecksprung.Detail($"belegungen/{bl.Id}", Ruecksprung.Aktuell(Navigation))" @onclick:stopPropagation="true">@t.Name</a></td>
                             <td>
                                 <StatusPille Stil="@(bl.Status == VibeVHS.Domain.Anmeldung.Belegungsstatus.Angemeldet ? "gut" : bl.Offen ? "warn" : "neutral")">@VibeVHS.Domain.Anmeldung.BelegungAnzeige.Status(bl.Status)@(t.Warteplatz is { } wp ? $" ({wp})" : "")</StatusPille>
                                 @if (bl.AngebotBis is { } ab) { <span class="vhs-small vhs-muted">bis @ab.ToLocalTime().ToString("dd.MM. HH:mm")</span> }

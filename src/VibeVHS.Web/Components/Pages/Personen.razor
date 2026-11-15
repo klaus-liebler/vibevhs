@@ -156,10 +156,10 @@
     <div class="vhs-vliste-kopf" aria-hidden="true">
         <span>Name</span><span>Geburtsdatum</span><span>Wohnort</span><span>Rollen</span><span>Status</span>
     </div>
-    <div class="vhs-vliste" role="list" aria-label="Personen">
+    <div class="vhs-vliste" role="list" aria-label="Personen" data-liste="personen">
         <Virtualize @ref="liste" TItem="PersonZeile" ItemsProvider="LadenAsync" ItemComparer="@GleicheId" ItemSize="46" OverscanCount="15" Context="p">
             <ItemContent>
-                <a class="vhs-vzeile" role="listitem" href="@($"personen/{p.Id}")">
+                <a @key="p.Id" class="vhs-vzeile" role="listitem" data-zeile="@p.Id" href="@Ruecksprung.Detail($"personen/{p.Id}", ListenUrl)">
                     <span class="vhs-vname">
                         <b>@p.Anzeigename</b>
                         @if (dublettenIds.Contains(p.Id))
@@ -195,6 +195,49 @@
     private Virtualize<PersonZeile>? liste;
     private PersonenFilter filter = new();
     private string? suche;
+
+    // Listenzustand in der Adresse (Suche und Filterchips): teilbar, Browser-Zurück und „← Zurück zur Liste“ stellen ihn wieder her.
+    [SupplyParameterFromQuery(Name = "q")]
+    private string? SucheAusAdresse { get; set; }
+
+    [SupplyParameterFromQuery(Name = "rolle")]
+    private string? RolleAusAdresse { get; set; }
+
+    [SupplyParameterFromQuery(Name = "status")]
+    private string? StatusAusAdresse { get; set; }
+
+    [SupplyParameterFromQuery(Name = "fb")]
+    private int? FbAusAdresse { get; set; }
+
+    [SupplyParameterFromQuery(Name = "ds")]
+    private string? DatenschutzAusAdresse { get; set; }
+
+    [SupplyParameterFromQuery(Name = "dubletten")]
+    private bool? DublettenAusAdresse { get; set; }
+
+    private bool zustandSchreiben;
+
+    private string ListenUrl => Ruecksprung.Url("personen",
+        ("q", string.IsNullOrWhiteSpace(filter.Suche) ? null : filter.Suche.Trim()), ("rolle", filter.Rolle?.ToString()), ("status", filter.Status?.ToString()),
+        ("fb", filter.Fachbereich?.ToString(System.Globalization.CultureInfo.InvariantCulture)), ("ds", filter.Datenschutz?.ToString()),
+        ("dubletten", filter.NurDublettenHinweise ? "true" : null));
+
+    private PersonenFilter FilterAusAdresse() => new(
+        string.IsNullOrWhiteSpace(SucheAusAdresse) ? null : SucheAusAdresse,
+        Enum.TryParse<Personenrolle>(RolleAusAdresse, out var r) ? r : null,
+        Enum.TryParse<Personenstatus>(StatusAusAdresse, out var s) ? s : null,
+        FbAusAdresse,
+        DublettenAusAdresse == true,
+        Enum.TryParse<VibeVHS.Domain.Datenschutz.Datenschutzstatus>(DatenschutzAusAdresse, out var d) ? d : null);
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && RendererInfo.IsInteractive)
+        {
+            zustandSchreiben = true;
+            Ruecksprung.ZustandSetzen(Navigation, ListenUrl);
+        }
+    }
     private Filterzahlen? zahlen;
     private IReadOnlyList<Fachbereich> fachbereiche = [];
     private HashSet<Guid> dublettenIds = [];
@@ -260,6 +303,8 @@
     protected override async Task OnInitializedAsync()
     {
         formularOffen = Neu == 1;
+        filter = FilterAusAdresse();
+        suche = filter.Suche;
         fachbereiche = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IStammdaten>().FachbereicheAsync());
         await HinweiseUndZahlenLadenAsync();
     }
@@ -311,6 +356,11 @@
         ersteMs = null;
         vorschau = null;
         zahlen = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenAbfrage>().ZaehlenAsync(filter));
+        if (zustandSchreiben)
+        {
+            Ruecksprung.ZustandSetzen(Navigation, ListenUrl);
+        }
+
         if (liste is not null)
         {
             await liste.RefreshDataAsync();

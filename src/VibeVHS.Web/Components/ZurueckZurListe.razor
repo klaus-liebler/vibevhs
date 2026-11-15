@@ -1,0 +1,24 @@
+@* Pfeil oben links auf Detailseiten: zurück zur Liste mit demselben Such- und Filterzustand (aus ?zurueck=).
+   Ohne (gültigen) Parameter führt er auf die ungefilterte Liste. Die zuletzt angesehene Zeile hebt verhalten.js hervor. *@
+
+<a class="vhs-zurueck" href="@Ziel" data-ruecksprung="@Schluessel" title="@(Zurueck is null ? "Zur Liste" : "Zur Liste mit Ihrer letzten Suche und Ihren Filtern")">
+    <span aria-hidden="true">←</span> @(Text ?? (Ziel.Split('?', '#')[0].Contains('/', StringComparison.Ordinal) ? "Zurück" : "Zurück zur Liste"))
+</a>
+
+@code {
+    /// <summary>Pfad der Liste ohne Filter, z. B. „kurse“ oder „personen“ (Rückfall ohne ?zurueck=).</summary>
+    [Parameter, EditorRequired]
+    public string Liste { get; set; } = "";
+
+    /// <summary>Beschriftung; ohne Angabe „Zurück zur Liste“ bzw. „Zurück“, wenn der Rückweg auf eine Detailseite führt.</summary>
+    [Parameter]
+    public string? Text { get; set; }
+
+    [SupplyParameterFromQuery(Name = Ruecksprung.Parameter)]
+    private string? Zurueck { get; set; }
+
+    private string Ziel => Ruecksprung.Sicher(Zurueck) ?? Liste;
+
+    /// <summary>Schlüssel der Liste (erster Pfadteil), passend zu data-liste auf der Listenseite.</summary>
+    private string Schluessel => Ziel.Split('?', '#')[0].Split('/')[0];
+}
