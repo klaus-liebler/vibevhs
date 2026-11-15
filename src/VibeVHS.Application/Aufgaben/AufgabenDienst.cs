@@ -196,9 +196,10 @@ public sealed class AufgabenDienst(
         var geschlossen = (await speicher.AbgeschlossenSeitAsync(heuteBeginn, abbruch))
             .Where(a => a.Status == Aufgabenstatus.Geschlossen && (leitung || ImKorb(wer, a) || a.BearbeiterKennung == wer.Kennung))
             .OrderByDescending(a => a.ErledigtAm).ToList();
-        var automatisch = (await protokoll.NeuesteAsync(400, abbruch))
-            .Where(e => e.BenutzerKennung == Benutzer.Automatik.Kennung && e.Zeitpunkt >= heuteBeginn.ToUniversalTime()
-                        && !e.Aktion.StartsWith("Aufgabe.", StringComparison.Ordinal) && !e.Aktion.StartsWith("Postausgang.", StringComparison.Ordinal))
+        // Alle automatischen Einträge seit 0 Uhr. Früher: Ausschnitt der neuesten 400 Protokolleinträge – die Zahl schrumpfte,
+        // sobald die Zustellungen des Postausgangs (alle 15 s) ältere Einträge aus dem Fenster schoben.
+        var automatisch = (await protokoll.SeitAsync(heuteBeginn.ToUniversalTime(), Benutzer.Automatik.Kennung, abbruch))
+            .Where(e => !e.Aktion.StartsWith("Aufgabe.", StringComparison.Ordinal) && !e.Aktion.StartsWith("Postausgang.", StringComparison.Ordinal))
             .ToList();
         var ueberfaellig = leitung
             ? offene.GroupBy(a => (a.Gruppe, a.Fachbereich))
