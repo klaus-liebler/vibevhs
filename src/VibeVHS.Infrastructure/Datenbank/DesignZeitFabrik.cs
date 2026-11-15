@@ -7,5 +7,5 @@ namespace VibeVHS.Infrastructure.Datenbank;
 internal sealed class DesignZeitFabrik : IDesignTimeDbContextFactory<VibeVhsDbContext>
 {
     public VibeVhsDbContext CreateDbContext(string[] args)
-        => new(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite("Data Source=designzeit.db").Options);
+        => new(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite("Data Source=designzeit.db", s => s.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)).Options);
 }

@@ -16,6 +16,9 @@ public sealed class Person
     private readonly List<AdressKennzeichen> _kennzeichen = [];
     private readonly List<Rufnummer> _rufnummern = [];
     private readonly List<EMailAdresse> _emails = [];
+    private readonly List<Organisationszugehoerigkeit> _organisationen = [];
+    private readonly List<Buchungsvollmacht> _vollmachten = [];
+    private readonly List<Einwilligung> _einwilligungen = [];
 
     private Person()
     {
@@ -53,9 +56,36 @@ public sealed class Person
 
     public IReadOnlyCollection<EMailAdresse> EMailAdressen => _emails;
 
+    public IReadOnlyCollection<Organisationszugehoerigkeit> Organisationen => _organisationen;
+
+    public IReadOnlyCollection<Buchungsvollmacht> Vollmachten => _vollmachten;
+
+    public IReadOnlyCollection<Einwilligung> Einwilligungen => _einwilligungen;
+
+    public Personenstatus Status { get; private set; }
+
+    /// <summary>Fachbereiche, denen die Person zugeordnet ist (v. a. Dozierende).</summary>
+    public List<int> Fachbereiche { get; private set; } = [];
+
+    /// <summary>Zwischenstand für Listen: "Titel Vorname Nachname".</summary>
+    public string Anzeigename { get; private set; } = string.Empty;
+
+    /// <summary>Zwischenstand für die Sortierung: normalisiert "nachname vorname".</summary>
+    public string Sortiername { get; private set; } = string.Empty;
+
+    /// <summary>Eindeutiger Sortierschlüssel (Sortiername + Id) für die Keyset-Pagination.</summary>
+    public string Sortierschluessel { get; private set; } = string.Empty;
+
+    /// <summary>Zwischenstand: Ort des üblichen Aufenthalts.</summary>
+    public string? Wohnort { get; private set; }
+
+    /// <summary>Gesetzt, wenn dieser Datensatz als Dublette in einen anderen überführt wurde.</summary>
+    public Guid? ZusammengefuehrtIn { get; private set; }
+
     /// <summary>Alle Versionen aller Stammdaten für die Datenhistorie.</summary>
     public IEnumerable<IHistorienwert> AlleVersionen =>
-        _namen.Cast<IHistorienwert>().Concat(_merkmale).Concat(_adressen).Concat(_kennzeichen).Concat(_rufnummern).Concat(_emails);
+        _namen.Cast<IHistorienwert>().Concat(_merkmale).Concat(_adressen).Concat(_kennzeichen).Concat(_rufnummern).Concat(_emails)
+            .Concat(_organisationen).Concat(_vollmachten).Concat(_einwilligungen);
 
     public static Person Anlegen(string vorname, string nachname, DateOnly nameGueltigAb, DateTimeOffset jetzt,
         DateOnly? geburtsdatum = null, string? eMail = null, string sprache = "de", string? von = null)
@@ -98,7 +128,10 @@ public sealed class Person
             Kennzeichen(AdressKennzeichenArt.UeblicherAufenthaltsort)?.AdressId,
             Kennzeichen(AdressKennzeichenArt.Korrespondenzadresse)?.AdressId,
             _rufnummern.AlleAmStichtag(gueltigAm, bekanntAm),
-            _emails.AlleAmStichtag(gueltigAm, bekanntAm));
+            _emails.AlleAmStichtag(gueltigAm, bekanntAm),
+            _organisationen.AlleAmStichtag(gueltigAm, bekanntAm),
+            _vollmachten.AlleAmStichtag(gueltigAm, bekanntAm),
+            _einwilligungen.AlleAmStichtag(gueltigAm, bekanntAm));
     }
 
     /// <summary>Name, der am <paramref name="gueltigAm"/> galt, nach dem Wissensstand vom <paramref name="bekanntAm"/>.</summary>
@@ -117,15 +150,27 @@ public sealed class Person
     {
         var neu = new PersonName(vorname, nachname, ab, null, Erfassung.Aenderung(jetzt, grund, von));
         ZeitlicheHistorie.AendernAb(_namen, neu);
+        ZwischenstandAktualisieren(jetzt);
         return neu;
     }
 
     /// <summary>Korrektur eines falsch erfassten Namens für dessen gesamten Gültigkeitszeitraum.</summary>
     public PersonName NameKorrigieren(string vorname, string nachname, DateOnly betroffenAm, string grund, DateTimeOffset jetzt, string? von = null)
-        => ZeitlicheHistorie.Korrigieren(_namen, betroffenAm,
+    {
+        var neu = ZeitlicheHistorie.Korrigieren(_namen, betroffenAm,
             (gv, gb) => new PersonName(vorname, nachname, gv, gb, Erfassung.Korrektur(jetzt, grund, von)), jetzt);
+        ZwischenstandAktualisieren(jetzt);
+        return neu;
+    }
 
-    public void TitelSetzen(string? titel) => Titel = string.IsNullOrWhiteSpace(titel) ? null : titel.Trim();
+    public void TitelSetzen(string? titel)
+    {
+        Titel = string.IsNullOrWhiteSpace(titel) ? null : titel.Trim();
+        if (_namen.AktuellerVerlauf().LastOrDefault() is { } n)
+        {
+            Anzeigename = Titel is null ? n.Anzeige : $"{Titel} {n.Anzeige}";
+        }
+    }
 
     // ---------- Merkmale ----------
 
@@ -207,6 +252,7 @@ public sealed class Person
         var erstes = !_kennzeichen.Any(k => k.Art == art);
         ZeitlicheHistorie.AendernAb(_kennzeichen, new AdressKennzeichen(art, adressId, adresse.Anzeige, ab, null,
             erstes ? erfassung with { Art = Erfassungsart.Ersterfassung } : erfassung));
+        ZwischenstandAktualisieren(erfassung.Am);
     }
 
     /// <summary>Umzug: neue Adresse ab Datum, alte Adresse aufgeben, Aufenthaltsort umstellen (Korrespondenz bleibt, wie sie ist).</summary>
@@ -254,6 +300,140 @@ public sealed class Person
         ZwischenstandAktualisieren(erfassung.Am);
     }
 
+    // ---------- Organisationen, Vollmachten, Einwilligungen ----------
+
+    public void OrganisationZuordnenAb(Organisation organisation, string? funktion, DateOnly ab, Erfassung erfassung)
+    {
+        ArgumentNullException.ThrowIfNull(organisation);
+        ZeitlicheHistorie.AendernAb(_organisationen, new Organisationszugehoerigkeit(organisation.Id, organisation.Name, funktion, ab, null, erfassung));
+    }
+
+    public void OrganisationVerlassenAb(Guid organisationId, DateOnly ab, Erfassung erfassung)
+    {
+        var aktuell = AktuelleVersion(_organisationen, o => o.OrganisationId == organisationId, ab, erfassung.Am, "Zugehörigkeit");
+        ZeitlicheHistorie.BeendenAb(_organisationen, aktuell.KopieMit(ab, null, erfassung with { Art = Erfassungsart.Beendet }));
+    }
+
+    /// <summary>Erteilt eine Buchungsvollmacht für den Zeitraum [von, bis).</summary>
+    public Guid VollmachtErteilen(Bevollmaechtigtenart art, Guid bevollmaechtigterId, string bevollmaechtigterName, string nachweis,
+        DateOnly von, DateOnly? bis, Erfassung erfassung)
+    {
+        if (art == Bevollmaechtigtenart.Person && bevollmaechtigterId == Id)
+        {
+            throw new InvalidOperationException("Eine Person braucht keine Vollmacht für sich selbst.");
+        }
+
+        var id = Ids.Neu();
+        _vollmachten.Add(new Buchungsvollmacht(id, art, bevollmaechtigterId, bevollmaechtigterName, nachweis, von, bis, erfassung));
+        return id;
+    }
+
+    public void VollmachtWiderrufenAb(Guid vollmachtId, DateOnly ab, Erfassung erfassung)
+    {
+        var aktuell = AktuelleVersion(_vollmachten, v => v.VollmachtId == vollmachtId, ab, erfassung.Am, "Vollmacht");
+        ZeitlicheHistorie.BeendenAb(_vollmachten, aktuell.KopieMit(ab, null, erfassung with { Art = Erfassungsart.Beendet }));
+    }
+
+    /// <summary>Darf <paramref name="bevollmaechtigterId"/> diese Person am Stichtag buchen (nach Wissensstand <paramref name="bekanntAm"/>)?</summary>
+    public bool DarfBuchen(Guid bevollmaechtigterId, DateOnly am, DateTimeOffset bekanntAm)
+        => bevollmaechtigterId == Id
+           || _vollmachten.AlleAmStichtag(am, bekanntAm).Any(v => v.BevollmaechtigterId == bevollmaechtigterId);
+
+    public void EinwilligungSetzenAb(Kontaktkanal kanal, Kontaktzweck zweck, bool erteilt, DateOnly ab, Erfassung erfassung)
+    {
+        var erstes = !_einwilligungen.Any(e => e.Kanal == kanal && e.Zweck == zweck);
+        ZeitlicheHistorie.AendernAb(_einwilligungen, new Einwilligung(kanal, zweck, erteilt, ab, null,
+            erstes && erfassung.Art == Erfassungsart.AenderungAbDatum ? erfassung with { Art = Erfassungsart.Ersterfassung } : erfassung));
+    }
+
+    public bool EinwilligungAm(Kontaktkanal kanal, Kontaktzweck zweck, DateOnly am, DateTimeOffset bekanntAm)
+        => _einwilligungen.Where(e => e.Kanal == kanal && e.Zweck == zweck).AlsStichtag(am, bekanntAm)?.Erteilt ?? false;
+
+    // ---------- Status und Zuordnung ----------
+
+    public void StatusSetzen(Personenstatus status) => Status = status;
+
+    public void FachbereicheSetzen(IEnumerable<int> fachbereiche) => Fachbereiche = fachbereiche.Distinct().Order().ToList();
+
+    /// <summary>
+    /// Übernimmt die heute gültigen Kontaktdaten, Rollen, Organisationen und Vollmachten einer Dublette, soweit sie hier fehlen.
+    /// Die Dublette selbst bleibt mit ihrer ganzen Historie erhalten und verweist auf diesen Datensatz.
+    /// </summary>
+    public void DubletteUebernehmen(Person dublette, Erfassung erfassung)
+    {
+        ArgumentNullException.ThrowIfNull(dublette);
+        if (dublette.Id == Id)
+        {
+            throw new InvalidOperationException("Eine Person kann nicht mit sich selbst zusammengeführt werden.");
+        }
+
+        if (dublette.Status == Personenstatus.Zusammengefuehrt)
+        {
+            throw new InvalidOperationException("Diese Dublette wurde bereits zusammengeführt.");
+        }
+
+        var heute = DateOnly.FromDateTime(erfassung.Am.Date);
+        var ihr = dublette.StandAm(heute, erfassung.Am);
+        var mein = StandAm(heute, erfassung.Am);
+        var e = erfassung with { Art = Erfassungsart.AenderungAbDatum };
+
+        foreach (var a in ihr.Adressen.Where(a => !mein.Adressen.Any(m => Suchtext.Normalisieren(m.Anzeige) == Suchtext.Normalisieren(a.Anzeige))))
+        {
+            var neu = AdresseHinzufuegen(a.Zusatz, a.Strasse, a.Postleitzahl, a.Ort, heute, e, a.Land);
+            if (mein.AufenthaltsortId is null && a.AdressId == ihr.AufenthaltsortId)
+            {
+                AdressKennzeichnenAb(AdressKennzeichenArt.UeblicherAufenthaltsort, neu, heute, e);
+            }
+        }
+
+        foreach (var r in ihr.Rufnummern.Where(r => !mein.Rufnummern.Any(m => m.Nummer == r.Nummer)))
+        {
+            RufnummerHinzufuegen(r.Art, r.Nummer, r.Dienste, r.Einwilligung, false, heute, e);
+        }
+
+        foreach (var m in ihr.EMails.Where(m => !mein.EMails.Any(x => string.Equals(x.Adresse, m.Adresse, StringComparison.OrdinalIgnoreCase))))
+        {
+            EMailHinzufuegen(m.Art, m.Adresse, mein.EMails.Count == 0 && m.Bevorzugt, heute, e);
+        }
+
+        foreach (var v in ihr.Vollmachten)
+        {
+            _vollmachten.Add(new Buchungsvollmacht(Ids.Neu(), v.Art, v.BevollmaechtigterId, v.BevollmaechtigterName, v.Nachweis, heute, v.GueltigBis, e));
+        }
+
+        foreach (var o in ihr.Organisationen.Where(o => !mein.Organisationen.Any(m => m.OrganisationId == o.OrganisationId)))
+        {
+            _organisationen.Add(new Organisationszugehoerigkeit(o.OrganisationId, o.OrganisationName, o.Funktion, heute, o.GueltigBis, e));
+        }
+
+        foreach (Personenrolle rolle in Enum.GetValues<Personenrolle>().Where(r => r != Personenrolle.Keine && ihr.Rollen.HasFlag(r)))
+        {
+            RolleHinzufuegen(rolle, heute, e);
+        }
+
+        FachbereicheSetzen(Fachbereiche.Concat(dublette.Fachbereiche));
+        if (Status != Personenstatus.Aktiv && dublette.Status == Personenstatus.Aktiv)
+        {
+            Status = Personenstatus.Aktiv;
+        }
+
+        dublette.Status = Personenstatus.Zusammengefuehrt;
+        dublette.ZusammengefuehrtIn = Id;
+        ZwischenstandAktualisieren(erfassung.Am);
+    }
+
+    /// <summary>Text für den Suchindex: alle (auch frühere) Namen, E-Mail-Adressen, Geburtsdatum, Wohnort – normalisiert.</summary>
+    public string SuchtextFuerIndex()
+    {
+        var teile = new List<string?> { Titel, Wohnort, Geburtsdatum?.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture) };
+        teile.AddRange(_namen.Select(n => n.Anzeige));
+        teile.AddRange(_emails.Select(e => e.Adresse));
+        return string.Join(' ', teile.Where(t => !string.IsNullOrWhiteSpace(t)).Select(Suchtext.Normalisieren).Distinct());
+    }
+
+    /// <summary>Berechnet die Zwischenstands-Spalten neu (z. B. nach einer Migration).</summary>
+    public void ZwischenstandNachfuehren(DateTimeOffset jetzt) => ZwischenstandAktualisieren(jetzt);
+
     // ---------- intern ----------
 
     private static T AktuelleVersion<T>(IEnumerable<T> versionen, Func<T, bool> betrifft, DateOnly ab, DateTimeOffset jetzt, string was)
@@ -270,10 +450,35 @@ public sealed class Person
     private void ZwischenstandAktualisieren(DateTimeOffset jetzt)
     {
         var stand = StandAm(DateOnly.FromDateTime(jetzt.Date), jetzt);
-        Geburtsdatum = stand.Geburtsdatum;
-        Sprache = stand.Sprache ?? "de";
-        Rollen = stand.Rollen;
-        EMail = (stand.EMails.FirstOrDefault(e => e.Bevorzugt) ?? stand.EMails.FirstOrDefault())?.Adresse;
+        // Felder ohne versionierte Daten (Altbestand vor Einführung der Versionierung) bleiben, wie sie sind.
+        if (_merkmale.Any(m => m.Art == MerkmalArt.Geburtsdatum))
+        {
+            Geburtsdatum = stand.Geburtsdatum;
+        }
+
+        if (_merkmale.Any(m => m.Art == MerkmalArt.Sprache))
+        {
+            Sprache = stand.Sprache ?? "de";
+        }
+
+        if (_merkmale.Any(m => m.Art == MerkmalArt.Rollen))
+        {
+            Rollen = stand.Rollen;
+        }
+
+        if (_emails.Count > 0)
+        {
+            EMail = (stand.EMails.FirstOrDefault(e => e.Bevorzugt) ?? stand.EMails.FirstOrDefault())?.Adresse;
+        }
+        var name = stand.Name ?? _namen.AktuellerVerlauf().LastOrDefault();
+        if (name is not null)
+        {
+            Anzeigename = string.IsNullOrEmpty(Titel) ? name.Anzeige : $"{Titel} {name.Anzeige}";
+            Sortiername = Suchtext.Normalisieren($"{name.Nachname} {name.Vorname}");
+            Sortierschluessel = $"{Sortiername}|{Id:N}";
+        }
+
+        Wohnort = stand.Aufenthaltsort?.Ort ?? Wohnort;
     }
 }
 
@@ -290,8 +495,15 @@ public sealed record PersonenStand(
     Guid? AufenthaltsortId,
     Guid? KorrespondenzadresseId,
     IReadOnlyList<Rufnummer> Rufnummern,
-    IReadOnlyList<EMailAdresse> EMails)
+    IReadOnlyList<EMailAdresse> EMails,
+    IReadOnlyList<Organisationszugehoerigkeit> Organisationen,
+    IReadOnlyList<Buchungsvollmacht> Vollmachten,
+    IReadOnlyList<Einwilligung> Einwilligungen)
 {
+    /// <summary>Liegt für Kanal und Zweck eine Einwilligung vor? Ohne Angabe: nein.</summary>
+    public bool Erlaubt(Kontaktkanal kanal, Kontaktzweck zweck)
+        => Einwilligungen.FirstOrDefault(e => e.Kanal == kanal && e.Zweck == zweck)?.Erteilt ?? false;
+
     public string NameMitTitel => Name is null ? "(unbekannt)" : string.IsNullOrEmpty(Titel) ? Name.Anzeige : $"{Titel} {Name.Anzeige}";
 
     public Postadresse? Aufenthaltsort => Adressen.FirstOrDefault(a => a.AdressId == AufenthaltsortId);

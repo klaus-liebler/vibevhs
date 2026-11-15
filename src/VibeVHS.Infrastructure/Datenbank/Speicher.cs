@@ -14,6 +14,14 @@ internal sealed class PersonenSpeicher(VibeVhsDbContext db) : IPersonenSpeicher
     public Task<Person?> LadenAsync(Guid id, CancellationToken abbruch = default)
         => db.Personen.FirstOrDefaultAsync(p => p.Id == id, abbruch);
 
+    public async Task<IReadOnlyList<Person>> LadenAsync(IEnumerable<Guid> ids, CancellationToken abbruch = default)
+    {
+        var liste = ids.ToList();
+        return await db.Personen.Where(p => liste.Contains(p.Id)).ToListAsync(abbruch);
+    }
+
+    public void AusschlussHinzufuegen(DublettenAusschluss ausschluss) => db.DublettenAusschluesse.Add(ausschluss);
+
     public async Task<IReadOnlyList<Person>> AlleAsync(CancellationToken abbruch = default)
         => await db.Personen.AsNoTracking().OrderBy(p => p.AngelegtAm).ToListAsync(abbruch);
 

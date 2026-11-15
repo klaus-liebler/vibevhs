@@ -15,6 +15,28 @@ internal static class Demodaten
 {
     private const string Von = "Demodaten";
 
+    /// <summary>Große Testdatenmenge (fester Startwert), einmalig, wenn <c>Demodaten:Massendaten</c> &gt; 0.</summary>
+    public static async Task MassendatenAnlegenAsync(IServiceProvider dienste, int anzahl)
+    {
+        await using var bereich = dienste.CreateAsyncScope();
+        var db = bereich.ServiceProvider.GetRequiredService<VibeVhsDbContext>();
+        if (anzahl <= 0 || await db.Protokoll.AnyAsync(e => e.Aktion == "Testdaten.Erzeugt"))
+        {
+            return;
+        }
+
+        var log = bereich.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(Demodaten));
+        var uhr = System.Diagnostics.Stopwatch.StartNew();
+        var daten = new VibeVHS.Adapters.Mocks.Testdaten.Massendaten().Erzeugen(anzahl,
+            bereich.ServiceProvider.GetRequiredService<TimeProvider>().GetLocalNow());
+        db.Organisationen.AddRange(daten.Organisationen);
+        db.Personen.AddRange(daten.Personen);
+        await bereich.ServiceProvider.GetRequiredService<IAuditProtokoll>().ProtokollierenAsync("Testdaten.Erzeugt",
+            $"Entwicklungsumgebung: {daten.Personen.Count} fiktive Testpersonen ({daten.GeplanteDubletten} geplante Dubletten) und {daten.Organisationen.Count} Organisationen angelegt");
+        await db.SaveChangesAsync();
+        log.LogInformation("Massendaten angelegt: {Anzahl} Personen in {Dauer} ms", daten.Personen.Count, uhr.ElapsedMilliseconds);
+    }
+
     public static async Task AnlegenAsync(IServiceProvider dienste)
     {
         await using var bereich = dienste.CreateAsyncScope();

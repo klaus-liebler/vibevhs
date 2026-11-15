@@ -3,11 +3,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using VibeVHS.Domain.Gemeinsam;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using VibeVHS.Application.Personen;
 using VibeVHS.Application.Postausgang;
 using VibeVHS.Application.Protokoll;
 using VibeVHS.Application.Sicherheit;
 using VibeVHS.Domain.Personen;
 using VibeVHS.Domain.Stammdaten;
+using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Infrastructure.Datenbank;
 
@@ -26,6 +28,12 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
     public DbSet<Fachbereich> Fachbereiche => Set<Fachbereich>();
 
     public DbSet<Benutzerkonto> Benutzerkonten => Set<Benutzerkonto>();
+
+    public DbSet<Organisation> Organisationen => Set<Organisation>();
+
+    public DbSet<DublettenAusschluss> DublettenAusschluesse => Set<DublettenAusschluss>();
+
+    public DbSet<Suchindexeintrag> Suchindex => Set<Suchindexeintrag>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder konfiguration)
     {
@@ -47,12 +55,24 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(p => p.Rollen).HasConversion<int>();
             b.Property(p => p.Benutzerkennung).HasMaxLength(100);
             b.HasIndex(p => p.Benutzerkennung).IsUnique();
+            b.Property(p => p.Status).HasMaxLength(30);
+            b.Property(p => p.Anzeigename).HasMaxLength(300);
+            b.Property(p => p.Sortiername).HasMaxLength(300);
+            b.Property(p => p.Sortierschluessel).HasMaxLength(340);
+            b.Property(p => p.Wohnort).HasMaxLength(200);
+            b.PrimitiveCollection(p => p.Fachbereiche);
+            b.HasIndex(p => p.Sortierschluessel).IsUnique();
+            b.HasIndex(p => p.Geburtsdatum);
+            b.HasIndex(p => p.Status);
             Unterliste(b, p => p.Namen, "_namen");
             Unterliste(b, p => p.Merkmale, "_merkmale");
             Unterliste(b, p => p.Adressen, "_adressen");
             Unterliste(b, p => p.AdressKennzeichen, "_kennzeichen");
             Unterliste(b, p => p.Rufnummern, "_rufnummern");
             Unterliste(b, p => p.EMailAdressen, "_emails");
+            Unterliste(b, p => p.Organisationen, "_organisationen");
+            Unterliste(b, p => p.Vollmachten, "_vollmachten");
+            Unterliste(b, p => p.Einwilligungen, "_einwilligungen");
         });
 
         Version<PersonName>(modelBuilder, "PersonNamen", b =>
@@ -78,6 +98,43 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(r => r.Dienste).HasConversion<int>();
             b.HasIndex(r => r.NummerId);
         });
+        Version<Organisationszugehoerigkeit>(modelBuilder, "PersonOrganisationen", b =>
+        {
+            b.Property(o => o.OrganisationName).HasMaxLength(300);
+            b.Property(o => o.Funktion).HasMaxLength(200);
+            b.HasIndex(o => o.OrganisationId);
+        });
+        Version<Buchungsvollmacht>(modelBuilder, "PersonVollmachten", b =>
+        {
+            b.Property(v => v.BevollmaechtigterName).HasMaxLength(300);
+            b.Property(v => v.Nachweis).HasMaxLength(500);
+            b.HasIndex(v => v.BevollmaechtigterId);
+        });
+        Version<Einwilligung>(modelBuilder, "PersonEinwilligungen", _ => { });
+
+        modelBuilder.Entity<Organisation>(b =>
+        {
+            b.ToTable("Organisationen");
+            b.HasKey(o => o.Id);
+            b.Property(o => o.Id).ValueGeneratedNever();
+            b.Property(o => o.Name).HasMaxLength(300);
+            b.Property(o => o.Ort).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<DublettenAusschluss>(b =>
+        {
+            b.ToTable("DublettenAusschluesse");
+            b.HasKey(d => new { d.PersonA, d.PersonB });
+            b.Property(d => d.Von).HasMaxLength(200);
+        });
+
+        // FTS5-Volltextindex; wird per SQL in der Migration angelegt und von SaveChanges gepflegt.
+        modelBuilder.Entity<Suchindexeintrag>(b =>
+        {
+            b.ToTable("PersonSuche", t => t.ExcludeFromMigrations());
+            b.HasKey(s => s.PersonId);
+        });
+
         Version<EMailAdresse>(modelBuilder, "PersonEMails", b =>
         {
             b.Property(e => e.Adresse).HasMaxLength(320);
@@ -175,10 +232,54 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
-    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         NurAnfuegenPruefen();
-        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        var geaendert = GeaendertePersonen();
+        if (geaendert.Count == 0)
+        {
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        var eigeneTransaktion = Database.CurrentTransaction is null ? await Database.BeginTransactionAsync(cancellationToken) : null;
+        try
+        {
+            var anzahl = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+            await PersonenSuchindex.AktualisierenAsync(this, geaendert, cancellationToken);
+            if (eigeneTransaktion is not null)
+            {
+                await eigeneTransaktion.CommitAsync(cancellationToken);
+            }
+
+            return anzahl;
+        }
+        finally
+        {
+            if (eigeneTransaktion is not null)
+            {
+                await eigeneTransaktion.DisposeAsync();
+            }
+        }
+    }
+
+    /// <summary>Personen, deren Daten (oder Unterlisten) sich in diesem Speichervorgang ändern.</summary>
+    private List<Person> GeaendertePersonen()
+    {
+        var ids = new HashSet<Guid>();
+        foreach (var e in ChangeTracker.Entries().Where(e => e.State is EntityState.Added or EntityState.Modified))
+        {
+            if (e.Entity is Person p)
+            {
+                ids.Add(p.Id);
+            }
+            else if (e.Entity is IHistorienwert && e.Metadata.FindProperty("PersonId") is not null
+                     && e.Property("PersonId").CurrentValue is Guid personId)
+            {
+                ids.Add(personId);
+            }
+        }
+
+        return ChangeTracker.Entries<Person>().Select(e => e.Entity).Where(p => ids.Contains(p.Id)).ToList();
     }
 
     /// <summary>Protokolleinträge und Namensversionen dürfen nur angefügt, nie gelöscht werden.</summary>

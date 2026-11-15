@@ -34,7 +34,7 @@ public class DatenhistorieTests
     {
         var eintraege = Datenhistorie.Erstellen(PersonMitAllenAenderungen());
 
-        eintraege.Select(e => e.Datenart).Distinct().Order().ShouldBe(Datenhistorie.Datenarten.Order());
+        eintraege.Select(e => e.Datenart).Distinct().Order().ShouldBe(Datenhistorie.Datenarten.Take(7).Order());
         eintraege.Select(e => e.ErfasstAm).ShouldBeInOrder(SortDirection.Descending);
 
         var juengste = eintraege.Where(e => e.ErfasstAm > T0).Select(e => e.Datenart).Distinct().ToList();

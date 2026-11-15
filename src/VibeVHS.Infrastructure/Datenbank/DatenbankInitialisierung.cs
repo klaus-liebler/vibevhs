@@ -27,6 +27,7 @@ public static class DatenbankInitialisierung
 
         await db.Database.MigrateAsync(abbruch);
         var modus = await db.Database.SqlQueryRaw<string>("PRAGMA journal_mode=WAL").ToListAsync(abbruch);
+        await Personen.PersonenSuchindex.AufbauenFallsNoetigAsync(db, log, abbruch);
         log.LogInformation("Datenbank {Datei} bereit, Journal-Modus {Modus}", datei, modus.FirstOrDefault());
     }
 }

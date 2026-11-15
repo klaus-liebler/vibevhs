@@ -8,6 +8,7 @@ using VibeVHS.Application.Postausgang;
 using VibeVHS.Application.Protokoll;
 using VibeVHS.Application.Sicherheit;
 using VibeVHS.Application.Stammdaten;
+using VibeVHS.Infrastructure.Personen;
 using VibeVHS.Infrastructure.Startdaten;
 using VibeVHS.Infrastructure.Datenbank;
 using VibeVHS.Infrastructure.Hintergrund;
@@ -26,7 +27,8 @@ public static class Registrierung
             verbindung.DataSource = Path.GetFullPath(Path.Combine(basisVerzeichnis, verbindung.DataSource));
         }
 
-        dienste.AddDbContext<VibeVhsDbContext>(o => o.UseSqlite(verbindung.ToString()));
+        dienste.AddDbContext<VibeVhsDbContext>(o => o.UseSqlite(verbindung.ToString(),
+            s => s.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 
         dienste.AddScoped<IPersonenSpeicher, PersonenSpeicher>();
         dienste.AddScoped<INachrichtenSpeicher, NachrichtenSpeicher>();
@@ -35,6 +37,12 @@ public static class Registrierung
         dienste.AddScoped<IStammdaten>(d => d.GetRequiredService<StammdatenSpeicher>());
         dienste.AddScoped<IBenutzerkonten>(d => d.GetRequiredService<StammdatenSpeicher>());
         dienste.AddScoped<StartdatenLader>();
+        dienste.AddScoped<DublettenSuche>();
+        dienste.AddScoped<IDublettenSuche>(d => d.GetRequiredService<DublettenSuche>());
+        dienste.AddScoped<PersonenAbfrage>();
+        dienste.AddScoped<IPersonenAbfrage>(d => d.GetRequiredService<PersonenAbfrage>());
+        dienste.AddScoped<IPersonenExport>(d => d.GetRequiredService<PersonenAbfrage>());
+        dienste.AddScoped<IOrganisationen, OrganisationenSpeicher>();
 
         var takt = konfiguration.GetValue("Postausgang:TaktSekunden", 15);
         dienste.AddQuartz(q =>

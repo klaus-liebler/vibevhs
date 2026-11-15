@@ -1,17 +1,19 @@
-﻿// Testdaten-Generator für VibeVHS.
+﻿// Testdaten-Generator für VibeVHS (fiktive Personen mit Rollen, Status, Fachbereichen, Kontaktdaten, Dubletten).
 // Aufruf:  dotnet run --project tools/Testdaten -- [Anzahl] [Datenbankdatei]
-// Standard: 500 Personen in src/VibeVHS.Web/data/vibevhs.db (die Datenbank der lokal gestarteten Anwendung).
+// Standard: 3000 Personen in src/VibeVHS.Web/data/vibevhs.db. Die Anwendung erzeugt diese Daten in der
+// Entwicklungsumgebung beim ersten Start auch selbst (Demodaten:Massendaten).
 
+using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using VibeVHS.Adapters.Mocks.Testdaten;
 using VibeVHS.Application.Protokoll;
 using VibeVHS.Application.Sicherheit;
 using VibeVHS.Infrastructure;
 using VibeVHS.Infrastructure.Datenbank;
-using VibeVHS.Testdaten;
 
-var anzahl = args.Length > 0 && int.TryParse(args[0], out var a) ? a : 500;
+var anzahl = args.Length > 0 && int.TryParse(args[0], out var a) ? a : 3000;
 var datei = args.Length > 1 ? args[1] : Path.Combine("src", "VibeVHS.Web", "data", "vibevhs.db");
 
 var konfiguration = new ConfigurationBuilder()
@@ -30,18 +32,18 @@ var dienste = new ServiceCollection()
 
 await DatenbankInitialisierung.InitialisierenAsync(dienste);
 
+var uhr = Stopwatch.StartNew();
 await using (var bereich = dienste.CreateAsyncScope())
 {
     var db = bereich.ServiceProvider.GetRequiredService<VibeVhsDbContext>();
-    var jetzt = TimeProvider.System.GetLocalNow();
-    var personen = new PersonenGenerator().Erzeugen(anzahl, jetzt);
-    db.Personen.AddRange(personen);
+    var daten = new Massendaten().Erzeugen(anzahl, TimeProvider.System.GetLocalNow());
+    db.Organisationen.AddRange(daten.Organisationen);
+    db.Personen.AddRange(daten.Personen);
     await bereich.ServiceProvider.GetRequiredService<IAuditProtokoll>()
-        .ProtokollierenAsync("Testdaten.Erzeugt", $"Testdaten-Generator: {anzahl} Personen angelegt");
+        .ProtokollierenAsync("Testdaten.Erzeugt", $"Testdaten-Generator: {daten.Personen.Count} Personen ({daten.GeplanteDubletten} geplante Dubletten), {daten.Organisationen.Count} Organisationen");
     await db.SaveChangesAsync();
+    Console.WriteLine($"{daten.Personen.Count} Testpersonen in {Path.GetFullPath(datei)} angelegt ({uhr.ElapsedMilliseconds} ms).");
 }
-
-Console.WriteLine($"{anzahl} Testpersonen in {Path.GetFullPath(datei)} angelegt.");
 
 internal sealed class Testdatenbenutzer : IAktuellerBenutzer
 {

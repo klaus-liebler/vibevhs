@@ -15,12 +15,33 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261115061341_Kontaktdaten";
+    public override string LastMigrationId => "20261115063016_PersonenListeUndBeziehungen";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
 #pragma warning disable 612, 618
         modelBuilder.HasAnnotation("ProductVersion", "11.0.0");
+
+        modelBuilder.Entity("VibeVHS.Application.Personen.DublettenAusschluss", b =>
+            {
+                b.Property<Guid>("PersonA")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("PersonB")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("Am")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Von")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.HasKey("PersonA", "PersonB");
+
+                b.ToTable("DublettenAusschluesse");
+            });
 
         modelBuilder.Entity("VibeVHS.Application.Postausgang.AusgehendeNachricht", b =>
             {
@@ -245,6 +266,71 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("PersonAdressKennzeichen");
             });
 
+        modelBuilder.Entity("VibeVHS.Domain.Personen.Buchungsvollmacht", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Art")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("BevollmaechtigterId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("BevollmaechtigterName")
+                    .IsRequired()
+                    .HasMaxLength(300)
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErfasstAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("ErfasstVon")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Erfassungsart")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("ErsetztAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Grund")
+                    .IsRequired()
+                    .HasMaxLength(500)
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly?>("GueltigBis")
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly>("GueltigVon")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Nachweis")
+                    .IsRequired()
+                    .HasMaxLength(500)
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("PersonId")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("VollmachtId")
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("BevollmaechtigterId");
+
+                b.HasIndex("PersonId", "GueltigVon");
+
+                b.ToTable("PersonVollmachten");
+            });
+
         modelBuilder.Entity("VibeVHS.Domain.Personen.EMailAdresse", b =>
             {
                 b.Property<Guid>("Id")
@@ -305,6 +391,141 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("PersonEMails");
             });
 
+        modelBuilder.Entity("VibeVHS.Domain.Personen.Einwilligung", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErfasstAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("ErfasstVon")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Erfassungsart")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("ErsetztAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<bool>("Erteilt")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Grund")
+                    .IsRequired()
+                    .HasMaxLength(500)
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly?>("GueltigBis")
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly>("GueltigVon")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Kanal")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("PersonId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Zweck")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("PersonId", "GueltigVon");
+
+                b.ToTable("PersonEinwilligungen");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Personen.Organisation", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Art")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Name")
+                    .IsRequired()
+                    .HasMaxLength(300)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Ort")
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.ToTable("Organisationen");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Personen.Organisationszugehoerigkeit", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErfasstAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("ErfasstVon")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Erfassungsart")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("ErsetztAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Funktion")
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Grund")
+                    .IsRequired()
+                    .HasMaxLength(500)
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly?>("GueltigBis")
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly>("GueltigVon")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("OrganisationId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("OrganisationName")
+                    .IsRequired()
+                    .HasMaxLength(300)
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("PersonId")
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("OrganisationId");
+
+                b.HasIndex("PersonId", "GueltigVon");
+
+                b.ToTable("PersonOrganisationen");
+            });
+
         modelBuilder.Entity("VibeVHS.Domain.Personen.Person", b =>
             {
                 b.Property<Guid>("Id")
@@ -312,6 +533,11 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
 
                 b.Property<long>("AngelegtAm")
                     .HasColumnType("INTEGER");
+
+                b.Property<string>("Anzeigename")
+                    .IsRequired()
+                    .HasMaxLength(300)
+                    .HasColumnType("TEXT");
 
                 b.Property<string>("Benutzerkennung")
                     .HasMaxLength(100)
@@ -321,6 +547,10 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(320)
                     .HasColumnType("TEXT");
 
+                b.PrimitiveCollection<string>("Fachbereiche")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
                 b.Property<DateOnly?>("Geburtsdatum")
                     .HasColumnType("TEXT");
 
@@ -328,19 +558,48 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(40)
                     .HasColumnType("INTEGER");
 
+                b.Property<string>("Sortiername")
+                    .IsRequired()
+                    .HasMaxLength(300)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Sortierschluessel")
+                    .IsRequired()
+                    .HasMaxLength(340)
+                    .HasColumnType("TEXT");
+
                 b.Property<string>("Sprache")
                     .IsRequired()
                     .HasMaxLength(10)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(30)
                     .HasColumnType("TEXT");
 
                 b.Property<string>("Titel")
                     .HasMaxLength(50)
                     .HasColumnType("TEXT");
 
+                b.Property<string>("Wohnort")
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("ZusammengefuehrtIn")
+                    .HasColumnType("TEXT");
+
                 b.HasKey("Id");
 
                 b.HasIndex("Benutzerkennung")
                     .IsUnique();
+
+                b.HasIndex("Geburtsdatum");
+
+                b.HasIndex("Sortierschluessel")
+                    .IsUnique();
+
+                b.HasIndex("Status");
 
                 b.ToTable("Personen");
             });
@@ -633,6 +892,24 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("Fachbereiche");
             });
 
+        modelBuilder.Entity("VibeVHS.Infrastructure.Personen.Suchindexeintrag", b =>
+            {
+                b.Property<Guid>("PersonId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Text")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.HasKey("PersonId");
+
+                b.ToTable("PersonSuche", t =>
+                    {
+                        t.ExcludeFromMigrations();
+                    });
+            });
+
         modelBuilder.Entity("VibeVHS.Domain.Personen.AdressKennzeichen", b =>
             {
                 b.HasOne("VibeVHS.Domain.Personen.Person", null)
@@ -642,10 +919,37 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .IsRequired();
             });
 
+        modelBuilder.Entity("VibeVHS.Domain.Personen.Buchungsvollmacht", b =>
+            {
+                b.HasOne("VibeVHS.Domain.Personen.Person", null)
+                    .WithMany("Vollmachten")
+                    .HasForeignKey("PersonId")
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .IsRequired();
+            });
+
         modelBuilder.Entity("VibeVHS.Domain.Personen.EMailAdresse", b =>
             {
                 b.HasOne("VibeVHS.Domain.Personen.Person", null)
                     .WithMany("EMailAdressen")
+                    .HasForeignKey("PersonId")
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .IsRequired();
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Personen.Einwilligung", b =>
+            {
+                b.HasOne("VibeVHS.Domain.Personen.Person", null)
+                    .WithMany("Einwilligungen")
+                    .HasForeignKey("PersonId")
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .IsRequired();
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Personen.Organisationszugehoerigkeit", b =>
+            {
+                b.HasOne("VibeVHS.Domain.Personen.Person", null)
+                    .WithMany("Organisationen")
                     .HasForeignKey("PersonId")
                     .OnDelete(DeleteBehavior.Restrict)
                     .IsRequired();
@@ -695,11 +999,17 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
 
                 b.Navigation("EMailAdressen");
 
+                b.Navigation("Einwilligungen");
+
                 b.Navigation("Merkmale");
 
                 b.Navigation("Namen");
 
+                b.Navigation("Organisationen");
+
                 b.Navigation("Rufnummern");
+
+                b.Navigation("Vollmachten");
             });
 #pragma warning restore 612, 618
     }

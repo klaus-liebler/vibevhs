@@ -10,6 +10,10 @@ public interface IPersonenSpeicher
 
     Task<Person?> LadenAsync(Guid id, CancellationToken abbruch = default);
 
+    Task<IReadOnlyList<Person>> LadenAsync(IEnumerable<Guid> ids, CancellationToken abbruch = default);
+
+    void AusschlussHinzufuegen(DublettenAusschluss ausschluss);
+
     Task<IReadOnlyList<Person>> AlleAsync(CancellationToken abbruch = default);
 
     Task<int> AnzahlAsync(CancellationToken abbruch = default);
@@ -61,6 +65,67 @@ public sealed class PersonenDienst(IPersonenSpeicher speicher, IAuditProtokoll p
         return neu;
     }
 
+    /// <summary>Führt eine Dublette in den Zieldatensatz über. Beide Historien bleiben erhalten; der Vorgang wird protokolliert.</summary>
+    public async Task ZusammenfuehrenAsync(Guid zielId, Guid dubletteId, CancellationToken abbruch = default)
+    {
+        var ziel = await PersonLadenAsync(zielId, abbruch);
+        var dublette = await PersonLadenAsync(dubletteId, abbruch);
+        var wer = await benutzer.ErmittelnAsync(abbruch);
+        var jetzt = uhr.GetLocalNow();
+        ziel.DubletteUebernehmen(dublette, Domain.Gemeinsam.Erfassung.Aenderung(jetzt,
+            $"Übernommen aus Dublette {dublette.Anzeigename} ({dublette.Id.ToString()[..8]})", wer.Anzeige));
+        await protokoll.ProtokollierenAsync("Person.Zusammengefuehrt",
+            $"Dublette {dublette.Anzeigename} in {ziel.Anzeigename} zusammengeführt; die Dublette bleibt mit Historie erhalten",
+            nameof(Person), zielId, abbruch: abbruch);
+        await protokoll.ProtokollierenAsync("Person.AlsDubletteMarkiert",
+            $"Zusammengeführt in {ziel.Anzeigename}", nameof(Person), dubletteId, abbruch: abbruch);
+        await speicher.SpeichernAsync(abbruch);
+    }
+
+    /// <summary>Hält fest, dass zwei ähnliche Datensätze verschiedene Personen sind (kein Dublettenhinweis mehr).</summary>
+    public async Task KeineDubletteAsync(Guid a, Guid b, CancellationToken abbruch = default)
+    {
+        var wer = await benutzer.ErmittelnAsync(abbruch);
+        speicher.AusschlussHinzufuegen(new DublettenAusschluss(a, b, uhr.GetUtcNow(), wer.Anzeige));
+        await protokoll.ProtokollierenAsync("Person.KeineDublette", "Zwei ähnliche Datensätze als verschiedene Personen bestätigt",
+            nameof(Person), a, abbruch: abbruch);
+        await speicher.SpeichernAsync(abbruch);
+    }
+
+    public async Task EinwilligungSetzenAsync(Guid personId, Kontaktkanal kanal, Kontaktzweck zweck, bool erteilt, DateOnly ab,
+        string nachweis, CancellationToken abbruch = default)
+    {
+        var person = await PersonLadenAsync(personId, abbruch);
+        var wer = await benutzer.ErmittelnAsync(abbruch);
+        person.EinwilligungSetzenAb(kanal, zweck, erteilt, ab, Domain.Gemeinsam.Erfassung.Aenderung(uhr.GetLocalNow(), nachweis, wer.Anzeige));
+        await protokoll.ProtokollierenAsync("Person.Einwilligung",
+            $"Einwilligung {Einwilligung.KanalAnzeige(kanal)} · {Einwilligung.ZweckAnzeige(zweck)} ab {ab:dd.MM.yyyy}: {(erteilt ? "erteilt" : "nicht erteilt")}. Nachweis: {nachweis}",
+            nameof(Person), personId, abbruch: abbruch);
+        await speicher.SpeichernAsync(abbruch);
+    }
+
+    public async Task VollmachtErteilenAsync(Guid personId, Bevollmaechtigtenart art, Guid bevollmaechtigterId, string bevollmaechtigterName,
+        string nachweis, DateOnly von, DateOnly? bis, CancellationToken abbruch = default)
+    {
+        var person = await PersonLadenAsync(personId, abbruch);
+        var wer = await benutzer.ErmittelnAsync(abbruch);
+        person.VollmachtErteilen(art, bevollmaechtigterId, bevollmaechtigterName, nachweis, von, bis,
+            Domain.Gemeinsam.Erfassung.Aenderung(uhr.GetLocalNow(), $"Vollmacht erteilt, Nachweis: {nachweis}", wer.Anzeige));
+        await protokoll.ProtokollierenAsync("Person.Vollmacht",
+            $"Buchungsvollmacht für {bevollmaechtigterName} ab {von:dd.MM.yyyy}{(bis is { } b ? $" bis {b.AddDays(-1):dd.MM.yyyy}" : "")}. Nachweis: {nachweis}",
+            nameof(Person), personId, abbruch: abbruch);
+        await speicher.SpeichernAsync(abbruch);
+    }
+
+    public async Task VollmachtWiderrufenAsync(Guid personId, Guid vollmachtId, DateOnly ab, string grund, CancellationToken abbruch = default)
+    {
+        var person = await PersonLadenAsync(personId, abbruch);
+        var wer = await benutzer.ErmittelnAsync(abbruch);
+        person.VollmachtWiderrufenAb(vollmachtId, ab, Domain.Gemeinsam.Erfassung.Ende(uhr.GetLocalNow(), grund, wer.Anzeige));
+        await protokoll.ProtokollierenAsync("Person.VollmachtWiderrufen", $"Buchungsvollmacht widerrufen ab {ab:dd.MM.yyyy}. Grund: {grund}",
+            nameof(Person), personId, abbruch: abbruch);
+        await speicher.SpeichernAsync(abbruch);
+    }
     private async Task<Person> PersonLadenAsync(Guid id, CancellationToken abbruch)
         => await speicher.LadenAsync(id, abbruch) ?? throw new InvalidOperationException("Person nicht gefunden.");
 }

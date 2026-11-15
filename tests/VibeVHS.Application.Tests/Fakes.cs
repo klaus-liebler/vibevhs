@@ -68,6 +68,13 @@ internal sealed class SpeicherPersonen : IPersonenSpeicher
     public Task<Person?> LadenAsync(Guid id, CancellationToken abbruch = default)
         => Task.FromResult(Personen.FirstOrDefault(p => p.Id == id));
 
+    public Task<IReadOnlyList<Person>> LadenAsync(IEnumerable<Guid> ids, CancellationToken abbruch = default)
+        => Task.FromResult<IReadOnlyList<Person>>(Personen.Where(p => ids.Contains(p.Id)).ToList());
+
+    public List<DublettenAusschluss> Ausschluesse { get; } = [];
+
+    public void AusschlussHinzufuegen(DublettenAusschluss ausschluss) => Ausschluesse.Add(ausschluss);
+
     public Task<IReadOnlyList<Person>> AlleAsync(CancellationToken abbruch = default)
         => Task.FromResult<IReadOnlyList<Person>>(Personen);
 

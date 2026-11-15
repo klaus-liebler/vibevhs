@@ -13,6 +13,7 @@ public static class Registrierung
         dienste.AddScoped<PostausgangDienst>();
         dienste.AddScoped<Zustellung>();
         dienste.AddScoped<PersonenDienst>();
+        dienste.AddScoped<Rundschreiben>();
         return dienste;
     }
 }
