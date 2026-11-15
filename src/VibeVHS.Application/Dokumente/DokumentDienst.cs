@@ -323,6 +323,14 @@ public sealed class DokumentDienst(
                 : (d, null);
     }
 
+    /// <summary>
+    /// Druckstück eines festgeschriebenen Finanzbelegs archivieren (mit Übersetzungs-QR). Bei Firmenkunden steht die
+    /// Organisation als Empfänger in <see cref="Dokument.PersonId"/>.
+    /// </summary>
+    public Task<Dokument> FinanzbelegArchivierenAsync(Guid empfaengerId, string titel, string datenJson, string? sprache, Func<Uri, Brief> brief,
+        CancellationToken abbruch = default)
+        => ArchivierenAsync(Dokumentart.Finanzbeleg, empfaengerId, null, null, titel, datenJson, sprache, brief, null, null, abbruch);
+
     private async Task<Dokument> ArchivierenAsync(Dokumentart art, Guid personId, Guid? kursId, Guid? belegungId, string titel, string datenJson, string? sprache,
         Func<Uri, Brief> brief, Guid? ersetzt, string? grund, CancellationToken abbruch)
     {

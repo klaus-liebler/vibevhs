@@ -52,6 +52,10 @@ public interface IDatenschutzSpeicher
     /// <summary>Aufgaben, die die Person betreffen (Ziel oder Schlüssel enthält ihre ID), verfolgt.</summary>
     Task<IReadOnlyList<Domain.Aufgaben.Aufgabe>> AufgabenZuPersonAsync(Guid personId, CancellationToken abbruch = default);
 
+    /// <summary>Finanzdaten der Person zum Anonymisieren (Belege, Mandate, Auszahlungskonto, zugeordnete Umsätze), verfolgt.</summary>
+    Task<(IReadOnlyList<Domain.Finanzen.Beleg> Belege, IReadOnlyList<Domain.Finanzen.SepaMandat> Mandate, Domain.Finanzen.Bankverbindung? Konto,
+        IReadOnlyList<Domain.Finanzen.Umsatz> Umsaetze)> FinanzdatenAsync(Guid personId, CancellationToken abbruch = default);
+
     /// <summary>Kursnummer und Titel je Kurs-ID (für die Auskunft).</summary>
     Task<IReadOnlyDictionary<Guid, string>> KurstitelAsync(IEnumerable<Guid> kursIds, CancellationToken abbruch = default);
 

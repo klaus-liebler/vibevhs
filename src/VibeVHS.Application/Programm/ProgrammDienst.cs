@@ -220,7 +220,7 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
     {
         var kurs = await KursAsync(kursId, abbruch);
         var v = kurs.Veranstaltungen.Single(x => x.Id == veranstaltungId);
-        v.Ausfallen(grund);
+        v.Ausfallen(grund, uhr.GetLocalNow());
         await protokoll.ProtokollierenAsync("Kurs.TerminFaelltAus", $"{kurs.Kursnummer}: Termin {v.Nummer} am {v.Beginn:dd.MM.yyyy} fällt aus. Grund: {grund}",
             nameof(Kurs), kursId, abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);

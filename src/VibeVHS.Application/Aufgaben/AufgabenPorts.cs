@@ -50,6 +50,11 @@ public static class Aufgabentypen
     public const string ZulassungAblauf = "zulassung-ablauf";
     public const string LoeschlaufFreigabe = "loeschlauf-freigabe";
     public const string PostausgangFehler = "postausgang-fehler";
+    public const string LastschriftFreigabe = "lastschrift-freigabe";
+    public const string MahnlaufFreigabe = "mahnlauf-freigabe";
+    public const string HonorarFreigabe = "honorar-freigabe";
+    public const string KontoauszugZuordnung = "kontoauszug-zuordnung";
+    public const string Ruecklastschrift = "ruecklastschrift";
 
     public static IReadOnlyList<Aufgabentyp> Vorschlaege() =>
     [
@@ -70,6 +75,16 @@ public static class Aufgabentypen
             nameof(Rolle.Verwaltungsleitung), jeFachbereich: false, eskalationNachTagen: 14),
         new(PostausgangFehler, "Fehlgeschlagene Nachrichten", "Mails oder Schnittstellenaufrufe sind nach mehreren Versuchen gescheitert.",
             nameof(Rolle.Systemverwaltung), jeFachbereich: false, eskalationNachTagen: 1),
+        new(LastschriftFreigabe, "Lastschriftlauf freigeben", "Vorschlag für den SEPA-Einzug prüfen, freigeben (Vorabankündigung) und die Datei zur Bank geben.",
+            nameof(Rolle.Buchhaltung), jeFachbereich: false, eskalationNachTagen: 2, menschGibtFrei: true),
+        new(MahnlaufFreigabe, "Mahnvorschlag freigeben", "Fällige Mahnungen prüfen, einzelne ausschließen und freigeben.",
+            nameof(Rolle.Buchhaltung), jeFachbereich: false, eskalationNachTagen: 3, menschGibtFrei: true),
+        new(HonorarFreigabe, "Honorarabrechnungen freigeben", "Entwürfe der Honorarabrechnungen prüfen und festschreiben.",
+            nameof(Rolle.Buchhaltung), jeFachbereich: false, eskalationNachTagen: 5),
+        new(KontoauszugZuordnung, "Kontoauszug zuordnen", "Umsätze ohne sichere Zuordnung klären.",
+            nameof(Rolle.Buchhaltung), jeFachbereich: false, eskalationNachTagen: 2),
+        new(Ruecklastschrift, "Rücklastschrift klären", "Nach einer Rücklastschrift ist die Rechnung wieder offen: Kontakt aufnehmen, neues Mandat oder Überweisung.",
+            nameof(Rolle.Buchhaltung), jeFachbereich: false, eskalationNachTagen: 7),
     ];
 }
 

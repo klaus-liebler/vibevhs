@@ -48,6 +48,14 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
             gruende.Add(new Aufbewahrungsgrund("buchhaltung", $"Kursentgelt, Kurs {b.Kursnummer}", bezug));
         }
 
+        // Festgeschriebene Finanzbelege (GoBD, FA-130/131): Buchungsbelege 8 Jahre, Mahnungen als Geschäftsbriefe 6 Jahre ab Jahresende.
+        foreach (var b in await db.Set<Domain.Finanzen.Beleg>().AsNoTracking()
+                     .Where(b => b.PersonId == personId && b.Nummer != null && b.AnonymisiertAm == null)
+                     .Select(b => new { b.Art, b.Nummer, b.Belegdatum }).ToListAsync(abbruch))
+        {
+            gruende.Add(new Aufbewahrungsgrund(Domain.Finanzen.BelegartInfo.Frist(b.Art), $"{Domain.Finanzen.BelegartInfo.Name(b.Art)} {b.Nummer}", b.Belegdatum));
+        }
+
         // Ausgestellte Bescheinigungen (Nachweis für Teilnehmende, Arbeitgeber, Kostenträger)
         foreach (var d in await db.Set<Domain.Dokumente.Dokument>().AsNoTracking()
                      .Where(d => d.PersonId == personId && d.AnonymisiertAm == null
@@ -186,6 +194,16 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
         var ziel = $"personen/{personId}";
         var teil = personId.ToString("N");
         return await db.Aufgaben.Where(a => a.Ziel == ziel || a.Schluessel.Contains(teil)).ToListAsync(abbruch);
+    }
+
+    public async Task<(IReadOnlyList<Domain.Finanzen.Beleg> Belege, IReadOnlyList<Domain.Finanzen.SepaMandat> Mandate, Domain.Finanzen.Bankverbindung? Konto,
+        IReadOnlyList<Domain.Finanzen.Umsatz> Umsaetze)> FinanzdatenAsync(Guid personId, CancellationToken abbruch = default)
+    {
+        var belege = await db.Set<Domain.Finanzen.Beleg>().Where(b => b.PersonId == personId).ToListAsync(abbruch);
+        var ids = belege.Select(b => b.Id).ToList();
+        var umsaetze = await db.Set<Domain.Finanzen.Umsatz>().Where(u => u.ZugeordnetBelegId != null && ids.Contains(u.ZugeordnetBelegId.Value)).ToListAsync(abbruch);
+        return (belege, await db.Set<Domain.Finanzen.SepaMandat>().Where(m => m.PersonId == personId).ToListAsync(abbruch),
+            await db.Set<Domain.Finanzen.Bankverbindung>().FirstOrDefaultAsync(b => b.PersonId == personId, abbruch), umsaetze);
     }
 
     public async Task<IReadOnlyDictionary<Guid, string>> KurstitelAsync(IEnumerable<Guid> kursIds, CancellationToken abbruch = default)

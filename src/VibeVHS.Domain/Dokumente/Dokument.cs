@@ -9,6 +9,9 @@ public enum Dokumentart
     Bildungsurlaub,
     Teilnehmerausweis,
     Auskunft,
+
+    /// <summary>Druckstück eines Finanzbelegs (Rechnung, Mahnung, Honorarabrechnung, Gutschrift, Storno).</summary>
+    Finanzbeleg,
 }
 
 public static class DokumentAnzeige
@@ -18,6 +21,7 @@ public static class DokumentAnzeige
         Dokumentart.Teilnahmebescheinigung => "Teilnahmebescheinigung",
         Dokumentart.Bildungsurlaub => "Bescheinigung Bildungsurlaub (AWbG)",
         Dokumentart.Teilnehmerausweis => "Teilnehmerausweis",
+        Dokumentart.Finanzbeleg => "Finanzbeleg",
         _ => "Auskunft nach Art. 15 DSGVO",
     };
 }

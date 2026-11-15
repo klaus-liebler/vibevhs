@@ -15,6 +15,9 @@ public enum Rolle
 
     /// <summary>Kursleitung: sieht und erfasst die Anwesenheit eigener Veranstaltungen.</summary>
     Dozierende,
+
+    /// <summary>Betriebs- oder Rechnungsprüfung: liest Finanzdaten und Protokoll, exportiert, ändert nichts (FA-132).</summary>
+    Pruefung,
 }
 
 public static class RollenExtensions
@@ -29,6 +32,7 @@ public static class RollenExtensions
         Rolle.IntegrationskursTeam => "Integrationskurs-Team",
         Rolle.Systemverwaltung => "Systemverwaltung",
         Rolle.Dozierende => "Dozierende",
+        Rolle.Pruefung => "Prüfung (nur lesen)",
         _ => rolle.ToString(),
     };
 

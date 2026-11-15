@@ -151,7 +151,7 @@ public class DatenschutzTests
 
         var pruefung = await dienst.PruefenAsync(anna.Id, ct);
         pruefung.Entscheidung.Aktion.ShouldBe(Loeschaktion.Sperren);
-        pruefung.Entscheidung.GesperrtBis.ShouldBe(new DateOnly(2035, 12, 31));
+        pruefung.Entscheidung.GesperrtBis.ShouldBe(new DateOnly(2033, 12, 31));
         pruefung.Entscheidung.Gruende.Single().ShouldContain("§ 147");
 
         var ergebnis = await dienst.LoeschverlangenAsync(anna.Id, ct);
@@ -160,7 +160,7 @@ public class DatenschutzTests
         await using var neu = t.NeuerKontext();
         var person = await neu.Personen.SingleAsync(p => p.Id == anna.Id, ct);
         person.Datenschutz.ShouldBe(Datenschutzstatus.Gesperrt);
-        person.GesperrtBis.ShouldBe(new DateOnly(2035, 12, 31));
+        person.GesperrtBis.ShouldBe(new DateOnly(2033, 12, 31));
         person.Anzeigename.ShouldBe("Anna Becker");                 // für die Frist nötig
         person.EMail.ShouldBeNull();                                 // nicht nötig: gelöscht
         person.EMailAdressen.ShouldAllBe(m => m.Adresse == "–");
@@ -246,7 +246,7 @@ public class DatenschutzTests
         auskunft.Stammdaten.EMails.ShouldHaveSingleItem().ShouldContain("anna.becker@example.org");
         auskunft.KurseAlsDozent.ShouldHaveSingleItem().Kursnummer.ShouldBe(kurs.Kursnummer);
         auskunft.Nachrichten.ShouldHaveSingleItem().Betreff.ShouldBe("Honorarvertrag");
-        auskunft.Aufbewahrung.ShouldHaveSingleItem().Fristende.ShouldBe("31.12.2035");
+        auskunft.Aufbewahrung.ShouldHaveSingleItem().Fristende.ShouldBe("31.12.2033");
         auskunft.Empfaenger.ShouldContain("E-Mail-Versand (Auftragsverarbeitung)");
 
         var json = JsonSerializer.Serialize(auskunft);
@@ -260,7 +260,7 @@ public class DatenschutzTests
     public void Fristende_beginnt_bei_Abgabenordnung_mit_dem_Jahresende()
     {
         var buchhaltung = Aufbewahrungsfrist.Vorschlaege().Single(f => f.Schluessel == "buchhaltung");
-        buchhaltung.Fristende(new DateOnly(2025, 3, 15)).ShouldBe(new DateOnly(2035, 12, 31));
+        buchhaltung.Fristende(new DateOnly(2025, 3, 15)).ShouldBe(new DateOnly(2033, 12, 31));
         var post = Aufbewahrungsfrist.Vorschlaege().Single(f => f.Schluessel == "postausgang");
         post.Fristende(new DateOnly(2025, 3, 15)).ShouldBe(new DateOnly(2027, 3, 15));
     }

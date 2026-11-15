@@ -27,6 +27,15 @@ public static class Registrierung
         dienste.AddScoped<Anmeldung.VorlagenDienst>();
         dienste.AddScoped<Aufgaben.AufgabenDienst>();
         dienste.AddScoped<Aufgaben.Routinen>();
+        dienste.AddScoped<Finanzen.FinanzDienst>();
+        dienste.AddScoped<Finanzen.ZahlungsDienst>();
+        dienste.AddScoped<Finanzen.MahnDienst>();
+        dienste.AddScoped<Finanzen.GobdDienst>();
+        dienste.AddScoped<Finanzen.FinanzRoutinen>();
+        dienste.AddScoped<Finanzen.Honorare.HonorarDienst>();
+        dienste.AddSingleton<Finanzen.Honorare.IHonorarModell, Finanzen.Honorare.HonorarProUe>();
+        dienste.AddSingleton<Finanzen.Honorare.IHonorarModell, Finanzen.Honorare.HonorarBasisUeTeilnehmende>();
+        dienste.AddSingleton<Finanzen.Honorare.HonorarModelle>();
         return dienste;
     }
 }

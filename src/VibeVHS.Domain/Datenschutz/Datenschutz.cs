@@ -130,7 +130,7 @@ public sealed class Aufbewahrungsfrist
     public static IReadOnlyList<Aufbewahrungsfrist> Vorschlaege() =>
     [
         new("stammdaten", "Stammdaten ohne weitere Pflichten (letzte Aktivität)", 3, false, "Art. 5 Abs. 1 e, Art. 17 DSGVO", "Vorschlag – mit dem Datenschutzbeauftragten abstimmen"),
-        new("buchhaltung", "Buchungsbelege, Rechnungen, Honorarabrechnungen", 10, true, "§ 147 Abs. 1 Nr. 4 AO, § 257 HGB", "gesetzlich; Beginn mit Schluss des Kalenderjahres"),
+        new("buchhaltung", "Buchungsbelege, Rechnungen, Honorarabrechnungen", 8, true, "§ 147 Abs. 1 Nr. 4, Abs. 3 AO, § 257 HGB", "gesetzlich (8 Jahre seit 2025); Beginn mit Schluss des Kalenderjahres"),
         new("handelsbriefe", "Geschäftsbriefe (z. B. Anmeldebestätigungen)", 6, true, "§ 147 Abs. 1 Nr. 2, 3 AO", "Vorschlag"),
         new("integrationskurs", "Integrationskurs: Teilnahme- und Abrechnungsunterlagen", 10, true, "IntV, Zuwendungs-/Abrechnungsrecht BAMF", "Vorschlag – mit den Vorgaben des BAMF abgleichen"),
         new("bescheinigungen", "Teilnahme- und Prüfungsdaten für Zweitschriften", 10, true, "berechtigtes Interesse (Art. 6 Abs. 1 f DSGVO)", "Vorschlag"),

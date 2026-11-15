@@ -14,7 +14,7 @@ internal static class ProgrammMapping
     private static readonly JsonSerializerOptions Json = new() { Converters = { new JsonStringEnumConverter() } };
 
     /// <summary>Wertobjekte (Serienregel, Richtlinie, Listen) als JSON-Spalte; Änderungen werden über den JSON-Text erkannt.</summary>
-    private static PropertyBuilder<T> AlsJson<T>(this PropertyBuilder<T> p)
+    internal static PropertyBuilder<T> AlsJson<T>(this PropertyBuilder<T> p)
     {
         p.HasConversion(
             v => JsonSerializer.Serialize(v, Json),

@@ -350,6 +350,24 @@ public sealed class DatenschutzDienst(
             aufgabe.Anonymisieren(platzhalter, jetzt);
         }
 
+        // Finanzdaten: erst nach Ablauf aller Fristen erreichbar (sonst wird gesperrt). Nummer, Betrag und Prüfsumme bleiben.
+        var finanz = await speicher.FinanzdatenAsync(person.Id, abbruch);
+        foreach (var b in finanz.Belege)
+        {
+            b.Anonymisieren(platzhalter, jetzt);
+        }
+
+        foreach (var m in finanz.Mandate)
+        {
+            m.Anonymisieren(platzhalter);
+        }
+
+        finanz.Konto?.Anonymisieren(platzhalter);
+        foreach (var u in finanz.Umsaetze)
+        {
+            u.Anonymisieren();
+        }
+
         if (protokollieren)
         {
             await protokoll.ProtokollierenAsync("Datenschutz.Anonymisiert", $"{Pseudonym.Person(person.Id)} anonymisiert ({anlass})", nameof(Person), person.Id,

@@ -347,8 +347,12 @@ public sealed class Veranstaltung
         Ausnahme = true;
     }
 
-    public void Ausfallen(string grund)
+    /// <summary>Wann der Ausfall erfasst wurde (für „kurzfristig abgesagt“ in der Honorarberechnung).</summary>
+    public DateTimeOffset? AusgefallenAm { get; private set; }
+
+    public void Ausfallen(string grund, DateTimeOffset? am = null)
     {
+        AusgefallenAm ??= am;
         Ausgefallen = true;
         Bemerkung = grund;
         Ausnahme = true;

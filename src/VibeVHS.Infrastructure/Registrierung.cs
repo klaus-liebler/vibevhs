@@ -54,6 +54,8 @@ public static class Registrierung
         dienste.AddScoped<Application.Datenschutz.IDatenschutzSpeicher, Datenschutz.DatenschutzSpeicher>();
         dienste.AddSingleton<Application.Datenschutz.IAuskunftPdf, Datenschutz.AuskunftPdf>();
         dienste.AddScoped<Application.Aufgaben.IAufgabenSpeicher, Aufgaben.AufgabenSpeicher>();
+        dienste.AddScoped<Application.Finanzen.IFinanzSpeicher, Finanzen.FinanzSpeicher>();
+        dienste.AddScoped<Application.Finanzen.IFinanzprotokoll, Finanzen.Finanzprotokoll>();
         dienste.AddScoped<Anmeldung.AnmeldungSpeicher>();
         dienste.AddScoped<Application.Anmeldung.IAnmeldungSpeicher>(d => d.GetRequiredService<Anmeldung.AnmeldungSpeicher>());
         dienste.AddScoped<Application.Anmeldung.IVorlagenSpeicher>(d => d.GetRequiredService<Anmeldung.AnmeldungSpeicher>());
@@ -89,6 +91,9 @@ public static class Registrierung
             q.AddTrigger(t => t.ForJob(AufgabenJob.Schluessel).WithIdentity("aufgaben-start", "automatik").StartAt(DateTimeOffset.UtcNow.AddSeconds(40)));
             q.AddJob<ErinnerungJob>(j => j.WithIdentity(ErinnerungJob.Schluessel));
             q.AddTrigger(t => t.ForJob(ErinnerungJob.Schluessel).WithIdentity("erinnerung-morgens", "automatik").WithCronSchedule("0 0 7 * * ?"));
+            q.AddJob<FinanzJob>(j => j.WithIdentity(FinanzJob.Schluessel));
+            q.AddTrigger(t => t.ForJob(FinanzJob.Schluessel).WithIdentity("finanzen-morgens", "automatik").WithCronSchedule("0 30 6 * * ?"));
+            q.AddTrigger(t => t.ForJob(FinanzJob.Schluessel).WithIdentity("finanzen-start", "automatik").StartAt(DateTimeOffset.UtcNow.AddSeconds(60)));
         });
         dienste.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
         return dienste;

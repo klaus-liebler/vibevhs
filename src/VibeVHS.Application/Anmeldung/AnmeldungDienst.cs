@@ -291,7 +291,7 @@ public sealed class AnmeldungDienst(
         kurs.StatusSetzen(Kursstatus.Abgesagt);
         foreach (var v in kurs.Veranstaltungen.Where(v => !v.Ausgefallen && v.Beginn >= jetzt.DateTime))
         {
-            v.Ausfallen($"Kurs abgesagt: {grund}");
+            v.Ausfallen($"Kurs abgesagt: {grund}", jetzt);
         }
 
         var anzahl = 0;

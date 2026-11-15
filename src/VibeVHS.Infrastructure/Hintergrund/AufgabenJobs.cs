@@ -34,3 +34,16 @@ internal sealed class ErinnerungJob(Routinen routinen, IConfiguration konfigurat
         log.LogInformation("Erinnerungen vor Kursbeginn: {Anzahl} verschickt", anzahl);
     }
 }
+
+/// <summary>Täglich: Rechnungslauf, Lastschrift- und Mahnvorschlag, Honorarentwürfe zum Monatsanfang, Finanzaufgaben.</summary>
+[DisallowConcurrentExecution]
+internal sealed class FinanzJob(VibeVHS.Application.Finanzen.FinanzRoutinen routinen, ILogger<FinanzJob> log) : IJob
+{
+    public static readonly JobKey Schluessel = new("finanz-routinen", "automatik");
+
+    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
+    {
+        var lauf = await routinen.TaeglichAsync(abbruch: cancellationToken);
+        log.LogInformation("Finanzroutinen: {Lauf}", lauf);
+    }
+}

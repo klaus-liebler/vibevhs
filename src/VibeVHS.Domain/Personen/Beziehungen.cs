@@ -37,6 +37,22 @@ public sealed class Organisation
 
     public string? Ort { get; private set; }
 
+    /// <summary>Rechnungsanschrift (mehrzeilig) für Firmenkunden.</summary>
+    public string? Rechnungsanschrift { get; private set; }
+
+    /// <summary>Leitweg-ID öffentlicher Auftraggeber (XRechnung, BT-10); sonst eine Bestellnummer o. Ä.</summary>
+    public string? LeitwegId { get; private set; }
+
+    /// <summary>Elektronische Adresse für XRechnungen.</summary>
+    public string? RechnungsEMail { get; private set; }
+
+    public void RechnungsdatenSetzen(string? anschrift, string? leitwegId, string? email)
+    {
+        Rechnungsanschrift = string.IsNullOrWhiteSpace(anschrift) ? null : anschrift.Trim();
+        LeitwegId = string.IsNullOrWhiteSpace(leitwegId) ? null : leitwegId.Trim();
+        RechnungsEMail = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+    }
+
     public static string ArtAnzeige(Organisationsart art) => art switch
     {
         Organisationsart.Behoerde => "Behörde",

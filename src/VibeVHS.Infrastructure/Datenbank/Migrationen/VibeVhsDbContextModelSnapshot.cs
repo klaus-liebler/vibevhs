@@ -15,7 +15,7 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261115090847_Aufgaben";
+    public override string LastMigrationId => "20261115094215_Finanzen";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -901,6 +901,591 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("Zugangstokens");
             });
 
+        modelBuilder.Entity("VibeVHS.Domain.Finanzen.Bankverbindung", b =>
+            {
+                b.Property<Guid>("PersonId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Bic")
+                    .HasMaxLength(11)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Iban")
+                    .IsRequired()
+                    .HasMaxLength(34)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Kontoinhaber")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.HasKey("PersonId");
+
+                b.ToTable("Bankverbindungen");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Finanzen.Beleg", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("AnonymisiertAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Art")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly>("Belegdatum")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("BetragCent")
+                    .HasColumnType("INTEGER");
+
+                b.Property<Guid?>("BezugBelegId")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("DokumentId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("EmpfaengerAnschrift")
+                    .HasMaxLength(1000)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("EmpfaengerName")
+                    .IsRequired()
+                    .HasMaxLength(300)
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErfasstAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("ErfasstVon")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly?>("Faellig")
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("FestgeschriebenAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("FestgeschriebenVon")
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Grundlage")
+                    .HasColumnType("TEXT");
+
+                b.Property<int?>("Jahr")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int?>("Laufnummer")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Nummer")
+                    .HasMaxLength(30)
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("OrganisationId")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("PersonId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Sha256")
+                    .HasMaxLength(64)
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("StorniertDurchId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Text")
+                    .HasMaxLength(2000)
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("UebergabeId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Xml")
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("BezugBelegId");
+
+                b.HasIndex("Nummer")
+                    .IsUnique();
+
+                b.HasIndex("OrganisationId");
+
+                b.HasIndex("PersonId");
+
+                b.ToTable("Belege");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Finanzen.Finanzeinstellungen", b =>
+            {
+                b.Property<int>("Id")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Anschrift")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Bic")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("GlaeubigerId")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Iban")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Kontoinhaber")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Mahnstufen")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("RuecklastschriftGebuehrCent")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Steuerhinweis")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Steuernummer")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("UstId")
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("VorabankuendigungTage")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("ZahlungszielTage")
+                    .HasColumnType("INTEGER");
+
+                b.HasKey("Id");
+
+                b.ToTable("Finanzeinstellungen");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Finanzen.Finanzprotokolleintrag", b =>
+            {
+                b.Property<long>("Nr")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Aktion")
+                    .IsRequired()
+                    .HasMaxLength(60)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("BenutzerKennung")
+                    .IsRequired()
+                    .HasMaxLength(100)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Hash")
+                    .IsRequired()
+                    .HasMaxLength(64)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Nachher")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("ObjektId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("ObjektTyp")
+                    .IsRequired()
+                    .HasMaxLength(60)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Vorher")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("VorigerHash")
+                    .IsRequired()
+                    .HasMaxLength(64)
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("Zeitpunkt")
+                    .HasColumnType("INTEGER");
+
+                b.HasKey("Nr");
+
+                b.ToTable("Finanzprotokoll");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Finanzen.Honorarvertrag", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Bezeichnung")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErfasstAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("ErfasstVon")
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly>("GueltigAb")
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly?>("GueltigBis")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("KursId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Modell")
+                    .IsRequired()
+                    .HasMaxLength(60)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Parameter")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("PersonId")
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("PersonId");
+
+                b.ToTable("Honorarvertraege");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Finanzen.Kontoauszug", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("AuszugId")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly?>("Bis")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Datei")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("EingelesenAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("EingelesenVon")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("EndsaldoCent")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Iban")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Sha256")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly?>("Von")
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("AuszugId");
+
+                b.HasIndex("Sha256")
+                    .IsUnique();
+
+                b.ToTable("Kontoauszuege");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Finanzen.Mahnlauf", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErstelltAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("ErstelltVon")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("FreigegebenAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("FreigegebenVon")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Posten")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.ToTable("Mahnlaeufe");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Finanzen.Nummernkreis", b =>
+            {
+                b.Property<string>("Art")
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("Jahr")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("Letzte")
+                    .HasColumnType("INTEGER");
+
+                b.Property<Guid>("Version")
+                    .IsConcurrencyToken()
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Art", "Jahr");
+
+                b.ToTable("Nummernkreise");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Finanzen.SepaMandat", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Bic")
+                    .HasMaxLength(11)
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErfasstAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<DateOnly?>("ErsteNutzungAm")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Iban")
+                    .IsRequired()
+                    .HasMaxLength(34)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Kontoinhaber")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly?>("LetzteNutzungAm")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("PersonId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Referenz")
+                    .IsRequired()
+                    .HasMaxLength(35)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly>("UnterschriebenAm")
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly?>("WiderrufenAm")
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("PersonId");
+
+                b.HasIndex("Referenz")
+                    .IsUnique();
+
+                b.ToTable("SepaMandate");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Finanzen.Uebergabe", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("Am")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int>("Anzahl")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Datei")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Inhalt")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Sha256")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("SummeCent")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Von")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.ToTable("Uebergaben");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Finanzen.Umsatz", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("BetragCent")
+                    .HasColumnType("INTEGER");
+
+                b.Property<DateOnly>("Buchungstag")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("EndToEndId")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("ErzeugterBelegId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("GegenIban")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("GegenName")
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid>("KontoauszugId")
+                    .HasColumnType("TEXT");
+
+                b.Property<int>("Nr")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Rueckgabegrund")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Sicherheit")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly?>("Valuta")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Verwendungszweck")
+                    .IsRequired()
+                    .HasMaxLength(500)
+                    .HasColumnType("TEXT");
+
+                b.Property<Guid?>("VorschlagBelegId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("VorschlagText")
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("ZugeordnetAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<Guid?>("ZugeordnetBelegId")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("ZugeordnetVon")
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("EndToEndId");
+
+                b.HasIndex("KontoauszugId");
+
+                b.ToTable("Umsaetze");
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Finanzen.Zahlungslauf", b =>
+            {
+                b.Property<Guid>("Id")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Art")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<DateOnly>("Ausfuehrung")
+                    .HasColumnType("TEXT");
+
+                b.Property<long>("ErstelltAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("ErstelltVon")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("ExportiertAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long?>("FreigegebenAm")
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("FreigegebenVon")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("NachrichtId")
+                    .IsRequired()
+                    .HasMaxLength(35)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Posten")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(40)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Xml")
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.ToTable("Zahlungslaeufe");
+            });
+
         modelBuilder.Entity("VibeVHS.Domain.Personen.AdressKennzeichen", b =>
             {
                 b.Property<Guid>("Id")
@@ -1146,6 +1731,9 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(40)
                     .HasColumnType("TEXT");
 
+                b.Property<string>("LeitwegId")
+                    .HasColumnType("TEXT");
+
                 b.Property<string>("Name")
                     .IsRequired()
                     .HasMaxLength(300)
@@ -1153,6 +1741,12 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
 
                 b.Property<string>("Ort")
                     .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("RechnungsEMail")
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Rechnungsanschrift")
                     .HasColumnType("TEXT");
 
                 b.HasKey("Id");
@@ -2101,6 +2695,9 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.Property<bool>("Ausgefallen")
                     .HasColumnType("INTEGER");
 
+                b.Property<long?>("AusgefallenAm")
+                    .HasColumnType("INTEGER");
+
                 b.Property<bool>("Ausnahme")
                     .HasColumnType("INTEGER");
 
@@ -2244,6 +2841,59 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasForeignKey("BelegungId")
                     .OnDelete(DeleteBehavior.Restrict)
                     .IsRequired();
+            });
+
+        modelBuilder.Entity("VibeVHS.Domain.Finanzen.Beleg", b =>
+            {
+                b.OwnsMany("VibeVHS.Domain.Finanzen.Belegposition", "Positionen", b1 =>
+                    {
+                        b1.Property<Guid>("BelegId")
+                            .HasColumnType("TEXT");
+
+                        b1.Property<int>("Nr")
+                            .HasColumnType("INTEGER");
+
+                        b1.Property<string>("Art")
+                            .IsRequired()
+                            .HasMaxLength(40)
+                            .HasColumnType("TEXT");
+
+                        b1.Property<Guid?>("BelegungId")
+                            .HasColumnType("TEXT");
+
+                        b1.Property<long>("BetragCent")
+                            .HasColumnType("INTEGER");
+
+                        b1.Property<long>("EinzelCent")
+                            .HasColumnType("INTEGER");
+
+                        b1.Property<Guid?>("KursId")
+                            .HasColumnType("TEXT");
+
+                        b1.Property<decimal>("Menge")
+                            .HasColumnType("TEXT");
+
+                        b1.Property<string>("Text")
+                            .IsRequired()
+                            .HasMaxLength(500)
+                            .HasColumnType("TEXT");
+
+                        b1.Property<Guid?>("VeranstaltungId")
+                            .HasColumnType("TEXT");
+
+                        b1.HasKey("BelegId", "Nr");
+
+                        b1.HasIndex("BelegungId");
+
+                        b1.HasIndex("VeranstaltungId");
+
+                        b1.ToTable("Belegpositionen");
+
+                        b1.WithOwner()
+                            .HasForeignKey("BelegId");
+                    });
+
+                b.Navigation("Positionen");
             });
 
         modelBuilder.Entity("VibeVHS.Domain.Personen.AdressKennzeichen", b =>
