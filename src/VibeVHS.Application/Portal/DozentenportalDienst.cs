@@ -586,7 +586,8 @@ public sealed class DozentenportalDienst(
     /// <summary>Eigener Termin: Leitung dieses Termins oder Mitglied im Team des Kurses.</summary>
     public static bool Eigen(Kurs k, Veranstaltung v, Guid ich) => v.DozentId == ich || k.Team.Any(t => t.PersonId == ich);
 
-    private static string? Aenderung(Kurs k, Veranstaltung v)
+    /// <summary>Hinweis auf Ausfall, Raum- oder Zeitänderung eines Termins (für Portale und Kalender).</summary>
+    public static string? Aenderung(Kurs k, Veranstaltung v)
     {
         if (v.Ausgefallen)
         {

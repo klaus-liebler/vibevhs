@@ -50,8 +50,10 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         // Dozierendenportal: eigene, schlanke Anmeldeseite (Link per Mail oder Testanmeldung).
         o.Events.OnRedirectToLogin = k =>
         {
-            var ziel = k.Request.Path.StartsWithSegments("/portal/dozierende")
-                ? $"{k.Request.PathBase}/portal/dozierende/anmelden?ReturnUrl={Uri.EscapeDataString(k.Request.PathBase + k.Request.Path + k.Request.QueryString)}"
+            var portal = k.Request.Path.StartsWithSegments("/portal/dozierende") ? "/portal/dozierende"
+                : k.Request.Path.StartsWithSegments("/portal/teilnehmende") ? "/portal/teilnehmende" : null;
+            var ziel = portal is not null
+                ? $"{k.Request.PathBase}{portal}/anmelden?ReturnUrl={Uri.EscapeDataString(k.Request.PathBase + k.Request.Path + k.Request.QueryString)}"
                 : k.RedirectUri;
             k.Response.Redirect(ziel);
             return Task.CompletedTask;
@@ -136,6 +138,7 @@ if (app.Configuration.GetValue("Demodaten:Anlegen", false))
                  ("Anmeldungen", AnmeldungDemodaten.AnlegenAsync),
                  ("Qualifikationen", QualifikationsDemodaten.AnlegenAsync),
                  ("Sprachfreigaben", QualifikationsDemodaten.SprachfreigabenAnlegenAsync),
+                 ("Teilnehmendenportal", TeilnehmendenDemodaten.AnlegenAsync),
                  ("Durchführung", DurchfuehrungDemodaten.AnlegenAsync),
                  ("Integration", IntegrationDemodaten.AnlegenAsync),
                  ("Finanzen", FinanzDemodaten.AnlegenAsync),

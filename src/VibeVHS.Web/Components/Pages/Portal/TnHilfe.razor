@@ -1,0 +1,97 @@
+@page "/portal/teilnehmende/hilfe"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@layout PortalLayout
+@using VibeVHS.Application.Portal
+@inject TeilnehmendenportalDienst Portal
+@inject VibeVHS.Application.Dokumente.IUebersetzer Uebersetzer
+
+@* Hilfe in einfacher Sprache, auf Wunsch übersetzt (gleicher Übersetzer wie bei Mails und Briefen). Die gewählte Sprache gilt auch für Mails und Briefe. *@
+
+<PageTitle>Hilfe · Meine vhs</PageTitle>
+
+<h1 style="font-size:22px;margin:0">Hilfe</h1>
+@if (meldung is not null)
+{
+    <div class="vhs-alert vhs-info" role="status">@meldung</div>
+}
+<section class="vhs-portal-karte">
+    <form method="get">
+        <label for="sprache">Sprache / Language / Dil / Мова / اللغة</label>
+        <select id="sprache" name="sprache" onchange="this.form.submit()">
+            @foreach (var s in VibeVHS.Web.Sprachen.Alle)
+            {
+                <option value="@s.Code" selected="@(s.Code == sprache)">@s.Name</option>
+            }
+        </select>
+        <noscript><button type="submit" class="vhs-btn">Übersetzen</button></noscript>
+    </form>
+    @if (sprache != "de")
+    {
+        <form method="post" @formname="merken" @onsubmit="MerkenAsync" style="margin-top:8px">
+            <AntiforgeryToken />
+            <input type="hidden" name="Gewaehlt" value="@sprache" />
+            <button type="submit" class="vhs-btn">Diese Sprache für Mails und Briefe nutzen</button>
+        </form>
+        <p class="vhs-small vhs-muted">Maschinelle Übersetzung. Verbindlich ist der deutsche Text.</p>
+    }
+</section>
+
+@foreach (var (titel, text) in Texte)
+{
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">@T(titel)</h2>
+        <p style="white-space:pre-line">@T(text)</p>
+    </section>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "sprache")]
+    private string? SpracheAusLink { get; set; }
+
+    [SupplyParameterFromForm(FormName = "merken")]
+    private string? Gewaehlt { get; set; }
+
+    private string sprache = "de";
+    private string? meldung;
+
+    /// <summary>Kurze Sätze, einfache Wörter (einfache Sprache).</summary>
+    private static readonly (string Titel, string Text)[] Texte =
+    [
+        ("Was ist „Meine vhs“?", "Hier sehen Sie Ihre Kurse und Termine.\nSie finden Unterlagen von Ihrer Kursleitung.\nSie finden Rechnungen und Bescheinigungen."),
+        ("Wie melde ich mich im Kurs an?", "Öffnen Sie „Termine“.\nTippen Sie auf „Check-in-Link öffnen“.\nScannen Sie den QR-Code im Kursraum.\nOder zeigen Sie der Kursleitung Ihren Ausweis."),
+        ("Ich kann nicht kommen.", "Öffnen Sie „Buchungen“.\nTippen Sie auf „Abmelden“.\nSie sehen vorher, ob es etwas kostet."),
+        ("Ein Platz auf der Warteliste ist frei.", "Sie bekommen eine E-Mail.\nÖffnen Sie „Buchungen“ und tippen Sie auf „Platz annehmen“.\nBitte achten Sie auf die Frist."),
+        ("Meine Adresse ist neu.", "Öffnen Sie „Meine Daten“.\nTragen Sie die neue Adresse ein.\nTippen Sie auf „Speichern“."),
+        ("Ich brauche Hilfe.", "Rufen Sie die vhs an oder kommen Sie zum Tresen.\nWir helfen Ihnen gern."),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var d = await Portal.DatenAsync();
+            sprache = SpracheAusLink ?? Gewaehlt ?? d.Sprache;
+        }
+        catch (PortalFehler)
+        {
+            sprache = SpracheAusLink ?? "de";
+        }
+    }
+
+    private string T(string text) => sprache == "de" ? text : Uebersetzer.Uebersetzen(text, sprache);
+
+    private async Task MerkenAsync()
+    {
+        try
+        {
+            await Portal.SpracheAsync(Gewaehlt ?? "de");
+            sprache = Gewaehlt ?? "de";
+            meldung = T("Gespeichert. Mails und Briefe kommen jetzt in dieser Sprache, mit Übersetzungslink.");
+        }
+        catch (PortalFehler f)
+        {
+            meldung = f.Message;
+        }
+    }
+}

@@ -75,7 +75,8 @@ public sealed class AnmeldungDienst(
     TimeProvider uhr,
     Durchfuehrung.CheckinZugang zugang,
     Dokumente.IQrCode qr,
-    IPlatzreservierungen? reservierungen = null)
+    IPlatzreservierungen? reservierungen = null,
+    IBenutzerkonten? konten = null)
 {
     /// <summary>Rollen, die am Tresen buchen, stornieren und umbuchen dürfen.</summary>
     public static readonly Rolle[] BuchungsRollen = [Rolle.Teilnehmerservice, Rolle.IntegrationskursTeam, Rolle.Verwaltungsleitung, Rolle.Leitung];
@@ -160,8 +161,11 @@ public sealed class AnmeldungDienst(
             throw new InvalidOperationException(pruefung.Erklaerung);
         }
 
+        var bevName = auftrag.BevollmaechtigterId is { } bv && bv != person.Id ? await BevollmaechtigterNameAsync(person, bv, abbruch) : null;
         var buchender = weg == Buchungsweg.Online
-            ? new Buchender(person.Anzeigename, null, null)
+            ? bevName is not null
+                ? new Buchender(bevName, null, "online mit Buchungsvollmacht", auftrag.BevollmaechtigterId, bevName, pruefung.VollmachtId)
+                : new Buchender(person.Anzeigename, null, null)
             : new Buchender(wer.Name, wer.Kennung, wer.Rolle?.Anzeigename(), auftrag.BevollmaechtigterId,
                 await BevollmaechtigterNameAsync(person, auftrag.BevollmaechtigterId, abbruch), pruefung.VollmachtId);
         var ermaessigung = await ErmaessigungHeuteAsync(person.Id, abbruch);
@@ -196,8 +200,8 @@ public sealed class AnmeldungDienst(
 
     public async Task AngebotAnnehmenAsync(Guid belegungId, CancellationToken abbruch = default)
     {
-        var wer = await BuchendeRolleAsync(abbruch);
         var b = await BelegungAsync(belegungId, abbruch);
+        var wer = await BuchendeRolleAsync(abbruch, b);
         var kurs = await KursAsync(b.KursId, abbruch);
         var person = await PersonAsync(b.PersonId, abbruch);
         b.AngebotAnnehmen(kurs.Richtlinie, uhr.GetLocalNow(), wer.Anzeige);
@@ -209,8 +213,8 @@ public sealed class AnmeldungDienst(
 
     public async Task AngebotAblehnenAsync(Guid belegungId, CancellationToken abbruch = default)
     {
-        await BuchendeRolleAsync(abbruch);
         var b = await BelegungAsync(belegungId, abbruch);
+        await BuchendeRolleAsync(abbruch, b);
         var kurs = await KursAsync(b.KursId, abbruch);
         b.AngebotVerfallenLassen(uhr.GetLocalNow(), "Angebot abgelehnt");
         await protokoll.ProtokollierenAsync("Anmeldung.AngebotAbgelehnt", $"{Pseudonym.Person(b.PersonId)} hat das Nachrückangebot für {kurs.Kursnummer} abgelehnt",
@@ -457,8 +461,8 @@ public sealed class AnmeldungDienst(
 
     public async Task<Belegung> UmbuchenAsync(Guid belegungId, Guid neuerKursId, CancellationToken abbruch = default)
     {
-        var wer = await BuchendeRolleAsync(abbruch);
         var alt = await BelegungAsync(belegungId, abbruch);
+        var wer = await BuchendeRolleAsync(abbruch, alt);
         var altKurs = await KursAsync(alt.KursId, abbruch);
         var neuKurs = await KursAsync(neuerKursId, abbruch);
         var person = await PersonAsync(alt.PersonId, abbruch);
@@ -467,7 +471,8 @@ public sealed class AnmeldungDienst(
         var jetzt = uhr.GetLocalNow();
         var lage = new Buchungslage(neuBelegungen.Count(b => b.HaeltPlatz), neuBelegungen.Count(b => b.Status == Belegungsstatus.Warteliste),
             neuBelegungen.Where(b => b.PersonId == person.Id && b.Offen).Select(b => (Belegungsstatus?)b.Status).FirstOrDefault());
-        var pruefung = Buchungspruefung.Pruefen(neuKurs, person, alt.Weg, alt.BevollmaechtigterId, lage, jetzt);
+        // Selbst umbuchen (Teilnehmendenportal): gleiche Regeln wie online buchen.
+        var pruefung = Buchungspruefung.Pruefen(neuKurs, person, wer.Rolle == Rolle.Teilnehmende ? Buchungsweg.Online : alt.Weg, alt.BevollmaechtigterId, lage, jetzt);
         if (pruefung.Code != Buchungscode.Buchbar)
         {
             throw new InvalidOperationException($"Umbuchung nicht möglich: {pruefung.Erklaerung}");
@@ -746,9 +751,22 @@ public sealed class AnmeldungDienst(
 
     private async Task<string> EinrichtungAsync(CancellationToken abbruch) => (await stammdaten.EinrichtungAsync(abbruch))?.Name ?? "Ihre Volkshochschule";
 
-    private async Task<Benutzer> BuchendeRolleAsync(CancellationToken abbruch)
+    /// <param name="selbst">Belegung, die Teilnehmende selbst (oder mit Buchungsvollmacht) ändern dürfen.</param>
+    private async Task<Benutzer> BuchendeRolleAsync(CancellationToken abbruch, Belegung? selbst = null)
     {
         var wer = await benutzer.ErmittelnAsync(abbruch);
+        if (wer.Rolle == Rolle.Teilnehmende && selbst is not null)
+        {
+            var ich = konten is null ? null : (await konten.FindenAsync(wer.Kennung, abbruch))?.PersonId;
+            var person = ich is null ? null : await personen.LadenAsync(selbst.PersonId, abbruch);
+            if (ich is { } id && person is not null && (selbst.PersonId == id || person.DarfBuchen(id, Heute, uhr.GetLocalNow())))
+            {
+                return wer;
+            }
+
+            throw new InvalidOperationException("Diese Buchung gehört nicht zu Ihnen, und Sie haben keine Buchungsvollmacht für diese Person.");
+        }
+
         if (!wer.IstAutomatik && (wer.Rolle is not { } r || !BuchungsRollen.Contains(r)))
         {
             throw new InvalidOperationException(Oberflaeche.Freigabe.NurFuer(wer.Rolle, BuchungsRollen).Begruendung);

@@ -232,9 +232,14 @@ public sealed class DokumentDienst(
 
     // ---------- Teilnehmerausweis ----------
 
-    public async Task<Dokument> TeilnehmerausweisAsync(Guid personId, CancellationToken abbruch = default)
+    /// <param name="selbst">Die Person stellt sich den Ausweis im Teilnehmendenportal selbst aus (Prüfung der Person dort).</param>
+    public async Task<Dokument> TeilnehmerausweisAsync(Guid personId, CancellationToken abbruch = default, bool selbst = false)
     {
-        await RolleAsync(AusstellRollen, abbruch);
+        if (!selbst)
+        {
+            await RolleAsync(AusstellRollen, abbruch);
+        }
+
         var person = await personen.LadenAsync(personId, abbruch) ?? throw new InvalidOperationException("Person nicht gefunden.");
         var jetzt = uhr.GetLocalNow();
         var stand = person.StandAm(DateOnly.FromDateTime(jetzt.Date), jetzt);

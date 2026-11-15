@@ -177,6 +177,9 @@ public enum Kontaktzweck
 
     /// <summary>Werbung: Programmheft, Newsletter, Kursempfehlungen.</summary>
     Werbung,
+
+    /// <summary>Fotos aus dem Kurs veröffentlichen (Website, Programmheft).</summary>
+    Fotos,
 }
 
 /// <summary>Einwilligung je Kanal und Zweck (DSGVO), zeitlich versioniert: erteilt oder verweigert/widerrufen.</summary>
@@ -207,7 +210,12 @@ public sealed class Einwilligung : BitemporaleVersion<Einwilligung>
         _ => k.ToString(),
     };
 
-    public static string ZweckAnzeige(Kontaktzweck z) => z == Kontaktzweck.Kursorganisation ? "Kursorganisation" : "Werbung";
+    public static string ZweckAnzeige(Kontaktzweck z) => z switch
+    {
+        Kontaktzweck.Kursorganisation => "Kursorganisation",
+        Kontaktzweck.Fotos => "Fotos veröffentlichen",
+        _ => "Werbung",
+    };
 
     public override string Datenart => "Einwilligungen";
 

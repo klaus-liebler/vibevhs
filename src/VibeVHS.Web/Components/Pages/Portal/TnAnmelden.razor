@@ -1,0 +1,42 @@
+@page "/portal/teilnehmende/anmelden"
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@layout PortalLayout
+@using VibeVHS.Application.Portal
+@inject IServiceScopeFactory Bereiche
+
+<PageTitle>Anmelden · Meine vhs</PageTitle>
+
+<section class="vhs-portal-karte">
+    <h1 style="font-size:22px;margin:0 0 8px">Meine vhs</h1>
+    <p>Hier sehen Sie Ihre Kurse, Termine, Unterlagen und Rechnungen.</p>
+    @if (gesendet)
+    {
+        <div class="vhs-alert vhs-info" role="status">Wir haben Ihnen einen Link geschickt, wenn wir Ihre Adresse kennen. Der Link gilt 15 Minuten. Bitte schauen Sie in Ihr Postfach.</div>
+    }
+    <form method="post" @formname="link" @onsubmit="AnfordernAsync">
+        <AntiforgeryToken />
+        <label for="mail">Ihre E-Mail-Adresse</label>
+        <input id="mail" name="EMail" type="email" autocomplete="email" required />
+        <button type="submit" class="vhs-btn">Link schicken</button>
+    </form>
+    <p class="vhs-small vhs-muted" style="margin-top:12px">Sie brauchen kein Passwort. Neu hier? Ein Kundenkonto legen Sie bei der ersten Online-Buchung an.
+        Im Testbetrieb: <a href="@($"anmelden?ReturnUrl={Uri.EscapeDataString(ReturnUrl ?? "/portal/teilnehmende")}")">Testanmeldung mit Demokonto</a>.</p>
+</section>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromForm(FormName = "link")]
+    private string? EMail { get; set; }
+
+    private bool gesendet;
+
+    private async Task AnfordernAsync()
+    {
+        await using var bereich = Bereiche.CreateAsyncScope();
+        await bereich.ServiceProvider.GetRequiredService<TeilnehmendenportalDienst>().LinkAnfordernAsync(EMail ?? "");
+        gesendet = true;
+    }
+}

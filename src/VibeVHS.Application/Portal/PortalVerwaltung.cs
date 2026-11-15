@@ -24,6 +24,9 @@ public sealed class PortalVerwaltung(
     AufgabenDienst aufgaben,
     FinanzDienst finanzen,
     QualifikationsDienst qualifikationen,
+    Datenschutz.DatenschutzDienst datenschutz,
+    Dokumente.DokumentDienst dokumente,
+    Datenschutz.IAuskunftPdf auskunftPdf,
     IAuditProtokoll protokoll,
     TimeProvider uhr)
 {
@@ -31,12 +34,21 @@ public sealed class PortalVerwaltung(
 
     public static readonly Rolle[] BuchhaltungRollen = [Rolle.Buchhaltung, Rolle.Verwaltungsleitung, Rolle.Leitung];
 
+    public static readonly Rolle[] DatenschutzRollen = [Rolle.Verwaltungsleitung, Rolle.Leitung];
+
     public static readonly Rolle[] LeseRollen = [Rolle.Fachbereichsleitung, Rolle.Buchhaltung, Rolle.Verwaltungsleitung, Rolle.Leitung];
 
-    public static Rolle[] EntscheiderFuer(Antragsart art) => art is Antragsart.Bankverbindung or Antragsart.Honorareinwand ? BuchhaltungRollen : FachbereichRollen;
-
-    public static string Aufgabentyp(Antragsart art) => art switch
+    public static Rolle[] EntscheiderFuer(Antragsart art) => art switch
     {
+        Antragsart.Bankverbindung or Antragsart.Honorareinwand => BuchhaltungRollen,
+        Antragsart.Auskunft or Antragsart.Loeschung or Antragsart.EMailAenderung => DatenschutzRollen,
+        _ => FachbereichRollen,
+    };
+
+    public static string? Aufgabentyp(Antragsart art) => art switch
+    {
+        Antragsart.EMailAenderung => null, // bestätigt die Person selbst über den Link
+        Antragsart.Auskunft or Antragsart.Loeschung => Aufgabentypen.PortalDatenschutz,
         Antragsart.Ausfall => Aufgabentypen.PortalAusfall,
         Antragsart.Bankverbindung or Antragsart.Honorareinwand => Aufgabentypen.PortalBuchhaltung,
         _ => Aufgabentypen.PortalFachbereich,
@@ -126,6 +138,15 @@ public sealed class PortalVerwaltung(
                         string.IsNullOrWhiteSpace(antrag.Daten.GetValueOrDefault("wert")) ? null : antrag.Daten["wert"],
                         $"Portal-Upload {datei?.Name} (SHA-256 {datei?.Sha256[..12]}…), geprüft von {wer.Name}", null, DateOnly.FromDateTime(uhr.GetLocalNow().Date), bis, abbruch);
                     break;
+                case Antragsart.Auskunft:
+                    // Wie in der Verwaltung: Auskunft erstellen und als Brief archivieren – die Person findet sie unter „Dokumente“.
+                    var auskunft = await datenschutz.AuskunftAsync(antrag.PersonId, abbruch);
+                    await dokumente.AuskunftArchivierenAsync(auskunft, link => auskunftPdf.Erzeugen(auskunft, link), abbruch);
+                    break;
+                case Antragsart.Loeschung:
+                    // Prüfung wie in der Verwaltung: löschen, soweit keine Aufbewahrungspflicht besteht, sonst sperren; Antwortschreiben per Mail.
+                    await datenschutz.LoeschverlangenAsync(antrag.PersonId, abbruch);
+                    break;
             }
         }
 
@@ -142,7 +163,7 @@ public sealed class PortalVerwaltung(
     {
         var offen = await speicher.AntraegeAsync(null, true, abbruch);
         var namen = await personen.AnzeigenamenAsync(offen.Select(a => a.PersonId).Distinct(), abbruch);
-        foreach (var gruppe in new[] { Aufgabentypen.PortalAusfall, Aufgabentypen.PortalBuchhaltung, Aufgabentypen.PortalFachbereich })
+        foreach (var gruppe in new[] { Aufgabentypen.PortalAusfall, Aufgabentypen.PortalBuchhaltung, Aufgabentypen.PortalFachbereich, Aufgabentypen.PortalDatenschutz })
         {
             var anlaesse = offen.Where(a => Aufgabentyp(a.Art) == gruppe)
                 .Select(a => new AufgabenAnlass($"portal:{a.Id:N}", $"{AntragAnzeige.Art(a.Art)}: {namen.GetValueOrDefault(a.PersonId) ?? "Kursleitung"} – {a.Titel}",

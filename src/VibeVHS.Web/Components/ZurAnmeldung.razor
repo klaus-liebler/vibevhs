@@ -5,7 +5,8 @@
     {
         var zurueck = "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
         // Dozierendenportal: eigene, schlanke Anmeldeseite (Link per Mail oder Testanmeldung).
-        var ziel = zurueck.StartsWith("/portal/dozierende", StringComparison.Ordinal) ? "portal/dozierende/anmelden" : "anmelden";
+        var ziel = zurueck.StartsWith("/portal/dozierende", StringComparison.Ordinal) ? "portal/dozierende/anmelden"
+            : zurueck.StartsWith("/portal/teilnehmende", StringComparison.Ordinal) ? "portal/teilnehmende/anmelden" : "anmelden";
         Navigation.NavigateTo($"{ziel}?ReturnUrl={Uri.EscapeDataString(zurueck)}", forceLoad: true);
     }
 }

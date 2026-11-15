@@ -18,6 +18,9 @@ public enum Rolle
 
     /// <summary>Betriebs- oder Rechnungsprüfung: liest Finanzdaten und Protokoll, exportiert, ändert nichts (FA-132).</summary>
     Pruefung,
+
+    /// <summary>Teilnehmende im Teilnehmendenportal: nur eigene Daten und Buchungen (bzw. per Buchungsvollmacht). Am Ende, damit gespeicherte Werte gleich bleiben.</summary>
+    Teilnehmende,
 }
 
 public static class RollenExtensions
@@ -32,6 +35,7 @@ public static class RollenExtensions
         Rolle.IntegrationskursTeam => "Integrationskurs-Team",
         Rolle.Systemverwaltung => "Systemverwaltung",
         Rolle.Dozierende => "Dozierende",
+        Rolle.Teilnehmende => "Teilnehmende",
         Rolle.Pruefung => "Prüfung (nur lesen)",
         _ => rolle.ToString(),
     };

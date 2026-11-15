@@ -152,7 +152,12 @@ try {
   await shot('shop-bestaetigung.png');
 
   // Mein Konto: unbekannte Adresse wird abgewiesen, Registrierung (Double-Opt-in) mit Arbeitsnachweis
+  // „Mein Konto“ im Shop führt ins Teilnehmendenportal; die Konto-Ansicht der Komponente bleibt für eigene Websites nutzbar.
   await cdp('Page.navigate', { url: `${basis}/shop/konto.html` });
+  pruefe('Mein Konto leitet ins Teilnehmendenportal', await bis(`location.pathname.startsWith('/portal/teilnehmende')`), await js('location.pathname'));
+  await cdp('Page.navigate', { url: `${basis}/shop/demo.html` });
+  await bis(`!!${S}?.querySelector('ul.kurse li')`);
+  await js(`(() => { const alt = document.querySelector('vhs-kurse'); const neu = document.createElement('vhs-kurse'); neu.setAttribute('ansicht', 'konto'); alt.replaceWith(neu); return true; })()`);
   pruefe('Kontoseite lädt', await bis(`!!${S}?.querySelector('#anmelden')`));
   a = await a11y('Konto'); pruefe('A11y Konto', a.probleme.length === 0, a.probleme);
   await js(`${S}.querySelector('#a-email').value = 'niemand@example.org'`);

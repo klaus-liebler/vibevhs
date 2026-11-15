@@ -60,11 +60,12 @@ public sealed class Schnellanmeldedienst(
 
     private static readonly CultureInfo De = CultureInfo.GetCultureInfo("de-DE");
 
-    public async Task<SchnellVorschau> VorschauAsync(Guid personId, string kursnummer, CancellationToken abbruch = default)
+    /// <param name="bevollmaechtigterId">Buchung für eine andere Person mit Buchungsvollmacht (Teilnehmendenportal).</param>
+    public async Task<SchnellVorschau> VorschauAsync(Guid personId, string kursnummer, CancellationToken abbruch = default, Guid? bevollmaechtigterId = null)
     {
         var (kurs, person) = await LadenAsync(personId, kursnummer, abbruch);
         var jetzt = uhr.GetLocalNow();
-        var pruefung = await PruefenAsync(kurs, person, abbruch);
+        var pruefung = await PruefenAsync(kurs, person, abbruch, bevollmaechtigterId);
         var entgelt = kurs.EntgeltFuerBuchung(jetzt);
         var ermaessigt = (await anmeldung.ErmaessigungHeuteAsync(personId, abbruch)) is not null && entgelt?.ErmaessigtCent is not null;
         var zahlart = await ZahlartAsync(personId, abbruch);
@@ -85,7 +86,7 @@ public sealed class Schnellanmeldedienst(
     /// <param name="weg">„Link“ oder „Gerät“ (fürs Protokoll).</param>
     /// <param name="stornoLink">Baut aus dem Storno-Token den Link für die Mail.</param>
     public async Task<SchnellErgebnis> AnmeldenAsync(Guid personId, string kursnummer, string agbVersion, string datenschutzVersion, string weg,
-        Func<string, Uri> stornoLink, CancellationToken abbruch = default)
+        Func<string, Uri> stornoLink, CancellationToken abbruch = default, Guid? bevollmaechtigterId = null)
     {
         ArgumentNullException.ThrowIfNull(stornoLink);
         if (agbVersion != optionen.AgbVersion || datenschutzVersion != optionen.DatenschutzVersion)
@@ -102,7 +103,7 @@ public sealed class Schnellanmeldedienst(
             AnmeldeErgebnis e;
             try
             {
-                e = await anmeldung.AnmeldenAsync(new AnmeldeAuftrag(personId, kurs.Id, zahlart, Weg: Buchungsweg.Online), abbruch);
+                e = await anmeldung.AnmeldenAsync(new AnmeldeAuftrag(personId, kurs.Id, zahlart, bevollmaechtigterId, Weg: Buchungsweg.Online), abbruch);
             }
             catch (InvalidOperationException ex)
             {
@@ -195,13 +196,13 @@ public sealed class Schnellanmeldedienst(
         return (kurs, person);
     }
 
-    private async Task<Buchungsergebnis> PruefenAsync(Kurs kurs, Domain.Personen.Person person, CancellationToken abbruch)
+    private async Task<Buchungsergebnis> PruefenAsync(Kurs kurs, Domain.Personen.Person person, CancellationToken abbruch, Guid? bevollmaechtigterId = null)
     {
         var belegungen = await anmeldungen.BelegungenDesKursesAsync(kurs.Id, abbruch);
         var reserviert = (await speicher.OffeneWarenkoerbeAsync(abbruch)).Where(w => w.Haelt(uhr.GetUtcNow()))
             .Sum(w => w.Positionen.Count(p => p.KursId == kurs.Id && !p.Warteliste));
         var bestehend = belegungen.Where(b => b.PersonId == person.Id && b.Offen).Select(b => (Belegungsstatus?)b.Status).FirstOrDefault();
-        return Buchungspruefung.Pruefen(kurs, person, Buchungsweg.Online, null,
+        return Buchungspruefung.Pruefen(kurs, person, Buchungsweg.Online, bevollmaechtigterId,
             new Buchungslage(belegungen.Count(b => b.HaeltPlatz) + reserviert, belegungen.Count(b => b.Status == Belegungsstatus.Warteliste), bestehend), uhr.GetLocalNow());
     }
 

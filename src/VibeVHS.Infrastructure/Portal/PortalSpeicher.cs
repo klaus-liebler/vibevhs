@@ -75,6 +75,9 @@ internal sealed class PortalSpeicher(VibeVhsDbContext db) : IPortalSpeicher
     public Task<Benutzerkonto?> KontoZurPersonAsync(Guid personId, CancellationToken abbruch = default)
         => db.Benutzerkonten.FirstOrDefaultAsync(k => k.PersonId == personId && k.Aktiv, abbruch);
 
+    public async Task<IReadOnlyList<Person>> PersonenMitVollmachtFuerAsync(Guid bevollmaechtigterId, CancellationToken abbruch = default)
+        => await db.Personen.Where(p => p.Vollmachten.Any(v => v.BevollmaechtigterId == bevollmaechtigterId)).ToListAsync(abbruch);
+
     public void Hinzufuegen(object eintrag) => db.Add(eintrag);
 
     public Task SpeichernAsync(CancellationToken abbruch = default) => db.SaveChangesAsync(abbruch);

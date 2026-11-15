@@ -107,7 +107,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        konten = await Konten.AlleAsync();
+        // Portal-Konten von Teilnehmenden (beim Anmeldelink angelegt) nicht in der Testanmeldung zeigen – nur das Demokonto.
+        konten = (await Konten.AlleAsync()).Where(k => !(k.Rollen.Count == 1 && k.Rollen[0] == Rolle.Teilnehmende) || (k.Hinweis?.Contains("Demo", StringComparison.Ordinal) ?? false)).ToList();
         fachbereiche = await Stammdaten.FachbereicheAsync();
         einrichtung = await Stammdaten.EinrichtungAsync();
     }

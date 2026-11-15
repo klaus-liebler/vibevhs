@@ -105,6 +105,53 @@ public static class PortalApi
                 : Results.File(d.Inhalt, d.Typ, d.Name);
         });
 
+        // ---------- Teilnehmendenportal ----------
+        const string Tn = "/portal/teilnehmende";
+        app.MapGet($"{Tn}/link/{{token}}", (string token) => Seite("Meine vhs",
+            $"""<p>Willkommen! Tippen Sie auf „Weiter“, um zu Ihren Kursen zu kommen.</p><form method="post"><input type="hidden" name="token" value="{WebUtility.HtmlEncode(token)}"><button type="submit">Weiter</button></form>"""));
+        app.MapPost($"{Tn}/link/{{token}}", async ([FromForm] string token, HttpContext http, TeilnehmendenportalDienst portal) =>
+        {
+            var konto = await portal.LinkEinloesenAsync(token);
+            if (konto is null)
+            {
+                return Seite("Link ungültig", $"""<p role="alert">Der Link ist abgelaufen oder wurde schon benutzt. <a href="{Tn.TrimStart('/')}/anmelden">Neuen Link anfordern</a>.</p>""", 410);
+            }
+
+            await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
+                MockAnmeldung.Anmelden(konto.AlsBenutzer(Rolle.Teilnehmende), CookieAuthenticationDefaults.AuthenticationScheme));
+            return Results.LocalRedirect("~" + Tn);
+        }).DisableAntiforgery();
+        app.MapGet($"{Tn}/kalender/{{token}}.ics", async (string token, TeilnehmendenportalDienst portal, HttpContext http) =>
+        {
+            var ics = await portal.KalenderAsync(token);
+            http.Response.Headers.CacheControl = "no-store";
+            return ics is null ? Results.NotFound() : Results.Text(ics, "text/calendar; charset=utf-8", Encoding.UTF8);
+        });
+        app.MapGet($"{Tn}/termin/{{id:guid}}.ics", (Guid id, TeilnehmendenportalDienst portal) => Ausfuehren(async () =>
+        {
+            var (datei, inhalt) = await portal.TerminIcsAsync(id);
+            return Results.File(Encoding.UTF8.GetBytes(inhalt), "text/calendar", datei);
+        })).RequireAuthorization();
+        app.MapGet($"{Tn}/dokumente/{{id:guid}}.pdf", (Guid id, TeilnehmendenportalDienst portal, HttpContext http) => Ausfuehren(async () =>
+        {
+            var (datei, pdf) = await portal.DokumentPdfAsync(id);
+            http.Response.Headers.CacheControl = "no-store";
+            return Results.File(pdf, "application/pdf", datei);
+        })).RequireAuthorization();
+        app.MapGet($"{Tn}/unterlagen/{{id:guid}}", (Guid id, TeilnehmendenportalDienst portal, HttpContext http) => Ausfuehren(async () =>
+        {
+            var d = await portal.UnterlageAsync(id);
+            http.Response.Headers.CacheControl = "no-store";
+            return Results.File(d.Inhalt, d.Typ, d.Name);
+        })).RequireAuthorization();
+        app.MapGet($"{Tn}/email/{{token}}", (string token) => Seite("E-Mail-Adresse bestätigen",
+            $"""<p>Tippen Sie auf „Bestätigen“, damit wir Ihnen an diese Adresse schreiben.</p><form method="post"><input type="hidden" name="token" value="{WebUtility.HtmlEncode(token)}"><button type="submit">Bestätigen</button></form>"""));
+        app.MapPost($"{Tn}/email/{{token}}", async ([FromForm] string token, TeilnehmendenportalDienst portal) =>
+            await portal.EMailBestaetigenAsync(token)
+                ? Seite("Danke!", """<p role="status">Ihre neue E-Mail-Adresse ist bestätigt.</p>""")
+                : Seite("Link ungültig", """<p role="alert">Der Link ist abgelaufen oder wurde schon benutzt. Bitte ändern Sie die Adresse in „Meine Daten“ noch einmal.</p>""", 410))
+            .DisableAntiforgery();
+
         // Datei zu einem Anliegen (Verwaltung)
         app.MapGet("/portal-anliegen/{id:guid}/datei", async (Guid id, PortalVerwaltung verwaltung) =>
         {

@@ -60,6 +60,7 @@ public static class Aufgabentypen
     public const string PortalAusfall = "portal-ausfall";
     public const string PortalBuchhaltung = "portal-buchhaltung";
     public const string PortalFachbereich = "portal-fachbereich";
+    public const string PortalDatenschutz = "portal-datenschutz";
 
     public static IReadOnlyList<Aufgabentyp> Vorschlaege() =>
     [
@@ -101,6 +102,9 @@ public static class Aufgabentypen
         new(PortalFachbereich, "Anliegen an die Fachbereichsleitung (Dozierendenportal)",
             "Qualifikationsnachweis prüfen, Verfügbarkeit oder Kursvorschlag fürs nächste Semester sichten.",
             nameof(Rolle.Fachbereichsleitung), jeFachbereich: true, eskalationNachTagen: 14),
+        new(PortalDatenschutz, "Datenschutzanfrage (Teilnehmendenportal)",
+            "Auskunft nach Art. 15 oder Löschung nach Art. 17 DSGVO: prüfen und bearbeiten (Frist ein Monat). Annehmen erzeugt die Auskunft bzw. führt die Löschprüfung aus.",
+            nameof(Rolle.Verwaltungsleitung), jeFachbereich: false, eskalationNachTagen: 14),
         new(Ruecklastschrift, "Rücklastschrift klären", "Nach einer Rücklastschrift ist die Rechnung wieder offen: Kontakt aufnehmen, neues Mandat oder Überweisung.",
             nameof(Rolle.Buchhaltung), jeFachbereich: false, eskalationNachTagen: 7),
     ];

@@ -393,6 +393,9 @@ Fachbereichsleitung und Prüfung lesen).
   Anwesenheit, Nachricht an Teilnehmende, Ausfall melden, Unterlagen verteilen, Honorar mit PDF und Einwand, eigene Daten
   (Bankverbindung mit Vier-Augen-Freigabe, Nachweise), Verfügbarkeit und Kursvorschläge. Anliegen landen als Aufgaben bei
   Fachbereichsleitung bzw. Buchhaltung (`/portal-anliegen`).
+- **Teilnehmendenportal „Meine vhs“** `/portal/teilnehmende`: Buchungen mit Storno/Umbuchung/Nachrückangebot, Buchen per
+  Vollmacht, Termine und Kalender-Abo, Check-in-Link und Ausweis, Unterlagen, Dokumente (Originale) und Teilnehmerkonto,
+  eigene Daten (E-Mail mit Bestätigung, Einwilligungen, SEPA-Mandat), Auskunft/Löschung als Vorgang, Hilfe in einfacher Sprache.
 - Details: `docs/dozierendenportal.md`.
 
 ## Testbenutzer der Pilot-VHS

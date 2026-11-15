@@ -95,7 +95,7 @@ internal sealed class ShopTestHost : IAsyncDisposable
 
     /// <summary>Veröffentlichter Kurs mit 6 Terminen ab in 30 Tagen.</summary>
     public async Task<Kurs> KursAsync(string nummer, int max, Buchungsrichtlinie? richtlinie = null, Sichtbarkeit sichtbarkeit = Sichtbarkeit.Oeffentlich,
-        Kursstatus status = Kursstatus.Veroeffentlicht)
+        Kursstatus status = Kursstatus.Veroeffentlicht, int startInTagen = 30, string? titel = null)
     {
         await using var bereich = App.Services.CreateAsyncScope();
         var db = bereich.ServiceProvider.GetRequiredService<VibeVhsDbContext>();
@@ -105,9 +105,9 @@ internal sealed class ShopTestHost : IAsyncDisposable
         var art = new Kursart($"Art {nummer}", Nutzungsart.Bewegung, [], richtlinie ?? Buchungsrichtlinie.Oeffentlich, sichtbarkeit);
         var haus = new Ort(Ortsart.Gebaeude, $"Haus {nummer}").MitAdresse("Bildungsweg 1", "48282", "Emsdetten");
         var raum = new Ort(Ortsart.Raum, "Bewegungsraum", haus.Id, "B 1.01").MitKapazitaet(Nutzungsart.Bewegung, 30);
-        var kurs = new Kurs(nummer, $"Yoga {nummer}", semester, 8, art, 1, max).MitBeschreibung("Sanftes Yoga für alle.");
+        var kurs = new Kurs(nummer, titel ?? $"Yoga {nummer}", semester, 8, art, 1, max).MitBeschreibung("Sanftes Yoga für alle.");
         kurs.EntgeltSetzenAb(Geld.Euro(84), Geld.Euro(63), semester.Beginn, Erfassung.Erst(jetzt.AddMonths(-1)));
-        var start = heute.AddDays(30);
+        var start = heute.AddDays(startInTagen);
         kurs.SerieFestlegen(new Serienregel
         {
             Start = start, Anzahl = 6, Wochentage = [start.DayOfWeek], Beginn = new TimeOnly(19, 0), DauerMinuten = 90, OrtIds = [raum.Id],

@@ -42,3 +42,24 @@ Gesperrte Knöpfe erklären per Tooltip den Grund.
 
 Teilnehmerlisten im Portal zeigen nur Name und Status. Ein Feld „Notfallkontakt“ gibt es in VibeVHS bisher nicht; es wird
 daher nicht angezeigt (offener Punkt, falls gewünscht: mit Einwilligung erfassen).
+
+## Teilnehmendenportal „Meine vhs“ `/portal/teilnehmende`
+
+Gleiche Grundlage wie das Dozierendenportal (mobil zuerst, statisch gerendert). Anmeldung per **Anmeldelink** an die
+E-Mail-Adresse (bestätigtes Shop-Kundenkonto oder eindeutige Person; beim ersten Link entsteht ein Konto mit der Rolle
+„Teilnehmende“; Mitarbeitende/Kursleitungen bekommen darüber keinen Zugang). Demokonto: `olena.kovalenko` (mit Buchungsvollmacht
+für ihren Sohn Taras). „Mein Konto“ im Webshop (`/shop/konto.html`) und in TYPO3 führt hierher.
+
+| Bereich | Inhalt |
+|---|---|
+| Termine | nächste sechs Wochen mit Ort, Wegbeschreibung, hervorgehobenen Änderungen; Einzeltermin-ICS; Check-in-Link öffnen; Teilnehmerausweis als Bild (Handy) und PDF (Archiv) |
+| Buchungen | aktuell/vergangen, Status, Wartelistenplatz, **Nachrückangebot annehmen/ablehnen** mit Frist, **Abmelden** mit Gebühr nach AGB (Vorschau vorher), **Umbuchen** in ähnliche öffentliche Kurse mit freien Plätzen (nur vor Kursbeginn) – dieselben Regeln wie am Tresen |
+| Kurs buchen | per Kursnummer für sich oder – mit **Buchungsvollmacht** – für andere (z. B. Kinder); Prüfung der Vollmacht durch die Buchungsprüfung, die Belegung vermerkt die bevollmächtigte Person |
+| Unterlagen & Rechnungen | Unterlagen der Kursleitungen (zurückgezogene verschwinden), **Teilnehmerkonto** mit Saldo und Buchungen, Bescheinigungen/Rechnungen/Mahnungen/Ausweis/Auskunft als **Original aus dem Archiv** (Prüfsumme geprüft, Abruf protokolliert) |
+| Meine Daten | Adresse, Telefon, E-Mail (neue Adresse erst nach Klick auf den Bestätigungslink), Newsletter- und Foto-Einwilligung (erteilen/widerrufen), SEPA-Mandat erteilen/widerrufen, Buchungsvollmachten (wer für mich, für wen ich), Kalender-Abo, eigene Anfragen |
+| Datenschutz | **Auskunft** (Art. 15) und **Löschung** (Art. 17) anfordern → Vorgang mit Aufgabe für die Verwaltungsleitung („Datenschutzanfrage“); Annehmen erzeugt die Auskunft (erscheint unter „Unterlagen“) bzw. führt die Löschprüfung der Verwaltung aus (löschen oder sperren, Antwortmail) – kein Sofortlöschen |
+| Hilfe / Sprache | Hilfe in einfacher Sprache, übersetzbar (gleicher Übersetzer wie Mails/Briefe, vorerst Mock); gewählte Sprache gilt für Mails und Briefe |
+
+**Rechte:** nur eigene Daten bzw. per Buchungsvollmacht (fremde Buchung/Termin/Dokument → 403). Mit der aktiven Rolle
+„Teilnehmende“ leiten Verwaltungsseiten und das Dozierendenportal auf „Meine vhs“ um. Portal-Konten erscheinen nicht in der
+Testanmeldung (außer dem Demokonto).

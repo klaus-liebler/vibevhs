@@ -49,6 +49,7 @@ public static class Registrierung
         dienste.AddScoped<Shop.Schnellanmeldedienst>();
         dienste.AddScoped<Portal.PortalVerwaltung>();
         dienste.AddScoped<Portal.DozentenportalDienst>();
+        dienste.AddScoped<Portal.TeilnehmendenportalDienst>();
         return dienste;
     }
 }

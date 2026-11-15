@@ -438,10 +438,19 @@ public sealed class FinanzDienst(
 
     public async Task<string?> MandatReferenzAsync(Guid mandatId, CancellationToken abbruch = default) => (await speicher.MandatAsync(mandatId, abbruch))?.Referenz;
 
-    public async Task MandatWiderrufenAsync(Guid mandatId, CancellationToken abbruch = default)
+    public async Task MandatWiderrufenAsync(Guid mandatId, CancellationToken abbruch = default, Guid? selbstPersonId = null)
     {
-        await PruefenAsync(Finanzrollen.Mandate, abbruch);
+        if (selbstPersonId is null)
+        {
+            await PruefenAsync(Finanzrollen.Mandate, abbruch);
+        }
+
         var m = await speicher.MandatAsync(mandatId, abbruch) ?? throw new InvalidOperationException("Mandat nicht gefunden.");
+        if (selbstPersonId is { } p && m.PersonId != p)
+        {
+            throw new InvalidOperationException("Dieses Mandat gehört nicht zu Ihnen.");
+        }
+
         if (m.Status != Mandatsstatus.Aktiv)
         {
             throw new InvalidOperationException("Das Mandat ist bereits widerrufen.");

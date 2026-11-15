@@ -1,0 +1,231 @@
+@page "/portal/teilnehmende/daten"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@layout PortalLayout
+@using VibeVHS.Application.Portal
+@using VibeVHS.Domain.Personen
+@using VibeVHS.Domain.Portal
+@inject TeilnehmendenportalDienst Portal
+
+<PageTitle>Meine Daten · Meine vhs</PageTitle>
+
+<h1 style="font-size:22px;margin:0">Meine Daten</h1>
+@if (meldung is not null)
+{
+    <div class="vhs-alert vhs-info" role="status">@meldung</div>
+}
+@if (fehler is not null)
+{
+    <div class="vhs-alert vhs-crit" role="alert">@fehler</div>
+}
+
+@if (d is not null)
+{
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">@d.Name</h2>
+        <form method="post" @formname="adresse" @onsubmit="AdresseAsync">
+            <AntiforgeryToken />
+            <label for="str">Straße und Hausnummer</label><input id="str" name="Strasse" autocomplete="street-address" value="@d.Strasse" required />
+            <label for="plz">Postleitzahl</label><input id="plz" name="Plz" autocomplete="postal-code" inputmode="numeric" value="@d.Postleitzahl" required />
+            <label for="ort">Ort</label><input id="ort" name="Ort" autocomplete="address-level2" value="@d.Ort" required />
+            <button type="submit" class="vhs-btn">Adresse speichern</button>
+        </form>
+        <form method="post" @formname="telefon" @onsubmit="TelefonAsync" style="margin-top:10px">
+            <AntiforgeryToken />
+            <label for="tel">Telefon</label><input id="tel" name="Telefon" type="tel" autocomplete="tel" value="@d.Telefon" required />
+            <button type="submit" class="vhs-btn">Telefon speichern</button>
+        </form>
+        <form method="post" @formname="email" @onsubmit="EMailAsync" style="margin-top:10px">
+            <AntiforgeryToken />
+            <label for="mail">E-Mail (jetzt: @(d.EMail ?? "keine"))</label><input id="mail" name="NeueEMail" type="email" autocomplete="email" required />
+            <button type="submit" class="vhs-btn">Neue Adresse bestätigen lassen</button>
+            <span class="vhs-small vhs-muted">Wir schicken einen Link an die neue Adresse. Erst nach dem Klick gilt sie.</span>
+        </form>
+    </section>
+
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Was Sie uns erlauben</h2>
+        <form method="post" @formname="einwilligung" @onsubmit="EinwilligungAsync">
+            <AntiforgeryToken />
+            <label style="font-weight:400"><input type="checkbox" name="Newsletter" value="ja" checked="@d.Newsletter" style="width:auto;min-height:0" /> Programmheft und Kurstipps per E-Mail (Newsletter)</label>
+            <label style="font-weight:400"><input type="checkbox" name="Fotos" value="ja" checked="@d.Fotos" style="width:auto;min-height:0" /> Fotos aus dem Kurs, auf denen ich zu sehen bin, dürfen veröffentlicht werden</label>
+            <button type="submit" class="vhs-btn">Speichern</button>
+            <span class="vhs-small vhs-muted">Sie können Ihre Erlaubnis jederzeit hier zurücknehmen. Nachrichten zu Ihren Kursen (z. B. Raumänderung) bekommen Sie immer.</span>
+        </form>
+    </section>
+
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Lastschrift (SEPA-Mandat)</h2>
+        @foreach (var m in d.Mandate)
+        {
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 0">
+                <span style="flex:1">@m.Referenz · @m.Iban · unterschrieben @m.Unterschrieben.ToString("dd.MM.yyyy") · @(m.Aktiv ? "aktiv" : "widerrufen")</span>
+                @if (m.Aktiv)
+                {
+                    <form method="post" @formname="@($"widerruf-{m.Id}")" @onsubmit="@(() => WiderrufAsync(m.Id))"><AntiforgeryToken /><button type="submit" class="vhs-btn">Widerrufen</button></form>
+                }
+            </div>
+        }
+        @if (d.Mandate.Count == 0) { <p class="vhs-small vhs-muted">Kein Mandat. Sie bezahlen per Rechnung.</p> }
+        <details>
+            <summary>@(d.Mandate.Any(m => m.Aktiv) ? "Neues Konto angeben" : "Lastschrift erlauben")</summary>
+            <form method="post" @formname="mandat" @onsubmit="MandatAsync">
+                <AntiforgeryToken />
+                <label for="inh">Kontoinhaber/in</label><input id="inh" name="Inhaber" required />
+                <label for="iban">IBAN</label><input id="iban" name="IbanEingabe" spellcheck="false" required />
+                <p class="vhs-small">@VibeVHS.Application.Shop.ShopDienst.MandatText</p>
+                <label style="font-weight:400"><input type="checkbox" name="Zustimmung" value="ja" required style="width:auto;min-height:0" /> Ich erteile das SEPA-Lastschriftmandat.</label>
+                <button type="submit" class="vhs-btn">Mandat erteilen</button>
+            </form>
+        </details>
+    </section>
+
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Buchungsvollmachten</h2>
+        <p class="vhs-small"><b>Diese Personen dürfen für Sie buchen:</b> @(d.DuerfenFuerMichBuchen.Count == 0 ? "niemand" : string.Join(", ", d.DuerfenFuerMichBuchen.Select(p => p.Name)))</p>
+        <p class="vhs-small"><b>Sie dürfen buchen für:</b> @(d.IchDarfBuchenFuer.Count == 0 ? "niemanden" : string.Join(", ", d.IchDarfBuchenFuer.Select(p => p.Name)))
+            @if (d.IchDarfBuchenFuer.Count > 0) { <span> · <a href="portal/teilnehmende/buchen">Für jemanden buchen</a></span> }</p>
+        <p class="vhs-small vhs-muted">Eine Vollmacht geben oder beenden Sie am Tresen der vhs (mit Nachweis, z. B. für Ihre Kinder).</p>
+    </section>
+
+    <section class="vhs-portal-karte" id="kalender">
+        <h2 style="font-size:18px">Kalender-Abo</h2>
+        <p class="vhs-small">Alle Ihre Termine im Handy-Kalender. Änderungen kommen automatisch.</p>
+        @if (kalenderLink is not null)
+        {
+            <label for="kal">Ihre Kalenderadresse (kopieren, im Kalender „abonnieren“)</label>
+            <input id="kal" readonly value="@kalenderLink" onclick="this.select()" />
+        }
+        <div class="vhs-row">
+            <form method="post" @formname="kalender" @onsubmit="KalenderAsync"><AntiforgeryToken /><button type="submit" class="vhs-btn">@(kalenderAktiv ? "Neue Adresse (alte sperren)" : "Kalenderadresse erzeugen")</button></form>
+            @if (kalenderAktiv)
+            {
+                <form method="post" @formname="sperren" @onsubmit="SperrenAsync"><AntiforgeryToken /><button type="submit" class="vhs-btn">Abo sperren</button></form>
+            }
+        </div>
+    </section>
+
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Datenschutz</h2>
+        <p class="vhs-small">Sie können erfahren, welche Daten wir über Sie speichern. Und Sie können verlangen, dass wir Ihre Daten löschen. Wir prüfen das und antworten innerhalb eines Monats. Daten, die wir aufbewahren müssen (z. B. Rechnungen), sperren wir bis zum Ende der Frist.</p>
+        <div class="vhs-row">
+            @if (Offen(Antragsart.Auskunft))
+            {
+                <span class="vhs-why" tabindex="0" data-why="Ihre Anfrage liegt schon bei uns. Die Auskunft finden Sie danach unter „Unterlagen & Rechnungen“."><button type="button" class="vhs-btn" disabled>Auskunft anfordern</button></span>
+            }
+            else
+            {
+                <form method="post" @formname="auskunft" @onsubmit="AuskunftAsync"><AntiforgeryToken /><button type="submit" class="vhs-btn">Auskunft anfordern</button></form>
+            }
+            @if (Offen(Antragsart.Loeschung))
+            {
+                <span class="vhs-why" tabindex="0" data-why="Ihr Löschantrag liegt schon bei uns. Wir antworten per E-Mail."><button type="button" class="vhs-btn" disabled>Löschung verlangen</button></span>
+            }
+            else
+            {
+                <details>
+                    <summary>Löschung verlangen</summary>
+                    <form method="post" @formname="loeschung" @onsubmit="LoeschungAsync">
+                        <AntiforgeryToken />
+                        <textarea name="Hinweis" rows="2" maxlength="500" placeholder="Optional: Ihr Hinweis"></textarea>
+                        <button type="submit" class="vhs-btn">Löschung verlangen</button>
+                    </form>
+                </details>
+            }
+        </div>
+    </section>
+
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Meine Anfragen</h2>
+        @if (d.Anliegen.Count == 0) { <p class="vhs-small vhs-muted">Keine.</p> }
+        @foreach (var a in d.Anliegen)
+        {
+            <div class="vhs-small" style="padding:4px 0;border-bottom:1px solid var(--vhs-line)">
+                <b>@AntragAnzeige.Art(a.Art)</b> · @a.EingereichtAm.ToLocalTime().ToString("dd.MM.yyyy") · @AntragAnzeige.Status(a.Status)@(a.Vermerk is null ? "" : $" · {a.Vermerk}")
+            </div>
+        }
+    </section>
+}
+
+@code {
+    [SupplyParameterFromForm(FormName = "adresse")] private string? Strasse { get; set; }
+    [SupplyParameterFromForm(FormName = "adresse")] private string? Plz { get; set; }
+    [SupplyParameterFromForm(FormName = "adresse")] private string? Ort { get; set; }
+    [SupplyParameterFromForm(FormName = "telefon")] private string? Telefon { get; set; }
+    [SupplyParameterFromForm(FormName = "email")] private string? NeueEMail { get; set; }
+    [SupplyParameterFromForm(FormName = "einwilligung")] private string? Newsletter { get; set; }
+    [SupplyParameterFromForm(FormName = "einwilligung")] private string? Fotos { get; set; }
+    [SupplyParameterFromForm(FormName = "mandat")] private string? Inhaber { get; set; }
+    [SupplyParameterFromForm(FormName = "mandat")] private string? IbanEingabe { get; set; }
+    [SupplyParameterFromForm(FormName = "mandat")] private string? Zustimmung { get; set; }
+    [SupplyParameterFromForm(FormName = "loeschung")] private string? Hinweis { get; set; }
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private TnDaten? d;
+    private bool kalenderAktiv;
+    private string? kalenderLink, meldung, fehler;
+
+    private bool Offen(Antragsart art) => d?.Anliegen.Any(a => a.Art == art && a.Status == Antragsstatus.Offen) ?? false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LadenAsync();
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+            HttpContext.Response.StatusCode = f.Status;
+        }
+    }
+
+    private async Task LadenAsync()
+    {
+        d = await Portal.DatenAsync();
+        kalenderAktiv = await Portal.KalenderAktivAsync();
+    }
+
+    private async Task Aktion(Func<Task> arbeit, string erfolg)
+    {
+        try
+        {
+            await arbeit();
+            meldung = erfolg;
+            fehler = null;
+            await LadenAsync();
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+        }
+    }
+
+    private Task AdresseAsync() => Aktion(() => Portal.AdresseAendernAsync(Strasse ?? "", Plz ?? "", Ort ?? ""), "Adresse gespeichert.");
+
+    private Task TelefonAsync() => Aktion(() => Portal.TelefonSetzenAsync(Telefon ?? ""), "Telefonnummer gespeichert.");
+
+    private Task EMailAsync() => Aktion(() => Portal.EMailAendernAsync(NeueEMail ?? ""), "Wir haben einen Link an die neue Adresse geschickt. Bitte klicken Sie ihn an.");
+
+    private Task EinwilligungAsync() => Aktion(async () =>
+    {
+        await Portal.EinwilligungAsync(Kontaktzweck.Werbung, Newsletter == "ja");
+        await Portal.EinwilligungAsync(Kontaktzweck.Fotos, Fotos == "ja");
+    }, "Gespeichert.");
+
+    private Task WiderrufAsync(Guid id) => Aktion(() => Portal.MandatWiderrufenAsync(id), "Mandat widerrufen. Künftige Beträge zahlen Sie per Überweisung.");
+
+    private Task MandatAsync() => Zustimmung != "ja"
+        ? Task.FromResult(fehler = "Bitte das Mandat mit dem Häkchen erteilen.")
+        : Aktion(() => Portal.MandatErteilenAsync(Inhaber ?? "", IbanEingabe ?? "", null), "Mandat erteilt. Danke!");
+
+    private Task KalenderAsync() => Aktion(async () => kalenderLink = (await Portal.KalenderLinkErzeugenAsync()).ToString(), "Neue Kalenderadresse erzeugt; frühere sind gesperrt.");
+
+    private Task SperrenAsync() => Aktion(() => Portal.KalenderSperrenAsync(), "Kalender-Abo gesperrt.");
+
+    private Task AuskunftAsync() => Aktion(() => Portal.AuskunftAnfordernAsync(), "Ihre Anfrage ist bei uns. Sie finden die Auskunft danach unter „Unterlagen & Rechnungen“.");
+
+    private Task LoeschungAsync() => Aktion(() => Portal.LoeschungAnfordernAsync(Hinweis), "Ihr Löschantrag ist bei uns. Wir prüfen ihn und antworten per E-Mail.");
+}

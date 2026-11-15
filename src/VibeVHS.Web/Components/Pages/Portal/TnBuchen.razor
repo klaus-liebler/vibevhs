@@ -1,0 +1,123 @@
+@page "/portal/teilnehmende/buchen"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@layout PortalLayout
+@using VibeVHS.Application.Portal
+@using VibeVHS.Application.Shop
+@inject TeilnehmendenportalDienst Portal
+@inject IServiceScopeFactory Bereiche
+
+@* Buchen für sich oder – mit Buchungsvollmacht – für andere (z. B. Kinder). Gleiche Prüfung wie Webshop und Tresen. *@
+
+<PageTitle>Kurs buchen · Meine vhs</PageTitle>
+
+<h1 style="font-size:22px;margin:0">Kurs buchen</h1>
+@if (fehler is not null)
+{
+    <div class="vhs-alert vhs-crit" role="alert">@fehler</div>
+}
+<section class="vhs-portal-karte">
+    <form method="get">
+        <label for="kurs">Kursnummer (steht im Programmheft)</label>
+        <input id="kurs" name="kurs" value="@Kurs" placeholder="z. B. 26H-501" required />
+        <label for="fuer">Für wen?</label>
+        <select id="fuer" name="fuer">
+            @foreach (var p in personen)
+            {
+                <option value="@p.Id" selected="@(p.Id == Fuer)">@p.Name</option>
+            }
+        </select>
+        <button type="submit" class="vhs-btn">Weiter</button>
+        @if (personen.Count == 1)
+        {
+            <span class="vhs-small vhs-muted">Für andere buchen Sie, wenn diese Person Ihnen bei der vhs eine Buchungsvollmacht gegeben hat (z. B. Eltern für Kinder).</span>
+        }
+    </form>
+</section>
+@if (Kurs is not null && Fuer is not null)
+{
+    <section class="vhs-portal-karte">
+        <form method="post" @formname="buchen" @onsubmit="BuchenAsync">
+            <AntiforgeryToken />
+            <input type="hidden" name="Kurs" value="@Kurs" />
+            <input type="hidden" name="Fuer" value="@Fuer" />
+            <SchnellanmeldungKarte Vorschau="vorschau" Ergebnis="ergebnis" Fehler="@buchFehler" />
+        </form>
+    </section>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "kurs")]
+    private string? KursAusLink { get; set; }
+
+    [SupplyParameterFromQuery(Name = "fuer")]
+    private Guid? FuerAusLink { get; set; }
+
+    [SupplyParameterFromForm(FormName = "buchen")] private string? Kurs { get; set; }
+    [SupplyParameterFromForm(FormName = "buchen")] private Guid? Fuer { get; set; }
+    [SupplyParameterFromForm(FormName = "buchen")] private string? Agb { get; set; }
+    [SupplyParameterFromForm(FormName = "buchen")] private string? Datenschutz { get; set; }
+    [SupplyParameterFromForm(FormName = "buchen")] private string? AgbVersion { get; set; }
+    [SupplyParameterFromForm(FormName = "buchen")] private string? DatenschutzVersion { get; set; }
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private IReadOnlyList<TnPerson> personen = [];
+    private SchnellVorschau? vorschau;
+    private SchnellErgebnis? ergebnis;
+    private string? fehler, buchFehler;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            personen = await Portal.BuchbarFuerAsync();
+            Kurs ??= KursAusLink?.Trim();
+            Fuer ??= FuerAusLink ?? personen.FirstOrDefault()?.Id;
+            if (Kurs is { Length: > 0 } && Fuer is { } f)
+            {
+                var (pid, bev) = await Portal.BuchenFuerAsync(f);
+                await using var bereich = Bereiche.CreateAsyncScope();
+                vorschau = await bereich.ServiceProvider.GetRequiredService<Schnellanmeldedienst>().VorschauAsync(pid, Kurs, default, bev);
+            }
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+            HttpContext.Response.StatusCode = f.Status;
+        }
+        catch (ShopFehler f)
+        {
+            buchFehler = f.Message;
+        }
+    }
+
+    private async Task BuchenAsync()
+    {
+        if (Agb != "ja" || Datenschutz != "ja")
+        {
+            buchFehler = "Bitte AGB und Datenschutzhinweise bestätigen.";
+            return;
+        }
+
+        try
+        {
+            var (pid, bev) = await Portal.BuchenFuerAsync(Fuer!.Value);
+            await using var bereich = Bereiche.CreateAsyncScope();
+            var adresse = bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Durchfuehrung.OeffentlicheAdresse>();
+            bereich.ServiceProvider.GetRequiredService<VibeVHS.Web.Sicherheit.BenutzerKontext>().Gesetzt =
+                await HttpContext.RequestServices.GetRequiredService<VibeVHS.Application.Sicherheit.IAktuellerBenutzer>().ErmittelnAsync();
+            ergebnis = await bereich.ServiceProvider.GetRequiredService<Schnellanmeldedienst>()
+                .AnmeldenAsync(pid, Kurs!, AgbVersion ?? "", DatenschutzVersion ?? "", "Portal", t => adresse.Link($"k/storno/{t}"), default, bev);
+        }
+        catch (ShopFehler f)
+        {
+            buchFehler = f.Message;
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+        }
+    }
+}

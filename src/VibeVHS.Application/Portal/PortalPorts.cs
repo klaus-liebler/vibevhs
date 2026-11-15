@@ -23,6 +23,9 @@ public interface IPortalSpeicher
 
     Task<Sicherheit.Benutzerkonto?> KontoZurPersonAsync(Guid personId, CancellationToken abbruch = default);
 
+    /// <summary>Personen, die der angegebenen Person (irgendwann) eine Buchungsvollmacht erteilt haben.</summary>
+    Task<IReadOnlyList<Domain.Personen.Person>> PersonenMitVollmachtFuerAsync(Guid bevollmaechtigterId, CancellationToken abbruch = default);
+
     void Hinzufuegen(object eintrag);
 
     Task SpeichernAsync(CancellationToken abbruch = default);

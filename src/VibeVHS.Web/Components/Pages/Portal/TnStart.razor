@@ -1,0 +1,90 @@
+@page "/portal/teilnehmende"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@layout PortalLayout
+@using VibeVHS.Application.Portal
+@inject TeilnehmendenportalDienst Portal
+@inject NavigationManager Navigation
+
+<PageTitle>Meine Termine · Meine vhs</PageTitle>
+
+@if (fehler is not null)
+{
+    <div class="vhs-alert vhs-warn" role="alert">@fehler</div>
+}
+else
+{
+    <h1 style="font-size:22px;margin:0">Meine nächsten Termine</h1>
+    <p class="vhs-small vhs-muted" style="margin:0">Die nächsten sechs Wochen. Wenn sich Raum oder Zeit ändern, sehen Sie es hier in Orange.</p>
+
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:17px">Einchecken im Kurs</h2>
+        <p class="vhs-small">So melden Sie sich im Kursraum an: Öffnen Sie Ihren Check-in-Link und scannen Sie den QR-Code am Aushang. Oder zeigen Sie der Kursleitung Ihren Ausweis.</p>
+        <div class="vhs-row">
+            <form method="post" @formname="checkin" @onsubmit="CheckinAsync"><AntiforgeryToken /><button type="submit" class="vhs-btn">📷 Check-in-Link öffnen</button></form>
+            <form method="post" @formname="ausweis" @onsubmit="AusweisAsync"><AntiforgeryToken /><button type="submit" class="vhs-btn">🪪 Mein Ausweis</button></form>
+        </div>
+        @if (ausweisPng is not null)
+        {
+            <div style="text-align:center;margin-top:8px">
+                <img src="@($"data:image/png;base64,{Convert.ToBase64String(ausweisPng)}")" alt="QR-Code Ihres Teilnehmerausweises" style="width:220px;height:220px" />
+                <p class="vhs-small">Speichern Sie das Bild auf Ihrem Handy (lange drücken) oder laden Sie das PDF.</p>
+                <a class="vhs-btn" href="@($"portal/teilnehmende/dokumente/{ausweisDokument}.pdf")">Ausweis als PDF</a>
+            </div>
+        }
+    </section>
+
+    @if (termine.Count == 0)
+    {
+        <div class="vhs-portal-karte">In den nächsten Wochen haben Sie keine Termine. <a href="shop/kurs.html">Kurse ansehen</a></div>
+    }
+    @foreach (var t in termine)
+    {
+        <article class="vhs-portal-karte @(t.Ausgefallen ? "vhs-portal-entfaellt" : t.Aenderung is not null ? "vhs-portal-geaendert" : null)">
+            <h2 style="font-size:17px">@t.Beginn.ToString("dddd, dd.MM.") · @t.Beginn.ToString("HH:mm")–@t.Ende.ToString("HH:mm")</h2>
+            <div><b>@t.Kurstitel</b> <span class="vhs-small vhs-muted">@t.Kursnummer · Termin @t.Nummer</span></div>
+            @if (t.Aenderung is not null)
+            {
+                <div class="vhs-portal-hinweis" role="note">@(t.Ausgefallen ? "✖" : "⚠") @t.Aenderung</div>
+            }
+            <div>📍 @t.Orte</div>
+            @if (t.Wegbeschreibung is not null)
+            {
+                <details><summary>So finden Sie hin</summary><p class="vhs-small" style="white-space:pre-line">@t.Wegbeschreibung</p></details>
+            }
+            <a class="vhs-btn" style="margin-top:6px" href="@($"portal/teilnehmende/termin/{t.VeranstaltungId}.ics")" download>In meinen Kalender</a>
+        </article>
+    }
+    <p class="vhs-small"><a href="portal/teilnehmende/daten#kalender">Alle Termine automatisch im Handy-Kalender (Kalender-Abo)</a></p>
+}
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private IReadOnlyList<PortalTermin> termine = [];
+    private string? fehler;
+    private byte[]? ausweisPng;
+    private Guid ausweisDokument;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            termine = await Portal.TermineAsync();
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+            HttpContext.Response.StatusCode = f.Status;
+        }
+    }
+
+    private async Task CheckinAsync()
+    {
+        var link = await Portal.CheckinLinkAsync();
+        Navigation.NavigateTo(link.ToString(), forceLoad: true);
+    }
+
+    private async Task AusweisAsync() => (ausweisDokument, ausweisPng) = await Portal.AusweisAsync();
+}

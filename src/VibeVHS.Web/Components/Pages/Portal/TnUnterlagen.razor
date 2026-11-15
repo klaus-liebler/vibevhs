@@ -1,0 +1,99 @@
+@page "/portal/teilnehmende/unterlagen"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@layout PortalLayout
+@using VibeVHS.Application.Portal
+@using VibeVHS.Application.Finanzen
+@using VibeVHS.Domain.Gemeinsam
+@inject TeilnehmendenportalDienst Portal
+
+<PageTitle>Unterlagen und Rechnungen · Meine vhs</PageTitle>
+
+@if (fehler is not null)
+{
+    <div class="vhs-alert vhs-warn" role="alert">@fehler</div>
+}
+else
+{
+    <h1 style="font-size:22px;margin:0">Unterlagen und Rechnungen</h1>
+
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Von Ihren Kursleitungen</h2>
+        @if (unterlagen.Count == 0)
+        {
+            <p class="vhs-small vhs-muted">Noch keine Unterlagen.</p>
+        }
+        @foreach (var u in unterlagen)
+        {
+            <div style="padding:6px 0;border-bottom:1px solid var(--vhs-line)">
+                <a href="@($"portal/teilnehmende/unterlagen/{u.Id}")"><b>@u.Titel</b></a><br />
+                <span class="vhs-small vhs-muted">@u.Kurs · @u.Datei · @(u.Groesse / 1024) KB · @u.Am.ToLocalTime().ToString("dd.MM.yyyy")</span>
+            </div>
+        }
+    </section>
+
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Mein Konto bei der vhs</h2>
+        @if (konto is { } k)
+        {
+            <p style="font-size:18px;margin:0">@(k.SaldoCent > 0 ? $"Offen: {new Geld(k.SaldoCent)}" : k.SaldoCent < 0 ? $"Guthaben: {new Geld(-k.SaldoCent)}" : "Alles bezahlt ✔")</p>
+            <details>
+                <summary>Buchungen auf dem Konto (@k.Zeilen.Count)</summary>
+                <ul class="vhs-small">
+                    @foreach (var z in k.Zeilen)
+                    {
+                        <li>@z.Beleg.Belegdatum.ToString("dd.MM.yyyy") · @z.Beleg.Nummer · @VibeVHS.Domain.Finanzen.BelegartInfo.Name(z.Beleg.Art) · @(new Geld(z.WirkungCent))@(z.OffenCent is > 0 ? $" · offen {new Geld(z.OffenCent.Value)}" : "")</li>
+                    }
+                </ul>
+            </details>
+        }
+    </section>
+
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Bescheinigungen, Rechnungen und Briefe</h2>
+        <p class="vhs-small vhs-muted">Sie bekommen immer das Original. Jeder Brief hat einen QR-Code „Translate this letter in your language“.</p>
+        @if (dokumente.Count == 0)
+        {
+            <p class="vhs-small vhs-muted">Noch keine.</p>
+        }
+        @foreach (var d in dokumente)
+        {
+            <div style="padding:6px 0;border-bottom:1px solid var(--vhs-line)">
+                @if (d.Verfuegbar)
+                {
+                    <a href="@($"portal/teilnehmende/dokumente/{d.Id}.pdf")"><b>@d.Titel</b></a>
+                }
+                else
+                {
+                    <span class="vhs-why" tabindex="0" data-why="Dieses Dokument ist nicht mehr verfügbar (z. B. nach Löschung). Bitte wenden Sie sich an die vhs."><b>@d.Titel</b></span>
+                }
+                <br /><span class="vhs-small vhs-muted">@d.Art · @d.Erstellt.ToLocalTime().ToString("dd.MM.yyyy")</span>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private IReadOnlyList<(Guid Id, string Kurs, string Titel, string Datei, long Groesse, DateTimeOffset Am)> unterlagen = [];
+    private IReadOnlyList<TnDokument> dokumente = [];
+    private Personenkonto? konto;
+    private string? fehler;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            unterlagen = await Portal.UnterlagenAsync();
+            dokumente = await Portal.DokumenteAsync();
+            konto = await Portal.KontoAsync();
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+            HttpContext.Response.StatusCode = f.Status;
+        }
+    }
+}

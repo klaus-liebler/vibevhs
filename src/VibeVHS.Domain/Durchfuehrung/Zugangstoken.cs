@@ -20,6 +20,12 @@ public enum Tokenart
 
     /// <summary>Anmeldelink für das Dozierendenportal per Mail (15 Minuten, einmal).</summary>
     PortalLink,
+
+    /// <summary>Anmeldelink für das Teilnehmendenportal per Mail (15 Minuten, einmal).</summary>
+    PortalLinkTeilnehmende,
+
+    /// <summary>Kalender-Abo von Teilnehmenden (ICS-Adresse, widerrufbar).</summary>
+    KalenderTeilnahme,
 }
 
 public static class TokenAnzeige
@@ -30,6 +36,8 @@ public static class TokenAnzeige
         Tokenart.Geraet => "gemerktes Gerät",
         Tokenart.Kalender => "Kalender-Abo (Kursleitung)",
         Tokenart.PortalLink => "Anmeldelink Dozierendenportal",
+        Tokenart.PortalLinkTeilnehmende => "Anmeldelink Teilnehmendenportal",
+        Tokenart.KalenderTeilnahme => "Kalender-Abo (Teilnahme)",
         _ => "Teilnehmerausweis",
     };
 }

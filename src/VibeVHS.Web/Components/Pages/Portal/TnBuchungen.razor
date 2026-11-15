@@ -1,0 +1,162 @@
+@page "/portal/teilnehmende/buchungen"
+@attribute [Authorize]
+@attribute [ExcludeFromInteractiveRouting]
+@layout PortalLayout
+@using VibeVHS.Application.Portal
+@using VibeVHS.Domain.Anmeldung
+@using VibeVHS.Domain.Gemeinsam
+@inject TeilnehmendenportalDienst Portal
+
+<PageTitle>Meine Buchungen · Meine vhs</PageTitle>
+
+<h1 style="font-size:22px;margin:0">Meine Buchungen</h1>
+@if (meldung is not null)
+{
+    <div class="vhs-alert vhs-info" role="status">@meldung</div>
+}
+@if (fehler is not null)
+{
+    <div class="vhs-alert vhs-crit" role="alert">@fehler</div>
+}
+
+@if (umbuchen is { } ub)
+{
+    <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Umbuchen: @ub.Titel</h2>
+        <p class="vhs-small">Diese Kurse sind ähnlich und haben freie Plätze. Für die Umbuchung kann eine Gebühr anfallen (siehe AGB).</p>
+        @if (optionen.Count == 0)
+        {
+            <p>Leider gibt es gerade keinen passenden Kurs mit freien Plätzen.</p>
+        }
+        @foreach (var o in optionen)
+        {
+            <form method="post" @formname="@($"um-{o.Kurs.Id}")" @onsubmit="@(() => UmbuchenAsync(ub.BelegungId, o.Kurs.Id))" style="border-bottom:1px solid var(--vhs-line);padding:6px 0">
+                <AntiforgeryToken />
+                <b>@o.Kurs.Titel</b> <span class="vhs-small vhs-muted">@o.Kurs.Kursnummer · ab @(o.Kurs.ErsterTermin?.ToString("dd.MM.yyyy")) · @(o.Entgelt?.ToString())</span>
+                <button type="submit" class="vhs-btn">Hierhin umbuchen</button>
+            </form>
+        }
+        <a href="portal/teilnehmende/buchungen" class="vhs-btn">Abbrechen</a>
+    </section>
+}
+
+<p class="vhs-small"><a href="shop/kurs.html">Neuen Kurs suchen</a> · Für jemand anderen buchen (mit Vollmacht): im Kurs den QR-Code scannen oder <a href="portal/teilnehmende/buchen">Kursnummer eingeben</a>.</p>
+
+@foreach (var gruppe in buchungen.GroupBy(b => b.Vergangen).OrderBy(g => g.Key))
+{
+    <h2 style="font-size:18px;margin:8px 0 0">@(gruppe.Key ? "Vergangen und abgemeldet" : "Aktuell")</h2>
+    @foreach (var b in gruppe)
+    {
+        <article class="vhs-portal-karte">
+            <div><b>@b.Titel</b> <span class="vhs-small vhs-muted">@b.Kursnummer@(b.Fuer == "Sie" ? "" : $" · für {b.Fuer}")</span></div>
+            <div class="vhs-small">@(b.Beginn?.ToString("dd.MM.yyyy") ?? "–") bis @(b.Ende?.ToString("dd.MM.yyyy") ?? "–") · @(new Geld(b.EntgeltCent))</div>
+            <div><StatusPille Stil="@(b.Status == Belegungsstatus.Angemeldet ? "gut" : b.Status == Belegungsstatus.Nachrueckangebot ? "warn" : "neutral")">@b.StatusText</StatusPille>
+                @if (b.Warteplatz is { } wp) { <span class="vhs-small"> · Sie sind auf Platz @wp der Warteliste.</span> }</div>
+            @if (b.Status == Belegungsstatus.Nachrueckangebot && b.AngebotBis is { } frist)
+            {
+                <div class="vhs-portal-hinweis">Ein Platz ist frei! Bitte sagen Sie bis @frist.ToLocalTime().ToString("dd.MM.yyyy, HH:mm") Uhr zu – sonst bekommt ihn die nächste Person.</div>
+                <div class="vhs-row">
+                    <form method="post" @formname="@($"ja-{b.BelegungId}")" @onsubmit="@(() => AngebotAsync(b.BelegungId, true))"><AntiforgeryToken /><button type="submit" class="vhs-btn">Platz annehmen</button></form>
+                    <form method="post" @formname="@($"nein-{b.BelegungId}")" @onsubmit="@(() => AngebotAsync(b.BelegungId, false))"><AntiforgeryToken /><button type="submit" class="vhs-btn">Ablehnen</button></form>
+                </div>
+            }
+            @if (!b.Vergangen)
+            {
+                <details>
+                    <summary>Abmelden</summary>
+                    <p class="vhs-small">@b.StornoText</p>
+                    <form method="post" @formname="@($"storno-{b.BelegungId}")" @onsubmit="@(() => StornoAsync(b.BelegungId))">
+                        <AntiforgeryToken />
+                        <button type="submit" class="vhs-btn">@(b.StornoGebuehrCent is > 0 ? $"Verbindlich abmelden ({new Geld(b.StornoGebuehrCent.Value)} Gebühr)" : "Verbindlich abmelden (kostenlos)")</button>
+                    </form>
+                </details>
+                @if (b.Umbuchbar)
+                {
+                    <a class="vhs-btn" href="@($"portal/teilnehmende/buchungen?umbuchen={b.BelegungId}")">Umbuchen</a>
+                }
+                else
+                {
+                    <span class="vhs-why" tabindex="0" data-why="@b.UmbuchungGesperrt"><button type="button" class="vhs-btn" disabled>Umbuchen</button></span>
+                }
+            }
+        </article>
+    }
+}
+@if (buchungen.Count == 0 && fehler is null)
+{
+    <div class="vhs-portal-karte">Sie haben noch keine Buchungen. <a href="shop/kurs.html">Kurse ansehen</a></div>
+}
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private IReadOnlyList<TnBuchung> buchungen = [];
+    private IReadOnlyList<VibeVHS.Application.Anmeldung.KursOption> optionen = [];
+    private TnBuchung? umbuchen;
+    private string? fehler, meldung;
+
+    [SupplyParameterFromQuery(Name = "umbuchen")]
+    private Guid? UmbuchenId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LadenAsync();
+        if (UmbuchenId is { } id && buchungen.FirstOrDefault(b => b.BelegungId == id && b.Umbuchbar) is { } b)
+        {
+            await OptionenAsync(b);
+        }
+    }
+
+    private async Task LadenAsync()
+    {
+        try
+        {
+            buchungen = await Portal.BuchungenAsync();
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+            if (f.Status == 403)
+            {
+                HttpContext.Response.StatusCode = 403;
+            }
+        }
+    }
+
+    private async Task Aktion(Func<Task> arbeit, string erfolg)
+    {
+        try
+        {
+            await arbeit();
+            meldung = erfolg;
+            fehler = null;
+            umbuchen = null;
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+        }
+
+        await LadenAsync();
+    }
+
+    private Task StornoAsync(Guid id) => Aktion(async () => { var r = await Portal.StornierenAsync(id); meldung = r.Erklaerung; }, "Sie sind abgemeldet. Eine Bestätigung kommt per E-Mail.");
+
+    private Task AngebotAsync(Guid id, bool ja) => Aktion(() => Portal.AngebotAsync(id, ja), ja ? "Sie haben den Platz angenommen. Eine Bestätigung kommt per E-Mail." : "Sie haben das Angebot abgelehnt.");
+
+    private Task UmbuchenAsync(Guid id, Guid kursId) => Aktion(() => Portal.UmbuchenAsync(id, kursId), "Umgebucht. Eine Bestätigung kommt per E-Mail.");
+
+    private async Task OptionenAsync(TnBuchung b)
+    {
+        try
+        {
+            optionen = await Portal.UmbuchungsoptionenAsync(b.BelegungId);
+            umbuchen = b;
+        }
+        catch (PortalFehler f)
+        {
+            fehler = f.Message;
+        }
+    }
+}

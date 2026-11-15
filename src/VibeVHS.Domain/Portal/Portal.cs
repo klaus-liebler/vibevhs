@@ -111,6 +111,15 @@ public enum Antragsart
 
     /// <summary>Kursvorschlag fürs nächste Semester.</summary>
     Kursvorschlag,
+
+    /// <summary>Teilnehmende: Auskunft nach Art. 15 DSGVO anfordern.</summary>
+    Auskunft,
+
+    /// <summary>Teilnehmende: Löschung nach Art. 17 DSGVO verlangen (Prüfung durch die Verwaltung, kein Sofortlöschen).</summary>
+    Loeschung,
+
+    /// <summary>Teilnehmende: neue E-Mail-Adresse, wirksam nach Bestätigung über einen Link an die neue Adresse (keine Aufgabe).</summary>
+    EMailAenderung,
 }
 
 public enum Antragsstatus
@@ -201,6 +210,9 @@ public static class AntragAnzeige
         Antragsart.Qualifikationsnachweis => "Qualifikationsnachweis",
         Antragsart.Verfuegbarkeit => "Verfügbarkeit nächstes Semester",
         Antragsart.Kursvorschlag => "Kursvorschlag",
+        Antragsart.Auskunft => "Auskunft über meine Daten (Art. 15 DSGVO)",
+        Antragsart.Loeschung => "Löschung meiner Daten (Art. 17 DSGVO)",
+        Antragsart.EMailAenderung => "Neue E-Mail-Adresse",
         _ => a.ToString(),
     };
 

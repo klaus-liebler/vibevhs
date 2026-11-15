@@ -5,7 +5,7 @@
 
 <div class="vhs-portal">
     <header class="vhs-portal-kopf">
-        <b>Dozierendenportal</b>
+        <b>@(Teilnehmende ? "Meine vhs" : "Dozierendenportal")</b>
         <span class="vhs-small vhs-muted" style="flex:1">Volkshochschule</span>
         <AuthorizeView>
             <Authorized>
@@ -20,7 +20,7 @@
     <AuthorizeView>
         <Authorized>
             <nav class="vhs-portal-nav" aria-label="Portal">
-                @foreach (var (pfad, text) in Navigationspunkte)
+                @foreach (var (pfad, text) in Teilnehmende ? TnPunkte : Navigationspunkte)
                 {
                     <a href="@pfad" class="@(Aktiv(pfad) ? "active" : null)" aria-current="@(Aktiv(pfad) ? "page" : null)">@text</a>
                 }
@@ -42,9 +42,22 @@
         ("portal/dozierende/daten", "Meine Daten"),
     ];
 
+    private static readonly (string Pfad, string Text)[] TnPunkte =
+    [
+        ("portal/teilnehmende", "Termine"),
+        ("portal/teilnehmende/buchungen", "Buchungen"),
+        ("portal/teilnehmende/unterlagen", "Unterlagen & Rechnungen"),
+        ("portal/teilnehmende/daten", "Meine Daten"),
+        ("portal/teilnehmende/hilfe", "Hilfe / Sprache"),
+    ];
+
+    private bool Teilnehmende => Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("portal/teilnehmende", StringComparison.Ordinal);
+
     private bool Aktiv(string pfad)
     {
         var hier = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?')[0].TrimEnd('/');
-        return pfad == "portal/dozierende" ? hier == pfad || hier.StartsWith("portal/dozierende/termin", StringComparison.Ordinal) : hier.StartsWith(pfad, StringComparison.Ordinal);
+        return pfad is "portal/dozierende" or "portal/teilnehmende"
+            ? hier == pfad || hier.StartsWith(pfad + "/termin", StringComparison.Ordinal)
+            : hier.StartsWith(pfad, StringComparison.Ordinal);
     }
 }

@@ -17,7 +17,7 @@ settings:
     label: 'Link „Mein Konto“ (Kundenkonto liegt in VibeVHS)'
     category: vibevhsShop
     type: string
-    default: 'https://liebler.iui.hs-osnabrueck.de/vibevhs/shop/konto.html'
+    default: 'https://liebler.iui.hs-osnabrueck.de/vibevhs/portal/teilnehmende'
   vibevhsShop.anbieter:
     label: 'Name der Einrichtung (schema.org provider)'
     category: vibevhsShop

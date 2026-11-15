@@ -195,7 +195,7 @@ public static class ShopApi
             try
             {
                 await dienste.GetRequiredService<ShopDienst>().BestaetigenAsync(token);
-                return Seite("Kundenkonto bestätigt", "<p role=\"status\">Vielen Dank! Ihr Kundenkonto ist bestätigt. Sie können sich jetzt anmelden und Kurse buchen.</p>");
+                return Seite("Kundenkonto bestätigt", "<p role=\"status\">Vielen Dank! Ihr Kundenkonto ist bestätigt. Sie können sich jetzt anmelden und Kurse buchen – Ihre Buchungen finden Sie unter <a href=\"/portal/teilnehmende\">Meine vhs</a>.</p>");
             }
             catch (ShopFehler f)
             {
