@@ -187,7 +187,7 @@ pre.code { background: var(--surface-2); border: 1px solid var(--line); border-r
     <header class="top">
       <div class="search">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input id="q" type="search" placeholder="Person, Kurs oder Kursnummer suchen" autocomplete="off" aria-label="Suche">
+        <input id="q" type="search" placeholder="Person, Kurs, Kursnummer oder Ort suchen" autocomplete="off" aria-label="Suche">
         <div class="results" id="results" hidden></div>
       </div>
       <div class="role"><label for="role">Angemeldet als J. Krüger, Rolle</label>
@@ -300,7 +300,7 @@ const state = {
   att: { termin: '17.11.2026', scanned: [] },
   cancelled: {}, decided: {}, conflictSolved: false, mahnFrei: false, sepaDone: false, fibuDone: false, ikDone: false,
   outSel: 0,
-  ort: 'R 2.20', ortFilter: 'alle', bamfRenewed: false, vas: {}, gen: null, single: null, showPast: false,
+  ort: 'R 2.20', ortFilter: 'alle', bamfRenewed: false, vas: {}, gen: null, single: null, showPast: false, histFor: null, histF: 'alle', histG: '2024-10-01', histB: '2026-11-14',
   k: { p: 'p-weber', n: 10, besucht: 4, verfallen: 1, res: ['2026-11-23|Bewegungsraum'], bis: '2027-03-06' },
   log: [
     { t: '14.11.2026 06:00', who: 'Automatik', what: 'Erinnerung vor Kursbeginn: 46 Mails versendet (je Mail mit Übersetzungslink)', ok: true },
@@ -571,22 +571,21 @@ function viewPersonen() {
   let detail = '';
   if (state.person === 'p-becker') {
     const vs = p.versions;
-    detail = '<section class="card"><div class="head"><div><h2>' + esc(p.name) + '</h2><p class="sub">Dozentin seit 2019 · Englisch, Deutsch als Zweitsprache</p></div>' + btn('Name ändern', 'personEdit') + '</div>' +
+    detail = '<section class="card"><div class="head"><div><h2>' + esc(p.name) + '</h2><p class="sub">Dozentin seit 2019 · Englisch, Deutsch als Zweitsprache</p></div>' + '<div class="row">' + btn('Datenhistorie', 'histOpen') + btn('Name ändern', 'personEdit') + '</div></div>' +
       '<div class="fields">' + plain('Nachname', esc(vs[vs.length - 1].n), 'name') + plain('Vorname', 'Anna') + plain('Geburtsdatum', p.geb) + plain('Wohnort', p.ort, 'Anschrift') + locked('Honorarsatz', '32,00 € je UE', 'Honorarsätze ändert die Fachbereichsleitung mit Gültigkeitsdatum. Laufende Verträge behalten ihren Satz.') + plain('Bevorzugte Sprache', p.sprache) + '</div>' +
       (state.personEdit ? '<div class="card" style="background:var(--surface-2)"><h3>Nachname ändern</h3><div class="fields"><div class="field"><label for="nn">Neuer Nachname</label><input id="nn" value="Becker-Schmidt"></div><div class="field"><span class="lbl">Art der Änderung</span><label class="row small"><input type="radio" name="art" value="aend" checked> Änderung ab Datum (z. B. Heirat)</label><label class="row small"><input type="radio" name="art" value="korr"> Korrektur (war schon immer so, z. B. Tippfehler)</label></div><div class="field"><label for="ab">Gültig ab</label><input id="ab" type="date" value="2026-11-14"></div><div class="field"><label for="nw">Nachweis</label><select id="nw"><option>Heiratsurkunde</option><option>Personalausweis</option><option>ohne Nachweis</option></select></div></div><p class="small muted">Alte Bescheinigungen und Verträge behalten den bisherigen Namen. Briefe gehen ab sofort an die aktuelle Anschrift.</p><div class="row">' + btn('Abbrechen', 'personEdit') + btn('Speichern', 'saveName', { pri: true }) + '</div></div>' : '') +
-      '<div class="grid"><div><h3 style="margin-bottom:10px">Historie Nachname</h3><div class="timeline">' + vs.slice().reverse().map(v => '<div class="' + (v.ers ? 'sup' : (v.bis !== 'offen' ? 'old' : '')) + '"><b>' + esc(v.n) + '</b> <span class="small muted">gültig ' + v.von + ' bis ' + v.bis + '</span><br><span class="small">' + esc(v.grund) + '</span><br><span class="small muted">erfasst ' + v.erf + (v.ers ? ' · ersetzt ' + v.ers : '') + '</span></div>').join('') + '</div></div>' +
-      '<div><h3 style="margin-bottom:10px">Was zeigt das System wann?</h3><div class="list"><div><span class="grow">Bescheinigung für einen Kurs im Herbst 2024</span><b>Schmidt</b></div><div><span class="grow">Honorarvertrag Herbst 2026</span><b>' + esc(vs[vs.length - 1].n) + '</b></div><div><span class="grow">„Was stand am 02.03.2019 im System?“ (Revision)</span><b>Schmitt</b></div></div><p class="small muted">Blasse Einträge sind ersetzte Erfassungen. Sie bleiben für Prüfungen erhalten.</p></div></div></section>';
+      '<div class="row"><span class="small muted grow">Zuletzt geändert: Nachname ab ' + dDE(vs[vs.length - 1].von) + ' (' + esc(vs[vs.length - 1].grund.split(',')[0]) + '), Postadresse ab 01.08.2025 (Umzug). Details unter „Datenhistorie“.</span></div></section>';
   } else if (state.person === 'p-yilmaz') {
-    detail = '<section class="card"><div class="head"><div><h2>' + esc(p.name) + '</h2><p class="sub">Teilnehmer seit 2024 · bevorzugte Sprache: Türkisch · SEPA-Mandat vorhanden</p></div>' + btn('Neue Anmeldung', 'enrollPerson', { pri: true, arg: 'p-yilmaz' }) + '</div>' +
+    detail = '<section class="card"><div class="head"><div><h2>' + esc(p.name) + '</h2><p class="sub">Teilnehmer seit 2024 · bevorzugte Sprache: Türkisch · SEPA-Mandat vorhanden</p></div>' + '<div class="row">' + btn('Datenhistorie', 'histOpen') + btn('Neue Anmeldung', 'enrollPerson', { pri: true, arg: 'p-yilmaz' }) + '</div></div>' +
       '<div class="tbl-wrap"><table><thead><tr><th>Kurs</th><th>Zeitraum</th><th>Kursleitung</th><th>Status</th><th></th></tr></thead><tbody>' +
       '<tr><td>26H-301 Englisch A2 – Konversation</td><td>06.10.–08.12.2026</td><td>Anna Becker</td><td><span class="pill p-good">läuft</span></td><td>' + btn('Bescheinigung', null, { sm: true, why: 'Der Kurs läuft noch bis 08.12.2026. Die Bescheinigung gibt es ab dem letzten Termin.' }) + '</td></tr>' +
       '<tr><td>24H-305 Englisch A1 – Einstieg</td><td>01.10.–10.12.2024</td><td>Anna Schmidt</td><td><span class="pill p-mute">abgeschlossen</span></td><td>' + btn('Bescheinigung nachdrucken', 'cert', { sm: true, pri: true }) + '</td></tr></tbody></table></div>' +
       '<p class="small muted">Die Kursleitung erscheint so, wie sie zum Kurszeitpunkt hieß.</p></section>' +
       (state.cert ? certificate() : '');
   } else {
-    detail = '<section class="card"><div class="head"><h2>' + esc(p.name) + '</h2>' + statusPillP(p) + '</div><div class="fields">' + plain('Rollen', p.rollen.join(', ')) + plain('Geburtsdatum', p.geb) + plain('Wohnort', p.ort, 'Anschrift') + plain('Bevorzugte Sprache', p.sprache) + plain('Letzte Belegung', p.last) + (p.fb ? plain('Fachbereich (Lehre)', p.fb) : '') + '</div><div class="row">' + btn('Neue Anmeldung', 'enrollPerson', { pri: true, arg: state.person }) + btn('Datenauskunft (Art. 15)', 'toast', { arg: 'Auskunft mit allen Daten und Historie als PDF und JSON erzeugt (Mock).' }) + '</div><p class="small muted">Generierte Beispielperson. Ausgearbeitet sind „Anna Becker“ (Historie) und „Mehmet Yılmaz“ (Nachdruck), beide oben in der Liste.</p></section>';
+    detail = '<section class="card"><div class="head"><h2>' + esc(p.name) + '</h2>' + statusPillP(p) + '</div><div class="fields">' + plain('Rollen', p.rollen.join(', ')) + plain('Geburtsdatum', p.geb) + plain('Wohnort', p.ort, 'Anschrift') + plain('Bevorzugte Sprache', p.sprache) + plain('Letzte Belegung', p.last) + (p.fb ? plain('Fachbereich (Lehre)', p.fb) : '') + '</div><div class="row">' + btn('Neue Anmeldung', 'enrollPerson', { pri: true, arg: state.person }) + btn('Datenhistorie', 'histOpen') + btn('Datenauskunft (Art. 15)', 'toast', { arg: 'Auskunft mit allen Daten und Historie als PDF und JSON erzeugt (Mock).' }) + '</div><p class="small muted">Generierte Beispielperson. Ausgearbeitet sind „Anna Becker“ (Historie) und „Mehmet Yılmaz“ (Nachdruck), beide oben in der Liste.</p></section>';
   }
-  return '<div class="head"><div><h1>Personen</h1><p class="sub">' + PEOPLE_IDS.length.toLocaleString('de-DE') + ' Personen, eine Person mit vielen Rollen: Teilnehmende, Dozierende, Ansprechpartner</p></div></div><div class="split">' + list + '<div style="display:flex;flex-direction:column;gap:16px;min-width:0">' + detail + contactCard(state.person) + '</div></div>';
+  return '<div class="head"><div><h1>Personen</h1><p class="sub">' + PEOPLE_IDS.length.toLocaleString('de-DE') + ' Personen, eine Person mit vielen Rollen: Teilnehmende, Dozierende, Ansprechpartner</p></div></div><div class="split">' + list + '<div style="display:flex;flex-direction:column;gap:16px;min-width:0">' + (state.histFor === state.person ? historyPage(state.person) : detail + contactCard(state.person)) + '</div></div>';
 }
 
 /* Personenliste: Suche zuerst, Filter mit Trefferzahlen, virtuelles Scrollen mit Nachladen */
@@ -950,10 +949,11 @@ const KONTAKT = {
   'p-becker': { adr: [{ art: 'Wohnung', txt: 'Lindenweg 7, 40000 Musterstadt', auf: true, korr: true, seit: '01.08.2025', alt: 'bis 31.07.2025: Kirchstraße 22, 40000 Musterstadt' }], tel: [['Mobil', '0170 1234567', 'SMS und Signal erlaubt', true], ['Festnetz', '0211 998877', '', false]], mail: [['privat', 'anna.becker@example.org', true], ['dienstlich, für Honorarverträge', 'a.becker@example.net', false]] },
   'p-yilmaz': { adr: [{ art: 'Wohnung', txt: 'Nordring 14, 40010 Musterstadt-Nord', auf: true, korr: false, seit: '01.03.2024' }, { art: 'Postanschrift', txt: 'c/o Hasan Yılmaz, Marktstraße 3, 40000 Musterstadt', auf: false, korr: true, seit: '15.01.2025', note: 'Briefkasten am Wohnort unzuverlässig' }], tel: [['Mobil', '0176 5550123', 'SMS und WhatsApp erlaubt, Werbung nein', true]], mail: [['privat', 'm.yilmaz@example.org', true]] }
 };
+contactCard.defaults = pid => { const p = PEOPLE[pid]; return { adr: [{ art: 'Wohnung', txt: 'Hauptstraße ' + (3 + pid.length * 7 % 90) + ', ' + p.ort, auf: true, korr: true, seit: '10.01.2024' }], tel: [['Mobil', '01** *******', 'SMS erlaubt', true]], mail: [['privat', norm(p.name).replace(/[^a-z]+/g, '.') + '@example.org', true]] }; };
 function contactCard(pid) {
   const p = PEOPLE[pid];
-  const k = KONTAKT[pid] || { adr: [{ art: 'Wohnung', txt: 'Hauptstraße ' + (3 + pid.length * 7 % 90) + ', ' + p.ort, auf: true, korr: true, seit: '–' }], tel: [['Mobil', '01** *******', 'SMS erlaubt', true]], mail: [['privat', norm(p.name).replace(/[^a-z]+/g, '.') + '@example.org', true]] };
-  const a = k.adr.map(x => '<div><span class="grow"><b>' + esc(x.txt) + '</b><br><span class="small muted">' + x.art + ', seit ' + x.seit + (x.note ? ' · ' + esc(x.note) : '') + (x.alt ? ' · ' + esc(x.alt) : '') + '</span></span><span class="row" style="gap:4px">' + (x.auf ? '<span class="pill p-info">üblicher Aufenthaltsort</span>' : '') + (x.korr ? '<span class="pill p-good">Korrespondenz</span>' : '') + '</span><button class="histbtn" data-a="hist" data-arg="Anschrift" title="Historie anzeigen: Wert ist zeitlich versioniert">' + ICON.clock + '</button></div>').join('');
+  const k = KONTAKT[pid] || contactCard.defaults(pid);
+  const a = k.adr.map(x => '<div><span class="grow"><b>' + esc(x.txt) + '</b><br><span class="small muted">' + x.art + ', seit ' + x.seit + (x.note ? ' · ' + esc(x.note) : '') + '</span></span><span class="row" style="gap:4px">' + (x.auf ? '<span class="pill p-info">üblicher Aufenthaltsort</span>' : '') + (x.korr ? '<span class="pill p-good">Korrespondenz</span>' : '') + '</span><button class="histbtn" data-a="hist" data-arg="Anschrift" title="Historie anzeigen: Wert ist zeitlich versioniert">' + ICON.clock + '</button></div>').join('');
   const t = k.tel.map(x => '<div><span class="grow">' + x[0] + ': <span class="mono">' + x[1] + '</span>' + (x[2] ? '<br><span class="small muted">' + esc(x[2]) + '</span>' : '') + '</span>' + (x[3] ? '<span class="pill p-mute">bevorzugt</span>' : '') + '</div>').join('');
   const m = k.mail.map(x => '<div><span class="grow"><span class="mono small">' + esc(x[1]) + '</span><br><span class="small muted">' + esc(x[0]) + '</span></span>' + (x[2] ? '<span class="pill p-mute">bevorzugt</span>' : '') + '</div>').join('');
   const diff = k.adr.some(x => x.korr && !x.auf);
@@ -961,6 +961,63 @@ function contactCard(pid) {
     '<h3>Postadressen</h3><div class="list">' + a + '</div>' +
     (diff ? '<p class="small muted">Briefe gehen an die Korrespondenzadresse. Statistik, Förderung und Fahrtkosten nutzen den üblichen Aufenthaltsort.</p>' : '<p class="small muted">Standardfall: Aufenthaltsort und Korrespondenzadresse sind dieselbe Adresse.</p>') +
     '<div class="grid"><div><h3>Telefon und Messaging</h3><div class="list">' + t + '</div></div><div><h3>E-Mail</h3><div class="list">' + m + '</div></div></div></section>';
+}
+
+/* Datenhistorie: alle Stammdaten einer Person, zeitlich versioniert (gültig von/bis, erfasst/ersetzt) */
+const HIST = {
+  'p-becker': [
+    { k: 'adr', f: 'Postadresse', v: 'Kirchstraße 22, 40000 Musterstadt', von: '2019-03-01', bis: '2025-08-01', erf: '2019-03-01', wer: 'S. Lorenz', art: 'Ersterfassung', note: 'Aufenthaltsort und Korrespondenz' },
+    { k: 'adr', f: 'Postadresse', v: 'Lindenweg 7, 40000 Musterstadt', von: '2025-08-01', erf: '2025-07-28', wer: 'J. Krüger', art: 'Änderung ab Datum', nw: 'Meldebescheinigung', note: 'Umzug; Aufenthaltsort und Korrespondenz wechseln mit' },
+    { k: 'tel', f: 'Telefon', v: 'Mobil 0170 1234567 (SMS und Signal erlaubt)', von: '2019-03-01', erf: '2019-03-01', wer: 'S. Lorenz', art: 'Ersterfassung' },
+    { k: 'tel2', f: 'Telefon', v: 'Festnetz 0211 998877', von: '2021-04-12', erf: '2021-04-12', wer: 'M. Öztürk', art: 'Ergänzung' },
+    { k: 'mail', f: 'E-Mail', v: 'anna.schmidt@example.org', von: '2019-03-01', bis: '2025-07-02', erf: '2019-03-01', wer: 'S. Lorenz', art: 'Ersterfassung' },
+    { k: 'mail', f: 'E-Mail', v: 'anna.becker@example.org', von: '2025-07-02', erf: '2025-07-02', wer: 'J. Krüger', art: 'Änderung ab Datum' },
+    { k: 'mail2', f: 'E-Mail', v: 'a.becker@example.net (dienstlich, für Honorarverträge)', von: '2024-01-15', erf: '2024-01-15', wer: 'J. Krüger', art: 'Ergänzung' },
+    { k: 'rolle', f: 'Rolle', v: 'Dozentin (Sprachen)', von: '2019-03-01', erf: '2019-03-01', wer: 'S. Lorenz', art: 'Ersterfassung' }
+  ],
+  'p-yilmaz': [
+    { k: 'name', f: 'Name', v: 'Mehmet Yılmaz', von: '2024-03-01', erf: '2024-03-01', wer: 'Online-Anmeldung', art: 'Ersterfassung' },
+    { k: 'adr', f: 'Postadresse', v: 'Nordring 14, 40010 Musterstadt-Nord', von: '2024-03-01', erf: '2024-03-01', wer: 'Online-Anmeldung', art: 'Ersterfassung', note: 'üblicher Aufenthaltsort' },
+    { k: 'korr', f: 'Korrespondenzadresse', v: 'wie Aufenthaltsort (Nordring 14)', von: '2024-03-01', bis: '2025-01-15', erf: '2024-03-01', wer: 'Online-Anmeldung', art: 'Ersterfassung' },
+    { k: 'korr', f: 'Korrespondenzadresse', v: 'c/o Hasan Yılmaz, Marktstraße 3, 40000 Musterstadt', von: '2025-01-15', erf: '2025-01-15', wer: 'M. Öztürk', art: 'Änderung ab Datum', note: 'Briefkasten am Wohnort unzuverlässig; Aufenthaltsort bleibt' },
+    { k: 'tel', f: 'Telefon', v: 'Mobil 0176 5550132', von: '2024-03-01', erf: '2024-03-01', ers: '2024-09-10', wer: 'Online-Anmeldung', art: 'Ersterfassung (Zahlendreher)' },
+    { k: 'tel', f: 'Telefon', v: 'Mobil 0176 5550123 (SMS und WhatsApp erlaubt, Werbung nein)', von: '2024-03-01', erf: '2024-09-10', wer: 'J. Krüger', art: 'Korrektur (gilt rückwirkend)' },
+    { k: 'mail', f: 'E-Mail', v: 'm.yilmaz@example.org', von: '2024-03-01', erf: '2024-03-01', wer: 'Online-Anmeldung', art: 'Ersterfassung' },
+    { k: 'rolle', f: 'Rolle', v: 'Teilnehmer', von: '2024-03-01', erf: '2024-03-01', wer: 'Online-Anmeldung', art: 'Ersterfassung' },
+    { k: 'sprache', f: 'Bevorzugte Sprache', v: 'Türkisch', von: '2024-03-01', erf: '2024-03-01', wer: 'Online-Anmeldung', art: 'Ersterfassung' }
+  ]
+};
+const HIST_GROUPS = { alle: 'Alle', name: 'Name', adr: 'Adressen', tel: 'Telefon', mail: 'E-Mail', rolle: 'Rollen und Sprache' };
+const histGroup = k => k === 'korr' ? 'adr' : k === 'tel2' ? 'tel' : k === 'mail2' ? 'mail' : k === 'sprache' ? 'rolle' : k;
+function histEntries(pid) {
+  const p = PEOPLE[pid];
+  let e = (HIST[pid] || []).slice();
+  if (p.versions) e = e.concat(p.versions.map(v => ({ k: 'name', f: 'Nachname', v: v.n, von: v.von, bis: v.bis === 'offen' ? '' : v.bis, erf: v.erf, ers: v.ers, wer: v.erf >= '2025' ? 'J. Krüger' : 'S. Lorenz', art: v.grund.split(', Nachweis')[0], nw: /Nachweis: (.*)/.test(v.grund) ? v.grund.split('Nachweis: ')[1] : '' })));
+  if (!HIST[pid]) {
+    const c = contactCard.defaults(pid);
+    e = e.concat([{ k: 'name', f: 'Name', v: p.name, von: '2024-01-10', erf: '2024-01-10', wer: 'Altdatenübernahme', art: 'Ersterfassung' }, { k: 'adr', f: 'Postadresse', v: c.adr[0].txt, von: '2024-01-10', erf: '2024-01-10', wer: 'Altdatenübernahme', art: 'Ersterfassung', note: 'Aufenthaltsort und Korrespondenz' }, { k: 'tel', f: 'Telefon', v: c.tel[0][1], von: '2024-01-10', erf: '2024-01-10', wer: 'Altdatenübernahme', art: 'Ersterfassung' }, { k: 'mail', f: 'E-Mail', v: c.mail[0][1], von: '2024-01-10', erf: '2024-01-10', wer: 'Altdatenübernahme', art: 'Ersterfassung' }, { k: 'rolle', f: 'Rolle', v: p.rollen.join(', '), von: '2024-01-10', erf: '2024-01-10', wer: 'Altdatenübernahme', art: 'Ersterfassung' }]);
+  }
+  return e.sort((a, b) => a.erf === b.erf ? (a.von < b.von ? 1 : -1) : (a.erf < b.erf ? 1 : -1));
+}
+function asOf(entries, k, g, b) {
+  const closedBy = e => !e.bis || e.ers !== undefined && e.ers !== '' ? e.bis : (entries.some(n => n.k === e.k && n.von === e.bis && n.erf <= b) ? e.bis : '');
+  const hit = entries.filter(e => e.k === k && e.erf <= b && (!e.ers || e.ers > b) && e.von <= g && (!closedBy(e) || closedBy(e) > g)).sort((x, y) => x.erf < y.erf ? -1 : 1);
+  return hit.length ? hit[hit.length - 1].v : '<span class="muted">– (noch nicht erfasst)</span>';
+}
+function historyPage(pid) {
+  const p = PEOPLE[pid], all = histEntries(pid), f = state.histF || 'alle';
+  const list = all.filter(e => f === 'alle' || histGroup(e.k) === f);
+  const chips = Object.keys(HIST_GROUPS).map(g => { const n = g === 'alle' ? all.length : all.filter(e => histGroup(e.k) === g).length; return n || g === 'alle' ? '<button class="pill ' + (f === g ? 'p-info' : 'p-mute') + '" style="border:0;cursor:pointer" data-a="histF" data-arg="' + g + '">' + HIST_GROUPS[g] + ' ' + n + '</button>' : ''; }).join(' ');
+  const g = state.histG, b = state.histB;
+  const keys = [['name', 'Name'], ['adr', 'Postadresse (Aufenthaltsort)'], ['korr', 'Korrespondenzadresse'], ['tel', 'Telefon'], ['mail', 'E-Mail']].filter(x => all.some(e => e.k === x[0]) || x[0] === 'korr');
+  const stich = keys.map(x => '<tr><td>' + x[1] + '</td><td>' + (x[0] === 'korr' && !all.some(e => e.k === 'korr') ? '<span class="muted">wie Aufenthaltsort</span>' : asOf(all, x[0], g, b)) + '</td></tr>').join('');
+  const tl = list.map(e => '<div class="' + (e.ers ? 'sup' : e.bis ? 'old' : '') + '"><span class="pill p-mute">' + e.f + '</span> <b>' + esc(e.v) + '</b>' + (e.note ? ' <span class="small muted">· ' + esc(e.note) + '</span>' : '') +
+    '<br><span class="small">gültig ' + dDE(e.von) + ' bis ' + (e.bis ? dDE(e.bis) : 'offen') + ' · ' + esc(e.art) + (e.nw ? ' · Nachweis: ' + esc(e.nw) : '') + '</span>' +
+    '<br><span class="small muted">erfasst ' + dDE(e.erf) + ' von ' + esc(e.wer) + (e.ers ? ' · ersetzt am ' + dDE(e.ers) : '') + '</span></div>').join('');
+  return '<section class="card"><div class="head"><div><p class="sub small"><a href="#personen" data-a="histClose">' + esc(p.name) + '</a> › Datenhistorie</p><h2>Datenhistorie</h2><p class="sub">Alle Stammdaten mit Gültigkeit und Erfassung. Nichts wird überschrieben, Korrekturen ersetzen Erfassungen.</p></div>' + btn('← Zur Person', 'histClose') + '</div>' +
+    '<div class="card" style="background:var(--surface-2)"><h3>Stand zu einem Stichtag</h3><div class="fields"><div class="field"><label for="hg">Gültig am</label><input id="hg" type="date" value="' + g + '" data-in="hist-g"></div><div class="field"><label for="hb">Im System bekannt am</label><input id="hb" type="date" value="' + b + '" data-in="hist-b"></div></div>' +
+    '<div class="tbl-wrap"><table><tbody>' + stich + '</tbody></table></div><p class="small muted">„Gültig am“ zeigt, was zu dem Zeitpunkt galt, z. B. für den Nachdruck einer Bescheinigung. „Bekannt am“ zeigt, was das System damals wusste, z. B. für eine Prüfung.</p></div>' +
+    '<div class="row" style="gap:6px">' + chips + '</div><div class="timeline">' + (tl || '<div class="small muted">Keine Einträge.</div>') + '</div><p class="small muted">Blasse Einträge sind ersetzte Erfassungen, z. B. ein korrigierter Zahlendreher. Sie bleiben für Prüfungen erhalten.</p></section>';
 }
 
 /* ---------- Rendern ---------- */
@@ -996,13 +1053,16 @@ const ACTIONS = {
   wizSave: () => { const w = state.wiz, c = course(w.course), chk = bookingCheck(c, PEOPLE[w.person]); w.done = true; if (chk.warte) c.warte++; else c.belegt++; addLog((chk.warte ? 'Warteliste: ' : 'Anmeldung: ') + PEOPLE[w.person].name + ' für ' + c.nr + ' (Tresen)'); toast('Gespeichert und protokolliert.'); render(); },
   wizAgain: () => { state.wiz = { step: 2, person: state.wiz.person, course: null, pay: 'sepa', q: '', done: false }; render(); },
   sendConfirm: () => { const w = state.wiz, p = PEOPLE[w.person], c = course(w.course); addOut({ typ: 'E-Mail', an: p.name, betreff: 'Anmeldebestätigung ' + c.nr + ' ' + c.titel, body: 'Betreff: Ihre Anmeldung: ' + c.titel + ' (' + c.nr + ')\n\nGuten Tag ' + p.name + ',\n\nvielen Dank für Ihre Anmeldung. Der Kurs beginnt am ' + c.beginn + ', ' + c.tag + ' ' + c.zeit + ', Raum ' + c.raum + '.\nEntgelt: ' + (c.entgelt ? eur(c.entgelt) : 'entgeltfrei') + '\n\n➜ Diese Nachricht in Ihrer Sprache lesen (' + p.sprache + '):\n  https://vhs-musterstadt.example/t/Kd4wM9pX2rVb\n\nAnhang: Termine.ics, QR-Teilnehmerausweis.pdf\nIhre VHS Musterstadt' }); toast('Bestätigung im Postausgang (mit Übersetzungslink).'); state.outSel = 0; go('postausgang'); },
-  openPerson: a => { state.person = a; state.cert = false; state.personEdit = false; state.naive = false; go('personen'); },
+  openPerson: a => { state.histFor = null; state.person = a; state.cert = false; state.personEdit = false; state.naive = false; go('personen'); },
   personEdit: () => { state.personEdit = !state.personEdit; render(); },
   saveName: () => { const nn = (document.getElementById('nn').value || '').trim() || 'Becker'; const art = document.querySelector('input[name=art]:checked').value; const ab = document.getElementById('ab').value || '2026-11-14'; const vs = PEOPLE['p-becker'].versions; const cur = vs[vs.length - 1];
     if (art === 'korr') { cur.ers = '2026-11-14'; vs.push({ n: nn, von: cur.von, bis: cur.bis, erf: '2026-11-14', ers: '', grund: 'Korrektur (gilt rückwirkend)' }); }
     else { cur.ers = '2026-11-14'; vs.push({ n: cur.n, von: cur.von, bis: ab, erf: '2026-11-14', ers: '', grund: 'Ende der Gültigkeit' }); vs.push({ n: nn, von: ab, bis: 'offen', erf: '2026-11-14', ers: '', grund: 'Änderung ab ' + ab + ', Nachweis: ' + document.getElementById('nw').value }); }
     PEOPLE['p-becker'].name = 'Anna ' + nn; state.personEdit = false; addLog('Nachname Anna ' + cur.n + ' → ' + nn + ' (' + (art === 'korr' ? 'Korrektur' : 'Änderung ab ' + ab) + ')'); toast('Gespeichert. Alte Dokumente behalten den bisherigen Namen.'); render(); },
-  hist: a => { if (a === 'p-becker' || a === 'name') { state.person = 'p-becker'; go('personen'); } else toast('Historie „' + a + '“: im Prototyp nur für den Namen von Anna Becker ausgearbeitet.'); },
+  histOpen: () => { state.histFor = state.person; state.histF = 'alle'; render(); window.scrollTo(0, 0); },
+  histClose: () => { state.histFor = null; render(); },
+  histF: a => { state.histF = a; render(); },
+  hist: a => { const mp = { name: 'name', 'p-becker': 'name', Anschrift: 'adr' }; if (mp[a] && (current() === 'personen' || a === 'p-becker')) { if (a === 'p-becker') state.person = 'p-becker'; state.histFor = state.person; state.histF = mp[a]; go('personen'); return; } if (a === 'p-becker' || a === 'name') { state.person = 'p-becker'; go('personen'); } else toast('Historie „' + a + '“: im Prototyp ist die Datenhistorie für Personen ausgearbeitet (Personen › Datenhistorie).'); },
   cert: () => { state.cert = !state.cert; state.naive = false; render(); },
   naive: () => { state.naive = !state.naive; render(); },
   sendCert: () => { addOut({ typ: 'E-Mail', an: 'Mehmet Yılmaz', betreff: 'Ihre Teilnahmebescheinigung 24H-305 (Nachdruck)', body: 'Betreff: Ihre Teilnahmebescheinigung\n\nGuten Tag Herr Yılmaz,\n\nanbei der Nachdruck Ihrer Teilnahmebescheinigung für „Englisch A1 – Einstieg“ (2024).\n\n➜ Bu mesajı Türkçe okuyun: https://vhs-musterstadt.example/t/Lw3nB8sQ5kYt\n\nAnhang: Teilnahmebescheinigung_24H-305.pdf (Archiv-Original)\nIhre VHS Musterstadt' }); toast('Mail im Postausgang.'); },
@@ -1049,6 +1109,8 @@ document.addEventListener('change', e => {
   if (k === 'pay') { state.wiz.pay = e.target.value; render(); }
   if (k && k.indexOf('gen-') === 0 && state.gen) { const f = k.slice(4); state.gen[f] = f === 'unbef' ? e.target.checked : (f === 'n' || f === 'rh' ? Number(e.target.value) || 1 : e.target.value); render(); }
   if (k && k.indexOf('sg-') === 0 && state.single) { state.single[k.slice(3)] = e.target.value; render(); }
+  if (k === 'hist-g') { state.histG = e.target.value || state.histG; render(); }
+  if (k === 'hist-b') { state.histB = e.target.value || state.histB; render(); }
   if (k === 'termin') { state.att.termin = e.target.value.slice(0, 10); render(); }
 });
 document.addEventListener('input', e => {
@@ -1071,9 +1133,12 @@ q.addEventListener('input', () => {
   const ns = norm(s);
   const ph = PEOPLE_IDS.filter(k => PEOPLE[k].key.indexOf(ns) >= 0);
   const ch = COURSES.filter(c => norm(c.titel + ' ' + c.nr).indexOf(ns) >= 0);
+  const oh = Object.keys(ORTE).filter(k => norm(k + ' ' + ORTE[k].name + ' ' + (ORTE[k].adr || '') + ' ' + ORTART[ORTE[k].art] + ' ' + Object.keys(merkmale(k)).map(m => MERKMALE[m].n).join(' ')).indexOf(ns) >= 0);
+  const nOrt = Math.min(3, oh.length);
   const hits = ch.slice(0, 3).map(c => '<button data-a="openCourse" data-arg="' + c.id + '">' + c.nr + ' ' + esc(c.titel) + '<small>Kurs</small></button>')
-    .concat(ph.slice(0, 8 - Math.min(3, ch.length)).map(k => '<button data-a="openPerson" data-arg="' + k + '">' + esc(PEOPLE[k].name) + '<small>' + esc(PEOPLE[k].ort) + ' · Person</small></button>'));
-  res.innerHTML = (hits.length ? hits.join('') : '<div style="padding:10px 12px" class="muted">Keine Treffer</div>') + (ph.length > 8 - Math.min(3, ch.length) ? '<button data-a="allHits" data-arg="' + esc(s) + '"><b>Alle ' + ph.length.toLocaleString('de-DE') + ' Personen-Treffer anzeigen</b><small>in der Personenliste</small></button>' : '');
+    .concat(oh.slice(0, 3).map(k => '<button data-a="ortOpen" data-arg="' + esc(k) + '">' + esc(ORTE[k].name) + '<small>' + ORTART[ORTE[k].art] + (ORTE[k].parent ? ' · ' + esc(ORTE[ORTE[k].parent].name) : '') + '</small></button>'))
+    .concat(ph.slice(0, Math.max(2, 8 - Math.min(3, ch.length) - nOrt)).map(k => '<button data-a="openPerson" data-arg="' + k + '">' + esc(PEOPLE[k].name) + '<small>' + esc(PEOPLE[k].ort) + ' · Person</small></button>'));
+  res.innerHTML = (hits.length ? hits.join('') : '<div style="padding:10px 12px" class="muted">Keine Treffer</div>') + (ph.length > Math.max(2, 8 - Math.min(3, ch.length) - nOrt) ? '<button data-a="allHits" data-arg="' + esc(s) + '"><b>Alle ' + ph.length.toLocaleString('de-DE') + ' Personen-Treffer anzeigen</b><small>in der Personenliste</small></button>' : '');
   res.hidden = false;
 });
 document.getElementById('nav').addEventListener('click', e => { const l = e.target.closest('a'); if (!l) return; state.course = null; if (l.getAttribute('href') === location.hash) { e.preventDefault(); render(); } });

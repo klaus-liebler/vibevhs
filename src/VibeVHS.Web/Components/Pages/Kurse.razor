@@ -1,0 +1,152 @@
+@page "/kurse"
+@using VibeVHS.Application.Programm
+@using VibeVHS.Application.Stammdaten
+@using VibeVHS.Domain.Programm
+@using VibeVHS.Domain.Stammdaten
+@inject Vorgang Vorgang
+@inject NavigationManager Navigation
+@inject NotificationService Hinweise
+
+<PageTitle>Kurse · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Kurse</h1>
+        <p class="vhs-sub">@zeilen.Count Kurse@(semester is null ? "" : $" im {semester.Name}") · Konflikte werden beim Planen geprüft</p>
+    </div>
+    <div class="vhs-row">
+        <BegruendeterButton Text="Kurs anlegen" Icon="add" Freigabe="@Planen" Click="@(() => Navigation.NavigateTo("kurse/neu"))" />
+        <BegruendeterButton Text="Semester kopieren" Icon="content_copy" ButtonStyle="ButtonStyle.Light" Freigabe="@Planen"
+                            Click="@(() => kopieOffen = !kopieOffen)" />
+        <RadzenButton Text="Raumplan" Icon="calendar_view_week" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("raumplan"))" />
+    </div>
+</div>
+
+@if (kopieOffen)
+{
+    <section class="vhs-card">
+        <h2>Semester kopieren</h2>
+        <p class="vhs-small vhs-muted" style="margin-top:-6px">Alle nicht abgesagten Kurse werden als Entwurf ins Zielsemester übernommen; Termine wandern um ganze Wochen mit (gleiche Wochentage), Ferien und Feiertage werden neu berücksichtigt.</p>
+        <div class="vhs-fields">
+            <RadzenFormField Text="Von" Variant="Variant.Outlined"><RadzenDropDown TValue="Guid?" @bind-Value="kopieVon" Data="@alleSemester" TextProperty="Name" ValueProperty="Id" /></RadzenFormField>
+            <RadzenFormField Text="Nach" Variant="Variant.Outlined"><RadzenDropDown TValue="Guid?" @bind-Value="kopieNach" Data="@alleSemester" TextProperty="Name" ValueProperty="Id" /></RadzenFormField>
+        </div>
+        <div class="vhs-row">
+            <BegruendeterButton Text="Kopieren" Icon="content_copy" Click="KopierenAsync" IsBusy="@kopiert"
+                                Freigabe="@(kopieVon is null || kopieNach is null ? Freigabe.Nein("Bitte Quell- und Zielsemester wählen.") : kopieVon == kopieNach ? Freigabe.Nein("Quelle und Ziel sind dasselbe Semester.") : Freigabe.Ja)" />
+        </div>
+    </section>
+}
+
+<NaechsteSchritte Schritte="@folgeschritte" />
+
+<section class="vhs-card">
+    <div class="vhs-row">
+        <RadzenDropDown TValue="Guid?" @bind-Value="semesterId" @bind-Value:after="LadenAsync" Data="@alleSemester" TextProperty="Name" ValueProperty="Id" Style="min-width:180px" />
+        <div class="vhs-suche" style="flex:1 1 280px">
+            <RadzenIcon Icon="search" />
+            <input type="search" @bind="suche" @bind:event="oninput" @bind:after="LadenAsync" placeholder="Kursnummer oder Titel" aria-label="Kurse suchen" />
+        </div>
+    </div>
+    <div class="vhs-filter">
+        <span class="vhs-filter-lbl">Fachbereich</span>
+        @foreach (var fb in fachbereiche)
+        {
+            var n = alle.Count(z => z.Fachbereich == fb.Nr);
+            <button class="vhs-chip @(fachbereich == fb.Nr ? "on" : "")" title="@fb.Anzeige" disabled="@(n == 0)" @onclick="@(() => { fachbereich = fachbereich == fb.Nr ? null : fb.Nr; Filtern(); })">FB @fb.Nr <span class="vhs-chip-n">@n</span></button>
+        }
+        <span class="vhs-filter-lbl">Status</span>
+        @foreach (var s in Enum.GetValues<Kursstatus>())
+        {
+            var n = alle.Count(z => z.Status == s);
+            <button class="vhs-chip @(status == s ? "on" : "")" disabled="@(n == 0)" @onclick="@(() => { status = status == s ? null : s; Filtern(); })">@KursAnzeige.Status(s) <span class="vhs-chip-n">@n</span></button>
+        }
+    </div>
+    <div class="vhs-tbl">
+        <table>
+            <thead><tr><th>Nr.</th><th>Titel</th><th>FB</th><th>Termine</th><th>Ort</th><th>Leitung</th><th>Plätze</th><th>Status</th></tr></thead>
+            <tbody>
+                @foreach (var z in zeilen)
+                {
+                    <tr class="vhs-klickzeile" @onclick="@(() => Navigation.NavigateTo($"kurse/{z.Id}"))">
+                        <td class="vhs-mono">@z.Kursnummer</td>
+                        <td><a href="@($"kurse/{z.Id}")">@z.Titel</a>
+                            @if (z.Sichtbarkeit != Sichtbarkeit.Oeffentlich) { <StatusPille Stil="info">@KursAnzeige.Sichtbarkeit(z.Sichtbarkeit)</StatusPille> }
+                            @if (z.Umfang == Kursumfang.Unbefristet) { <StatusPille Stil="neutral">fortlaufend</StatusPille> }
+                        </td>
+                        <td>@z.Fachbereich</td>
+                        <td class="vhs-small">@(z.ErsterTermin is { } e ? $"{e:ddd dd.MM.} {e:HH:mm}" : "–")@(z.Termine > 1 ? $" · {z.Termine}×" : "")</td>
+                        <td class="vhs-small">@z.Ort</td>
+                        <td class="vhs-small">@z.Leitung</td>
+                        <td class="vhs-mono">@z.MaxTeilnehmende</td>
+                        <td><StatusPille Stil="@(z.Status == Kursstatus.Veroeffentlicht ? "gut" : z.Status == Kursstatus.Abgesagt ? "krit" : "neutral")">@KursAnzeige.Status(z.Status)</StatusPille></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    private IReadOnlyList<Semester> alleSemester = [];
+    private IReadOnlyList<Fachbereich> fachbereiche = [];
+    private IReadOnlyList<KursZeile> alle = [];
+    private List<KursZeile> zeilen = [];
+    private Semester? semester;
+    private Guid? semesterId;
+    private string? suche;
+    private int? fachbereich;
+    private Kursstatus? status;
+    private Rolle? rolle;
+    private bool kopieOffen, kopiert;
+    private Guid? kopieVon, kopieNach;
+    private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
+
+    [SupplyParameterFromQuery(Name = "fb")]
+    private int? FbAusAdresse { get; set; }
+
+    private Freigabe Planen => Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Leitung);
+
+    protected override async Task OnInitializedAsync()
+    {
+        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        fachbereich = FbAusAdresse;
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            alleSemester = await d.GetRequiredService<IProgrammSpeicher>().SemesterAsync();
+            fachbereiche = await d.GetRequiredService<IStammdaten>().FachbereicheAsync();
+        });
+        var heute = DateOnly.FromDateTime(DateTime.Today);
+        semesterId = (alleSemester.FirstOrDefault(s => s.Beginn <= heute && heute <= s.Ende) ?? alleSemester.LastOrDefault())?.Id;
+        kopieVon = semesterId;
+        kopieNach = alleSemester.FirstOrDefault(s => s.Beginn > heute)?.Id;
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync()
+    {
+        semester = alleSemester.FirstOrDefault(s => s.Id == semesterId);
+        alle = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IProgrammSpeicher>().KurseAsync(new KursFilter(semesterId, Suche: suche)));
+        Filtern();
+    }
+
+    private void Filtern() => zeilen = alle.Where(z => (fachbereich is null || z.Fachbereich == fachbereich) && (status is null || z.Status == status)).ToList();
+
+    private async Task KopierenAsync()
+    {
+        kopiert = true;
+        try
+        {
+            var n = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().SemesterKopierenAsync(kopieVon!.Value, kopieNach!.Value));
+            Hinweise.Notify(NotificationSeverity.Success, "Semesterkopie", $"{n} Kurse als Entwurf angelegt.");
+            semesterId = kopieNach;
+            kopieOffen = false;
+            folgeschritte = [new("Raumplan des Zielsemesters prüfen", "raumplan", "Konflikte durch neue Ferien oder Räume erkennen", Hauptschritt: true)];
+            await LadenAsync();
+        }
+        finally
+        {
+            kopiert = false;
+        }
+    }
+}

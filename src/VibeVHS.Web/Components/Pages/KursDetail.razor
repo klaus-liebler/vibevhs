@@ -1,0 +1,263 @@
+@page "/kurse/{Id:guid}"
+@using VibeVHS.Application.Programm
+@using VibeVHS.Domain.Programm
+@inject Vorgang Vorgang
+@inject TimeProvider Uhr
+@inject NotificationService Hinweise
+
+<PageTitle>@(kurs?.Kursnummer ?? "Kurs") · VibeVHS</PageTitle>
+
+@if (kurs is null || verzeichnis is null)
+{
+    <h1>Kurs nicht gefunden</h1>
+    <NaechsteSchritte Schritte="@([new NaechsterSchritt("Zur Kursliste", "kurse", Hauptschritt: true)])" />
+    return;
+}
+
+<div class="vhs-head">
+    <div>
+        <h1>@kurs.Kursnummer @kurs.Titel</h1>
+        <p class="vhs-sub">
+            <StatusPille Stil="@(kurs.Status == Kursstatus.Veroeffentlicht ? "gut" : kurs.Status == Kursstatus.Abgesagt ? "krit" : "neutral")">@KursAnzeige.Status(kurs.Status)</StatusPille>
+            FB @kurs.Fachbereich · @NutzungsartAnzeige.Text(kurs.Nutzungsart) · @KursAnzeige.Sichtbarkeit(kurs.Sichtbarkeit)@(kurs.AuftraggeberName is null ? "" : $" für {kurs.AuftraggeberName}")
+            · @kurs.MinTeilnehmende–@kurs.MaxTeilnehmende Teilnehmende
+        </p>
+    </div>
+    <div class="vhs-row">
+        <BegruendeterButton Text="Veröffentlichen" Icon="public" Freigabe="@VeroeffentlichenFreigabe" Click="@(() => StatusAsync(Kursstatus.Veroeffentlicht))" />
+        <BegruendeterButton Text="Absagen" Icon="cancel" ButtonStyle="ButtonStyle.Light" Freigabe="@AbsagenFreigabe" Click="@(() => StatusAsync(Kursstatus.Abgesagt))" />
+    </div>
+</div>
+
+<NaechsteSchritte Titel="Wie geht es weiter?" Schritte="@folgeschritte" />
+
+<div class="vhs-grid-2">
+    <section class="vhs-card">
+        <h2>Kursdaten</h2>
+        <dl class="vhs-kv">
+            <dt>Team</dt><dd>@(kurs.Team.Count == 0 ? "–" : string.Join(", ", kurs.Team.Select(t => t.Name + (t.Leitung ? " (Leitung)" : ""))))</dd><dd></dd>
+            <dt>Serie</dt><dd>@SerieText</dd><dd></dd>
+            <dt>Entgelt</dt>
+            <dd>
+                @(kurs.EntgeltAm(DateOnly.FromDateTime(Uhr.GetLocalNow().Date), Uhr.GetLocalNow())?.Wert ?? kurs.Entgelte.LastOrDefault()?.Wert ?? "–")
+                @if (kurs.Entgelte.Count(e => e.IstAktuellerWissensstand) > 1)
+                {
+                    <br /><span class="vhs-small vhs-muted">@string.Join(" · ", kurs.Entgelte.Where(e => e.IstAktuellerWissensstand && !e.IstEndemarke).OrderBy(e => e.GueltigVon).Select(e => $"ab {e.GueltigVon:dd.MM.yyyy}: {e.Wert}"))</span>
+                }
+            </dd><dd></dd>
+            <dt>Buchung</dt>
+            <dd>
+                @string.Join(", ", kurs.Richtlinie.Rechte.Where(r => r.DarfBuchen).Select(r => r.Weg + (r.DarfUeberbuchen ? " (darf überbuchen)" : "")))
+                <br /><span class="vhs-small vhs-muted">
+                    @(kurs.Richtlinie.Belegung == Belegungsart.Kontingent ? $"Kontingent: {kurs.Richtlinie.KontingentAnzahl} Termine, {kurs.Richtlinie.KontingentGueltigMonate} Monate gültig" : "Belegung aller Veranstaltungen")
+                    · Warteliste @(kurs.Richtlinie.Warteliste ? "ja" : "nein") · Storno bis @kurs.Richtlinie.StornofristTage Tage vorher
+                </span>
+            </dd><dd></dd>
+            @if (kurs.BenoetigteMerkmale.Count > 0)
+            {
+                <dt>Ort braucht</dt><dd>@string.Join(", ", kurs.BenoetigteMerkmale.Select(s => verzeichnis.Katalog.GetValueOrDefault(s)?.Name ?? s))</dd><dd></dd>
+            }
+        </dl>
+    </section>
+
+    <section class="vhs-card">
+        <h2>Ändern</h2>
+        <RadzenRadioButtonList TValue="string" @bind-Value="modus" Orientation="Orientation.Vertical">
+            <Items>
+                <RadzenRadioButtonListItem Text="Nur diese Veranstaltung (Termin unten auswählen)" Value="@("einzeln")" />
+                <RadzenRadioButtonListItem Text="Alle folgenden ab dem gewählten Termin (einzeln geänderte bleiben)" Value="@("folgende")" Disabled="@(kurs.Serie is null)" />
+                <RadzenRadioButtonListItem Text="Zusätzliche Einzelveranstaltung" Value="@("zusatz")" />
+            </Items>
+        </RadzenRadioButtonList>
+        <div class="vhs-fields">
+            @if (modus != "folgende")
+            {
+                <RadzenFormField Text="Datum" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly" @bind-Value="aDatum" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+            }
+            <RadzenFormField Text="Beginn (hh:mm)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="aBeginn" /></RadzenFormField>
+            <RadzenFormField Text="Dauer (Min.)" Variant="Variant.Outlined"><RadzenNumeric TValue="int" @bind-Value="aDauer" Min="15" Step="15" /></RadzenFormField>
+            <RadzenFormField Text="Ort" Variant="Variant.Outlined">
+                <RadzenDropDown TValue="Guid" @bind-Value="aOrt" Data="@buchbareOrte" TextProperty="Anzeige" ValueProperty="Id" AllowFiltering="true" />
+            </RadzenFormField>
+            <RadzenFormField Text="Bemerkung" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="aBemerkung" /></RadzenFormField>
+        </div>
+        <div class="vhs-row">
+            <BegruendeterButton Text="Übernehmen" Icon="save" Click="AendernAsync" Freigabe="@AendernFreigabe" />
+            <BegruendeterButton Text="Gewählten Termin ausfallen lassen" Icon="event_busy" ButtonStyle="ButtonStyle.Light"
+                                Freigabe="@(gewaehlt is null ? Freigabe.Nein("Bitte zuerst unten einen Termin auswählen.") : Planen)" Click="AusfallenAsync" />
+        </div>
+    </section>
+</div>
+
+<section class="vhs-card">
+    <h2>@kurs.Veranstaltungen.Count Veranstaltungen @(konflikte.Count > 0 ? $"· {konflikte.Count} Konflikte" : "")</h2>
+    <div class="vhs-tbl">
+        <table>
+            <thead><tr><th>Nr.</th><th>Datum</th><th>Zeit</th><th>Ort(e)</th><th>Dozent</th><th>Plätze</th><th>Hinweis</th></tr></thead>
+            <tbody>
+                @foreach (var v in kurs.Veranstaltungen.OrderBy(x => x.Beginn))
+                {
+                    var konflikt = konflikte.FirstOrDefault(k => k.A.VeranstaltungId == v.Id || k.B.VeranstaltungId == v.Id);
+                    <tr class="vhs-klickzeile @(gewaehlt?.Id == v.Id ? "vhs-gewaehlt" : "") @(v.Ausgefallen ? "vhs-ersetzt" : "")" @onclick="@(() => Waehlen(v))">
+                        <td class="vhs-mono">@v.Nummer</td>
+                        <td>@v.Beginn.ToString("ddd dd.MM.yyyy")</td>
+                        <td class="vhs-mono">@v.Beginn.ToString("HH:mm")–@v.Ende.ToString("HH:mm")</td>
+                        <td>@string.Join(" + ", v.Orte.Select(o => o.OrtName))</td>
+                        <td class="vhs-small">@v.DozentName</td>
+                        <td class="vhs-mono">@Ortsplanung.Kapazitaet(v, kurs, verzeichnis)</td>
+                        <td>
+                            @if (v.Ausgefallen) { <StatusPille Stil="neutral">fällt aus</StatusPille> }
+                            @if (v.Ausnahme && !v.Ausgefallen) { <StatusPille Stil="info">einzeln geändert</StatusPille> }
+                            @if (!v.AusSerie) { <StatusPille Stil="info">Einzeltermin</StatusPille> }
+                            @if (konflikt is not null)
+                            {
+                                <span class="vhs-why" tabindex="0" data-why="@konflikt.Beschreibung(id => verzeichnis.Finden(id)?.Anzeige ?? "?")"><StatusPille Stil="krit">Konflikt</StatusPille></span>
+                            }
+                            <span class="vhs-small vhs-muted">@v.Bemerkung</span>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    [SupplyParameterFromQuery(Name = "neu")]
+    private int? Neu { get; set; }
+
+    private Kurs? kurs;
+    private Ortsverzeichnis? verzeichnis;
+    private IReadOnlyList<Ort> buchbareOrte = [];
+    private IReadOnlyList<Konflikt> konflikte = [];
+    private Veranstaltung? gewaehlt;
+    private Rolle? rolle;
+    private string modus = "einzeln";
+    private DateOnly aDatum = DateOnly.FromDateTime(DateTime.Today);
+    private string aBeginn = "18:00";
+    private int aDauer = 90;
+    private Guid aOrt;
+    private string? aBemerkung;
+    private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
+
+    private Freigabe Planen => Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Leitung);
+
+    private Freigabe VeroeffentlichenFreigabe => Planen.Und(() => kurs!.Status == Kursstatus.Veroeffentlicht
+        ? Freigabe.Nein("Der Kurs ist bereits veröffentlicht.")
+        : kurs.Veranstaltungen.Count == 0 ? Freigabe.Nein("Ohne Veranstaltungen kann der Kurs nicht veröffentlicht werden.") : Freigabe.Ja);
+
+    private Freigabe AbsagenFreigabe => Planen.Und(() => kurs!.Status == Kursstatus.Abgesagt ? Freigabe.Nein("Der Kurs ist bereits abgesagt.") : Freigabe.Ja);
+
+    private Freigabe AendernFreigabe => Planen.Und(() =>
+        !TimeOnly.TryParse(aBeginn, out _) ? Freigabe.Nein("Beginn bitte als hh:mm eingeben.")
+        : modus != "zusatz" && gewaehlt is null ? Freigabe.Nein("Bitte unten den Termin anklicken, der geändert werden soll.")
+        : aOrt == Guid.Empty ? Freigabe.Nein("Bitte einen Ort wählen.")
+        : Freigabe.Ja);
+
+    private string SerieText => kurs?.Serie is not { } s ? "keine (nur Einzeltermine)"
+        : $"{string.Join("/", s.Wochentage.Select(KursAnzeige.Wochentag))} {s.Beginn:HH\\:mm}, {s.DauerMinuten} Min., ab {s.Start:dd.MM.yyyy}, "
+          + (s.Unbefristet ? $"unbefristet (erzeugt bis {kurs.ErzeugtBis:dd.MM.yyyy}, rollierend)" : s.Anzahl is { } a ? $"{a} Termine" : $"bis {s.Ende:dd.MM.yyyy}")
+          + (s.FerienAuslassen ? ", ohne Schulferien" : "") + (s.FeiertageAuslassen ? ", ohne Feiertage" : "");
+
+    protected override async Task OnParametersSetAsync()
+    {
+        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        await LadenAsync();
+        if (Neu == 1)
+        {
+            folgeschritte =
+            [
+                new("Kurs veröffentlichen", "#", Freigabe: VeroeffentlichenFreigabe, Hauptschritt: true),
+                new("Raumplan prüfen", "raumplan"),
+                new("Weiteren Kurs anlegen", "kurse/neu"),
+            ];
+        }
+    }
+
+    private async Task LadenAsync()
+    {
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var p = d.GetRequiredService<IProgrammSpeicher>();
+            kurs = await p.KursLadenAsync(Id);
+            verzeichnis = await p.OrtsverzeichnisAsync();
+            if (kurs is { Veranstaltungen.Count: > 0 })
+            {
+                var von = kurs.Veranstaltungen.Min(v => v.Beginn);
+                var bis = kurs.Veranstaltungen.Max(v => v.Ende);
+                var termine = await p.TermineAsync(von, bis);
+                konflikte = Konfliktpruefung.Finden(termine.Select(t => t.Termin), id => verzeichnis.Finden(id)?.Exklusiv ?? false)
+                    .Where(k => k.A.KursId == Id || k.B.KursId == Id).ToList();
+            }
+        });
+        buchbareOrte = verzeichnis?.Alle.Where(o => o.Buchbar).OrderBy(o => o.Anzeige).ToList() ?? [];
+        if (aOrt == Guid.Empty && kurs?.Serie?.OrtIds.FirstOrDefault() is { } o)
+        {
+            aOrt = o;
+        }
+    }
+
+    private void Waehlen(Veranstaltung v)
+    {
+        gewaehlt = v;
+        aDatum = v.Datum;
+        aBeginn = v.Beginn.ToString("HH:mm");
+        aDauer = (int)(v.Ende - v.Beginn).TotalMinutes;
+        aOrt = v.Orte.FirstOrDefault()?.OrtId ?? aOrt;
+        aBemerkung = v.Bemerkung;
+    }
+
+    private async Task AendernAsync()
+    {
+        var b = TimeOnly.Parse(aBeginn, System.Globalization.CultureInfo.InvariantCulture);
+        var dienst = (IServiceProvider d) => d.GetRequiredService<ProgrammDienst>();
+        try
+        {
+            switch (modus)
+            {
+                case "einzeln":
+                    var beginn = aDatum.ToDateTime(b);
+                    await Vorgang.AusfuehrenAsync(d => dienst(d).NurDieseAendernAsync(Id, gewaehlt!.Id, beginn, beginn.AddMinutes(aDauer), [aOrt], aBemerkung));
+                    break;
+                case "folgende":
+                    var regel = kurs!.Serie! with { Beginn = b, DauerMinuten = aDauer, OrtIds = [aOrt] };
+                    await Vorgang.AusfuehrenAsync(d => dienst(d).SerieAendernAbAsync(Id, gewaehlt!.Datum, regel));
+                    break;
+                default:
+                    var zusatz = aDatum.ToDateTime(b);
+                    await Vorgang.AusfuehrenAsync(d => dienst(d).EinzelveranstaltungAsync(Id, zusatz, zusatz.AddMinutes(aDauer), [aOrt]));
+                    break;
+            }
+
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", "Die Termine wurden geändert und protokolliert.");
+            gewaehlt = null;
+            await LadenAsync();
+            folgeschritte = [new("Raumplan prüfen", "raumplan", Hauptschritt: konflikte.Count > 0), new("Protokoll ansehen", "protokoll")];
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task AusfallenAsync()
+    {
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().AusfallenLassenAsync(Id, gewaehlt!.Id, aBemerkung ?? "ohne Angabe"));
+        Hinweise.Notify(NotificationSeverity.Info, "Fällt aus", "Der Termin ist als ausgefallen markiert.");
+        gewaehlt = null;
+        await LadenAsync();
+        folgeschritte = [new("Teilnehmende informieren", "#", Freigabe: Freigabe.Geplant("Die Benachrichtigung der Teilnehmenden", "I3"), Hauptschritt: true)];
+    }
+
+    private async Task StatusAsync(Kursstatus status)
+    {
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().StatusSetzenAsync(Id, status));
+        await LadenAsync();
+        folgeschritte = status == Kursstatus.Abgesagt
+            ? [new("Teilnehmende informieren", "#", Freigabe: Freigabe.Geplant("Die Absage an Teilnehmende", "I3"), Hauptschritt: true)]
+            : [new("Anmeldungen erfassen", "anmeldung", Freigabe: Freigabe.Geplant("Die Kursanmeldung", "I3"), Hauptschritt: true), new("Zur Kursliste", "kurse")];
+    }
+}

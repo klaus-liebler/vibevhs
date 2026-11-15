@@ -1,0 +1,235 @@
+@page "/orte"
+@using VibeVHS.Application.Programm
+@using VibeVHS.Domain.Aufgaben
+@using VibeVHS.Domain.Programm
+@inject Vorgang Vorgang
+@inject TimeProvider Uhr
+@inject NavigationManager Navigation
+@inject NotificationService Hinweise
+
+<PageTitle>Orte · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Orte</h1>
+        <p class="vhs-sub">Liegenschaft › Gebäude › Raum, dazu Treffpunkte und virtuelle Räume. Merkmale werden vom Gebäude auf die Räume vererbt.</p>
+    </div>
+    <div class="vhs-row">
+        <RadzenButton Text="Raumplan" Icon="calendar_view_week" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("raumplan"))" />
+    </div>
+</div>
+
+@foreach (var a in aufgaben)
+{
+    <div class="vhs-alert vhs-warn"><b>Aufgabe:</b> @a.Titel (fällig @a.Faellig.ToString("dd.MM.yyyy")) – @a.Beschreibung <a href="@a.Ziel">öffnen</a></div>
+}
+
+<div class="vhs-split">
+    <section class="vhs-card">
+        <h2>Alle Orte</h2>
+        @if (verzeichnis is not null)
+        {
+            <ul class="vhs-baum">
+                @foreach (var wurzel in verzeichnis.Alle.Where(o => o.ElternId is null).OrderBy(o => o.Art).ThenBy(o => o.Name))
+                {
+                    @Knoten(wurzel)
+                }
+            </ul>
+        }
+    </section>
+
+    <section class="vhs-card">
+        @if (ort is null || verzeichnis is null)
+        {
+            <p class="vhs-muted">Ort links auswählen.</p>
+        }
+        else
+        {
+            <h2>@ort.Anzeige</h2>
+            <p class="vhs-small vhs-muted" style="margin-top:-6px">@verzeichnis.PfadAnzeige(ort) · @OrtsartText(ort.Art)</p>
+
+            @if (ort.Kapazitaeten.Count > 0)
+            {
+                <h3>Kapazität je Nutzungsart</h3>
+                <div class="vhs-row">
+                    @foreach (var k in ort.Kapazitaeten.OrderByDescending(k => k.Plaetze))
+                    {
+                        <StatusPille Stil="info">@NutzungsartAnzeige.Text(k.Nutzungsart): @k.Plaetze</StatusPille>
+                    }
+                </div>
+            }
+
+            <h3>Wirksame Merkmale am @tag.ToString("dd.MM.yyyy")</h3>
+            <div class="vhs-row"><RadzenDatePicker TValue="DateOnly" @bind-Value="tag" DateFormat="dd.MM.yyyy" /> <span class="vhs-small vhs-muted">Stichtag ändern, z. B. für einen geplanten Kurs</span></div>
+            <div class="vhs-tbl">
+                <table>
+                    <thead><tr><th>Merkmal</th><th>Wert / Nachweis</th><th>Herkunft</th><th>gültig bis</th></tr></thead>
+                    <tbody>
+                        @foreach (var w in verzeichnis.WirksameMerkmale(ort, tag, Uhr.GetLocalNow()).OrderBy(w => w.Merkmal.Gruppe))
+                        {
+                            var bald = w.GueltigBis is { } bis && bis <= tag.AddDays(60);
+                            <tr>
+                                <td>@w.Merkmal.Name <span class="vhs-small vhs-muted">(@w.Merkmal.Gruppe)</span></td>
+                                <td class="vhs-small">@w.Eintrag.Wert</td>
+                                <td class="vhs-small">@(w.Geerbt ? $"geerbt von {w.Herkunft.Name}" : "eigenes")</td>
+                                <td>@if (w.GueltigBis is { } b) { <StatusPille Stil="@(bald ? "warn" : "neutral")">@b.ToString("dd.MM.yyyy")</StatusPille> } else { <span class="vhs-muted">–</span> }</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Wegbeschreibung (automatisch)</h3>
+            <pre class="vhs-code">@verzeichnis.Wegbeschreibung(ort)</pre>
+
+            <details>
+                <summary><b>Merkmal eintragen</b> <span class="vhs-small vhs-muted">– mit Nachweis und Gültigkeit, die bisherige Eintragung bleibt in der Historie</span></summary>
+                <div class="vhs-fields">
+                    <RadzenFormField Text="Merkmal" Variant="Variant.Outlined">
+                        <RadzenDropDown TValue="string" @bind-Value="mSchluessel" Data="@verzeichnis.Katalog.Values.OrderBy(k => k.Gruppe).ThenBy(k => k.Name)" TextProperty="Name" ValueProperty="Schluessel" />
+                    </RadzenFormField>
+                    <RadzenFormField Text="Wert" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="mWert" Placeholder="z. B. 12 Plätze, gemeldet" /></RadzenFormField>
+                    <RadzenFormField Text="Nachweis" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="mNachweis" Placeholder="z. B. BAMF-Schreiben vom …" /></RadzenFormField>
+                    <RadzenFormField Text="gültig ab" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly" @bind-Value="mAb" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+                    <RadzenFormField Text="gültig bis (leer = unbefristet)" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly?" @bind-Value="mBis" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+                </div>
+                <BegruendeterButton Text="Eintragen" Icon="save" Click="MerkmalSpeichernAsync" Freigabe="@MerkmalFreigabe" />
+            </details>
+
+            <h3>Nächste Belegungen</h3>
+            <div class="vhs-list">
+                @if (belegungen.Count == 0)
+                {
+                    <div class="vhs-small vhs-muted">In den nächsten 14 Tagen keine Veranstaltungen.</div>
+                }
+                @foreach (var b in belegungen)
+                {
+                    <div><span class="vhs-mono vhs-small vhs-zeit">@b.Termin.Beginn.ToString("ddd dd.MM. HH:mm")</span><span class="vhs-grow"><a href="@($"kurse/{b.Termin.KursId}")">@b.Kursnummer @b.Termin.Kurs</a></span></div>
+                }
+            </div>
+        }
+    </section>
+</div>
+
+<details class="vhs-card">
+    <summary><b>Merkmalskatalog</b> <span class="vhs-small vhs-muted">– pflegbar; vererbbare Merkmale gelten auch für Räume im Gebäude</span></summary>
+    <div class="vhs-tbl">
+        <table>
+            <thead><tr><th>Schlüssel</th><th>Name</th><th>Gruppe</th><th>vererbbar</th><th>Nachweis Pflicht</th><th>Ausschlussgruppe</th></tr></thead>
+            <tbody>
+                @foreach (var k in verzeichnis?.Katalog.Values.OrderBy(k => k.Gruppe).ThenBy(k => k.Name) ?? Enumerable.Empty<Merkmal>())
+                {
+                    <tr><td class="vhs-mono">@k.Schluessel</td><td>@k.Name</td><td>@k.Gruppe</td><td>@(k.Vererbbar ? "ja" : "nein")</td><td>@(k.NachweisPflicht ? "ja" : "nein")</td><td>@k.Ausschlussgruppe</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="vhs-fields">
+        <RadzenFormField Text="Schlüssel *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="kSchluessel" /></RadzenFormField>
+        <RadzenFormField Text="Name *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="kName" /></RadzenFormField>
+        <RadzenFormField Text="Gruppe" Variant="Variant.Outlined"><RadzenDropDown TValue="string" @bind-Value="kGruppe" Data="@(new[] { "Zugänglichkeit", "Zulassung", "Ausstattung", "Organisation" })" /></RadzenFormField>
+    </div>
+    <div class="vhs-row">
+        <label><input type="checkbox" @bind="kVererbbar" /> vererbbar</label>
+        <label><input type="checkbox" @bind="kNachweis" /> Nachweis Pflicht</label>
+        <BegruendeterButton Text="Aufnehmen" Icon="add" Click="KatalogAsync" Freigabe="@KatalogFreigabe" />
+    </div>
+</details>
+
+@code {
+    [SupplyParameterFromQuery(Name = "id")]
+    private Guid? OrtId { get; set; }
+
+    private Ortsverzeichnis? verzeichnis;
+    private Ort? ort;
+    private DateOnly tag = DateOnly.FromDateTime(DateTime.Today);
+    private IReadOnlyList<PlanTermin> belegungen = [];
+    private IReadOnlyList<Aufgabe> aufgaben = [];
+    private Rolle? rolle;
+    private string? mSchluessel, mWert, mNachweis, kSchluessel, kName;
+    private string kGruppe = "Ausstattung";
+    private bool kVererbbar = true, kNachweis;
+    private DateOnly mAb = DateOnly.FromDateTime(DateTime.Today);
+    private DateOnly? mBis;
+
+    private Freigabe Pflegen => Freigabe.NurFuer(rolle, Rolle.Verwaltungsleitung, Rolle.Leitung, Rolle.Systemverwaltung, Rolle.IntegrationskursTeam);
+
+    private Freigabe MerkmalFreigabe => Pflegen.Und(() => mSchluessel is null ? Freigabe.Nein("Bitte ein Merkmal wählen.")
+        : verzeichnis!.Katalog[mSchluessel].NachweisPflicht && string.IsNullOrWhiteSpace(mNachweis) ? Freigabe.Nein("Für dieses Merkmal ist ein Nachweis Pflicht (z. B. Zulassungsschreiben).")
+        : !ort!.Buchbar && ort.Art != Ortsart.Gebaeude && ort.Art != Ortsart.Liegenschaft ? Freigabe.Nein("Für diesen Ort können keine Merkmale gepflegt werden.")
+        : Freigabe.Ja);
+
+    private Freigabe KatalogFreigabe => Freigabe.NurFuer(rolle, Rolle.Systemverwaltung, Rolle.Verwaltungsleitung)
+        .Und(() => string.IsNullOrWhiteSpace(kSchluessel) || string.IsNullOrWhiteSpace(kName) ? Freigabe.Nein("Bitte Schlüssel und Namen angeben.")
+            : verzeichnis!.Katalog.ContainsKey(kSchluessel.Trim().ToLowerInvariant()) ? Freigabe.Nein("Diesen Schlüssel gibt es schon.") : Freigabe.Ja);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync()
+    {
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var p = d.GetRequiredService<IProgrammSpeicher>();
+            verzeichnis = await p.OrtsverzeichnisAsync();
+            aufgaben = (await p.OffeneAufgabenAsync(null)).Where(a => a.Ziel?.StartsWith("orte", StringComparison.Ordinal) == true).ToList();
+            ort = OrtId is { } id ? verzeichnis.Finden(id) : null;
+            if (ort is not null)
+            {
+                var ids = verzeichnis.Alle.Where(o => verzeichnis.Pfad(o).Any(x => x.Id == ort.Id)).Select(o => o.Id).ToHashSet();
+                belegungen = (await p.TermineAsync(DateTime.Today, DateTime.Today.AddDays(14))).Where(t => t.Termin.OrtIds.Any(ids.Contains)).Take(20).ToList();
+            }
+        });
+    }
+
+    private RenderFragment Knoten(Ort o) => __builder =>
+    {
+        <li>
+            <a href="@($"orte?id={o.Id}")" class="@(ort?.Id == o.Id ? "on" : "")">@o.Anzeige</a>
+            <span class="vhs-small vhs-muted">@OrtsartText(o.Art)@(o.Stadt is null ? "" : $" · {o.Stadt}")</span>
+            @if (verzeichnis!.Kinder(o.Id).Any())
+            {
+                <ul>
+                    @foreach (var k in verzeichnis.Kinder(o.Id))
+                    {
+                        @Knoten(k)
+                    }
+                </ul>
+            }
+        </li>
+    };
+
+    private static string OrtsartText(Ortsart a) => a switch
+    {
+        Ortsart.Gebaeude => "Gebäude",
+        Ortsart.AllgemeinerOrt => "Treffpunkt",
+        Ortsart.VirtuellerRaum => "virtueller Raum",
+        _ => a.ToString(),
+    };
+
+    private async Task MerkmalSpeichernAsync()
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().MerkmalSetzenAsync(ort!.Id, mSchluessel!, mWert, mNachweis, mAb, mBis));
+            Hinweise.Notify(NotificationSeverity.Success, "Eingetragen", "Das Merkmal ist eingetragen und protokolliert.");
+            mWert = mNachweis = null;
+            mBis = null;
+            await LadenAsync();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task KatalogAsync()
+    {
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().MerkmalKatalogErgaenzenAsync(new Merkmal(kSchluessel!, kName!, kGruppe, kVererbbar, kNachweis)));
+        kSchluessel = kName = null;
+        await LadenAsync();
+    }
+}

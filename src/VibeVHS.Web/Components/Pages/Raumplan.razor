@@ -1,0 +1,104 @@
+@page "/raumplan"
+@using VibeVHS.Application.Programm
+@using VibeVHS.Domain.Programm
+@inject Vorgang Vorgang
+
+<PageTitle>Raumplan · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Raumplan</h1>
+        <p class="vhs-sub">Woche vom @montag.ToString("dd.MM.yyyy") bis @montag.AddDays(6).ToString("dd.MM.yyyy") · rot = Konflikt (Tooltip nennt die Überschneidung)</p>
+    </div>
+    <div class="vhs-row">
+        <RadzenButton Icon="chevron_left" ButtonStyle="ButtonStyle.Light" Click="@(() => WocheAsync(-7))" title="Vorige Woche" />
+        <RadzenDatePicker TValue="DateOnly" Value="@montag" ValueChanged="@(async (DateOnly d) => { montag = Montag(d); await LadenAsync(); })" DateFormat="dd.MM.yyyy" />
+        <RadzenButton Icon="chevron_right" ButtonStyle="ButtonStyle.Light" Click="@(() => WocheAsync(7))" title="Nächste Woche" />
+        <RadzenDropDown TValue="Guid?" @bind-Value="liegenschaft" @bind-Value:after="LadenAsync" Data="@liegenschaften" TextProperty="Name" ValueProperty="Id"
+                        Placeholder="alle Standorte" AllowClear="true" Style="min-width:240px" />
+    </div>
+</div>
+
+@if (konflikte.Count > 0)
+{
+    <div class="vhs-alert vhs-crit">
+        <b>@konflikte.Count Konflikt(e) in dieser Woche:</b>
+        <ul class="vhs-kompakt">
+            @foreach (var k in konflikte)
+            {
+                <li>@k.Beschreibung(id => verzeichnis?.Finden(id)?.Anzeige ?? "?") – <a href="@($"kurse/{k.B.KursId}")">@k.B.Kurs öffnen</a></li>
+            }
+        </ul>
+    </div>
+}
+
+<section class="vhs-card">
+    <div class="vhs-tbl">
+        <div class="vhs-plan" style="grid-template-columns: 170px repeat(@Tage, minmax(130px, 1fr))">
+            <div class="vhs-ph">Raum</div>
+            @for (var i = 0; i < Tage; i++)
+            {
+                var t = montag.AddDays(i);
+                <div class="vhs-ph">@t.ToString("ddd dd.MM.")@(FeiertageNrw.Name(t) is { } f ? $" · {f}" : "")</div>
+            }
+            @foreach (var raum in raeume)
+            {
+                <div class="vhs-rh"><a href="@($"orte?id={raum.Id}")"><b>@(raum.Kurzname ?? raum.Name)</b></a><span class="vhs-small vhs-muted">@string.Join(", ", raum.Kapazitaeten.Take(2).Select(k => $"{NutzungsartAnzeige.Text(k.Nutzungsart)} {k.Plaetze}"))</span></div>
+                @for (var i = 0; i < Tage; i++)
+                {
+                    var tagStart = montag.AddDays(i).ToDateTime(TimeOnly.MinValue);
+                    <div>
+                        @foreach (var t in termine.Where(x => x.Termin.OrtIds.Contains(raum.Id) && x.Termin.Beginn >= tagStart && x.Termin.Beginn < tagStart.AddDays(1)))
+                        {
+                            var konflikt = konflikte.FirstOrDefault(k => k.OrtId == raum.Id && (k.A.VeranstaltungId == t.Termin.VeranstaltungId || k.B.VeranstaltungId == t.Termin.VeranstaltungId));
+                            <a class="vhs-slot @(konflikt is null ? "" : "konf") @(t.Termin.Ausgefallen ? "aus" : "")" href="@($"kurse/{t.Termin.KursId}")"
+                               title="@(konflikt?.Beschreibung(id => verzeichnis?.Finden(id)?.Anzeige ?? "?") ?? $"{t.Kursnummer} {t.Termin.Kurs} · {t.Dozent}")">
+                                <b>@t.Termin.Beginn.ToString("HH:mm")–@t.Termin.Ende.ToString("HH:mm")</b>@t.Kursnummer @t.Termin.Kurs
+                            </a>
+                        }
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</section>
+
+@code {
+    private const int Tage = 6;
+
+    private DateOnly montag = Montag(DateOnly.FromDateTime(DateTime.Today));
+    private Guid? liegenschaft;
+    private Ortsverzeichnis? verzeichnis;
+    private IReadOnlyList<Ort> liegenschaften = [];
+    private IReadOnlyList<Ort> raeume = [];
+    private IReadOnlyList<PlanTermin> termine = [];
+    private IReadOnlyList<Konflikt> konflikte = [];
+
+    private static DateOnly Montag(DateOnly d) => d.AddDays(-(((int)d.DayOfWeek + 6) % 7));
+
+    protected override Task OnInitializedAsync() => LadenAsync();
+
+    private async Task WocheAsync(int tage)
+    {
+        montag = montag.AddDays(tage);
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync()
+    {
+        var von = montag.ToDateTime(TimeOnly.MinValue);
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var p = d.GetRequiredService<IProgrammSpeicher>();
+            verzeichnis = await p.OrtsverzeichnisAsync();
+            termine = await p.TermineAsync(von, von.AddDays(7));
+        });
+        liegenschaften = verzeichnis!.Alle.Where(o => o.Art == Ortsart.Liegenschaft).OrderBy(o => o.Name).ToList();
+        raeume = verzeichnis.Alle.Where(o => o.Buchbar)
+            .Where(o => liegenschaft is null || verzeichnis.Pfad(o).Any(x => x.Id == liegenschaft))
+            .OrderBy(o => verzeichnis.PfadAnzeige(o), StringComparer.Ordinal)
+            .ToList();
+        konflikte = Konfliktpruefung.Finden(termine.Select(t => t.Termin), id => verzeichnis.Finden(id)?.Exklusiv ?? false)
+            .Where(k => k.Art == Konfliktart.Raum).ToList();
+    }
+}

@@ -117,6 +117,29 @@ pre.vhs-code { background: var(--vhs-surface-2); border: 1px solid var(--vhs-lin
 /* Anmeldung und schlichte Seiten */
 .vhs-leer { min-height: 100vh; display: flex; justify-content: center; padding: 48px 16px; }
 .vhs-login { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 16px; background: var(--vhs-surface); border: 1px solid var(--vhs-line); border-radius: 12px; padding: 24px; align-self: flex-start; }
+/* Globale Suche */
+.vhs-search { position: relative; }
+.vhs-ergebnisse { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--vhs-surface); border: 1px solid var(--vhs-line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 50; overflow: hidden; color: var(--vhs-fg); }
+.vhs-ergebnisse a { display: flex; gap: 8px; align-items: center; padding: 7px 12px; color: var(--vhs-fg); text-decoration: none; }
+.vhs-ergebnisse a:hover, .vhs-ergebnisse a:focus { background: var(--vhs-surface-2); }
+.vhs-ergebnisse small { color: var(--vhs-muted); margin-left: auto; }
+.vhs-ergebnis-gruppe { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--vhs-muted); padding: 6px 12px 2px; }
+/* Programm: Tabellenzeilen, Ortsbaum, Raumplan, Terminvorschau */
+.vhs-klickzeile { cursor: pointer; }
+.vhs-klickzeile:hover td { background: var(--vhs-surface-2); }
+.vhs-baum, .vhs-baum ul { list-style: none; margin: 0; padding-left: 16px; }
+.vhs-baum { padding-left: 0; }
+.vhs-baum li { padding: 3px 0; }
+.vhs-baum a.on { font-weight: 700; }
+.vhs-termine { display: flex; flex-wrap: wrap; gap: 6px; }
+.vhs-plan { display: grid; min-width: 900px; border: 1px solid var(--vhs-line); border-radius: 8px; overflow: hidden; }
+.vhs-plan > div { padding: 6px; border-right: 1px solid var(--vhs-line); border-bottom: 1px solid var(--vhs-line); min-height: 54px; display: flex; flex-direction: column; gap: 4px; }
+.vhs-plan .vhs-ph { background: var(--vhs-surface-2); font-weight: 600; font-size: 12.5px; min-height: 0; }
+.vhs-plan .vhs-rh { background: var(--vhs-surface-2); font-size: 12.5px; }
+.vhs-slot { border-radius: 6px; padding: 3px 6px; font-size: 12px; background: var(--vhs-accent-weak); color: var(--vhs-fg); border-left: 3px solid var(--vhs-accent); text-decoration: none; }
+.vhs-slot b { display: block; font-weight: 600; }
+.vhs-slot.konf { background: var(--vhs-crit-weak); border-left-color: var(--vhs-crit); }
+.vhs-slot.aus { opacity: 0.5; text-decoration: line-through; }
 /* Große Personenliste: Suche, Filter-Chips, virtuelle Liste */
 .vhs-suche { display: flex; align-items: center; gap: 8px; border: 2px solid var(--vhs-accent); border-radius: 10px; padding: 8px 12px; background: var(--vhs-surface); }
 .vhs-suche input { border: 0; outline: none; font: inherit; font-size: 16px; width: 100%; background: transparent; color: var(--vhs-fg); }

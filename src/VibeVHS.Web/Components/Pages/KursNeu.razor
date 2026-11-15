@@ -1,0 +1,272 @@
+@page "/kurse/neu"
+@using VibeVHS.Application.Personen
+@using VibeVHS.Application.Programm
+@using VibeVHS.Application.Stammdaten
+@using VibeVHS.Domain.Gemeinsam
+@using VibeVHS.Domain.Personen
+@using VibeVHS.Domain.Programm
+@using VibeVHS.Domain.Stammdaten
+@inject Vorgang Vorgang
+@inject NavigationManager Navigation
+@inject NotificationService Hinweise
+
+<PageTitle>Kurs anlegen · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Kurs anlegen</h1>
+        <p class="vhs-sub">Schnellweg: regelmäßig, gleicher Ort, gleiche Dozentin. Vorschau zeigt Termine, ausgelassene Tage und Konflikte vor dem Speichern.</p>
+    </div>
+</div>
+
+<section class="vhs-card">
+    <h2>Kurs</h2>
+    <div class="vhs-fields">
+        <RadzenFormField Text="Titel *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="titel" /></RadzenFormField>
+        <RadzenFormField Text="Semester" Variant="Variant.Outlined"><RadzenDropDown TValue="Guid" @bind-Value="semesterId" Data="@alleSemester" TextProperty="Name" ValueProperty="Id" /></RadzenFormField>
+        <RadzenFormField Text="Fachbereich" Variant="Variant.Outlined"><RadzenDropDown TValue="int" @bind-Value="fachbereich" Data="@fachbereiche" TextProperty="Anzeige" ValueProperty="Nr" /></RadzenFormField>
+        <RadzenFormField Text="Kursart" Variant="Variant.Outlined">
+            <RadzenDropDown TValue="Guid" @bind-Value="kursartId" @bind-Value:after="OrteNeuBewertenAsync" Data="@kursarten" TextProperty="Name" ValueProperty="Id" />
+        </RadzenFormField>
+        <RadzenFormField Text="Mindestzahl" Variant="Variant.Outlined"><RadzenNumeric TValue="int" @bind-Value="min" Min="0" /></RadzenFormField>
+        <RadzenFormField Text="Höchstzahl" Variant="Variant.Outlined"><RadzenNumeric TValue="int" @bind-Value="max" Min="1" /></RadzenFormField>
+        <RadzenFormField Text="Entgelt (€)" Variant="Variant.Outlined"><RadzenNumeric TValue="decimal" @bind-Value="entgelt" Min="0" Format="0.00" /></RadzenFormField>
+        <RadzenFormField Text="ermäßigt (€)" Variant="Variant.Outlined"><RadzenNumeric TValue="decimal?" @bind-Value="ermaessigt" Min="0" Format="0.00" /></RadzenFormField>
+    </div>
+    @if (Kursart is { } ka)
+    {
+        <p class="vhs-small vhs-muted" style="margin:0">
+            Kursart „@ka.Name“: Nutzungsart @NutzungsartAnzeige.Text(ka.Nutzungsart)@(ka.BenoetigteMerkmale.Count > 0 ? $", benötigt {string.Join(", ", ka.BenoetigteMerkmale)}" : "") ·
+            Sichtbarkeit @KursAnzeige.Sichtbarkeit(ka.Sichtbarkeit) · Buchung: @string.Join(", ", ka.Richtlinie.Rechte.Where(r => r.DarfBuchen).Select(r => r.Weg))@(ka.Richtlinie.Belegung == Belegungsart.Kontingent ? $" · Kontingent {ka.Richtlinie.KontingentAnzahl}er-Karte" : "")
+        </p>
+    }
+
+    <h3>Dozentin / Dozent</h3>
+    <div class="vhs-row">
+        <RadzenTextBox @bind-Value="dozentSuche" @bind-Value:after="DozentSuchenAsync" Placeholder="Dozierende suchen (Name)" Style="min-width:260px" />
+        @foreach (var d in dozentTreffer)
+        {
+            <button class="vhs-chip @(dozent?.PersonId == d.Id ? "on" : "")" @onclick="@(() => dozent = new KursDozent(d.Id, d.Anzeigename, true))">@d.Anzeigename @(d.Fachbereiche.Count > 0 ? $"(FB {string.Join(",", d.Fachbereiche)})" : "")</button>
+        }
+    </div>
+    @if (dozent is not null)
+    {
+        <p class="vhs-small" style="margin:0">Gewählt: <b>@dozent.Name</b></p>
+    }
+</section>
+
+<section class="vhs-card">
+    <h2>Termine</h2>
+    <div class="vhs-row">
+        @foreach (var tag in Wochentage)
+        {
+            <label class="vhs-chip @(tage.Contains(tag) ? "on" : "")"><input type="checkbox" checked="@tage.Contains(tag)" @onchange="@(async _ => { if (!tage.Remove(tag)) tage.Add(tag); await OrteNeuBewertenAsync(); })" style="display:none" />@KursAnzeige.Wochentag(tag)</label>
+        }
+    </div>
+    <div class="vhs-fields">
+        <RadzenFormField Text="Erster Termin ab" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly" @bind-Value="start" @bind-Value:after="OrteNeuBewertenAsync" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+        <RadzenFormField Text="Beginn (hh:mm)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="beginnText" /></RadzenFormField>
+        <RadzenFormField Text="Dauer (Minuten)" Variant="Variant.Outlined"><RadzenNumeric TValue="int" @bind-Value="dauer" Min="15" Step="15" /></RadzenFormField>
+        <RadzenFormField Text="Umfang" Variant="Variant.Outlined">
+            <RadzenDropDown TValue="string" @bind-Value="umfang" @bind-Value:after="OrteNeuBewertenAsync" Data="@(new[] { "Anzahl", "Enddatum", "unbefristet" })" />
+        </RadzenFormField>
+        @if (umfang == "Anzahl")
+        {
+            <RadzenFormField Text="Anzahl Termine" Variant="Variant.Outlined"><RadzenNumeric TValue="int" @bind-Value="anzahl" @bind-Value:after="OrteNeuBewertenAsync" Min="1" /></RadzenFormField>
+        }
+        else if (umfang == "Enddatum")
+        {
+            <RadzenFormField Text="Letzter möglicher Tag" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly" @bind-Value="ende" @bind-Value:after="OrteNeuBewertenAsync" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+        }
+    </div>
+    <div class="vhs-row">
+        <label><input type="checkbox" @bind="ferienAuslassen" @bind:after="OrteNeuBewertenAsync" /> Schulferien NRW auslassen</label>
+        <label><input type="checkbox" @bind="feiertageAuslassen" @bind:after="OrteNeuBewertenAsync" /> Feiertage NRW auslassen</label>
+    </div>
+
+    <h3>Ort(e) <span class="vhs-small vhs-muted">– mehrere wählen = hybrid (z. B. Raum + Online)</span></h3>
+    <div class="vhs-row">
+        @foreach (var o in ortswahl)
+        {
+            if (o.Geeignet)
+            {
+                <button class="vhs-chip @(ortIds.Contains(o.Ort.Id) ? "on" : "")" @onclick="@(() => { if (!ortIds.Remove(o.Ort.Id)) ortIds.Add(o.Ort.Id); vorschau = null; })"
+                        title="@($"Kapazität {o.Kapazitaet}")">@o.Ort.Anzeige <span class="vhs-chip-n">@o.Kapazitaet</span></button>
+            }
+            else
+            {
+                <span class="vhs-why" tabindex="0" data-why="@o.Begruendung"><button class="vhs-chip" disabled>@o.Ort.Anzeige</button></span>
+            }
+        }
+    </div>
+    <div class="vhs-row">
+        <BegruendeterButton Text="Vorschau berechnen" Icon="preview" ButtonStyle="ButtonStyle.Light" Click="VorschauAsync" Freigabe="@EingabeFreigabe" IsBusy="@rechnet" />
+    </div>
+</section>
+
+@if (fehler is not null)
+{
+    <div class="vhs-alert vhs-crit" role="alert">@fehler</div>
+}
+
+@if (vorschau is { } v)
+{
+    <section class="vhs-card">
+        <h2>Vorschau: @v.Kursnummer · @v.Termine.Count(t => t.Findet) Termine</h2>
+        @foreach (var k in v.Konflikte)
+        {
+            <div class="vhs-alert vhs-warn">@k</div>
+        }
+        @foreach (var o in v.Orte.Where(o => !o.Geeignet))
+        {
+            <div class="vhs-alert vhs-crit">@o.Ort.Anzeige: @o.Begruendung</div>
+        }
+        <div class="vhs-termine">
+            @foreach (var t in v.Termine)
+            {
+                <span class="vhs-pill @(t.Findet ? "vhs-p-info" : "vhs-p-neutral")" title="@t.AusgelassenWeil">@t.Beginn.ToString("ddd dd.MM.")@(t.Findet ? "" : " – " + t.AusgelassenWeil)</span>
+            }
+        </div>
+        <div class="vhs-row">
+            <BegruendeterButton Text="Kurs speichern" Icon="save" Click="SpeichernAsync" IsBusy="@speichert"
+                                Freigabe="@(v.Speicherbar ? Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Leitung) : Freigabe.Nein("Ein gewählter Ort ist nicht geeignet oder die Serie ergibt keine Termine."))" />
+            @if (v.Konflikte.Count > 0)
+            {
+                <span class="vhs-small vhs-muted">Speichern ist trotz Konflikten möglich; der Kurs erscheint im Raumplan rot.</span>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private static readonly DayOfWeek[] Wochentage = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
+
+    private IReadOnlyList<Semester> alleSemester = [];
+    private IReadOnlyList<Fachbereich> fachbereiche = [];
+    private IReadOnlyList<Kursart> kursarten = [];
+    private IReadOnlyList<Ortseignung> ortswahl = [];
+    private IReadOnlyList<PersonZeile> dozentTreffer = [];
+    private Rolle? rolle;
+
+    private string? titel, dozentSuche, fehler;
+    private Guid semesterId, kursartId;
+    private int fachbereich = 5, min = 6, max = 14, dauer = 90, anzahl = 10;
+    private decimal entgelt = 98;
+    private decimal? ermaessigt = 73.5m;
+    private KursDozent? dozent;
+    private readonly List<DayOfWeek> tage = [DayOfWeek.Tuesday];
+    private DateOnly start = DateOnly.FromDateTime(DateTime.Today.AddDays(14));
+    private DateOnly ende = DateOnly.FromDateTime(DateTime.Today.AddDays(90));
+    private string beginnText = "18:00";
+    private string umfang = "Anzahl";
+    private bool ferienAuslassen = true, feiertageAuslassen = true, rechnet, speichert;
+    private readonly List<Guid> ortIds = [];
+    private KursVorschau? vorschau;
+
+    private Kursart? Kursart => kursarten.FirstOrDefault(k => k.Id == kursartId);
+
+    private Freigabe EingabeFreigabe =>
+        string.IsNullOrWhiteSpace(titel) ? Freigabe.Nein("Bitte einen Titel eingeben.")
+        : tage.Count == 0 ? Freigabe.Nein("Bitte mindestens einen Wochentag wählen.")
+        : !TimeOnly.TryParse(beginnText, out _) ? Freigabe.Nein("Beginn bitte als hh:mm eingeben, z. B. 18:00.")
+        : ortIds.Count == 0 ? Freigabe.Nein("Bitte mindestens einen Ort wählen. Ausgegraute Orte sind ungeeignet – der Tooltip nennt den Grund.")
+        : dozent is null ? Freigabe.Nein("Bitte eine Dozentin oder einen Dozenten auswählen.")
+        : Freigabe.Ja;
+
+    protected override async Task OnInitializedAsync()
+    {
+        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var p = d.GetRequiredService<IProgrammSpeicher>();
+            alleSemester = await p.SemesterAsync();
+            kursarten = await p.KursartenAsync();
+            fachbereiche = await d.GetRequiredService<IStammdaten>().FachbereicheAsync();
+        });
+        var heute = DateOnly.FromDateTime(DateTime.Today);
+        semesterId = (alleSemester.FirstOrDefault(s => s.Beginn > heute) ?? alleSemester.LastOrDefault())?.Id ?? Guid.Empty;
+        if (alleSemester.FirstOrDefault(s => s.Id == semesterId) is { } sem && sem.Beginn > start)
+        {
+            start = sem.Beginn;
+            ende = sem.Ende;
+        }
+
+        kursartId = kursarten.FirstOrDefault(k => k.Name == "Sprachkurs")?.Id ?? kursarten.FirstOrDefault()?.Id ?? Guid.Empty;
+        await OrteNeuBewertenAsync();
+    }
+
+    private Serienregel? Regel() => TimeOnly.TryParse(beginnText, out var b) && tage.Count > 0
+        ? new Serienregel
+        {
+            Start = start,
+            Ende = umfang == "Enddatum" ? ende : null,
+            Anzahl = umfang == "Anzahl" ? anzahl : null,
+            Wochentage = [.. tage],
+            Beginn = b,
+            DauerMinuten = dauer,
+            FerienAuslassen = ferienAuslassen,
+            FeiertageAuslassen = feiertageAuslassen,
+            OrtIds = [.. ortIds],
+            DozentId = dozent?.PersonId,
+        }
+        : null;
+
+    private async Task OrteNeuBewertenAsync()
+    {
+        vorschau = null;
+        if (kursartId == Guid.Empty)
+        {
+            return;
+        }
+
+        ortswahl = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().OrtsauswahlAsync(kursartId, Regel()));
+        ortIds.RemoveAll(id => ortswahl.Any(o => o.Ort.Id == id && !o.Geeignet));
+    }
+
+    private async Task DozentSuchenAsync()
+    {
+        dozentTreffer = string.IsNullOrWhiteSpace(dozentSuche)
+            ? []
+            : await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenAbfrage>().SeiteAsync(new PersonenFilter(dozentSuche, Personenrolle.Dozierende), null, 8));
+    }
+
+    private KursEntwurf Entwurf() => new(titel!, semesterId, fachbereich, kursartId, Regel()!, dozent is null ? [] : [dozent], min, max,
+        new Geld((long)Math.Round(entgelt * 100)), ermaessigt is { } e ? new Geld((long)Math.Round(e * 100)) : null);
+
+    private async Task VorschauAsync()
+    {
+        fehler = null;
+        rechnet = true;
+        try
+        {
+            vorschau = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().VorschauAsync(Entwurf()));
+        }
+        catch (ArgumentException ex)
+        {
+            fehler = ex.Message;
+        }
+        finally
+        {
+            rechnet = false;
+        }
+    }
+
+    private async Task SpeichernAsync()
+    {
+        speichert = true;
+        try
+        {
+            var kurs = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().AnlegenAsync(Entwurf()));
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", $"{kurs.Kursnummer} mit {kurs.Veranstaltungen.Count} Terminen angelegt (Entwurf).");
+            Navigation.NavigateTo($"kurse/{kurs.Id}?neu=1");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            fehler = ex.Message;
+        }
+        finally
+        {
+            speichert = false;
+        }
+    }
+}

@@ -14,6 +14,7 @@ public static class Registrierung
         dienste.AddScoped<Zustellung>();
         dienste.AddScoped<PersonenDienst>();
         dienste.AddScoped<Rundschreiben>();
+        dienste.AddScoped<Programm.ProgrammDienst>();
         return dienste;
     }
 }

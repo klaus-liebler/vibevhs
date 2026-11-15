@@ -43,6 +43,8 @@ public static class Registrierung
         dienste.AddScoped<IPersonenAbfrage>(d => d.GetRequiredService<PersonenAbfrage>());
         dienste.AddScoped<IPersonenExport>(d => d.GetRequiredService<PersonenAbfrage>());
         dienste.AddScoped<IOrganisationen, OrganisationenSpeicher>();
+        dienste.AddScoped<Application.Programm.IProgrammSpeicher, Programm.ProgrammSpeicher>();
+        dienste.AddScoped<Application.Programm.IGlobaleSuche, Programm.GlobaleSuche>();
 
         var takt = konfiguration.GetValue("Postausgang:TaktSekunden", 15);
         dienste.AddQuartz(q =>
@@ -53,6 +55,15 @@ public static class Registrierung
                 .WithIdentity("postausgang-takt", "automatik")
                 .StartNow()
                 .WithSimpleSchedule(s => s.WithInterval(TimeSpan.FromSeconds(takt)).RepeatForever()));
+
+            // Täglich nachts sowie einmal kurz nach dem Start.
+            q.AddJob<TermineFortschreibenJob>(j => j.WithIdentity(TermineFortschreibenJob.Schluessel));
+            q.AddJob<MerkmalAblaufJob>(j => j.WithIdentity(MerkmalAblaufJob.Schluessel));
+            foreach (var schluessel in new[] { TermineFortschreibenJob.Schluessel, MerkmalAblaufJob.Schluessel })
+            {
+                q.AddTrigger(t => t.ForJob(schluessel).WithIdentity(schluessel.Name + "-nacht", "automatik").WithCronSchedule("0 15 2 * * ?"));
+                q.AddTrigger(t => t.ForJob(schluessel).WithIdentity(schluessel.Name + "-start", "automatik").StartAt(DateTimeOffset.UtcNow.AddSeconds(20)));
+            }
         });
         dienste.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
         return dienste;

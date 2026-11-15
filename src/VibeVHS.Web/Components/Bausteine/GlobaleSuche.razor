@@ -1,0 +1,82 @@
+@using VibeVHS.Application.Programm
+@implements IDisposable
+@inject Vorgang Vorgang
+@inject NavigationManager Navigation
+
+@* Globale Suche in der Kopfzeile: Personen, Kurse und Orte. *@
+<div class="vhs-search" @onfocusout="ZuklappenSpaeter">
+    <RadzenIcon Icon="search" />
+    <input type="search" @bind="text" @bind:event="oninput" @bind:after="SuchenVerzoegert" @onkeydown="TasteAsync"
+           placeholder="Person, Kurs, Kursnummer oder Ort suchen" aria-label="Suche nach Personen, Kursen und Orten" autocomplete="off" />
+    @if (offen && treffer.Count > 0)
+    {
+        <div class="vhs-ergebnisse" role="listbox">
+            @foreach (var gruppe in treffer.GroupBy(t => t.Typ))
+            {
+                <div class="vhs-ergebnis-gruppe">@(gruppe.Key switch { Treffertyp.Person => "Personen", Treffertyp.Kurs => "Kurse", _ => "Orte" })</div>
+                @foreach (var t in gruppe)
+                {
+                    <a href="@t.Ziel" role="option" @onclick="@(() => offen = false)">
+                        <RadzenIcon Icon="@(t.Typ switch { Treffertyp.Person => "person", Treffertyp.Kurs => "school", _ => "place" })" />
+                        <span>@t.Titel</span><small>@t.Zusatz</small>
+                    </a>
+                }
+            }
+        </div>
+    }
+    else if (offen && !string.IsNullOrWhiteSpace(text) && fertig)
+    {
+        <div class="vhs-ergebnisse"><div class="vhs-ergebnis-gruppe">Keine Treffer</div></div>
+    }
+</div>
+
+@code {
+    private string? text;
+    private bool offen, fertig;
+    private IReadOnlyList<Suchtreffer> treffer = [];
+    private CancellationTokenSource? verzoegerung;
+
+    private async Task SuchenVerzoegert()
+    {
+        verzoegerung?.Cancel();
+        verzoegerung = new CancellationTokenSource();
+        var token = verzoegerung.Token;
+        fertig = false;
+        try
+        {
+            await Task.Delay(250, token);
+            treffer = string.IsNullOrWhiteSpace(text) ? [] : await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IGlobaleSuche>().SuchenAsync(text!));
+            offen = true;
+            fertig = true;
+        }
+        catch (TaskCanceledException)
+        {
+            // es wird noch getippt
+        }
+    }
+
+    private void TasteAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            offen = false;
+        }
+        else if (e.Key == "Enter" && treffer.Count > 0)
+        {
+            offen = false;
+            Navigation.NavigateTo(treffer[0].Ziel);
+        }
+    }
+
+    private async Task ZuklappenSpaeter()
+    {
+        await Task.Delay(200);
+        offen = false;
+    }
+
+    public void Dispose()
+    {
+        verzoegerung?.Cancel();
+        verzoegerung?.Dispose();
+    }
+}

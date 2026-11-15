@@ -35,6 +35,19 @@
 
 <NaechsteSchritte Titel="Was steht an?" Schritte="@Schritte" />
 
+@if (aufgaben.Count > 0)
+{
+    <section class="vhs-card">
+        <div class="vhs-head"><h2>Aufgaben</h2><span class="vhs-small vhs-muted">aus automatischen Prüfungen; Gruppenkörbe und Zuweisen folgen in Iteration I5</span></div>
+        <div class="vhs-list">
+            @foreach (var a in aufgaben)
+            {
+                <div><StatusPille Stil="@(a.Faellig <= DateOnly.FromDateTime(DateTime.Today) ? "krit" : "warn")">fällig @a.Faellig.ToString("dd.MM.")</StatusPille><span class="vhs-grow">@a.Titel</span>@if (a.Ziel is not null) { <a href="@a.Ziel">öffnen</a> }</div>
+            }
+        </div>
+    </section>
+}
+
 <section class="vhs-card">
     <div class="vhs-head">
         <h2>Letzte Aktivitäten</h2>
@@ -71,6 +84,7 @@
     private IReadOnlyList<NaechsterSchritt> Schritte = [];
     private Rolle? rolle;
     private Einrichtung? einrichtung;
+    private IReadOnlyList<VibeVHS.Domain.Aufgaben.Aufgabe> aufgaben = [];
     private IReadOnlyList<Fachbereich> eigeneFachbereiche = [];
 
     private Freigabe KursAnlegen => Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Leitung)
@@ -101,6 +115,8 @@
             var stammdaten = d.GetRequiredService<IStammdaten>();
             einrichtung = await stammdaten.EinrichtungAsync();
             fachbereiche = await stammdaten.FachbereicheAsync();
+            aufgaben = await d.GetRequiredService<VibeVHS.Application.Programm.IProgrammSpeicher>()
+                .OffeneAufgabenAsync(benutzer.Rolle is Rolle.Leitung or null ? null : benutzer.Rolle.ToString());
         });
 
         Schritte = WasStehtAn.Fuer(benutzer, fachbereiche, new WasStehtAn.Lage(fehlgeschlagen));

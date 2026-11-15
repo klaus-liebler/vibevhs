@@ -1,0 +1,84 @@
+@page "/ferien"
+@using VibeVHS.Application.Programm
+@using VibeVHS.Domain.Programm
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+
+<PageTitle>Ferien und Feiertage · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Ferien und Feiertage (NRW)</h1>
+        <p class="vhs-sub">Feiertage berechnet das System selbst (auch Ostern-abhängige). Schulferien werden hier gepflegt – bitte mit dem Ferienkalender des Schulministeriums NRW abgleichen.</p>
+    </div>
+</div>
+
+<div class="vhs-grid-2">
+    <section class="vhs-card">
+        <h2>Schulferien</h2>
+        <div class="vhs-tbl">
+            <table>
+                <thead><tr><th>Ferien</th><th>von</th><th>bis</th><th>Tage</th></tr></thead>
+                <tbody>
+                    @foreach (var f in ferien)
+                    {
+                        <tr><td>@f.Name</td><td class="vhs-mono">@f.Von.ToString("ddd dd.MM.yyyy")</td><td class="vhs-mono">@f.Bis.ToString("ddd dd.MM.yyyy")</td><td>@(f.Bis.DayNumber - f.Von.DayNumber + 1)</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="vhs-fields">
+            <RadzenFormField Text="Name *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="name" Placeholder="z. B. Herbstferien" /></RadzenFormField>
+            <RadzenFormField Text="erster Ferientag" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly?" @bind-Value="von" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+            <RadzenFormField Text="letzter Ferientag" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly?" @bind-Value="bis" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+        </div>
+        <BegruendeterButton Text="Ferien eintragen" Icon="add" Click="SpeichernAsync" Freigabe="@Freigabe" />
+        <p class="vhs-small vhs-muted">Neue Ferien wirken auf neu erzeugte Termine; bestehende Kurse ändern Sie über „Alle folgenden ändern“.</p>
+    </section>
+
+    <section class="vhs-card">
+        <div class="vhs-head">
+            <h2>Feiertage @jahr</h2>
+            <div class="vhs-row">
+                <RadzenButton Icon="chevron_left" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@(() => jahr--)" />
+                <RadzenButton Icon="chevron_right" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@(() => jahr++)" />
+            </div>
+        </div>
+        <p class="vhs-small vhs-muted" style="margin-top:-6px">Ostersonntag: @FeiertageNrw.Ostersonntag(jahr).ToString("dd.MM.yyyy")</p>
+        <div class="vhs-list">
+            @foreach (var (datum, n) in FeiertageNrw.Fuer(jahr))
+            {
+                <div><span class="vhs-mono vhs-small vhs-zeit">@datum.ToString("ddd dd.MM.yyyy")</span><span class="vhs-grow">@n</span></div>
+            }
+        </div>
+    </section>
+</div>
+
+@code {
+    private IReadOnlyList<Ferienzeitraum> ferien = [];
+    private int jahr = DateTime.Today.Year;
+    private string? name;
+    private DateOnly? von, bis;
+    private Rolle? rolle;
+
+    private Freigabe Freigabe => VibeVHS.Application.Oberflaeche.Freigabe.NurFuer(rolle, Rolle.Verwaltungsleitung, Rolle.Leitung, Rolle.Systemverwaltung)
+        .Und(() => string.IsNullOrWhiteSpace(name) || von is null || bis is null ? VibeVHS.Application.Oberflaeche.Freigabe.Nein("Bitte Name, ersten und letzten Ferientag angeben.")
+            : bis < von ? VibeVHS.Application.Oberflaeche.Freigabe.Nein("Der letzte Ferientag liegt vor dem ersten.") : VibeVHS.Application.Oberflaeche.Freigabe.Ja);
+
+    protected override async Task OnInitializedAsync()
+    {
+        rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync() => ferien = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IProgrammSpeicher>().FerienAsync());
+
+    private async Task SpeichernAsync()
+    {
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().FerienHinzufuegenAsync(new Ferienzeitraum(name!, von!.Value, bis!.Value)));
+        Hinweise.Notify(NotificationSeverity.Success, "Eingetragen", $"{name} eingetragen.");
+        name = null;
+        von = bis = null;
+        await LadenAsync();
+    }
+}

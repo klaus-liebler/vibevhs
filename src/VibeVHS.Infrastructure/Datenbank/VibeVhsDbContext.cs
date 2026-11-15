@@ -35,6 +35,22 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
 
     public DbSet<Suchindexeintrag> Suchindex => Set<Suchindexeintrag>();
 
+    public DbSet<VibeVHS.Domain.Programm.Semester> Semester => Set<VibeVHS.Domain.Programm.Semester>();
+
+    public DbSet<VibeVHS.Domain.Programm.Kursart> Kursarten => Set<VibeVHS.Domain.Programm.Kursart>();
+
+    public DbSet<VibeVHS.Domain.Programm.Kurs> Kurse => Set<VibeVHS.Domain.Programm.Kurs>();
+
+    public DbSet<VibeVHS.Domain.Programm.Veranstaltung> Veranstaltungen => Set<VibeVHS.Domain.Programm.Veranstaltung>();
+
+    public DbSet<VibeVHS.Domain.Programm.Ort> Orte => Set<VibeVHS.Domain.Programm.Ort>();
+
+    public DbSet<VibeVHS.Domain.Programm.Merkmal> Merkmale => Set<VibeVHS.Domain.Programm.Merkmal>();
+
+    public DbSet<VibeVHS.Domain.Programm.Ferienzeitraum> Ferien => Set<VibeVHS.Domain.Programm.Ferienzeitraum>();
+
+    public DbSet<VibeVHS.Domain.Aufgaben.Aufgabe> Aufgaben => Set<VibeVHS.Domain.Aufgaben.Aufgabe>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder konfiguration)
     {
         // SQLite kennt keinen Zeitstempel mit Offset; als sortierbare Zahl (UTC-Ticks) speichern.
@@ -128,6 +144,10 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(d => d.Von).HasMaxLength(200);
         });
 
+        ProgrammMapping.Anwenden(modelBuilder);
+        Version<VibeVHS.Domain.Programm.KursEntgelt>(modelBuilder, "KursEntgelte", _ => { }, "KursId");
+        Version<VibeVHS.Domain.Programm.OrtMerkmal>(modelBuilder, "OrtMerkmale", b => b.Property(m => m.Schluessel).HasMaxLength(40), "OrtId");
+
         // FTS5-Volltextindex; wird per SQL in der Migration angelegt und von SaveChanges gepflegt.
         modelBuilder.Entity<Suchindexeintrag>(b =>
         {
@@ -211,7 +231,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
     }
 
     /// <summary>Gemeinsame Abbildung aller bitemporalen Versionen.</summary>
-    private static void Version<T>(ModelBuilder modelBuilder, string tabelle, Action<EntityTypeBuilder<T>> weiter)
+    private static void Version<T>(ModelBuilder modelBuilder, string tabelle, Action<EntityTypeBuilder<T>> weiter, string fremdschluessel = "PersonId")
         where T : BitemporaleVersion<T>
     {
         modelBuilder.Entity<T>(b =>
@@ -221,7 +241,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(v => v.Id).ValueGeneratedNever();
             b.Property(v => v.Grund).HasMaxLength(500);
             b.Property(v => v.ErfasstVon).HasMaxLength(200);
-            b.HasIndex("PersonId", nameof(BitemporaleVersion<T>.GueltigVon));
+            b.HasIndex(fremdschluessel, nameof(BitemporaleVersion<T>.GueltigVon));
             weiter(b);
         });
     }

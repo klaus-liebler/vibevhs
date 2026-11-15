@@ -1,4 +1,4 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @using VibeVHS.Application.Stammdaten
 @using VibeVHS.Domain.Stammdaten
 @inject NavigationManager Navigation
@@ -30,11 +30,7 @@
     </aside>
     <div class="vhs-main">
         <header class="vhs-top">
-            <div class="vhs-search vhs-why" tabindex="0"
-                 data-why="Die allgemeine Suche über Personen, Kurse, Kursnummern und Orte folgt in einer späteren Iteration.">
-                <RadzenIcon Icon="search" />
-                <input type="search" placeholder="Person, Kurs, Kursnummer oder Ort suchen" disabled aria-label="Suche (noch nicht verfügbar)" />
-            </div>
+            <GlobaleSuche />
             <AuthorizeView>
                 <Authorized>
                     @{
@@ -92,9 +88,10 @@
     private static readonly IReadOnlyList<Navigationspunkt> Navigationspunkte =
     [
         new("Übersicht", "Start", ""),
-        new("Programm", "Kurse", "kurse", Geplant("Die Kursverwaltung")),
-        new("Programm", "Raumplan", "raumplan", Geplant("Der Raumplan")),
-        new("Programm", "Orte", "orte", Geplant("Die Verwaltung von Orten und Räumen")),
+        new("Programm", "Kurse", "kurse"),
+        new("Programm", "Raumplan", "raumplan"),
+        new("Programm", "Orte", "orte"),
+        new("Programm", "Ferien und Feiertage", "ferien"),
         new("Teilnahme", "Anmeldung", "anmeldung", Geplant("Die Kursanmeldung (manuell und per QR-Code)")),
         new("Teilnahme", "Personen", "personen"),
         new("Teilnahme", "Anwesenheit", "anwesenheit", Geplant("Die Anwesenheitserfassung (auch per QR-Code)")),

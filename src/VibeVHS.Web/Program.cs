@@ -95,6 +95,7 @@ if (app.Configuration.GetValue("Demodaten:Anlegen", false))
 {
     await Demodaten.AnlegenAsync(app.Services);
     await Demodaten.MassendatenAnlegenAsync(app.Services, app.Configuration.GetValue("Demodaten:Massendaten", 0));
+    await ProgrammDemodaten.AnlegenAsync(app.Services);
 }
 
 if (hinterProxy)

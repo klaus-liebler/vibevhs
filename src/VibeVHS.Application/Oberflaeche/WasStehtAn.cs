@@ -25,7 +25,7 @@ public static class WasStehtAn
         switch (benutzer.Rolle)
         {
             case Rolle.Leitung:
-                liste.Add(new("Auslastung aller Fachbereiche", "kurse", Freigabe: Freigabe.Geplant("Die Auslastungsübersicht")));
+                liste.Add(new("Programm und Raumplan", "raumplan", "Belegung aller Standorte mit Konflikten"));
                 liste.Add(new("Protokoll ansehen", "protokoll", "Was ist heute passiert?", Hauptschritt: liste.Count == 0));
                 break;
             case Rolle.Verwaltungsleitung:
@@ -42,8 +42,7 @@ public static class WasStehtAn
 
                 foreach (var fb in eigene)
                 {
-                    liste.Add(new($"{fb.Anzeige}: Kurse unter Mindestzahl", $"kurse?fb={fb.Nr}",
-                        Freigabe: Freigabe.Geplant($"Die Mindestteilnehmerprüfung für {fb.Anzeige}")));
+                    liste.Add(new($"{fb.Anzeige}: Kurse planen", $"kurse?fb={fb.Nr}", "Kurse des Fachbereichs, Konflikte und Termine"));
                 }
 
                 liste.Add(new("Protokoll ansehen", "protokoll", Hauptschritt: liste.Count(s => s.Status.Erlaubt) == 0));

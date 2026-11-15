@@ -114,6 +114,32 @@ Einwilligung, bevorzugt) und E-Mail-Adressen (Art, bevorzugt). Die Kennzeichen �
 - **Einwilligungen** je Kanal (E-Mail, SMS, Messenger, Telefon, Brief) und Zweck (Kursorganisation, Werbung).
 - Alles davon ist bitemporal und erscheint in der Datenhistorie der Person.
 
+## Programm (I2)
+
+- **Semester, Fachbereiche 1–8, Kursarten** (Nutzungsart, benötigte Merkmale, Vorlage der Buchungsrichtlinie) und
+  **Kurse** mit Dozierendenteam, Sichtbarkeit (öffentlich/intern/geschlossen mit Auftraggeber), Buchungsrichtlinie je
+  Buchungsweg (Tresen, Integrationskurs-Team, Online, Auftraggeber; Datenmodell für Kontingent und Vorab-Einbuchung)
+  und zeitlich gültigem Entgelt.
+- **Schnellweg** `/kurse/neu`: regelmäßig, gleicher Ort, gleiche Dozentin – mit Vorschau (ausgelassene Ferien- und
+  Feiertage mit Grund, Konflikte). Ungeeignete Orte sind gesperrt, der Tooltip nennt den Grund (fehlende Kapazität für
+  die Nutzungsart, fehlendes oder abgelaufenes Merkmal, nicht buchbare Ebene).
+- **Kursumfang** begrenzt (Anzahl oder Enddatum) oder **unbefristet**: rollierend per Quartz-Job, Horizont 12 Wochen.
+- **Änderungen** an Terminen: nur diese / alle folgenden (einzeln geänderte bleiben) / Einzelveranstaltung / Ausfall.
+- **Feiertage NRW** werden selbst berechnet (Osterformel), **Schulferien** sind eine pflegbare Tabelle (`/ferien`;
+  Demodaten bitte mit dem Ferienkalender des Schulministeriums NRW abgleichen).
+- **Orte** `/orte`: Liegenschaft › Gebäude › Raum, Treffpunkte, virtuelle Räume; Kapazität je Nutzungsart; pflegbarer
+  Merkmalskatalog mit Vererbung, Ausschlussgruppen (barrierefrei/nicht barrierefrei), Nachweis und Gültigkeit;
+  automatische Wegbeschreibung mit Kartenlink. Läuft eine befristete Zulassung in 60 Tagen ab, legt ein täglicher Job
+  eine Aufgabe an (Aufgabenmodul mit Körben folgt in I5).
+- **Hybride Veranstaltungen**: mehrere Orte je Termin, Kapazität = Summe (Ort/Nutzungsart oder eigene Höchstzahl),
+  höchstens die Höchstzahl des Kurses.
+- **Raumplan** `/raumplan`: Wochenansicht je Standort, Konflikte rot mit Erklärung.
+- **Globale Suche** in der Kopfzeile: Personen, Kurse, Orte.
+- **Semesterkopie** mit Verschiebung um ganze Wochen; Kopien sind Entwürfe mit neuer Kursnummer.
+- Demodaten: drei Standorte (Emsdetten, Greven, Saerbeck; echte Ortsnamen, fiktive Häuser und Adressen), zwei
+  Online-Räume, ein Treffpunkt, 40 Kurse über alle Fachbereiche, darunter Integrationskurse, ein hybrider Vortrag und
+  ein unbefristeter Kurs mit 10er-Karte.
+
 ## Testbenutzer der Pilot-VHS
 
 Die Startdaten liegen in [`tools/Testdaten/testbenutzer-vhs-egs.json`](../tools/Testdaten/testbenutzer-vhs-egs.json)
