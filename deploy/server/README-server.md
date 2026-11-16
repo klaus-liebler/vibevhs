@@ -64,7 +64,7 @@ ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/<schritt>.sh"
 `ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/01-ssh-haerten.sh"`
 
 - Prüft, dass `~srvadmin/.ssh/authorized_keys` einen Schlüssel enthält und dass `srvadmin` sich damit angemeldet hat.
-- Spielt `ssh/10-vibevhs.conf` nach `/etc/ssh/sshd_config.d/` ein: `PasswordAuthentication no`, `KbdInteractiveAuthentication no`,
+- Spielt `ssh/10-haertung.conf` nach `/etc/ssh/sshd_config.d/` ein: `PasswordAuthentication no`, `KbdInteractiveAuthentication no`,
   `PermitRootLogin no`, `AllowUsers srvadmin`; `sshd -t` vor dem Neuladen.
 - **Prüfen** (neues Fenster): `ssh liebler` klappt; `ssh -o PubkeyAuthentication=no srvadmin@liebler.iui.hs-osnabrueck.de` wird abgelehnt.
 - **Rückweg:** `sudo bash /tmp/vibevhs-kit/schritte/01-zurueck.sh` (in der offenen zweiten Sitzung).

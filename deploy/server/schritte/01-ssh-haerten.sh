@@ -24,10 +24,10 @@ else
     frage "Trotzdem fortfahren (Passwort-Anmeldung wird abgeschaltet)?" || fehler "Abgebrochen."
 fi
 
-einspielen ssh/10-vibevhs.conf /etc/ssh/sshd_config.d/10-vibevhs.conf 0644 || true
+einspielen ssh/10-haertung.conf /etc/ssh/sshd_config.d/10-haertung.conf 0644 || true
 
 info "Konfiguration prüfen (sshd -t)"
-sshd -t || { warn "Fehler in der Konfiguration – nehme sie zurück."; rm -f /etc/ssh/sshd_config.d/10-vibevhs.conf; fehler "sshd -t fehlgeschlagen"; }
+sshd -t || { warn "Fehler in der Konfiguration – nehme sie zurück."; rm -f /etc/ssh/sshd_config.d/10-haertung.conf; fehler "sshd -t fehlgeschlagen"; }
 info "Wirksame Werte:"
 sshd -T 2>/dev/null | grep -E '^(passwordauthentication|kbdinteractiveauthentication|permitrootlogin|pubkeyauthentication|allowusers) ' | sed 's/^/   /'
 
