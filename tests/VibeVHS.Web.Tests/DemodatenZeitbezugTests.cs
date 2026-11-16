@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 using VibeVHS.Application.Aufgaben;
@@ -15,8 +15,8 @@ using VibeVHS.Web.Sicherheit;
 namespace VibeVHS.Web.Tests;
 
 /// <summary>
-/// Demodaten werden relativ zum Tagesdatum angelegt: Eine Demo in zwei Monaten sieht aus wie heute â€“ gleich viele Ã¼berfÃ¤llige
-/// Aufgaben und Rechnungen, laufende und kÃ¼nftige Kurse, ein aktuelles Semester mit passendem Namen und KÃ¼rzel.
+/// Demodaten werden relativ zum Tagesdatum angelegt: Eine Demo in zwei Monaten sieht aus wie heute – gleich viele überfällige
+/// Aufgaben und Rechnungen, laufende und künftige Kurse, ein aktuelles Semester mit passendem Namen und Kürzel.
 /// </summary>
 public sealed class DemodatenZeitbezugTests
 {
@@ -59,7 +59,7 @@ public sealed class DemodatenZeitbezugTests
 
         var log = new Warnungen();
         await Demodaten.AllesAnlegenAsync(h.App.Services, 200, log);
-        log.Meldungen.ShouldBeEmpty("Alle Demodaten-Teile mÃ¼ssen sich ohne Fehler anlegen lassen");
+        log.Meldungen.ShouldBeEmpty("Alle Demodaten-Teile müssen sich ohne Fehler anlegen lassen");
 
         // Routinen wie nach dem Start (Startabgleich), damit Aufgaben, Rechnungen und Fristen entstehen.
         await using (var bereich = h.App.Services.CreateAsyncScope())
@@ -88,19 +88,19 @@ public sealed class DemodatenZeitbezugTests
             await db.Belegungen.CountAsync(Ct),
             aufgaben.Count(a => a.Ueberfaellig(heute)), aufgaben.Count,
             rechnungen.Count, rechnungen.Count(r => r.Faellig is { } f && f < heute),
-            aufgaben.Count(a => a.Titel.Contains("lÃ¤uft", StringComparison.OrdinalIgnoreCase) || a.Titel.Contains("Ablauf", StringComparison.OrdinalIgnoreCase)),
+            aufgaben.Count(a => a.Titel.Contains("läuft", StringComparison.OrdinalIgnoreCase) || a.Titel.Contains("Ablauf", StringComparison.OrdinalIgnoreCase)),
             heute);
     }
 
     [Fact]
     public async Task Demodaten_sind_relativ_zum_Tagesdatum()
     {
-        // Die Testuhr kann nicht zurÃ¼ckgestellt werden: â€žheuteâ€œ ist das echte Datum, â€žspÃ¤terâ€œ 60 Tage danach.
+        // Die Testuhr kann nicht zurückgestellt werden: „heute“ ist das echte Datum, „später“ 60 Tage danach.
         var bezug = DateTimeOffset.UtcNow.AddMinutes(1);
         var heute = await SeedenAsync(bezug);
         var spaeter = await SeedenAsync(bezug.AddDays(60));
 
-        // Es gibt jeweils ein aktuelles Semester; Name und KÃ¼rzel folgen der Verschiebung (z. B. 16.11.2026 â†’ â€žHerbst 2026â€œ, â€ž26Hâ€œ).
+        // Es gibt jeweils ein aktuelles Semester; Name und Kürzel folgen der Verschiebung (z. B. 16.11.2026 → „Herbst 2026“, „26H“).
         heute.Kuerzel.ShouldBe(Demozeit.Fuer(heute.Heute).Kuerzel("26H"));
         spaeter.Kuerzel.ShouldBe(Demozeit.Fuer(spaeter.Heute).Kuerzel("26H"));
         heute.Semester.ShouldBe(Demozeit.Semestername(heute.Kuerzel));
@@ -114,7 +114,7 @@ public sealed class DemodatenZeitbezugTests
         spaeter.UeberfaelligeRechnungen.ShouldBeInRange(heute.UeberfaelligeRechnungen - 3, heute.UeberfaelligeRechnungen + 3);
         spaeter.UeberfaelligeAufgaben.ShouldBeInRange(heute.UeberfaelligeAufgaben - 3, heute.UeberfaelligeAufgaben + 3);
         spaeter.OffeneAufgaben.ShouldBeInRange(heute.OffeneAufgaben - 5, heute.OffeneAufgaben + 5);
-        TestContext.Current.TestOutputHelper?.WriteLine($"heute:   {heute}\nspÃ¤ter:  {spaeter}");
+        TestContext.Current.TestOutputHelper?.WriteLine($"heute:   {heute}\nspäter:  {spaeter}");
     }
 
     [Theory]

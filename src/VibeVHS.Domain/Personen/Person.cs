@@ -80,12 +80,6 @@ public sealed class Person
     /// <summary>Sortierform des heutigen Namens (DIN 5007-2, normalisiert).</summary>
     public string Sortiername => HeutigerName?.Sortierschluessel ?? string.Empty;
 
-    /// <summary>Eindeutiger Sortierschlüssel (Sortiername + Id) für die Keyset-Pagination.</summary>
-    public string Sortierschluessel => Seitenschluessel(Sortiername, Id);
-
-    /// <summary>Gemeinsame Form des Seitenschlüssels (auch in SQL so gebildet).</summary>
-    /// <remarks>Id als Hex der 16 Bytes in Speicherreihenfolge (Big Endian) – so wie SQLite <c>hex(Id)</c> sie liefert.</remarks>
-    public static string Seitenschluessel(string sortiername, Guid id) => $"{sortiername}|{Convert.ToHexString(id.ToByteArray(bigEndian: true))}";
 
     /// <summary>Ort des üblichen Aufenthalts nach heutigem Stand (nach der Anonymisierung: das grobe Gebiet).</summary>
     public string? Wohnort => IstAnonymisiert ? AnonymisiertGebiet : Heute.Aufenthaltsort?.Ort;

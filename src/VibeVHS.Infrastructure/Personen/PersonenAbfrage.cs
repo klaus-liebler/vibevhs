@@ -25,10 +25,10 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
         var sortiert = db.MitSortierschluessel(await BasisAsync(filter, abbruch), Heute);
         if (nach is not null)
         {
-            sortiert = sortiert.Where(x => string.Compare(x.Schluessel, nach.Wert) > 0);
+            sortiert = sortiert.Nach(nach.Nachname, nach.Vorname, nach.IdHex);
         }
 
-        var seite = await sortiert.OrderBy(x => x.Schluessel).Take(anzahl).ToListAsync(abbruch);
+        var seite = await sortiert.Sortiert().Take(anzahl).ToListAsync(abbruch);
         var ids = seite.Select(x => x.Id).ToList();
         var personen = await db.Personen.AsNoTracking().AsSplitQuery().Where(p => ids.Contains(p.Id)).ToDictionaryAsync(p => p.Id, abbruch);
         var jetzt = Jetzt;
@@ -36,7 +36,7 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
         {
             var p = personen[x.Id];
             p.StichzeitSetzen(jetzt);
-            return new PersonZeile(p.Id, p.Anzeigename, x.Schluessel, p.Geburtsdatum, p.Wohnort, p.EMail, p.Sprache, p.Rollen, p.Status, p.Fachbereiche);
+            return new PersonZeile(p.Id, p.Anzeigename, new Seitenschluessel(x.Nachname, x.Vorname, x.IdHex), p.Geburtsdatum, p.Wohnort, p.EMail, p.Sprache, p.Rollen, p.Status, p.Fachbereiche);
         }).ToList();
     }
 
@@ -91,7 +91,7 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
     /// <summary>Für Rundschreiben und Export: alle Treffer mit vollständig geladener Person, paketweise (500).</summary>
     public async IAsyncEnumerable<Person> PersonenAsync(PersonenFilter filter, [EnumeratorCancellation] CancellationToken abbruch = default)
     {
-        var ids = await db.MitSortierschluessel(await BasisAsync(filter, abbruch), Heute).OrderBy(x => x.Schluessel).Select(x => x.Id).ToListAsync(abbruch);
+        var ids = await db.MitSortierschluessel(await BasisAsync(filter, abbruch), Heute).Sortiert().Select(x => x.Id).ToListAsync(abbruch);
         var jetzt = Jetzt;
         foreach (var paket in ids.Chunk(500))
         {
@@ -276,9 +276,9 @@ internal sealed class DublettenSuche(VibeVhsDbContext db) : IDublettenSuche
                 .Select(m => new { PersonId = EF.Property<Guid>(m, "PersonId"), m.Inhalt }).ToListAsync(abbruch))
             .GroupBy(m => m.PersonId).ToDictionary(g => g.Key, g => g.First().Inhalt);
         var namen = await db.NamenAm(heute).AsNoTracking().Where(n => aktiv.Contains(EF.Property<Guid>(n, "PersonId")))
-            .Select(n => new { PersonId = EF.Property<Guid>(n, "PersonId"), n.Sortierschluessel }).ToListAsync(abbruch);
+            .Select(n => new { PersonId = EF.Property<Guid>(n, "PersonId"), Name = n }).ToListAsync(abbruch);
         var alle = namen.Where(n => geburt.ContainsKey(n.PersonId))
-            .Select(n => new { Id = n.PersonId, Geburtsdatum = (DateOnly?)DateOnly.ParseExact(geburt[n.PersonId], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), Sortiername = n.Sortierschluessel })
+            .Select(n => new { Id = n.PersonId, Geburtsdatum = (DateOnly?)DateOnly.ParseExact(geburt[n.PersonId], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), Sortiername = n.Name.Sortierschluessel })
             .ToList();
         var ausschluesse = (await db.DublettenAusschluesse.AsNoTracking().Select(d => new { d.PersonA, d.PersonB }).ToListAsync(abbruch))
             .Select(d => (d.PersonA, d.PersonB)).ToHashSet();

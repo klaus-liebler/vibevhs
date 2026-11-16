@@ -14,11 +14,11 @@ public sealed record PersonenFilter(
     public bool IstLeer => string.IsNullOrWhiteSpace(Suche) && Rolle is null && Status is null && Fachbereich is null && !NurDublettenHinweise && Datenschutz is null;
 }
 
-/// <summary>Eine Zeile der Personenliste (aus den Zwischenstands-Spalten, ohne die Historie zu laden).</summary>
+/// <summary>Eine Zeile der Personenliste (Stand heute, aus den Versionen berechnet) mit ihrer Position für das Weiterblättern.</summary>
 public sealed record PersonZeile(
     Guid Id,
     string Anzeigename,
-    string Sortierschluessel,
+    Seitenschluessel Seite,
     DateOnly? Geburtsdatum,
     string? Wohnort,
     string? EMail,
@@ -27,10 +27,26 @@ public sealed record PersonZeile(
     Personenstatus Status,
     IReadOnlyList<int> Fachbereiche);
 
-/// <summary>Position in der sortierten Liste für die Keyset-Pagination (statt Seitennummer und OFFSET).</summary>
-public sealed record Seitenschluessel(string Wert)
+/// <summary>
+/// Position in der sortierten Liste für die Keyset-Pagination (statt Seitennummer und OFFSET): Nachname und Vorname (verglichen nach
+/// DIN 5007-2, Collation DIN5007_2) und die Id als Hex der 16 Bytes (eindeutiger Gleichstandsbrecher).
+/// </summary>
+public sealed record Seitenschluessel(string Nachname, string Vorname, string IdHex)
 {
-    public static Seitenschluessel Von(PersonZeile zeile) => new(zeile.Sortierschluessel);
+    public static Seitenschluessel Von(PersonZeile zeile) => zeile.Seite;
+
+    /// <summary>Reihenfolge wie in der Datenbank (für Tests und Sortierung im Speicher).</summary>
+    public static int Vergleichen(Seitenschluessel a, Seitenschluessel b)
+    {
+        var n = Domain.Gemeinsam.Din5007.Vergleichen(a.Nachname, b.Nachname);
+        if (n != 0)
+        {
+            return n;
+        }
+
+        var v = Domain.Gemeinsam.Din5007.Vergleichen(a.Vorname, b.Vorname);
+        return v != 0 ? v : string.CompareOrdinal(a.IdHex, b.IdHex);
+    }
 }
 
 /// <summary>Trefferzahlen für die Filter-Chips: je Wert, mit allen übrigen gesetzten Filtern.</summary>

@@ -2,7 +2,6 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
-using Microsoft.Extensions.Logging.Abstractions;
 using VibeVHS.Domain.Personen;
 using VibeVHS.Infrastructure.Datenbank;
 
@@ -16,7 +15,7 @@ namespace VibeVHS.Infrastructure.Tests;
 public sealed class KopienEntfallenMigrationTests
 {
     [Fact]
-    public async Task Werte_nur_in_Kopiespalten_werden_Merkmale_und_Sortierschluessel_wird_nachgetragen()
+    public async Task Werte_nur_in_Kopiespalten_werden_Merkmale_und_Kontonamen_kommen_aus_der_Person()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var verbindung = new SqliteConnection("Data Source=:memory:");
@@ -43,7 +42,6 @@ public sealed class KopienEntfallenMigrationTests
             """, ct);
 
         await migrator.MigrateAsync(cancellationToken: ct);
-        await DatenbankInitialisierung.SortierschluesselNachtragenAsync(db, NullLogger.Instance, ct);
 
         await using var neu = new VibeVhsDbContext(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite(verbindung).Options);
         var merkmale = await neu.Set<PersonMerkmal>().AsNoTracking()
@@ -55,8 +53,7 @@ public sealed class KopienEntfallenMigrationTests
         merkmale.Where(m => m.PersonId == a).ShouldAllBe(m => m.GueltigVon == new DateOnly(2020, 1, 1)); // ab erstem Namen
         merkmale.Where(m => m.PersonId == b).Select(m => (m.Art, m.Inhalt)).ShouldBe([(MerkmalArt.Sprache, "en")]); // keine Rolle 0, kein Doppel
 
-        var schluessel = await neu.Set<PersonName>().AsNoTracking().OrderBy(n => n.Id).Select(n => n.Sortierschluessel).ToListAsync(ct);
-        schluessel.ShouldBe(new[] { "berg anna von", "ohne kai" }, ignoreOrder: true);
+        // Der Sortierschlüssel (Etappe 1) ist inzwischen wieder entfallen (Sortierung per Collation DIN5007_2, Migration SortierungPerCollation).
 
         await using (var c = verbindung.CreateCommand())
         {

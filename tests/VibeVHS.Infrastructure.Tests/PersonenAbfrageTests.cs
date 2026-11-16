@@ -49,7 +49,7 @@ public class PersonenAbfrageTests
 
         gesehen.Count.ShouldBe(daten.Personen.Count);
         gesehen.Select(z => z.Id).Distinct().Count().ShouldBe(gesehen.Count);
-        gesehen.Select(z => z.Sortierschluessel).ShouldBe(gesehen.Select(z => z.Sortierschluessel).Order(StringComparer.Ordinal));
+        gesehen.Select(z => z.Seite).ShouldBe(gesehen.Select(z => z.Seite).Order(Comparer<Seitenschluessel>.Create(Seitenschluessel.Vergleichen)));
     }
 
     [Fact]

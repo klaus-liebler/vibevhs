@@ -128,6 +128,7 @@ internal sealed class SqliteSicherung(VibeVhsDbContext db, IConfiguration konfig
             try
             {
                 await using var c = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = test, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
+                VibeVHS.Infrastructure.Datenbank.SqliteErweiterungen.Registrieren(c); // integrity_check prüft auch den Index mit Collation DIN5007_2
                 await c.OpenAsync(abbruch);
                 var integritaet = (await Skalar(c, "PRAGMA integrity_check", abbruch))?.ToString();
                 migration = (await Skalar(c, "SELECT MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId DESC LIMIT 1", abbruch))?.ToString();

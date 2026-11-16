@@ -58,7 +58,7 @@ public sealed class TitelGeschlechtMigrationTests
         t.Parameters.AddWithValue("$am", Binaer(p.AngelegtAm));
         t.Parameters.AddWithValue("$anzeige", p.Anzeigename);
         t.Parameters.AddWithValue("$sort", p.Sortiername);
-        t.Parameters.AddWithValue("$schluessel", p.Sortierschluessel);
+        t.Parameters.AddWithValue("$schluessel", $"{p.Sortiername}|{p.Id}");
         t.Parameters.AddWithValue("$g", geschlecht);
         t.Parameters.AddWithValue("$titel", (object?)titel ?? DBNull.Value);
         await t.ExecuteNonQueryAsync(ct);

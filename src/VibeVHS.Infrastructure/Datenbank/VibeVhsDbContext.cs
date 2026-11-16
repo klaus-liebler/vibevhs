@@ -18,6 +18,9 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
     /// <summary>Anwendungsuhr: Bezugszeitpunkt („jetzt“) geladener Personen für ihre berechneten Eigenschaften.</summary>
     public TimeProvider Uhr { get; } = uhr ?? TimeProvider.System;
 
+    /// <summary>Für SQLite-Funktionen (Collation DIN5007_2) – registriert bei jeder Verbindung, auch bei von außen geöffneten.</summary>
+    private readonly bool _erweitert = SqliteErweiterungen.Registrieren(optionen);
+
     public DbSet<Person> Personen => Set<Person>();
 
     public DbSet<PersonName> PersonNamen => Set<PersonName>();
@@ -62,6 +65,9 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
 
     public DbSet<VibeVHS.Domain.Vorlagen.Textvorlage> Vorlagen => Set<VibeVHS.Domain.Vorlagen.Textvorlage>();
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionen)
+        => optionen.AddInterceptors(SqliteErweiterungenBeimOeffnen.Instanz);
+
     protected override void ConfigureConventions(ModelConfigurationBuilder konfiguration)
     {
         // Speicherformate (siehe Speicherformate.cs): Ids 16 Byte (Big Endian, UUIDv7), Tage JJJJMMTT, Zeitpunkte und Termine UTC-Millisekunden.
@@ -93,7 +99,6 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Ignore(p => p.Rollen);
             b.Ignore(p => p.Anzeigename);
             b.Ignore(p => p.Sortiername);
-            b.Ignore(p => p.Sortierschluessel);
             b.Ignore(p => p.Wohnort);
             b.Ignore(p => p.Geburtsdatum);
             b.Ignore(p => p.Stichzeit);
@@ -119,13 +124,13 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
 
         Version<PersonName>(modelBuilder, "PersonNamen", b =>
         {
-            b.Property(n => n.Vorname).HasMaxLength(200);
-            b.Property(n => n.Nachname).HasMaxLength(200);
-            b.Property(n => n.Sortierschluessel).HasMaxLength(400);
-            b.HasIndex(n => n.Sortierschluessel);
+            // Sortierung nach DIN 5007-2 per Collation auf den Spalten (Index, ORDER BY und Vergleiche nutzen sie); kein Sortierschlüssel.
+            b.Property(n => n.Vorname).HasMaxLength(200).UseCollation(Domain.Gemeinsam.Din5007.Collation);
+            b.Property(n => n.Nachname).HasMaxLength(200).UseCollation(Domain.Gemeinsam.Din5007.Collation);
+            b.Ignore(n => n.Sortierschluessel);
             b.Property(n => n.Vorsatz).HasMaxLength(30);
             b.Property(n => n.Zusatz).HasMaxLength(20);
-            b.HasIndex(n => n.Nachname);
+            b.HasIndex(n => new { n.Nachname, n.Vorname }).HasDatabaseName("IX_PersonNamen_Sortierung");
         });
         Version<PersonMerkmal>(modelBuilder, "PersonMerkmale", b => b.Property(m => m.Inhalt).HasMaxLength(200));
         Version<Postadresse>(modelBuilder, "PersonAdressen", b =>

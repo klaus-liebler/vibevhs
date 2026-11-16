@@ -18,11 +18,12 @@ public sealed class DatenbankDokuTests
         var sb = new StringBuilder();
         sb.AppendLine("# Datenbank – Tabellenstrukturen");
         sb.AppendLine();
-        sb.AppendLine("Automatisch erzeugt aus dem EF-Modell (`DatenbankDokuTests`), nicht von Hand ändern. SQLite; Zeitpunkte (`DateTimeOffset`) sind binär");
-        sb.AppendLine("als Ganzzahl gespeichert, Datumswerte als Text `JJJJ-MM-TT`, Aufzählungen als Text, Ids als GUID-Text.");
+        sb.AppendLine("Automatisch erzeugt aus dem EF-Modell (`DatenbankDokuTests`), nicht von Hand ändern. SQLite. Speicherformate: Ids als 16-Byte-BLOB");
+        sb.AppendLine("(UUIDv7, Big Endian), Kalendertage als Ganzzahl JJJJMMTT, Zeitpunkte (`DateTimeOffset`) und Termine als UTC-Millisekunden seit 1970,");
+        sb.AppendLine("Aufzählungen als Text. Namen sortieren per Collation `DIN5007_2` (siehe unten).");
         sb.AppendLine();
         sb.AppendLine("**Bitemporale Versionstabellen** (Namen, Merkmale, Adressen, … – Spalten `GueltigVon`/`GueltigBis` = fachliche Zeit, halboffen;");
-        sb.AppendLine("`ErfasstAm`/`ErsetztAm` = Wissenszeit, `ErsetztAm` nur bei Korrektur; `Erfassungsart`, `ErfasstVon`, `Grund` = Änderungsvorgang).");
+        sb.AppendLine("`ErfasstAm`/`ErsetztAm` = Wissenszeit, `ErsetztAm` = durch neueres Wissen ersetzt (Änderung ab Datum oder Korrektur); `Erfassungsart`, `ErfasstVon`, `Grund` = Änderungsvorgang).");
         sb.AppendLine("„Einstufung“: F = führend, C = Lese-Cache (Kopie), A = nur nach Anonymisierung (siehe `Spalteneinstufung.cs`). Spalten mit „JSON“ enthalten eine");
         sb.AppendLine("serialisierte Liste bzw. Struktur (Kandidaten für eigene Tabellen).");
         sb.AppendLine();

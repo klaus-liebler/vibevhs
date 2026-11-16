@@ -40,17 +40,30 @@ public static class Personensicht
             .Select(e => EF.Property<Guid>(e, "PersonId"));
     }
 
-    /// <summary>Sortierung nach Name (DIN 5007-2) mit eindeutigem Seitenschlüssel „sortierform|ID“ – wie <see cref="Person.Sortierschluessel"/>.</summary>
+    /// <summary>
+    /// Personen mit Name zum Stichtag für die sortierte Liste: Nachname und Vorname tragen die Collation DIN5007_2 (Index
+    /// IX_PersonNamen_Sortierung), die Id als Hex bricht Gleichstände. Der Namensvorsatz zählt für die Sortierung nicht.
+    /// </summary>
     public static IQueryable<PersonMitSchluessel> MitSortierschluessel(this VibeVhsDbContext db, IQueryable<Person> personen, DateOnly tag)
         => from p in personen
            join n in db.NamenAm(tag) on p.Id equals EF.Property<Guid>(n, "PersonId")
-           select new PersonMitSchluessel { Id = p.Id, Schluessel = n.Sortierschluessel + "|" + SqlFunktionen.Hex(p.Id) };
+           select new PersonMitSchluessel { Id = p.Id, Nachname = n.Nachname, Vorname = n.Vorname, IdHex = SqlFunktionen.Hex(p.Id) };
+
+    /// <summary>Sortiert nach Nachname, Vorname (DIN 5007-2) und Id.</summary>
+    public static IOrderedQueryable<PersonMitSchluessel> Sortiert(this IQueryable<PersonMitSchluessel> q)
+        => q.OrderBy(x => x.Nachname).ThenBy(x => x.Vorname).ThenBy(x => x.IdHex);
+
+    /// <summary>Nur Einträge nach dem Seitenschlüssel (Keyset), gleiche Reihenfolge wie <see cref="Sortiert"/>.</summary>
+    public static IQueryable<PersonMitSchluessel> Nach(this IQueryable<PersonMitSchluessel> q, string nachname, string vorname, string idHex)
+        => q.Where(x => string.Compare(x.Nachname, nachname) > 0
+                        || (x.Nachname == nachname && (string.Compare(x.Vorname, vorname) > 0
+                                                       || (x.Vorname == vorname && string.Compare(x.IdHex, idHex) > 0))));
 
     /// <summary>Personen sortiert nach Name zum Stichtag (DIN 5007-2), eindeutig über die Id.</summary>
     public static IQueryable<Person> NachNameSortiert(this IQueryable<Person> personen, VibeVhsDbContext db, DateOnly tag)
         => from p in personen
            join n in db.NamenAm(tag) on p.Id equals EF.Property<Guid>(n, "PersonId")
-           orderby n.Sortierschluessel, p.Id
+           orderby n.Nachname, n.Vorname, p.Id
            select p;
 
     /// <summary>Personen mit diesem Namen am Stichtag (exakt, z. B. für Demodaten).</summary>
@@ -83,7 +96,11 @@ public sealed class PersonMitSchluessel
 {
     public required Guid Id { get; init; }
 
-    public required string Schluessel { get; init; }
+    public required string Nachname { get; init; }
+
+    public required string Vorname { get; init; }
+
+    public required string IdHex { get; init; }
 }
 
 /// <summary>SQL-Funktionen für Abfragen auf Textspalten (in <see cref="VibeVhsDbContext"/> registriert).</summary>

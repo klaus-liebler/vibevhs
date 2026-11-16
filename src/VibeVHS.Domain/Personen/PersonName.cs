@@ -11,7 +11,6 @@ public sealed class PersonName : BitemporaleVersion<PersonName>
         Nachname = string.Empty;
         Vorsatz = string.Empty;
         Zusatz = string.Empty;
-        Sortierschluessel = string.Empty;
     }
 
     public PersonName(string vorname, string nachname, DateOnly gueltigVon, DateOnly? gueltigBis, Erfassung erfassung, string? vorsatz = null,
@@ -24,7 +23,6 @@ public sealed class PersonName : BitemporaleVersion<PersonName>
         ArgumentException.ThrowIfNullOrWhiteSpace(nachname);
         Vorname = vorname?.Trim() ?? string.Empty;
         Nachname = nachname.Trim();
-        Sortierschluessel = Suchtext.Normalisieren(Sortierform);
     }
 
     /// <summary>Kurzform: Änderung ab Datum.</summary>
@@ -47,10 +45,10 @@ public sealed class PersonName : BitemporaleVersion<PersonName>
     public string NachnameMitVorsatz => Vorsatz.Length == 0 ? Nachname : $"{Vorsatz} {Nachname}";
 
     /// <summary>
-    /// Normalisierte Sortierform dieser Version („berg anna von“) für Sortierung, Seitenschlüssel und Suche in SQL. Abgeleitet aus den
-    /// Feldern derselben, unveränderlichen Zeile – kann daher nicht veralten (keine Kopie).
+    /// Normalisierte Sortierform („berg anna von“) für Vergleiche in C# (z. B. Dublettenprüfung). Nicht gespeichert: in der Datenbank sortiert
+    /// die Collation DIN5007_2 auf Nachname und Vorname (siehe <see cref="Din5007"/>).
     /// </summary>
-    public string Sortierschluessel { get; private set; }
+    public string Sortierschluessel => Suchtext.Normalisieren(Sortierform);
 
     /// <summary>Sortierform nach DIN 5007-2 (Telefonbuch): Nachname, Vorname, Vorsatz – „Berg Anna von“.</summary>
     public string Sortierform => string.Join(' ', new[] { Nachname, Vorname, Vorsatz }.Where(t => t.Length > 0));
@@ -66,7 +64,6 @@ public sealed class PersonName : BitemporaleVersion<PersonName>
         Nachname = nachname;
         Vorsatz = string.Empty;
         Zusatz = string.Empty;
-        Sortierschluessel = Suchtext.Normalisieren(Sortierform);
     }
 
     public override string Datenart => "Name";

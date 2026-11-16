@@ -109,6 +109,13 @@ public sealed class MessungTests
             var seite = await new PersonenAbfrage(db, new DublettenSuche(db)).SeiteAsync(new PersonenFilter(), null, 50, ct);
             weiter = Seitenschluessel.Von(seite[^1]);
         });
+        await Messen("davon: nur Sortierabfrage (50 Ids)", async db =>
+            _ = await db.MitSortierschluessel(db.Personen.Where(p => p.Status != Personenstatus.Zusammengefuehrt), heute).Sortiert().Take(50).ToListAsync(ct));
+        await Messen("davon: 50 Personen vollständig laden", async db =>
+        {
+            var auswahl = ids.Take(50).ToList();
+            _ = await db.Personen.AsNoTracking().AsSplitQuery().Where(p => auswahl.Contains(p.Id)).ToListAsync(ct);
+        });
         await Messen("Personenliste, Folgeseite (Keyset)", async db => (await new PersonenAbfrage(db, new DublettenSuche(db)).SeiteAsync(new PersonenFilter(), weiter, 50, ct)).Count.ShouldBe(50));
         await Messen("Filter Rolle Dozierende", async db => _ = await new PersonenAbfrage(db, new DublettenSuche(db)).SeiteAsync(new PersonenFilter(Rolle: Personenrolle.Dozierende), null, 50, ct));
         await Messen("Volltextsuche „müller“", async db => _ = await new PersonenAbfrage(db, new DublettenSuche(db)).SeiteAsync(new PersonenFilter("müller"), null, 50, ct));
@@ -129,8 +136,33 @@ public sealed class MessungTests
         });
         // Startabgleich: Der Fortschreib-Job der Personen-Kopien entfällt mit der Normalisierung (keine Kopien mehr).
 
+        // Abfrageplan der Personenliste (erste Seite und Folgeseite): nutzt SQLite den Index IX_PersonNamen_Sortierung (Collation DIN5007_2)?
+        var plaene = new List<string>();
+        await using (var db = t.NeuerKontext())
+        {
+            await db.Database.OpenConnectionAsync(ct);
+            var basis = db.Personen.Where(p => p.Status != Personenstatus.Zusammengefuehrt);
+            foreach (var (name, q) in new[]
+                     {
+                         ("erste Seite", db.MitSortierschluessel(basis, heute).Sortiert().Take(50)),
+                         ("Folgeseite", db.MitSortierschluessel(basis, heute).Nach(weiter!.Nachname, weiter.Vorname, weiter.IdHex).Sortiert().Take(50)),
+                     })
+            {
+                await using var cmd = q.CreateDbCommand();
+                cmd.CommandText = "EXPLAIN QUERY PLAN " + cmd.CommandText;
+                await using var r = await cmd.ExecuteReaderAsync(ct);
+                var zeilenPlan = new List<string>();
+                while (await r.ReadAsync(ct))
+                {
+                    zeilenPlan.Add(r.GetString(3));
+                }
+
+                plaene.Add($"{name}: {string.Join(" / ", zeilenPlan)}");
+            }
+        }
+
         var zeilen = string.Join("\n", ergebnisse.Select(e => $"| {e.Name} | {e.Median:0} ms |"));
-        var bericht = $"MESSUNG {anzahl} Personen, {kurse} Kurse (Aufbau {aufbau.Elapsed.TotalSeconds:0} s)\n{zeilen}";
+        var bericht = $"MESSUNG {anzahl} Personen, {kurse} Kurse (Aufbau {aufbau.Elapsed.TotalSeconds:0} s)\n{zeilen}\nPLAN\n{string.Join("\n", plaene)}";
         File.WriteAllText(Path.Combine(Path.GetTempPath(), $"vibevhs-messung-{anzahl}.txt"), bericht);
         TestContext.Current.SendDiagnosticMessage(bericht);
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

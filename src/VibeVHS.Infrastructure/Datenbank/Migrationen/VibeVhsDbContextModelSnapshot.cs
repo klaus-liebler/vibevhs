@@ -14,7 +14,7 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261116213514_SpeicherformateUmwandeln";
+    public override string LastMigrationId => "20261116215700_SortierungPerCollation";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -2361,21 +2361,18 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.Property<string>("Nachname")
                     .IsRequired()
                     .HasMaxLength(200)
-                    .HasColumnType("TEXT");
+                    .HasColumnType("TEXT")
+                    .UseCollation("DIN5007_2");
 
                 b.Property<byte[]>("PersonId")
                     .IsRequired()
                     .HasColumnType("BLOB");
 
-                b.Property<string>("Sortierschluessel")
-                    .IsRequired()
-                    .HasMaxLength(400)
-                    .HasColumnType("TEXT");
-
                 b.Property<string>("Vorname")
                     .IsRequired()
                     .HasMaxLength(200)
-                    .HasColumnType("TEXT");
+                    .HasColumnType("TEXT")
+                    .UseCollation("DIN5007_2");
 
                 b.Property<string>("Vorsatz")
                     .IsRequired()
@@ -2389,9 +2386,8 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
 
                 b.HasKey("Id");
 
-                b.HasIndex("Nachname");
-
-                b.HasIndex("Sortierschluessel");
+                b.HasIndex("Nachname", "Vorname")
+                    .HasDatabaseName("IX_PersonNamen_Sortierung");
 
                 b.HasIndex("PersonId", "GueltigVon");
 
