@@ -50,5 +50,5 @@ Write-Host "» Archiv hochladen" -ForegroundColor Cyan
 scp @sshArgs $archiv "${Ziel}:/tmp/vibevhs.tar.gz"
 Write-Host "» einspielen (sudo fragt nach dem Passwort von srvadmin)" -ForegroundColor Cyan
 ssh @sshArgs -t $Ziel "sudo bash /tmp/vibevhs-kit/schritte/ausrollen.sh /tmp/vibevhs.tar.gz"
-if ($LASTEXITCODE -ne 0) { throw "Einspielen fehlgeschlagen (vorige Version läuft weiter)." }
+if ($LASTEXITCODE -ne 0) { throw "Einspielen fehlgeschlagen – Meldung oben (eine vorhandene Version läuft unverändert weiter)." }
 Write-Host "✓ ausgerollt: https://liebler.iui.hs-osnabrueck.de/vibevhs/" -ForegroundColor Green

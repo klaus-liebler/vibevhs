@@ -16,6 +16,9 @@ if [[ "${1:-}" == "--zurueck" ]]; then
     exit 0
 fi
 
+# Voraussetzungen aus Schritt 06 (Dienstbenutzer, Verzeichnisse, Unit) – sonst vor jeder Änderung abbrechen
+id vibevhs >/dev/null 2>&1 && [[ -f /etc/systemd/system/vibevhs.service && -d /var/lib/vibevhs && -d /var/backups/vibevhs ]]     || fehler "Schritt 06 fehlt (Dienstbenutzer vibevhs, /var/lib/vibevhs, vibevhs.service) – erst einrichten, dann erneut ausrollen. Nichts geändert."
+
 archiv="${1:?Pfad zum Archiv fehlt}"
 [[ -f "$archiv" ]] || fehler "Archiv $archiv fehlt"
 neu=$(mktemp -d /opt/vibevhs.neu.XXXX)
