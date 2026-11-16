@@ -17,16 +17,43 @@ namespace VibeVHS.Infrastructure;
 
 public static class Registrierung
 {
+    /// <summary>
+    /// Liest die Verbindungszeichenfolge (ConnectionStrings:VibeVHS bzw. ConnectionStrings__VibeVHS) und löst relative Pfade auf.
+    /// Fehlt sie, gilt „Data Source=data/vibevhs.db“; ist sie ungültig, bricht der Start mit einer verständlichen Meldung ab.
+    /// </summary>
+    public static SqliteConnectionStringBuilder Datenbankverbindung(string? wert, string basisVerzeichnis)
+    {
+        const string hinweis = "Erwartet z. B. „Data Source=/var/lib/vibevhs/vibevhs.db“. In einer systemd-Unit die ganze Zuweisung " +
+                               "in Anführungszeichen setzen: Environment=\"ConnectionStrings__VibeVHS=Data Source=…\" (sonst trennt systemd am Leerzeichen).";
+        SqliteConnectionStringBuilder verbindung;
+        try
+        {
+            verbindung = new SqliteConnectionStringBuilder(string.IsNullOrWhiteSpace(wert) ? "Data Source=data/vibevhs.db" : wert);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidOperationException($"Ungültige Datenbank-Verbindungszeichenfolge ConnectionStrings:VibeVHS = „{wert}“. {hinweis}", ex);
+        }
+
+        if (string.IsNullOrWhiteSpace(verbindung.DataSource))
+        {
+            throw new InvalidOperationException($"Datenbank-Verbindungszeichenfolge ConnectionStrings:VibeVHS = „{wert}“ nennt keine Datei (Data Source fehlt). {hinweis}");
+        }
+
+        if (!Path.IsPathRooted(verbindung.DataSource) && verbindung.DataSource != ":memory:")
+        {
+            verbindung.DataSource = Path.GetFullPath(Path.Combine(basisVerzeichnis, verbindung.DataSource));
+        }
+
+        return verbindung;
+    }
+
     /// <param name="strengeAbfragepruefung">Abfragen ohne eindeutige Sortierung brechen ab (Entwicklung, Tests) statt nur protokolliert zu werden.</param>
     /// <param name="basisVerzeichnis">Relative Datenbankpfade werden hierzu aufgelöst (Inhaltsverzeichnis der Anwendung).</param>
     public static IServiceCollection AddVibeVhsInfrastruktur(this IServiceCollection dienste, IConfiguration konfiguration,
         string basisVerzeichnis, bool strengeAbfragepruefung = false)
     {
-        var verbindung = new SqliteConnectionStringBuilder(konfiguration.GetConnectionString("VibeVHS") ?? "Data Source=data/vibevhs.db");
-        if (!Path.IsPathRooted(verbindung.DataSource) && verbindung.DataSource != ":memory:")
-        {
-            verbindung.DataSource = Path.GetFullPath(Path.Combine(basisVerzeichnis, verbindung.DataSource));
-        }
+        var verbindung = Datenbankverbindung(konfiguration.GetConnectionString("VibeVHS"), basisVerzeichnis);
 
         dienste.AddDbContext<VibeVhsDbContext>(o => o.UseSqlite(verbindung.ToString(),
             s => s.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)).Konfigurieren(strengeAbfragepruefung));
