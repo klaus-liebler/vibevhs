@@ -14,11 +14,18 @@ public static class Registrierung
         dienste.AddScoped<PostausgangDienst>();
         dienste.AddScoped<Zustellung>();
         dienste.AddScoped<PersonenDienst>();
+        dienste.AddScoped<Personen.PersonenrollenDienst>();
+        dienste.AddScoped<Personen.Stammdatenaenderung>();
         dienste.AddScoped<Rundschreiben>();
         dienste.AddScoped<Programm.ProgrammDienst>();
+        dienste.AddScoped<Programm.Terminnachricht>();
+        dienste.AddScoped<Programm.MerkmalKatalogDienst>();
         dienste.AddScoped<Programm.QualifikationsDienst>();
         dienste.AddScoped<Programm.IDozenteneinsatz>(d => d.GetRequiredService<Programm.QualifikationsDienst>());
         dienste.AddScoped<Datenschutz.DatenschutzDienst>();
+        dienste.AddSingleton<Stammdaten.Briefkopf>();
+        dienste.AddScoped<Stammdaten.EinrichtungDienst>();
+        dienste.AddScoped<Sicherheit.Benutzerverwaltung>();
         dienste.AddScoped<Anmeldung.AnmeldungDienst>();
         dienste.AddScoped<Durchfuehrung.Termincodes>();
         dienste.AddSingleton(new Durchfuehrung.OeffentlicheAdresse(oeffentlicheAdresse));

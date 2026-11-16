@@ -11,7 +11,8 @@ namespace VibeVHS.Application.Datenschutz;
 public sealed record Loeschpruefung(Guid PersonId, Datenschutzstatus Status, IReadOnlyList<(Aufbewahrungsgrund Grund, Aufbewahrungsfrist? Frist, DateOnly? Fristende)> Gruende,
     Loeschentscheidung Entscheidung);
 
-public sealed record LoeschverlangenErgebnis(Loeschentscheidung Entscheidung, bool AntwortEingereiht);
+/// <param name="Antwortbrief">Druckstück des Antwortbriefs (mit Anschrift, nicht gespeichert), wenn keine E-Mail-Adresse vorlag.</param>
+public sealed record LoeschverlangenErgebnis(Loeschentscheidung Entscheidung, bool AntwortEingereiht, byte[]? Antwortbrief = null);
 
 /// <summary>
 /// Datenschutz: Archivieren, Sperren (Art. 18), Anonymisieren, Löschverlangen (Art. 17), Löschläufe mit Vier-Augen-Freigabe,
@@ -24,7 +25,8 @@ public sealed class DatenschutzDienst(
     IAuditProtokoll protokoll,
     IAktuellerBenutzer benutzer,
     IStammdaten stammdaten,
-    TimeProvider uhr)
+    TimeProvider uhr,
+    Dokumente.DokumentDienst? dokumente = null)
 {
     public static readonly Rolle[] FreigabeRollen = [Rolle.Verwaltungsleitung, Rolle.Leitung];
 
@@ -91,22 +93,37 @@ public sealed class DatenschutzDienst(
         var person = await PersonAsync(personId, abbruch);
         var einrichtung = (await stammdaten.EinrichtungAsync(abbruch))?.Name ?? "Ihre Volkshochschule";
         var antwort = false;
-        if (person.EMail is { } mail)
-        {
-            var text = pruefung.Entscheidung.Aktion == Loeschaktion.Anonymisieren
+        byte[]? brief = null;
+        var text = pruefung.Entscheidung.Aktion == Loeschaktion.Anonymisieren
                 ? "wir haben Ihre personenbezogenen Daten wie gewünscht gelöscht. Übrig bleiben nur anonyme statistische Angaben (Altersgruppe, Gebiet)."
                 : "wir haben Ihre Daten gelöscht, soweit keine gesetzliche Aufbewahrungspflicht besteht. Die übrigen Daten sind gesperrt und werden "
                   + $"nach Ablauf der Frist am {pruefung.Entscheidung.GesperrtBis:dd.MM.yyyy} gelöscht. Gründe:\n- "
                   + string.Join("\n- ", pruefung.Entscheidung.Gruende);
+        if (person.EMail is { } mail)
+        {
             // Ohne Personenbezug eingereiht, damit die Antwort nicht mit anonymisiert wird.
             await postausgang.KundenmailEinreihenAsync(mail, null, "Ihr Antrag auf Löschung Ihrer Daten (Art. 17 DSGVO)",
                 $"Guten Tag,\n\n{text}\n\nMit freundlichen Grüßen\n{einrichtung}", string.IsNullOrEmpty(person.Sprache) ? "de" : person.Sprache, null, abbruch);
             antwort = true;
         }
+        else if (dokumente is not null)
+        {
+            // Ohne E-Mail-Adresse: Antwortbrief, solange die Anschrift noch da ist (vor dem Anonymisieren).
+            var jetzt = uhr.GetLocalNow();
+            var stand = person.StandAm(DateOnly.FromDateTime(jetzt.Date), jetzt);
+            var anschrift = new List<string> { stand.NameMitTitel };
+            if (stand.BriefAn is { } a)
+            {
+                anschrift.AddRange(new[] { a.Zusatz, a.Strasse, $"{a.Postleitzahl} {a.Ort}" }.Where(z => !string.IsNullOrWhiteSpace(z)).Select(z => z!));
+            }
+
+            brief = (await dokumente.DatenschutzantwortAsync(anschrift, person.Sprache, "Ihr Antrag auf Löschung Ihrer Daten (Art. 17 DSGVO)",
+                text.Split("\n", StringSplitOptions.RemoveEmptyEntries), abbruch)).Druck;
+        }
 
         await AnwendenAsync(person, pruefung.Entscheidung, "Löschverlangen nach Art. 17 DSGVO", abbruch);
         await speicher.SpeichernAsync(abbruch);
-        return new LoeschverlangenErgebnis(pruefung.Entscheidung, antwort);
+        return new LoeschverlangenErgebnis(pruefung.Entscheidung, antwort, brief);
     }
 
     /// <summary>Gesperrte Person ansehen: nur berechtigte Rollen, jeder Zugriff wird protokolliert.</summary>

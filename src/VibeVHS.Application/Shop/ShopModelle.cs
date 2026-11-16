@@ -187,10 +187,13 @@ public static class ShopText
 }
 
 /// <summary>Ein Kurs auf dem QR-Bogen fürs Programmheft.</summary>
-public sealed record KursQrEintrag(string Nummer, string Titel, string? Zusatz, string Inhalt);
+public sealed record KursQrEintrag(string Nummer, string Titel, string? Zusatz, string Inhalt, int? Fachbereich = null, string? Preis = null);
+
+/// <summary>Gestaltung des QR-Bogens: Untertitel, Fachbereichsnamen für Zwischenüberschriften, Schneidemarken (Aushang zum Ausschneiden).</summary>
+public sealed record KursQrBogenOptionen(string? Untertitel = null, IReadOnlyDictionary<int, string>? Fachbereiche = null, bool Schneidemarken = false);
 
 /// <summary>Sammel-PDF der Kurs-QR-Codes (Programmheft, Aushang).</summary>
 public interface IKursQrBogen
 {
-    byte[] Erzeugen(string ueberschrift, IReadOnlyList<KursQrEintrag> kurse);
+    byte[] Erzeugen(string ueberschrift, IReadOnlyList<KursQrEintrag> kurse, KursQrBogenOptionen? optionen = null);
 }

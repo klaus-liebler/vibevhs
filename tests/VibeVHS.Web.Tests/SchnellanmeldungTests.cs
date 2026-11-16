@@ -130,6 +130,8 @@ public sealed class SchnellanmeldungTests
             [new("26H-501", "Englisch A2", "ab 29.09.2026", "https://vhs.example/k/26H-501"), new("26H-502", "Spanisch A1", null, "https://vhs.example/k/26H-502")]);
         System.Text.Encoding.ASCII.GetString(pdf, 0, 5).ShouldBe("%PDF-");
         pdf.Length.ShouldBeGreaterThan(2000);
+        // Je Kurs ein eingebettetes QR-Bild (MigraDoc zeigt sonst graue Kästen „Image has no valid type.“)
+        Regex.Matches(System.Text.Encoding.Latin1.GetString(pdf), @"/Subtype\s*/Image").Count.ShouldBe(2);
         Regex.IsMatch(KursQrAblauf.Kursseite(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(), "26H-501"), "^shop/kurs.html#kurs=26H-501$").ShouldBeTrue();
     }
 }

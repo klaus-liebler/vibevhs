@@ -172,18 +172,29 @@ public static class ShopApi
             "svg" => Results.File(Encoding.UTF8.GetBytes(qr.Svg(KursQrAblauf.QrInhalt(adresse, nummer))), "image/svg+xml", $"kurs-qr-{nummer}.svg"),
             _ => Results.NotFound(),
         }).RequireAuthorization();
-        app.MapGet("/kurse/qr-bogen.pdf", async (Guid? semester, int? fb, Application.Programm.IProgrammSpeicher programm,
-            Application.Durchfuehrung.OeffentlicheAdresse adresse, IKursQrBogen bogen) =>
+        // Kurs-QR-Bogen fürs Programmheft; ?schnitt=1: gestrichelte Kartenränder zum Ausschneiden (Aushang).
+        app.MapGet("/kurse/qr-bogen.pdf", async (Guid? semester, int? fb, int? schnitt, Application.Programm.IProgrammSpeicher programm,
+            Application.Stammdaten.IStammdaten stammdaten, Application.Durchfuehrung.OeffentlicheAdresse adresse, IKursQrBogen bogen, TimeProvider uhr) =>
         {
             var semesterName = semester is { } sid ? (await programm.SemesterAsync()).FirstOrDefault(x => x.Id == sid)?.Name : null;
+            // Entgelt zum heutigen Buchungsstand (nur mit Semester: dort sind die Entgelte geladen).
+            var jetzt = uhr.GetLocalNow();
+            var preise = semester is { } s2
+                ? (await programm.KurseMitTerminenAsync(s2)).ToDictionary(k => k.Id, k => k.EntgeltFuerBuchung(jetzt))
+                : [];
+            static string? Preis(Domain.Programm.KursEntgelt? e) => e is null || e.Cent <= 0 ? null
+                : $"{new Domain.Gemeinsam.Geld(e.Cent)}{(e.ErmaessigtCent is { } erm && erm < e.Cent ? $" · ermäßigt {new Domain.Gemeinsam.Geld(erm)}" : "")}";
             var kurse = (await programm.KurseAsync(new Application.Programm.KursFilter(semester, fb)))
                 .Where(k => k.Sichtbarkeit == Domain.Programm.Sichtbarkeit.Oeffentlich && k.Status != Domain.Programm.Kursstatus.Abgesagt)
-                .OrderBy(k => k.Kursnummer, StringComparer.Ordinal)
-                .Select(k => new KursQrEintrag(k.Kursnummer, k.Titel, k.ErsterTermin is { } b ? $"ab {b:dd.MM.yyyy}{(k.Ort is null ? "" : $" · {k.Ort}")}" : k.Ort,
-                    KursQrAblauf.QrInhalt(adresse, k.Kursnummer)))
+                .OrderBy(k => k.Fachbereich).ThenBy(k => k.Kursnummer, StringComparer.Ordinal)
+                .Select(k => new KursQrEintrag(k.Kursnummer, k.Titel, k.ErsterTermin is { } b ? $"ab {b:dd.MM.yyyy, HH:mm} Uhr{(k.Ort is null ? "" : $" · {k.Ort}")}" : k.Ort,
+                    KursQrAblauf.QrInhalt(adresse, k.Kursnummer), k.Fachbereich, Preis(preise.GetValueOrDefault(k.Id))))
                 .ToList();
-            var titel = $"Kurs-QR-Codes{(semesterName is null ? "" : $" {semesterName}")}{(fb is { } f ? $" · Fachbereich {f}" : "")}";
-            return Results.File(bogen.Erzeugen(titel, kurse), "application/pdf", $"kurs-qr{(fb is { } g ? $"-fb{g}" : "")}.pdf");
+            var fachbereiche = (await stammdaten.FachbereicheAsync()).ToDictionary(f => f.Nr, f => f.Name);
+            var titel = $"Kursprogramm{(semesterName is null ? "" : $" {semesterName}")}";
+            var untertitel = $"Direkt anmelden per QR-Code{(fb is { } f && fachbereiche.TryGetValue(f, out var fn) ? $" · Fachbereich {f} {fn}" : "")}";
+            return Results.File(bogen.Erzeugen(titel, kurse, new KursQrBogenOptionen(untertitel, fachbereiche, schnitt == 1)), "application/pdf",
+                $"kurs-qr{(fb is { } g ? $"-fb{g}" : "")}{(schnitt == 1 ? "-aushang" : "")}.pdf");
         }).RequireAuthorization();
 
         // Bestätigungslink aus der Mail: erst eine Seite mit Knopf (Mail-Scanner öffnen Links, bestätigen aber nicht), dann POST.

@@ -260,6 +260,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(e => e.Name).HasMaxLength(200);
             b.Property(e => e.Kurzname).HasMaxLength(50);
             b.Property(e => e.Bundesland).HasMaxLength(50);
+            b.Property(e => e.Website).HasMaxLength(200);
             b.PrimitiveCollection(e => e.Orte);
         });
 

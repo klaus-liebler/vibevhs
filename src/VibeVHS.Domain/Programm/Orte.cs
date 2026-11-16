@@ -45,9 +45,38 @@ public enum MerkmalBezug
     Person,
 }
 
+/// <summary>Werttyp eines Merkmals: bestimmt Erfassungsfeld, Prüfung des Werts und mögliche Bedingungen der Kursarten.</summary>
+public enum Merkmalstyp
+{
+    /// <summary>Vorhanden oder nicht (optional mit Bemerkung, z. B. „1. OG ohne Aufzug“).</summary>
+    JaNein,
+
+    /// <summary>Einer (oder mit <see cref="Merkmal.Mehrfach"/> mehrere) der festgelegten Werte, z. B. Tafel: Kreide/Whiteboard/Smartboard.</summary>
+    Auswahl,
+
+    /// <summary>Ganze Zahl mit optionaler Einheit und Grenzen, z. B. PC-Arbeitsplätze, Fläche in m².</summary>
+    Ganzzahl,
+
+    /// <summary>Freier Text, z. B. Hinweise zum Zugang; nicht als Bedingung verwendbar.</summary>
+    Text,
+}
+
+public static class MerkmalstypAnzeige
+{
+    public static string Text(Merkmalstyp t) => t switch
+    {
+        Merkmalstyp.JaNein => "Ja/Nein",
+        Merkmalstyp.Auswahl => "Auswahl",
+        Merkmalstyp.Ganzzahl => "Ganzzahl",
+        _ => "Text",
+    };
+}
+
 /// <summary>Eintrag im gemeinsamen, pflegbaren Merkmalskatalog (z. B. "barrierefrei", "BAMF-Kursort", "BAMF-Lehrkraftzulassung").</summary>
 public sealed class Merkmal
 {
+    public const int TextMaxLaenge = 500;
+
     private Merkmal()
     {
         Schluessel = string.Empty;
@@ -56,7 +85,8 @@ public sealed class Merkmal
     }
 
     public Merkmal(string schluessel, string name, string gruppe, bool vererbbar = true, bool nachweisPflicht = false, string? ausschlussgruppe = null,
-        MerkmalBezug bezug = MerkmalBezug.Ort, bool gesetzlich = false, IEnumerable<string>? werte = null, int vorlaufTage = 60, bool mehrfach = false)
+        MerkmalBezug bezug = MerkmalBezug.Ort, bool gesetzlich = false, IEnumerable<string>? werte = null, int vorlaufTage = 60, bool mehrfach = false,
+        Merkmalstyp? typ = null, string? einheit = null, int? min = null, int? max = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(schluessel);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -71,7 +101,154 @@ public sealed class Merkmal
         Werte = werte?.ToList() ?? [];
         VorlaufTage = vorlaufTage;
         Mehrfach = mehrfach && Werte.Count > 0;
+        // Ohne Angabe: mit Werten eine Auswahl, sonst Ja/Nein (bisheriges Verhalten).
+        TypSetzen(typ ?? (Werte.Count > 0 ? Merkmalstyp.Auswahl : Merkmalstyp.JaNein), Werte, Mehrfach, einheit, min, max);
     }
+
+    /// <summary>Werttyp; nach der ersten Verwendung nicht mehr änderbar (<see cref="TypFestlegen"/>).</summary>
+    public Merkmalstyp Typ { get; private set; }
+
+    /// <summary>Einheit bei Ganzzahlen, z. B. „Plätze“ oder „m²“.</summary>
+    public string? Einheit { get; private set; }
+
+    public int? Min { get; private set; }
+
+    public int? Max { get; private set; }
+
+    /// <summary>Auswahlwerte, die nicht mehr neu vergeben werden (bestehende Einträge bleiben gültig).</summary>
+    public List<string> InaktiveWerte { get; private set; } = [];
+
+    public IReadOnlyList<string> AktiveWerte => Werte.Where(w => !InaktiveWerte.Contains(w, StringComparer.OrdinalIgnoreCase)).ToList();
+
+    /// <summary>Kann eine Kursart darauf eine Bedingung stellen? (Text nicht.)</summary>
+    public bool AlsBedingung => Typ != Merkmalstyp.Text;
+
+    /// <summary>Typ und Typangaben festlegen. Nach der ersten Verwendung (Eintrag an Ort/Person oder Bedingung einer Kursart) ist ein anderer Typ nicht mehr möglich.</summary>
+    public void TypFestlegen(Merkmalstyp typ, bool verwendet, IEnumerable<string>? werte = null, bool mehrfach = false, string? einheit = null, int? min = null, int? max = null)
+    {
+        if (verwendet && typ != Typ)
+        {
+            throw new InvalidOperationException($"Der Typ von „{Name}“ ist nicht mehr änderbar, weil das Merkmal schon verwendet wird. Möglich: Auswahlwerte ergänzen oder deaktivieren.");
+        }
+
+        if (verwendet && Typ == Merkmalstyp.Auswahl && werte is not null && Werte.Any(w => !werte.Contains(w, StringComparer.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("Verwendete Auswahlwerte können nicht gelöscht, nur deaktiviert werden.");
+        }
+
+        TypSetzen(typ, werte?.ToList() ?? Werte, mehrfach, einheit, min, max);
+    }
+
+    private void TypSetzen(Merkmalstyp typ, List<string> werte, bool mehrfach, string? einheit, int? min, int? max)
+    {
+        var bereinigt = werte.Where(w => !string.IsNullOrWhiteSpace(w)).Select(w => w.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (typ == Merkmalstyp.Auswahl && bereinigt.Count == 0)
+        {
+            throw new ArgumentException($"Für die Auswahl bei „{Name}“ bitte mindestens einen Wert angeben.");
+        }
+
+        if (typ == Merkmalstyp.Ganzzahl && min is { } a && max is { } b && a > b)
+        {
+            throw new ArgumentException("Das Minimum liegt über dem Maximum.");
+        }
+
+        Typ = typ;
+        Werte = typ == Merkmalstyp.Auswahl ? bereinigt : [];
+        Mehrfach = typ == Merkmalstyp.Auswahl && mehrfach;
+        InaktiveWerte = typ == Merkmalstyp.Auswahl ? InaktiveWerte.Where(w => Werte.Contains(w, StringComparer.OrdinalIgnoreCase)).ToList() : [];
+        Einheit = typ == Merkmalstyp.Ganzzahl && !string.IsNullOrWhiteSpace(einheit) ? einheit.Trim() : null;
+        Min = typ == Merkmalstyp.Ganzzahl ? min : null;
+        Max = typ == Merkmalstyp.Ganzzahl ? max : null;
+    }
+
+    /// <summary>Auswahlwert ergänzen (oder einen deaktivierten wieder aktivieren).</summary>
+    public void WertErgaenzen(string wert)
+    {
+        if (Typ != Merkmalstyp.Auswahl)
+        {
+            throw new InvalidOperationException($"„{Name}“ ist keine Auswahl.");
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(wert);
+        var w = wert.Trim();
+        InaktiveWerte.RemoveAll(x => x.Equals(w, StringComparison.OrdinalIgnoreCase));
+        if (!Werte.Contains(w, StringComparer.OrdinalIgnoreCase))
+        {
+            Werte = [.. Werte, w];
+        }
+    }
+
+    /// <summary>Auswahlwert deaktivieren: nicht mehr neu wählbar; bestehende Einträge bleiben gültig.</summary>
+    public void WertDeaktivieren(string wert)
+    {
+        var w = Werte.FirstOrDefault(x => x.Equals(wert?.Trim(), StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException($"„{wert}“ ist kein Wert von „{Name}“.");
+        if (AktiveWerte.Count <= 1 && !InaktiveWerte.Contains(w))
+        {
+            throw new InvalidOperationException("Mindestens ein Auswahlwert muss aktiv bleiben.");
+        }
+
+        if (!InaktiveWerte.Contains(w))
+        {
+            InaktiveWerte = [.. InaktiveWerte, w];
+        }
+    }
+
+    /// <summary>
+    /// Prüft und vereinheitlicht einen Wert zum Eintragen: Ja/Nein mit optionaler Bemerkung, Auswahl nur aus den aktiven Werten
+    /// (bei Mehrfachauswahl kommagetrennt), Ganzzahl innerhalb der Grenzen, Text nicht leer.
+    /// </summary>
+    public string? WertPruefen(string? wert)
+    {
+        var w = string.IsNullOrWhiteSpace(wert) ? null : wert.Trim();
+        switch (Typ)
+        {
+            case Merkmalstyp.JaNein:
+                return w;
+            case Merkmalstyp.Auswahl:
+                var gewaehlt = Mehrfach ? Anforderung.Werte(w) : w is null ? [] : [w];
+                if (gewaehlt.Count == 0)
+                {
+                    throw new ArgumentException($"Bitte für „{Name}“ {(Mehrfach ? "mindestens einen" : "einen")} der Werte wählen: {string.Join(", ", AktiveWerte)}.");
+                }
+
+                var kanonisch = new List<string>();
+                foreach (var g in gewaehlt)
+                {
+                    kanonisch.Add(AktiveWerte.FirstOrDefault(a => a.Equals(g, StringComparison.OrdinalIgnoreCase))
+                                  ?? throw new ArgumentException($"„{g}“ ist für „{Name}“ nicht wählbar. Möglich: {string.Join(", ", AktiveWerte)}."));
+                }
+
+                return string.Join(", ", kanonisch.Distinct());
+            case Merkmalstyp.Ganzzahl:
+                if (!int.TryParse(w, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var zahl))
+                {
+                    throw new ArgumentException($"Für „{Name}“ bitte eine ganze Zahl eingeben{(Einheit is null ? "" : $" ({Einheit})")}.");
+                }
+
+                if ((Min is { } min && zahl < min) || (Max is { } max && zahl > max))
+                {
+                    throw new ArgumentException($"„{Name}“: erlaubt sind {Min?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "beliebig"} bis {Max?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "beliebig"}{(Einheit is null ? "" : $" {Einheit}")}.");
+                }
+
+                return zahl.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            default:
+                if (w is null)
+                {
+                    throw new ArgumentException($"Bitte für „{Name}“ einen Text eingeben.");
+                }
+
+                return w.Length <= TextMaxLaenge ? w : throw new ArgumentException($"Der Text für „{Name}“ ist zu lang (höchstens {TextMaxLaenge} Zeichen).");
+        }
+    }
+
+    /// <summary>Wert zur Anzeige, z. B. „12 Plätze“, „ja“ oder die Bemerkung.</summary>
+    public string WertAnzeige(string? wert) => Typ switch
+    {
+        Merkmalstyp.JaNein => wert ?? "ja",
+        Merkmalstyp.Ganzzahl => wert is null ? "–" : $"{wert}{(Einheit is null ? "" : $" {Einheit}")}",
+        _ => wert ?? "–",
+    };
 
     public MerkmalBezug Bezug { get; private set; }
 
@@ -247,7 +424,12 @@ public sealed class Ort
             throw new ArgumentException($"Für „{merkmal.Name}“ ist ein Nachweis Pflicht.");
         }
 
-        ZeitlicheHistorie.AendernAb(_merkmale, new OrtMerkmal(merkmal.Schluessel, wert, nachweis, ab, bisEinschliesslich?.AddDays(1), erfassung));
+        if (merkmal.Bezug != MerkmalBezug.Ort)
+        {
+            throw new ArgumentException($"„{merkmal.Name}“ ist ein Merkmal für Personen, nicht für Orte.");
+        }
+
+        ZeitlicheHistorie.AendernAb(_merkmale, new OrtMerkmal(merkmal.Schluessel, merkmal.WertPruefen(wert), nachweis, ab, bisEinschliesslich?.AddDays(1), erfassung));
     }
 
     public void MerkmalEntfernenAb(string schluessel, DateOnly ab, Erfassung erfassung)

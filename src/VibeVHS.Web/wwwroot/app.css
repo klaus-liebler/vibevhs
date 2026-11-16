@@ -228,7 +228,8 @@ details.vhs-card > summary { cursor: pointer; }
 .vhs-aufgabe-titel { font-weight: 600; }
 .vhs-aufgabe-panel { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--vhs-surface-2); border-radius: 8px; padding: 8px 10px; }
 .vhs-wsa { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
-.vhs-wsa h2 .vhs-zahl { font-weight: 500; color: var(--vhs-muted); margin-left: 6px; }
+/* Zähler hinter Bereichsüberschriften als Badge (Startseite, Dashboard, Finanzen) */
+.vhs-zahl { display: inline-flex; align-items: center; justify-content: center; min-width: 1.7em; margin-left: 8px; padding: 1px 8px; border-radius: 12px; border: 1px solid var(--vhs-line); background: var(--vhs-bg); color: var(--vhs-muted); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; vertical-align: middle; line-height: 1.5; }
 @media (max-width: 600px) { .vhs-wsa { grid-template-columns: 1fr; } }
 .vhs-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 12px; }
 
@@ -272,3 +273,22 @@ details.vhs-card > summary { cursor: pointer; }
 /* Testsystem-Banner (Testsystem:Aktiv) */
 .vhs-testsystem { background: var(--vhs-warn-weak); color: var(--vhs-warn); border-bottom: 2px solid var(--vhs-warn); padding: 6px 16px; font-size: 13px; text-align: center; }
 .vhs-app > .vhs-testsystem { grid-column: 1 / -1; }
+/* Rücksprung zur Liste (ZurueckZurListe) und zuletzt angesehene Zeile */
+.vhs-zurueck { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; font-size: 14px; color: var(--vhs-muted); text-decoration: none; align-self: flex-start; }
+.vhs-zurueck:hover, .vhs-zurueck:focus-visible { color: var(--vhs-fg); text-decoration: underline; }
+
+/* Einstellungen: Logo-Vorschau */
+.vhs-logo-vorschau { padding: 12px; border: 1px dashed var(--vhs-line); border-radius: 8px; background: #fff; align-self: flex-start; }
+.vhs-logo-vorschau img { display: block; max-height: 64px; max-width: 100%; }
+
+/* Benutzerverwaltung: Mehrfachauswahl Rollen/Fachbereiche */
+.vhs-auswahl { border: 1px solid var(--vhs-line); border-radius: 8px; padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0; }
+.vhs-auswahl legend { font-weight: 600; padding: 0 4px; }
+.vhs-auswahl label { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; }
+.vhs-einschub { border-color: var(--vhs-accent); }
+a.vhs-chip { text-decoration: none; display: inline-flex; align-items: center; }
+
+/* Merkmale: Filter der Orte, deaktivierte Auswahlwerte */
+.vhs-filterbox { margin-bottom: 10px; }
+.vhs-filterbox summary { cursor: pointer; min-height: 32px; }
+.vhs-chip.vhs-aus { text-decoration: line-through; opacity: 0.6; }

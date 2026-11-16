@@ -4,7 +4,8 @@
     Mit PersonId erscheint je Feld ein Uhr-Symbol, das in die Datenhistorie springt.
 *@
 <dl class="vhs-kv">
-    @Zeile("Name", Stand.NameMitTitel, "Name")
+    @Zeile("Name", $"{(Stand.Anrede is { } an && an != "Keine Anrede" ? an + " " : "")}{Stand.NameMitTitel}{(Stand.Geburtsname is { } gn ? $", geb. {gn}" : "")}", "Name")
+    @if (Stand.Geschlecht is { } gs) { @Zeile("Geschlecht", gs, "Name") }
     @Zeile("Geburtsdatum", Stand.Geburtsdatum?.ToString("dd.MM.yyyy") ?? "–", "Geburtsdatum")
     @Zeile("Rollen", PersonMerkmal.RollenAnzeige(Stand.Rollen), "Rollen")
     @Zeile("Sprache", Stand.Sprache is null ? "–" : Sprachen.Name(Stand.Sprache), "Sprache")

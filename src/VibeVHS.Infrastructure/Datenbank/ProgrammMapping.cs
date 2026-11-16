@@ -104,6 +104,9 @@ internal static class ProgrammMapping
             b.Property(m => m.Ausschlussgruppe).HasMaxLength(60);
             b.Property(m => m.Bezug).HasMaxLength(20);
             b.PrimitiveCollection(m => m.Werte);
+            b.Property(m => m.Typ).HasMaxLength(20);
+            b.Property(m => m.Einheit).HasMaxLength(30);
+            b.PrimitiveCollection(m => m.InaktiveWerte);
         });
 
         mb.Entity<Ort>(b =>

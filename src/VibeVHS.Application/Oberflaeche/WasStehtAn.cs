@@ -49,20 +49,20 @@ public static class WasStehtAn
                 break;
             case Rolle.Teilnehmerservice:
                 liste.Add(new("Person anlegen", "personen?neu=1", "Neue Teilnehmende oder Dozierende erfassen", Hauptschritt: liste.Count == 0));
-                liste.Add(new("Anmeldung erfassen", "anmeldung", Freigabe: Freigabe.Geplant("Die Kursanmeldung")));
+                liste.Add(new("Anmeldung erfassen", "anmeldung", "Person und Kurs wählen, Buchungsprüfung, Bestätigung"));
                 liste.Add(new("Personen durchsuchen", "personen"));
                 break;
             case Rolle.Buchhaltung:
-                liste.Add(new("Mahnvorschläge freigeben", "finanzen", Freigabe: Freigabe.Geplant("Das Mahnwesen")));
+                liste.Add(new("Mahnvorschläge freigeben", "finanzen?tab=mahnwesen", "Vorschlag prüfen, Posten abwählen, freigeben"));
                 liste.Add(new("Postausgang (Übergaben an die Kämmerei)", "postausgang", Hauptschritt: liste.Count == 0));
                 break;
             case Rolle.IntegrationskursTeam:
-                liste.Add(new("BAMF-Meldungen prüfen", "integration", Freigabe: Freigabe.Geplant("Die BAMF-Schnittstelle")));
+                liste.Add(new("BAMF-Meldungen prüfen", "integration", "Abschnitte, Kostenbeiträge und Meldungen"));
                 liste.Add(new("Postausgang ansehen", "postausgang", Hauptschritt: liste.Count == 0));
                 break;
             case Rolle.Systemverwaltung:
                 liste.Add(new("Protokoll prüfen", "protokoll", "Automatische Abläufe und Fehler im Blick behalten", Hauptschritt: liste.Count == 0));
-                liste.Add(new("Benutzer und Rollen pflegen", "", Freigabe: Freigabe.Geplant("Die Benutzerverwaltung")));
+                liste.Add(new("Benutzer und Rollen pflegen", "einstellungen?tab=benutzer", "Konten, Rollen und Fachbereiche für den Testbetrieb"));
                 break;
         }
 

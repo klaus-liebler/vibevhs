@@ -137,7 +137,12 @@ public sealed class Person
             _vollmachten.AlleAmStichtag(gueltigAm, bekanntAm),
             _einwilligungen.AlleAmStichtag(gueltigAm, bekanntAm),
             Merkmal(MerkmalArt.Beschaeftigung)?.AlsBeschaeftigung(),
-            _qualifikationen.AlleAmStichtag(gueltigAm, bekanntAm));
+            _qualifikationen.AlleAmStichtag(gueltigAm, bekanntAm),
+            Leer(Merkmal(MerkmalArt.Anrede)?.Inhalt),
+            Leer(Merkmal(MerkmalArt.Geschlecht)?.Inhalt),
+            Leer(Merkmal(MerkmalArt.Geburtsname)?.Inhalt));
+
+        static string? Leer(string? s) => string.IsNullOrWhiteSpace(s) ? null : s;
     }
 
     // ---------- Dozierende: Beschäftigungsart und Qualifikationen ----------
@@ -168,11 +173,7 @@ public sealed class Person
             throw new ArgumentException($"Für „{merkmal.Name}“ ist ein Nachweis Pflicht (Dokument oder Aktenzeichen).");
         }
 
-        var werte = merkmal.Mehrfach ? Programm.Anforderung.Werte(wert) : wert is null ? [] : [wert];
-        if (merkmal.Werte.Count > 0 && (werte.Count == 0 || werte.Any(w => !merkmal.Werte.Contains(w))))
-        {
-            throw new ArgumentException($"Bitte für „{merkmal.Name}“ einen der Werte wählen: {string.Join(", ", merkmal.Werte)}.");
-        }
+        wert = merkmal.WertPruefen(wert);
 
         if (bisEinschliesslich is { } b && b < ab)
         {
@@ -180,10 +181,6 @@ public sealed class Person
         }
 
         var erste = !_qualifikationen.Any(q => q.Schluessel == merkmal.Schluessel);
-        if (merkmal.Mehrfach)
-        {
-            wert = string.Join(", ", werte.Distinct());
-        }
 
         var neu = new PersonQualifikation(merkmal.Schluessel, merkmal.Name, wert, nachweis, ausstellendeStelle, ab, bisEinschliesslich?.AddDays(1),
             erste && erfassung.Art == Erfassungsart.AenderungAbDatum ? erfassung with { Art = Erfassungsart.Ersterfassung } : erfassung);
@@ -259,6 +256,37 @@ public sealed class Person
         ZwischenstandAktualisieren(erfassung.Am);
     }
 
+    /// <summary>Anrede, Geschlecht oder Geburtsname: Änderung ab Datum oder Korrektur der am Datum gültigen Angabe (leer = keine Angabe).</summary>
+    public void AngabeAendern(MerkmalArt art, string? wert, DateOnly datum, Erfassung erfassung, bool korrektur)
+    {
+        if (art is not (MerkmalArt.Anrede or MerkmalArt.Geschlecht or MerkmalArt.Geburtsname))
+        {
+            throw new ArgumentException("Nur Anrede, Geschlecht und Geburtsname sind freie Angaben.", nameof(art));
+        }
+
+        var inhalt = wert?.Trim() ?? string.Empty;
+        if (!_merkmale.Any(m => m.Art == art))
+        {
+            _merkmale.Add(new PersonMerkmal(art, inhalt, korrektur ? DateOnly.MinValue : datum, null, erfassung with { Art = Erfassungsart.Ersterfassung }));
+        }
+        else if (korrektur)
+        {
+            ZeitlicheHistorie.Korrigieren(_merkmale, datum, (gv, gb) => new PersonMerkmal(art, inhalt, gv, gb, erfassung with { Art = Erfassungsart.Korrektur }),
+                erfassung.Am, m => m.Art == art);
+        }
+        else
+        {
+            ZeitlicheHistorie.AendernAb(_merkmale, new PersonMerkmal(art, inhalt, datum, null, erfassung));
+        }
+
+        if (art == MerkmalArt.Geschlecht)
+        {
+            StatistikGeschlecht = inhalt.Length == 0 ? "nicht erfasst" : inhalt;
+        }
+
+        ZwischenstandAktualisieren(erfassung.Am);
+    }
+
     public void SpracheAendernAb(string sprache, DateOnly ab, Erfassung erfassung)
     {
         ZeitlicheHistorie.AendernAb(_merkmale, new PersonMerkmal(MerkmalArt.Sprache, NormierteSprache(sprache), ab, null, erfassung));
@@ -278,6 +306,23 @@ public sealed class Person
         ZeitlicheHistorie.AendernAb(_merkmale, new PersonMerkmal(MerkmalArt.Rollen, PersonMerkmal.RollenText(bisher | rolle), ab, null, art));
         ZwischenstandAktualisieren(erfassung.Am);
     }
+
+    /// <summary>Beendet eine Rolle: ab <paramref name="ab"/> (dem Tag nach dem letzten Tag) gilt sie nicht mehr; die Historie bleibt.</summary>
+    public void RolleBeendenAb(Personenrolle rolle, DateOnly ab, Erfassung erfassung)
+    {
+        var bisher = RollenAm(ab, erfassung.Am);
+        if (!bisher.HasFlag(rolle))
+        {
+            throw new InvalidOperationException($"Die Rolle „{PersonMerkmal.RollenAnzeige(rolle)}“ besteht am {ab:dd.MM.yyyy} nicht.");
+        }
+
+        ZeitlicheHistorie.AendernAb(_merkmale, new PersonMerkmal(MerkmalArt.Rollen, PersonMerkmal.RollenText(bisher & ~rolle), ab, null, erfassung));
+        ZwischenstandAktualisieren(erfassung.Am);
+    }
+
+    /// <summary>Rollen am Stichtag (Wissensstand <paramref name="bekanntAm"/>).</summary>
+    public Personenrolle RollenAm(DateOnly tag, DateTimeOffset bekanntAm)
+        => _merkmale.Where(m => m.Art == MerkmalArt.Rollen).AlsStichtag(tag, bekanntAm)?.AlsRollen() ?? Personenrolle.Keine;
 
     /// <summary>Verknüpft die Person mit einem Benutzerkonto und macht sie zur Mitarbeitenden.</summary>
     public void AlsMitarbeitendeVerknuepfen(string benutzerkennung, DateOnly ab, Erfassung erfassung)
@@ -762,7 +807,10 @@ public sealed record PersonenStand(
     IReadOnlyList<Buchungsvollmacht> Vollmachten,
     IReadOnlyList<Einwilligung> Einwilligungen,
     Beschaeftigungsart? Beschaeftigung = null,
-    IReadOnlyList<PersonQualifikation>? Qualifikationen = null)
+    IReadOnlyList<PersonQualifikation>? Qualifikationen = null,
+    string? Anrede = null,
+    string? Geschlecht = null,
+    string? Geburtsname = null)
 {
     /// <summary>Liegt für Kanal und Zweck eine Einwilligung vor? Ohne Angabe: nein.</summary>
     public bool Erlaubt(Kontaktkanal kanal, Kontaktzweck zweck)

@@ -72,4 +72,22 @@ internal sealed class AuditProtokoll(VibeVhsDbContext db, IAktuellerBenutzer ben
 
     public async Task<IReadOnlyList<AuditEintrag>> NeuesteAsync(int anzahl, CancellationToken abbruch = default)
         => await db.Protokoll.AsNoTracking().OrderByDescending(e => e.Zeitpunkt).ThenByDescending(e => e.Id).Take(anzahl).ToListAsync(abbruch);
+
+    /// <summary>Blockweise rückwärts lesen, bis der Zeitpunkt unterschritten ist (Zeitpunkte sind binär gespeichert, der Vergleich läuft im Speicher).</summary>
+    public async Task<IReadOnlyList<AuditEintrag>> SeitAsync(DateTimeOffset seit, string? benutzerKennung = null, CancellationToken abbruch = default)
+    {
+        const int Block = 1000;
+        var basis = db.Protokoll.AsNoTracking().Where(e => benutzerKennung == null || e.BenutzerKennung == benutzerKennung)
+            .OrderByDescending(e => e.Zeitpunkt).ThenByDescending(e => e.Id);
+        var ergebnis = new List<AuditEintrag>();
+        for (var start = 0; ; start += Block)
+        {
+            var block = await basis.Skip(start).Take(Block).ToListAsync(abbruch);
+            ergebnis.AddRange(block.Where(e => e.Zeitpunkt >= seit));
+            if (block.Count < Block || block[^1].Zeitpunkt < seit)
+            {
+                return ergebnis;
+            }
+        }
+    }
 }

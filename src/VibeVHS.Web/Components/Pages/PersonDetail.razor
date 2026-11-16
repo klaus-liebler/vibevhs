@@ -11,6 +11,16 @@
 
 <PageTitle>@(stand?.NameMitTitel ?? "Person") · VibeVHS</PageTitle>
 
+@if (antwortbrief is { } ab)
+{
+    <div class="vhs-alert vhs-info" id="antwortbrief" role="status">
+        <b>Antwortbrief zum Löschverlangen</b> – die Person hat keine E-Mail-Adresse.
+        <a download="antwort-loeschverlangen.pdf" href="@($"data:application/pdf;base64,{Convert.ToBase64String(ab)}")">PDF herunterladen</a>, drucken und per Post versenden.
+        <span class="vhs-small vhs-muted">Das Druckstück mit Anschrift wird nicht gespeichert; im Archiv steht nur der Text ohne Anschrift (mit Übersetzungs-QR).</span>
+    </div>
+}
+
+
 @if (person is null || stand is null)
 {
     <h1>Person nicht gefunden</h1>
@@ -60,6 +70,7 @@ else if (dubletten.Count > 0)
     </div>
 }
 
+<ZurueckZurListe Liste="personen" />
 <div class="vhs-head">
     <div>
         <h1>@stand.NameMitTitel</h1>
@@ -71,7 +82,8 @@ else if (dubletten.Count > 0)
         <BegruendeterButton Text="Testmail" Icon="mail" ButtonStyle="ButtonStyle.Light"
                             Freigabe="@MailFreigabe" Click="TestmailAsync" />
         <BegruendeterButton Text="Bescheinigung drucken" Icon="print" ButtonStyle="ButtonStyle.Light"
-                            Freigabe="@(Freigabe.Geplant("Der Druck von Bescheinigungen (mit QR-Code „Translate this letter“)"))" />
+                            Freigabe="@(Freigabe.NurFuer(rolle, VibeVHS.Application.Dokumente.DokumentDienst.AusstellRollen).Und(() => belegungen.Count == 0 ? Freigabe.Nein("Die Person hat keine Kursanmeldungen; Bescheinigungen gibt es je Belegung.") : Freigabe.Ja))"
+                            Click="@(() => Navigation.NavigateTo($"personen/{Id}#anmeldungen"))" />
     </div>
 </div>
 
@@ -85,10 +97,50 @@ else if (dubletten.Count > 0)
     <StammdatenKompakt Stand="@stand" PersonId="@Id" Widerrufen="@VollmachtWiderrufenAsync" />
 </section>
 
+<section class="vhs-card" id="rollen" aria-labelledby="h-rollen">
+    <div class="vhs-head"><h2 id="h-rollen">Rollen</h2>
+        <span class="vhs-small vhs-muted">additiv und zeitlich gültig; Wechsel stehen in der <a href="@($"personen/{Id}/historie?art=Rollen")">Datenhistorie</a></span></div>
+    <div class="vhs-list">
+        @foreach (var r in new[] { Personenrolle.Teilnehmende, Personenrolle.Dozierende, Personenrolle.Mitarbeitende })
+        {
+            var hat = stand.Rollen.HasFlag(r);
+            var pflegbar = VibeVHS.Application.Personen.PersonenrollenDienst.Pflegbar.Contains(r);
+            <div>
+                <span class="vhs-grow"><b>@PersonMerkmal.RollenAnzeige(r)</b>
+                    @if (r == Personenrolle.Mitarbeitende) { <br /><span class="vhs-small vhs-muted">entsteht über ein Benutzerkonto (Einstellungen → Benutzer)</span> }
+                </span>
+                <StatusPille Stil="@(hat ? "gut" : "neutral")">@(hat ? "aktiv" : "–")</StatusPille>
+                @if (pflegbar)
+                {
+                    <BegruendeterButton Text="@(hat ? "Rolle beenden …" : "Rolle hinzufügen …")" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                        Freigabe="@RollenRecht" Click="@(() => RolleOeffnenAsync(r, !hat))" />
+                }
+            </div>
+            @if (rRolle == r)
+            {
+                <div class="vhs-einschub">
+                    <div class="vhs-fields">
+                        <RadzenFormField Text="@(rHinzu ? "gilt ab" : "letzter Tag mit der Rolle")" Variant="Variant.Outlined">
+                            <RadzenDatePicker TValue="DateOnly" @bind-Value="rDatum" @bind-Value:after="SperreAsync" DateFormat="dd.MM.yyyy" />
+                        </RadzenFormField>
+                        <RadzenFormField Text="Grund *" Variant="Variant.Outlined" Style="min-width:320px">
+                            <RadzenTextBox @bind-Value="rGrund" Placeholder="@(rHinzu ? "z. B. leitet ab Frühjahr den Englischkurs" : "z. B. Tätigkeit beendet")" />
+                        </RadzenFormField>
+                    </div>
+                    <div class="vhs-row">
+                        <BegruendeterButton Text="@(rHinzu ? "Hinzufügen" : "Beenden")" Icon="@(rHinzu ? "add" : "event_busy")" Freigabe="@RollenFreigabe" Click="RolleSpeichernAsync" />
+                        <RadzenButton Text="Abbrechen" ButtonStyle="ButtonStyle.Light" Click="@(() => rRolle = null)" />
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</section>
+
 @if (stand.Rollen.HasFlag(Personenrolle.Dozierende) || stand.Qualifikationen is { Count: > 0 } || stand.Beschaeftigung is not null)
 {
     var heuteQ = DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
-    <section class="vhs-card">
+    <section class="vhs-card" id="qualifikationen">
         <div class="vhs-head">
             <h2>Qualifikationen</h2>
             <span class="vhs-small vhs-muted">Beschäftigung: <b>@(stand.Beschaeftigung is { } ba ? $"{BeschaeftigungAnzeige.Text(ba)} ({BeschaeftigungAnzeige.Erklaerung(ba)})" : "nicht erfasst")</b> · Verlauf in der <a href="@($"personen/{Id}/historie")">Datenhistorie</a></span>
@@ -124,17 +176,11 @@ else if (dubletten.Count > 0)
         <details>
             <summary class="vhs-small">Qualifikation eintragen oder erneuern</summary>
             <div class="vhs-fields" style="margin-top:8px">
-                <RadzenFormField Text="Merkmal" Variant="Variant.Outlined"><RadzenDropDown TValue="string" @bind-Value="qSchluessel" Data="@personenmerkmale" TextProperty="Name" ValueProperty="Schluessel" /></RadzenFormField>
-                @if (personenmerkmale.FirstOrDefault(m => m.Schluessel == qSchluessel) is { Werte.Count: > 0, Mehrfach: true } mm)
+                <RadzenFormField Text="Merkmal" Variant="Variant.Outlined"><RadzenDropDown TValue="string" @bind-Value="qSchluessel" @bind-Value:after="@(() => qWert = null)" Data="@personenmerkmale" TextProperty="Name" ValueProperty="Schluessel" /></RadzenFormField>
+                @if (personenmerkmale.FirstOrDefault(m => m.Schluessel == qSchluessel) is { Typ: not VibeVHS.Domain.Programm.Merkmalstyp.JaNein } qm)
                 {
-                    <RadzenFormField Text="Freigegeben für (mehrere möglich)" Variant="Variant.Outlined">
-                        <RadzenDropDown TValue="IEnumerable<string>" Multiple="true" Chips="true" Value="@(VibeVHS.Domain.Programm.Anforderung.Werte(qWert))"
-                                        ValueChanged="@((IEnumerable<string> w) => qWert = w?.Any() == true ? string.Join(", ", w) : null)" Data="@mm.Werte" />
-                    </RadzenFormField>
-                }
-                else if (personenmerkmale.FirstOrDefault(m => m.Schluessel == qSchluessel) is { Werte.Count: > 0 } mw)
-                {
-                    <RadzenFormField Text="Art / Wert" Variant="Variant.Outlined"><RadzenDropDown TValue="string" @bind-Value="qWert" Data="@mw.Werte" /></RadzenFormField>
+                    @* Eingabe passend zum Werttyp: Auswahl (auch mehrfach, z. B. Sprachen), Ganzzahl, Text *@
+                    <MerkmalWertEingabe Merkmal="@qm" @bind-Wert="qWert" />
                 }
                 <RadzenFormField Text="Nachweis (Dokument, Aktenzeichen)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="qNachweis" /></RadzenFormField>
                 <RadzenFormField Text="Ausstellende Stelle" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="qStelle" /></RadzenFormField>
@@ -162,7 +208,7 @@ else if (dubletten.Count > 0)
     </section>
 }
 
-<section class="vhs-card">
+<section class="vhs-card" id="anmeldungen">
     <div class="vhs-head">
         <h2>Kurse und Anmeldungen</h2>
         <BegruendeterButton Text="Neue Anmeldung" Icon="add" Size="ButtonSize.Small" Click="@(() => Navigation.NavigateTo($"anmeldung?person={Id}"))"
@@ -179,10 +225,16 @@ else if (dubletten.Count > 0)
             {
                 var bl = pb.Belegung;
                 <div>
-                    <span class="vhs-grow"><a href="@($"belegungen/{bl.Id}")"><b>@bl.Kursnummer</b> @pb.Kurstitel</a>
+                    <span class="vhs-grow"><a href="@Ruecksprung.Detail($"belegungen/{bl.Id}", Ruecksprung.Aktuell(Navigation))"><b>@bl.Kursnummer</b> @pb.Kurstitel</a>
                         <br /><span class="vhs-small vhs-muted">@(pb.Beginn is { } bg ? $"ab {bg:dd.MM.yyyy}" : "") · gebucht @bl.GebuchtAm.ToLocalTime().ToString("dd.MM.yyyy") (@VibeVHS.Domain.Anmeldung.BelegungAnzeige.Weg(bl.Weg)) · @bl.Entgelt@(bl.IstKontingent && bl.KontingentAnzahl is not null ? $" · Kontingent: {bl.Kontingent.Verbleibend} von {bl.Kontingent.Anzahl} übrig" : "")</span>
                     </span>
                     @if (pb.KursAbgesagt && bl.Offen) { <StatusPille Stil="krit">Kurs abgesagt</StatusPille> }
+                    @if (bl.Status == VibeVHS.Domain.Anmeldung.Belegungsstatus.Angemeldet)
+                    {
+                        <BegruendeterButton Text="Bescheinigung" Icon="print" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Light"
+                                            Freigabe="@(Freigabe.NurFuer(rolle, VibeVHS.Application.Dokumente.DokumentDienst.AusstellRollen))"
+                                            Click="@(() => BescheinigungAsync(bl.Id))" />
+                    }
                     <StatusPille Stil="@(bl.Status == VibeVHS.Domain.Anmeldung.Belegungsstatus.Angemeldet ? "gut" : bl.Offen ? "warn" : "neutral")">@VibeVHS.Domain.Anmeldung.BelegungAnzeige.Status(bl.Status)</StatusPille>
                 </div>
             }
@@ -196,7 +248,7 @@ else if (dubletten.Count > 0)
 
 <VibeVHS.Web.Components.Finanzen.PersonFinanzen @key="@Id" PersonId="@Id" Dozierend="@(stand.Rollen.HasFlag(Personenrolle.Dozierende) || stand.Beschaeftigung is not null)" Name="@stand.NameMitTitel" />
 
-<section class="vhs-card">
+<section class="vhs-card" id="dokumente">
     <div class="vhs-head">
         <h2>Dokumente</h2>
         <div class="vhs-row">
@@ -220,6 +272,11 @@ else if (dubletten.Count > 0)
                     </span>
                     @if (dok.ErsetztDurch is not null) { <StatusPille Stil="neutral">ersetzt</StatusPille> }
                     @if (dok.BelegungId is { } bid) { <a class="vhs-small" href="@($"belegungen/{bid}")">Belegung</a> }
+                    @if (dok.ErsetztDurch is null && !dok.IstAnonymisiert && dok.Art is VibeVHS.Domain.Dokumente.Dokumentart.Teilnahmebescheinigung or VibeVHS.Domain.Dokumente.Dokumentart.Bildungsurlaub)
+                    {
+                        <BegruendeterButton Text="Neu ausstellen" Icon="autorenew" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => NeuAusstellenAsync(dok.Id))"
+                                            Freigabe="@(Freigabe.NurFuer(rolle, VibeVHS.Application.Dokumente.DokumentDienst.NeuausstellRollen))" />
+                    }
                     <BegruendeterButton Text="Nachdruck" Icon="print" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo($"dokumente/{dok.Id}.pdf", true))"
                                         Freigabe="@(dok.IstAnonymisiert ? Freigabe.Nein("Der Inhalt wurde bei der Anonymisierung gelöscht.") : rolle is null or Rolle.Dozierende ? Freigabe.Nein("Archivdokumente drucken Verwaltung und Leitung.") : Freigabe.Ja)" />
                 </div>
@@ -289,21 +346,44 @@ else if (dubletten.Count > 0)
     </div>
 </details>
 
-<details class="vhs-card" open="@nameOffen">
-    <summary><b>Namen ändern</b> <span class="vhs-small vhs-muted">– Namen werden nie überschrieben, ältere Dokumente behalten den damals gültigen Namen</span></summary>
+<details class="vhs-card" id="stammdaten-aendern" open="@nameOffen">
+    <summary><b>Stammdaten ändern</b> <span class="vhs-small vhs-muted">– nichts wird überschrieben: ältere Dokumente und Auswertungen behalten den damals gültigen Stand</span></summary>
     <RadzenRadioButtonList TValue="bool" @bind-Value="istKorrektur" Orientation="Orientation.Vertical">
         <Items>
-            <RadzenRadioButtonListItem Text="Änderung ab einem Datum (z. B. Heirat): ältere Dokumente behalten den alten Namen" Value="false" />
-            <RadzenRadioButtonListItem Text="Korrektur (Tippfehler): der Name war schon immer falsch erfasst" Value="true" />
+            <RadzenRadioButtonListItem Text="Änderung ab einem Datum (z. B. Heirat, Umzug): bis dahin gilt der bisherige Stand" Value="false" />
+            <RadzenRadioButtonListItem Text="Korrektur (Tippfehler): war schon immer so, die betroffene Version wird berichtigt" Value="true" />
         </Items>
     </RadzenRadioButtonList>
+    <h3>Person</h3>
     <div class="vhs-fields">
+        <RadzenFormField Text="Anrede" Variant="Variant.Outlined"><RadzenDropDown TValue="string" @bind-Value="sdAnrede" Data="@VibeVHS.Application.Personen.Stammdatenaenderung.Anreden" AllowClear="true" /></RadzenFormField>
+        <RadzenFormField Text="Titel" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="sdTitel" Placeholder="z. B. Dr." /></RadzenFormField>
         <RadzenFormField Text="Vorname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="neuVorname" /></RadzenFormField>
         <RadzenFormField Text="Nachname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="neuNachname" /></RadzenFormField>
+        <RadzenFormField Text="Geburtsname" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="sdGeburtsname" /></RadzenFormField>
+        <RadzenFormField Text="Geburtsdatum" Variant="Variant.Outlined">
+            <span class="vhs-why" tabindex="0" data-why="Das Geburtsdatum ändert sich nicht – eine Änderung wird immer als Korrektur gespeichert.">
+                <RadzenDatePicker TValue="DateOnly?" @bind-Value="sdGeburtsdatum" DateFormat="dd.MM.yyyy" />
+            </span>
+        </RadzenFormField>
+        <RadzenFormField Text="Geschlecht" Variant="Variant.Outlined"><RadzenDropDown TValue="string" @bind-Value="sdGeschlecht" Data="@VibeVHS.Application.Personen.Stammdatenaenderung.Geschlechter" AllowClear="true" /></RadzenFormField>
+        <RadzenFormField Text="Sprache für Post" Variant="Variant.Outlined"><RadzenDropDown TValue="string" @bind-Value="sdSprache" Data="@Sprachen.Alle" TextProperty="Name" ValueProperty="Code" /></RadzenFormField>
+    </div>
+    <h3>Anschrift und Kontakt</h3>
+    <div class="vhs-fields">
+        <RadzenFormField Text="Adresszusatz" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="sdZusatz" Placeholder="z. B. c/o" /></RadzenFormField>
+        <RadzenFormField Text="Straße und Hausnummer" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="sdStrasse" /></RadzenFormField>
+        <RadzenFormField Text="PLZ" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="sdPlz" Style="width:90px" /></RadzenFormField>
+        <RadzenFormField Text="Ort" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="sdOrt" /></RadzenFormField>
+        <RadzenFormField Text="Telefon (bevorzugt)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="sdTelefon" /></RadzenFormField>
+        <RadzenFormField Text="E-Mail (bevorzugt)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="sdEMail" /></RadzenFormField>
+    </div>
+    <p class="vhs-small vhs-muted">Weitere Adressen, Rufnummern und Einwilligungen stehen oben bei den Stammdaten (mit Verlauf); Vollmachten und Einwilligungen haben eigene Abschnitte.</p>
+    <div class="vhs-fields">
         <RadzenFormField Text="@(istKorrektur ? "Betroffene Version gültig am *" : "Gültig ab *")" Variant="Variant.Outlined">
             <RadzenDatePicker TValue="DateOnly?" @bind-Value="aenderungsdatum" DateFormat="dd.MM.yyyy" />
         </RadzenFormField>
-        <RadzenFormField Text="Grund / Nachweis *" Variant="Variant.Outlined">
+        <RadzenFormField Text="Grund / Nachweis *" Variant="Variant.Outlined" Style="min-width:320px">
             <RadzenTextBox @bind-Value="grund" Placeholder="z. B. Heirat, Nachweis: Heiratsurkunde" />
         </RadzenFormField>
     </div>
@@ -313,7 +393,8 @@ else if (dubletten.Count > 0)
     }
     <div class="vhs-row">
         <BegruendeterButton Text="@(istKorrektur ? "Korrektur speichern" : "Änderung speichern")" Icon="save"
-                            Freigabe="@AenderungFreigabe" Click="NameSpeichernAsync" IsBusy="@speichert" />
+                            Freigabe="@AenderungFreigabe" Click="StammdatenSpeichernAsync" IsBusy="@speichert" />
+        <RadzenButton Text="Zurücksetzen" ButtonStyle="ButtonStyle.Light" Click="@(() => StammdatenVorbelegen(true))" />
     </div>
 </details>
 
@@ -412,6 +493,105 @@ else if (dubletten.Count > 0)
         await LadenAsync();
     }
 
+    // ---------- Rollen ----------
+    private Personenrolle? rRolle;
+    private bool rHinzu;
+    private DateOnly rDatum;
+    private string? rGrund, rSperre;
+
+    private Freigabe RollenRecht => Schreibschutz.Und(() => Freigabe.NurFuer(rolle, VibeVHS.Application.Personen.PersonenrollenDienst.Rollen));
+
+    private Freigabe RollenFreigabe => RollenRecht.Und(() =>
+        rSperre is { } s ? Freigabe.Nein(s)
+        : string.IsNullOrWhiteSpace(rGrund) ? Freigabe.Nein("Bitte einen Grund angeben (steht in der Datenhistorie).")
+        : Freigabe.Ja);
+
+    private async Task RolleOeffnenAsync(Personenrolle r, bool hinzu)
+    {
+        rRolle = r;
+        rHinzu = hinzu;
+        rDatum = DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+        rGrund = null;
+        await SperreAsync();
+    }
+
+    /// <summary>Beenden gesperrt, solange noch Einsätze, offene Honorare oder Anmeldungen daran hängen (Grund im Tooltip).</summary>
+    private async Task SperreAsync()
+    {
+        rSperre = rRolle is { } r && !rHinzu
+            ? (await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Personen.PersonenrollenDienst>().PruefenAsync(Id, r, rDatum))).Sperrgrund
+            : null;
+    }
+
+    private async Task RolleSpeichernAsync()
+    {
+        var r = rRolle!.Value;
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => rHinzu
+                ? d.GetRequiredService<VibeVHS.Application.Personen.PersonenrollenDienst>().RolleHinzufuegenAsync(Id, r, rDatum, rGrund!)
+                : d.GetRequiredService<VibeVHS.Application.Personen.PersonenrollenDienst>().RolleBeendenAsync(Id, r, rDatum, rGrund!));
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert",
+                rHinzu ? $"{PersonMerkmal.RollenAnzeige(r)} ab {rDatum:dd.MM.yyyy}." : $"{PersonMerkmal.RollenAnzeige(r)} endet am {rDatum:dd.MM.yyyy}.");
+            var warHinzu = rHinzu;
+            rRolle = null;
+            await LadenAsync();
+            folgeschritte = warHinzu && r == Personenrolle.Dozierende
+                ?
+                [
+                    new("Beschäftigungsart erfassen", $"personen/{Id}#qualifikationen", "Freiberuflich, angestellt …: bestimmt Honorar und Fahrtkosten", Hauptschritt: true),
+                    new("Honorarvertrag anlegen", $"personen/{Id}#h-honorar", "Honorarmodell und Sätze für die Abrechnung"),
+                    new("Qualifikationen eintragen", $"personen/{Id}#qualifikationen", "z. B. Lehrfreigabe, Prüferlizenz – geprüft an jedem Veranstaltungstag"),
+                    new("Datenhistorie ansehen", $"personen/{Id}/historie?art=Rollen"),
+                ]
+                : warHinzu && r == Personenrolle.Teilnehmende
+                    ? [new("Person anmelden", $"anmeldung?person={Id}", Hauptschritt: true), new("Datenhistorie ansehen", $"personen/{Id}/historie?art=Rollen")]
+                    : [new("Datenhistorie ansehen", $"personen/{Id}/historie?art=Rollen", Hauptschritt: true)];
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task BescheinigungAsync(Guid belegungId)
+    {
+        try
+        {
+            var dok = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Dokumente.DokumentDienst>()
+                .BescheinigungErstellenAsync(belegungId, VibeVHS.Domain.Dokumente.Dokumentart.Teilnahmebescheinigung));
+            Hinweise.Notify(NotificationSeverity.Success, "Archiviert", $"{dok.Titel} erstellt.");
+            await LadenAsync();
+            Navigation.NavigateTo($"dokumente/{dok.Id}.pdf", true);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // z. B. noch keine Anwesenheit erfasst oder bereits ausgestellt (dann im Archiv nachdrucken)
+            Hinweise.Notify(NotificationSeverity.Warning, "Keine neue Bescheinigung", ex.Message);
+        }
+    }
+
+    /// <summary>Grund der Neuausstellung; nach einer Namensänderung mit deren Begründung vorbelegt.</summary>
+    private string neuausstellGrund = "Angaben aktualisiert";
+
+    /// <summary>Druckstück des Antwortbriefs zum Löschverlangen (nur im Speicher dieser Seite, nicht archiviert).</summary>
+    private byte[]? antwortbrief;
+
+    private async Task NeuAusstellenAsync(Guid dokumentId)
+    {
+        try
+        {
+            var dok = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Dokumente.DokumentDienst>().NeuAusstellenAsync(dokumentId, neuausstellGrund));
+            Hinweise.Notify(NotificationSeverity.Success, "Neu ausgestellt", $"{dok.Titel} – die frühere Ausfertigung ist als ersetzt markiert.");
+            await LadenAsync();
+            Navigation.NavigateTo($"dokumente/{dok.Id}.pdf", true);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
     private async Task AusweisAsync()
     {
         try
@@ -435,8 +615,8 @@ else if (dubletten.Count > 0)
         .Und(() => qSchluessel is null || qAb is null ? Freigabe.Nein("Bitte Merkmal und Beginn der Gültigkeit angeben.")
             : personenmerkmale.FirstOrDefault(m => m.Schluessel == qSchluessel) is { NachweisPflicht: true } && string.IsNullOrWhiteSpace(qNachweis)
                 ? Freigabe.Nein("Für dieses Merkmal ist ein Nachweis Pflicht (Dokument oder Aktenzeichen).")
-                : personenmerkmale.FirstOrDefault(m => m.Schluessel == qSchluessel) is { Werte.Count: > 0 } && qWert is null
-                    ? Freigabe.Nein("Bitte die Art bzw. die freigegebenen Werte auswählen (z. B. Zulassungsart, Sprachen).") : Freigabe.Ja);
+                : personenmerkmale.FirstOrDefault(m => m.Schluessel == qSchluessel) is { Typ: not VibeVHS.Domain.Programm.Merkmalstyp.JaNein } && string.IsNullOrWhiteSpace(qWert)
+                    ? Freigabe.Nein("Bitte den Wert angeben (z. B. Zulassungsart, freigegebene Sprachen, Anzahl oder Text).") : Freigabe.Ja);
 
     private async Task QualifikationAsync()
     {
@@ -508,9 +688,14 @@ else if (dubletten.Count > 0)
             Hinweise.Notify(NotificationSeverity.Success, "Löschverlangen bearbeitet",
                 ergebnis.Entscheidung.Aktion == Loeschaktion.Anonymisieren ? "Die Person wurde anonymisiert." : $"Kontaktdaten gelöscht, Rest gesperrt bis {ergebnis.Entscheidung.GesperrtBis:dd.MM.yyyy}.");
             pruefung = null;
+            antwortbrief = ergebnis.Antwortbrief;
             folgeschritte = ergebnis.AntwortEingereiht
                 ? [new("Antwortschreiben im Postausgang ansehen", "postausgang", Hauptschritt: true), new("Protokoll ansehen", "protokoll")]
-                : [new("Antwort per Brief", "#", Freigabe: Freigabe.Geplant("Der Briefdruck", "I4"), Hauptschritt: true), new("Protokoll ansehen", "protokoll")];
+                : ergebnis.Antwortbrief is { } brief
+                    ? [new("Antwortbrief herunterladen und versenden", $"personen/{Id}#antwortbrief",
+                        "Druckstück mit Anschrift – wird nicht gespeichert; im Archiv steht nur der Text ohne Anschrift", Hauptschritt: true), new("Protokoll ansehen", "protokoll")]
+                    : [new("Antwort per Brief", "#", Freigabe: Freigabe.Nein("Für die Person ist weder eine E-Mail-Adresse noch eine Anschrift hinterlegt."), Hauptschritt: true),
+                        new("Protokoll ansehen", "protokoll")];
             sperrzugriff = true;
             await LadenAsync();
         }
@@ -528,6 +713,25 @@ else if (dubletten.Count > 0)
 
     private bool istKorrektur, speichert, nameOffen;
     private string? neuVorname, neuNachname, grund, fehler;
+    private string? sdAnrede, sdTitel, sdGeburtsname, sdGeschlecht, sdSprache, sdZusatz, sdStrasse, sdPlz, sdOrt, sdTelefon, sdEMail;
+    private DateOnly? sdGeburtsdatum;
+    private bool sdVorbelegt;
+
+    /// <summary>Dialog mit dem aktuellen Stand füllen (beim Laden einmalig, „Zurücksetzen“ jederzeit).</summary>
+    private void StammdatenVorbelegen(bool erzwingen = false)
+    {
+        if (stand is null || (sdVorbelegt && !erzwingen))
+        {
+            return;
+        }
+
+        var a = VibeVHS.Application.Personen.StammdatenEingabe.Aus(stand);
+        (sdAnrede, sdTitel, neuVorname, neuNachname, sdGeburtsname, sdGeburtsdatum, sdGeschlecht, sdSprache) =
+            (a.Anrede, a.Titel, a.Vorname, a.Nachname, a.Geburtsname, a.Geburtsdatum, a.Geschlecht, a.Sprache ?? "de");
+        (sdZusatz, sdStrasse, sdPlz, sdOrt, sdTelefon, sdEMail) = (a.AdressZusatz, a.Strasse, a.Postleitzahl, a.Ort, a.Telefon, a.EMail);
+        sdVorbelegt = true;
+        fehler = null;
+    }
     private DateOnly? aenderungsdatum;
     private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
 
@@ -566,7 +770,7 @@ else if (dubletten.Count > 0)
         string.IsNullOrWhiteSpace(neuVorname) || string.IsNullOrWhiteSpace(neuNachname)
             ? Freigabe.Nein("Bitte Vor- und Nachnamen eintragen.")
             : aenderungsdatum is null
-                ? Freigabe.Nein(istKorrektur ? "Bitte angeben, für welchen Tag die zu korrigierende Version gilt." : "Bitte das Datum angeben, ab dem der neue Name gilt.")
+                ? Freigabe.Nein(istKorrektur ? "Bitte angeben, für welchen Tag die zu korrigierende Version gilt." : "Bitte das Datum angeben, ab dem die Änderung gilt.")
                 : string.IsNullOrWhiteSpace(grund)
                     ? Freigabe.Nein("Ein Grund ist Pflicht, damit die Änderung später nachvollziehbar ist.")
                     : Freigabe.Ja;
@@ -605,10 +809,9 @@ else if (dubletten.Count > 0)
                 zugaenge = await d.GetRequiredService<VibeVHS.Application.Durchfuehrung.CheckinZugang>().DerPersonAsync(Id);
             });
         }
+        StammdatenVorbelegen();
         if (stand?.Name is { } name)
         {
-            neuVorname ??= name.Vorname;
-            neuNachname ??= name.Nachname;
             dubletten = person!.Status == Personenstatus.Zusammengefuehrt
                 ? []
                 : await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IDublettenSuche>()
@@ -616,27 +819,41 @@ else if (dubletten.Count > 0)
         }
     }
 
-    private async Task NameSpeichernAsync()
+    private async Task StammdatenSpeichernAsync()
     {
         fehler = null;
         speichert = true;
         try
         {
-            var dienst = (IServiceProvider d) => d.GetRequiredService<PersonenDienst>();
-            var neu = istKorrektur
-                ? await Vorgang.AusfuehrenAsync(d => dienst(d).NameKorrigierenAsync(Id, neuVorname!, neuNachname!, aenderungsdatum!.Value, grund!))
-                : await Vorgang.AusfuehrenAsync(d => dienst(d).NameAendernAbAsync(Id, neuVorname!, neuNachname!, aenderungsdatum!.Value, grund!));
+            var eingabe = new VibeVHS.Application.Personen.StammdatenEingabe(sdAnrede, sdTitel, neuVorname!, neuNachname!, sdGeburtsname, sdGeburtsdatum, sdGeschlecht,
+                sdSprache, sdZusatz, sdStrasse, sdPlz, sdOrt, sdTelefon, sdEMail);
+            var ergebnis = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Personen.Stammdatenaenderung>()
+                .AendernAsync(Id, eingabe, istKorrektur, aenderungsdatum!.Value, grund!));
             Hinweise.Notify(NotificationSeverity.Success, "Gespeichert",
-                istKorrektur ? $"Name korrigiert in {neu.Anzeige}." : $"{neu.Anzeige} gilt ab {neu.GueltigVon:dd.MM.yyyy}.");
+                $"{string.Join(", ", ergebnis.Geaendert)} {(istKorrektur ? "korrigiert" : $"geändert ab {aenderungsdatum:dd.MM.yyyy}")}.");
+            if (ergebnis.NameGeaendert)
+            {
+                neuausstellGrund = $"Namensänderung: {grund}";
+            }
+
             grund = null;
             nameOffen = false;
+            sdVorbelegt = false;
             await LadenAsync();
-            folgeschritte =
-            [
-                new("Änderung in der Datenhistorie ansehen", $"personen/{Id}/historie?art=Name", Hauptschritt: true),
-                new("Bescheinigungen neu drucken", "#", Freigabe: Freigabe.Geplant("Der Druck von Bescheinigungen")),
-                new("Zur Personenliste", "personen"),
-            ];
+            var schritte = new List<NaechsterSchritt>
+            {
+                new("Änderung in der Datenhistorie ansehen", $"personen/{Id}/historie", Hauptschritt: true),
+            };
+            // Bescheinigungen tragen den Namen: nur bei Namensänderung neu ausstellen anbieten.
+            if (ergebnis.NameGeaendert)
+            {
+                schritte.Add(new("Bescheinigungen neu ausstellen", $"personen/{Id}#dokumente", "Unten bei den Dokumenten „Neu ausstellen“ – mit dem neuen Namen",
+                    Freigabe: dokumente.Any(x => x.ErsetztDurch is null && x.Art is VibeVHS.Domain.Dokumente.Dokumentart.Teilnahmebescheinigung or VibeVHS.Domain.Dokumente.Dokumentart.Bildungsurlaub)
+                        ? Freigabe.Ja : Freigabe.Nein("Es gibt keine Bescheinigungen, die neu ausgestellt werden müssten.")));
+            }
+
+            schritte.Add(new("Zur Personenliste", "personen"));
+            folgeschritte = schritte;
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {

@@ -5,8 +5,22 @@ using VibeVHS.Domain.Stammdaten;
 
 namespace VibeVHS.Infrastructure.Datenbank;
 
-internal sealed class StammdatenSpeicher(VibeVhsDbContext db) : IStammdaten, IBenutzerkonten
+internal sealed class StammdatenSpeicher(VibeVhsDbContext db) : IStammdaten, IBenutzerkonten, IEinrichtungAendern, IBenutzerkontenPflege
 {
+    public async Task<IReadOnlyList<Benutzerkonto>> AlleMitInaktivenAsync(CancellationToken abbruch = default)
+        => await db.Benutzerkonten.OrderBy(k => k.Name).ThenBy(k => k.Id).ToListAsync(abbruch);
+
+    public Task<Benutzerkonto?> ZumAendernAsync(Guid id, CancellationToken abbruch = default) => db.Benutzerkonten.FirstOrDefaultAsync(k => k.Id == id, abbruch);
+
+    public Task<bool> LoginVergebenAsync(string login, CancellationToken abbruch = default) => db.Benutzerkonten.AnyAsync(k => k.Login == login, abbruch);
+
+    public void Hinzufuegen(Benutzerkonto konto) => db.Benutzerkonten.Add(konto);
+
+    public Task<Einrichtung?> EinrichtungZumAendernAsync(CancellationToken abbruch = default)
+        => db.Einrichtungen.FirstOrDefaultAsync(e => e.Id == Einrichtung.EinzigeId, abbruch);
+
+    public Task SpeichernAsync(CancellationToken abbruch = default) => db.SaveChangesAsync(abbruch);
+
     public Task<Einrichtung?> EinrichtungAsync(CancellationToken abbruch = default)
         => db.Einrichtungen.AsNoTracking().FirstOrDefaultAsync(e => e.Id == Einrichtung.EinzigeId, abbruch);
 

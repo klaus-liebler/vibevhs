@@ -21,6 +21,8 @@
         <RadzenButton Text="Raumplan" Icon="calendar_view_week" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("raumplan"))" />
         <a class="vhs-btn vhs-btn-light" href="@($"kurse/qr-bogen.pdf?semester={semesterId}{(fachbereich is { } f ? $"&fb={f}" : "")}")" target="_blank"
            title="Sammel-PDF mit den QR-Codes aller öffentlichen Kurse des gewählten Semesters (und Fachbereichs) für das Programmheft">Kurs-QR-Bogen (PDF)</a>
+        <a class="vhs-btn vhs-btn-light" href="@($"kurse/qr-bogen.pdf?semester={semesterId}{(fachbereich is { } f2 ? $"&fb={f2}" : "")}&schnitt=1")" target="_blank"
+           title="Gleicher Bogen mit gestrichelten Kartenrändern zum Ausschneiden (Aushang, Flyer)">… zum Ausschneiden</a>
     </div>
 </div>
 
@@ -44,7 +46,7 @@
 
 <section class="vhs-card">
     <div class="vhs-row">
-        <RadzenDropDown TValue="Guid?" @bind-Value="semesterId" @bind-Value:after="LadenAsync" Data="@alleSemester" TextProperty="Name" ValueProperty="Id" Style="min-width:180px" />
+        <RadzenDropDown TValue="Guid?" @bind-Value="semesterId" @bind-Value:after="LadenAsync" aria-label="Semester" Data="@alleSemester" TextProperty="Name" ValueProperty="Id" Style="min-width:180px" />
         <div class="vhs-suche" style="flex:1 1 280px">
             <RadzenIcon Icon="search" />
             <input type="search" @bind="suche" @bind:event="oninput" @bind:after="LadenAsync" placeholder="Kursnummer oder Titel" aria-label="Kurse suchen" />
@@ -56,24 +58,24 @@
         @foreach (var fb in fachbereiche)
         {
             var n = alle.Count(z => z.Fachbereich == fb.Nr);
-            <button class="vhs-chip @(fachbereich == fb.Nr ? "on" : "")" title="@fb.Anzeige" disabled="@(n == 0)" @onclick="@(() => { fachbereich = fachbereich == fb.Nr ? null : fb.Nr; Filtern(); })">FB @fb.Nr <span class="vhs-chip-n">@n</span></button>
+            <button class="vhs-chip @(fachbereich == fb.Nr ? "on" : "")" title="@fb.Anzeige" disabled="@(n == 0)" @onclick="@(() => { fachbereich = fachbereich == fb.Nr ? null : fb.Nr; Filtern(); })" aria-pressed="@(fachbereich == fb.Nr ? "true" : "false")">FB @fb.Nr <span class="vhs-chip-n">@n</span></button>
         }
         <span class="vhs-filter-lbl">Status</span>
         @foreach (var s in Enum.GetValues<Kursstatus>())
         {
             var n = alle.Count(z => z.Status == s);
-            <button class="vhs-chip @(status == s ? "on" : "")" disabled="@(n == 0)" @onclick="@(() => { status = status == s ? null : s; Filtern(); })">@KursAnzeige.Status(s) <span class="vhs-chip-n">@n</span></button>
+            <button class="vhs-chip @(status == s ? "on" : "")" disabled="@(n == 0)" @onclick="@(() => { status = status == s ? null : s; Filtern(); })" aria-pressed="@(status == s ? "true" : "false")">@KursAnzeige.Status(s) <span class="vhs-chip-n">@n</span></button>
         }
     </div>
-    <div class="vhs-tbl">
+    <div class="vhs-tbl" data-liste="kurse">
         <table>
             <thead><tr><th>Nr.</th><th>Titel</th><th>FB</th><th>Termine</th><th>Ort</th><th>Leitung</th><th>Plätze</th><th>Status</th></tr></thead>
             <tbody>
                 @foreach (var z in zeilen)
                 {
-                    <tr class="vhs-klickzeile" @onclick="@(() => Navigation.NavigateTo($"kurse/{z.Id}"))">
+                    <tr class="vhs-klickzeile" data-zeile="@z.Id" @onclick="@(() => Navigation.NavigateTo(DetailLink(z.Id)))">
                         <td class="vhs-mono">@z.Kursnummer</td>
-                        <td><a href="@($"kurse/{z.Id}")">@z.Titel</a>
+                        <td><a href="@DetailLink(z.Id)" @onclick:stopPropagation="true">@z.Titel</a>
                             @if (z.Sichtbarkeit != Sichtbarkeit.Oeffentlich) { <StatusPille Stil="info">@KursAnzeige.Sichtbarkeit(z.Sichtbarkeit)</StatusPille> }
                             @if (z.Umfang == Kursumfang.Unbefristet) { <StatusPille Stil="neutral">fortlaufend</StatusPille> }
                         </td>
@@ -105,8 +107,28 @@
     private Guid? kopieVon, kopieNach;
     private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
 
+    // Listenzustand in der Adresse: teilbar, Browser-Zurück und „← Zurück zur Liste“ stellen ihn wieder her.
     [SupplyParameterFromQuery(Name = "fb")]
     private int? FbAusAdresse { get; set; }
+
+    [SupplyParameterFromQuery(Name = "semester")]
+    private Guid? SemesterAusAdresse { get; set; }
+
+    [SupplyParameterFromQuery(Name = "q")]
+    private string? SucheAusAdresse { get; set; }
+
+    [SupplyParameterFromQuery(Name = "status")]
+    private string? StatusAusAdresse { get; set; }
+
+    [SupplyParameterFromQuery(Name = "archiv")]
+    private bool? ArchivAusAdresse { get; set; }
+
+    /// <summary>Basisrelative Adresse der Liste im aktuellen Zustand.</summary>
+    private string ListenUrl => Ruecksprung.Url("kurse",
+        ("semester", semesterId?.ToString()), ("q", string.IsNullOrWhiteSpace(suche) ? null : suche.Trim()), ("fb", fachbereich?.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+        ("status", status?.ToString()), ("archiv", archivierte ? "true" : null));
+
+    private string DetailLink(Guid id) => Ruecksprung.Detail($"kurse/{id}", ListenUrl);
 
     private Freigabe Planen => Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Leitung);
 
@@ -114,13 +136,18 @@
     {
         rolle = (await Vorgang.BenutzerAsync()).Rolle;
         fachbereich = FbAusAdresse;
+        suche = SucheAusAdresse;
+        status = Enum.TryParse<Kursstatus>(StatusAusAdresse, out var st) ? st : null;
+        archivierte = ArchivAusAdresse == true;
         await Vorgang.AusfuehrenAsync(async d =>
         {
             alleSemester = await d.GetRequiredService<IProgrammSpeicher>().SemesterAsync();
             fachbereiche = await d.GetRequiredService<IStammdaten>().FachbereicheAsync();
         });
         var heute = DateOnly.FromDateTime(DateTime.Today);
-        semesterId = (alleSemester.FirstOrDefault(s => s.Beginn <= heute && heute <= s.Ende) ?? alleSemester.LastOrDefault())?.Id;
+        semesterId = alleSemester.Any(s => s.Id == SemesterAusAdresse)
+            ? SemesterAusAdresse
+            : (alleSemester.FirstOrDefault(s => s.Beginn <= heute && heute <= s.Ende) ?? alleSemester.LastOrDefault())?.Id;
         kopieVon = semesterId;
         kopieNach = alleSemester.FirstOrDefault(s => s.Beginn > heute)?.Id;
         await LadenAsync();
@@ -133,7 +160,26 @@
         Filtern();
     }
 
-    private void Filtern() => zeilen = alle.Where(z => (fachbereich is null || z.Fachbereich == fachbereich) && (status is null || z.Status == status)).ToList();
+    private void Filtern()
+    {
+        zeilen = alle.Where(z => (fachbereich is null || z.Fachbereich == fachbereich) && (status is null || z.Status == status)).ToList();
+        if (zustandSchreiben)
+        {
+            Ruecksprung.ZustandSetzen(Navigation, ListenUrl);
+        }
+    }
+
+    // Erst nach dem ersten Laden schreiben (beim Vorrendern gibt es noch keine interaktive Navigation).
+    private bool zustandSchreiben;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && RendererInfo.IsInteractive)
+        {
+            zustandSchreiben = true;
+            Ruecksprung.ZustandSetzen(Navigation, ListenUrl);
+        }
+    }
 
     private async Task KopierenAsync()
     {

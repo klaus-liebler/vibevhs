@@ -4,6 +4,7 @@
 @using VibeVHS.Domain.Durchfuehrung
 @implements IAsyncDisposable
 @inject Vorgang Vorgang
+@inject NavigationManager Navigation
 @inject TimeProvider Uhr
 @inject NotificationService Hinweise
 @inject IJSRuntime Js
@@ -24,6 +25,10 @@
     var nacherfassung = jetzt > v.Ende.AddHours(1);
 }
 
+@if (!Portal)
+{
+    <ZurueckZurListe Liste="anwesenheit" />
+}
 <div class="vhs-head">
     <div>
         <p class="vhs-sub vhs-mono">@if (Portal) { @liste.Kurs.Kursnummer } else { <a href="@($"kurse/{liste.Kurs.Id}")">@liste.Kurs.Kursnummer</a> } · Termin @v.Nummer</p>
@@ -74,7 +79,7 @@
                 var minuten = MinutenFuer(z);
                 <div>
                     <span class="vhs-grow">
-                        @if (Portal) { <b>@z.Name</b> } else { <a href="@($"belegungen/{z.Belegung.Id}")"><b>@z.Name</b></a> }
+                        @if (Portal) { <b>@z.Name</b> } else { <a href="@Ruecksprung.Detail($"belegungen/{z.Belegung.Id}", Ruecksprung.Aktuell(Navigation))"><b>@z.Name</b></a> }
                         @if (a is not null)
                         {
                             <StatusPille Stil="@(a.Status == Anwesenheitsstatus.Anwesend ? "gut" : a.Status == Anwesenheitsstatus.Unbestaetigt ? "warn" : a.Status == Anwesenheitsstatus.Entschuldigt ? "info" : "neutral")">@AnwesenheitAnzeige.Status(a.Status)@(a.Status == Anwesenheitsstatus.Anwesend ? $" · {a.Minuten} Min. ({a.Ue:0.##} UE)" : "")</StatusPille>

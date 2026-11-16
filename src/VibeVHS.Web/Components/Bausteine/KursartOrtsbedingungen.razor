@@ -1,0 +1,118 @@
+@using VibeVHS.Application.Programm
+@using VibeVHS.Domain.Programm
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+
+@* Was jede Kursart vom Ort verlangt: Ja/Nein-Merkmal vorhanden, Auswahlwert, Ganzzahl mindestens n. Textmerkmale sind keine Bedingung. *@
+
+<div class="vhs-tbl">
+    <table>
+        <thead><tr><th>Kursart</th><th>Ort muss haben</th><th>Bedingung ergänzen</th></tr></thead>
+        <tbody>
+            @foreach (var art in kursarten)
+            {
+                <tr>
+                    <td><b>@art.Name</b><br /><span class="vhs-small vhs-muted">@NutzungsartAnzeige.Text(art.Nutzungsart)</span></td>
+                    <td>
+                        <div class="vhs-chips">
+                            @if (art.BenoetigteMerkmale.Count == 0) { <span class="vhs-small vhs-muted">nichts Besonderes</span> }
+                            @foreach (var b in art.BenoetigteMerkmale)
+                            {
+                                <span class="vhs-chip on">@Anforderung.Anzeige(b, katalog)
+                                    @if (Recht.Erlaubt)
+                                    {
+                                        <button class="vhs-linkbutton" title="Bedingung entfernen" aria-label="@($"{Anforderung.Anzeige(b, katalog)} entfernen")"
+                                                @onclick="@(() => SetzenAsync(art, art.BenoetigteMerkmale.Where(x => x != b).ToList()))">×</button>
+                                    }
+                                </span>
+                            }
+                        </div>
+                    </td>
+                    <td>
+                        @if (bearbeitet == art.Id)
+                        {
+                            var m = schluessel is null ? null : katalog.GetValueOrDefault(schluessel);
+                            <div class="vhs-row">
+                                <RadzenDropDown TValue="string" @bind-Value="schluessel" @bind-Value:after="@(() => { wert = null; mindestens = null; })"
+                                                Data="@katalog.Values.Where(k => k.Bezug == MerkmalBezug.Ort && k.AlsBedingung).OrderBy(k => k.Name)" TextProperty="Name" ValueProperty="Schluessel"
+                                                Placeholder="Merkmal" aria-label="Merkmal" Style="min-width:180px" />
+                                @if (m?.Typ == Merkmalstyp.Auswahl)
+                                {
+                                    <RadzenDropDown TValue="string" @bind-Value="wert" Data="@m.AktiveWerte" Placeholder="beliebiger Wert" AllowClear="true" aria-label="Wert" />
+                                }
+                                else if (m?.Typ == Merkmalstyp.Ganzzahl)
+                                {
+                                    <span class="vhs-small">mind.</span>
+                                    <RadzenNumeric TValue="int?" @bind-Value="mindestens" ShowUpDown="false" Style="width:90px" aria-label="mindestens" />
+                                    @if (m.Einheit is { } e) { <span class="vhs-small vhs-muted">@e</span> }
+                                }
+                                <BegruendeterButton Text="Hinzufügen" Size="ButtonSize.Small" Freigabe="@HinzuFreigabe(art, m)" Click="@(() => HinzufuegenAsync(art, m!))" />
+                            </div>
+                        }
+                        else
+                        {
+                            <BegruendeterButton Text="Bedingung …" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@Recht"
+                                                Click="@(() => { bearbeitet = art.Id; schluessel = wert = null; mindestens = null; })" />
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public Rolle? Rolle { get; set; }
+
+    private IReadOnlyList<Kursart> kursarten = [];
+    private IReadOnlyDictionary<string, Merkmal> katalog = new Dictionary<string, Merkmal>();
+    private Guid? bearbeitet;
+    private string? schluessel, wert;
+    private int? mindestens;
+
+    private Freigabe Recht => Freigabe.NurFuer(Rolle, MerkmalKatalogDienst.BedingungsRollen);
+
+    private Freigabe HinzuFreigabe(Kursart art, Merkmal? m) => Recht.Und(() =>
+        m is null ? Freigabe.Nein("Bitte ein Merkmal wählen.")
+        : art.BenoetigteMerkmale.Any(b => Anforderung.Basis(b) == m.Schluessel) ? Freigabe.Nein("Für dieses Merkmal gibt es schon eine Bedingung; erst entfernen.")
+        : m.Typ == Merkmalstyp.Ganzzahl && mindestens is null ? Freigabe.Nein("Bitte den Mindestwert angeben, z. B. 12.")
+        : Freigabe.Ja);
+
+    protected override async Task OnInitializedAsync() => await LadenAsync();
+
+    public async Task LadenAsync()
+    {
+        await Vorgang.AusfuehrenAsync(async d =>
+        {
+            kursarten = await d.GetRequiredService<IProgrammSpeicher>().KursartenAsync();
+            katalog = await d.GetRequiredService<QualifikationsDienst>().KatalogAsync();
+        });
+    }
+
+    private Task HinzufuegenAsync(Kursart art, Merkmal m)
+    {
+        var neu = m.Typ switch
+        {
+            Merkmalstyp.Ganzzahl => Anforderung.Mindestens(m.Schluessel, mindestens!.Value),
+            Merkmalstyp.Auswahl => Anforderung.Bilden(m.Schluessel, wert),
+            _ => m.Schluessel,
+        };
+        return SetzenAsync(art, [.. art.BenoetigteMerkmale, neu]);
+    }
+
+    private async Task SetzenAsync(Kursart art, IReadOnlyList<string> bedingungen)
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<MerkmalKatalogDienst>().KursartOrtsanforderungenSetzenAsync(art.Id, bedingungen));
+            Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", $"„{art.Name}“: Raumbedingungen aktualisiert, auch in den Kursen dieser Art.");
+            bearbeitet = null;
+            await LadenAsync();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+}

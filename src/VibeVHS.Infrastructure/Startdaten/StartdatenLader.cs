@@ -24,10 +24,10 @@ public sealed class StartdatenLader(VibeVhsDbContext db, IAuditProtokoll protoko
         await using var strom = File.OpenRead(datei);
         var daten = await JsonSerializer.DeserializeAsync<StartdatenDatei>(strom, JsonOptionen, abbruch)
             ?? throw new InvalidDataException($"Startdaten {datei} sind leer.");
-        return await LadenAsync(daten, abbruch);
+        return await LadenAsync(daten, abbruch, Path.GetDirectoryName(Path.GetFullPath(datei)));
     }
 
-    public async Task<StartdatenErgebnis> LadenAsync(StartdatenDatei daten, CancellationToken abbruch = default)
+    public async Task<StartdatenErgebnis> LadenAsync(StartdatenDatei daten, CancellationToken abbruch = default, string? ordner = null)
     {
         ArgumentNullException.ThrowIfNull(daten);
         int neueFachbereiche = 0, neueKonten = 0, neuePersonen = 0;
@@ -37,6 +37,24 @@ public sealed class StartdatenLader(VibeVhsDbContext db, IAuditProtokoll protoko
         {
             db.Einrichtungen.Add(new Einrichtung(vhs.Name, vhs.Kurz, vhs.Orte, vhs.Bundesland ?? string.Empty));
             einrichtungNeu = true;
+        }
+
+        // Logo und Website als Vorgabe, solange in den Einstellungen nichts anderes hinterlegt ist.
+        if (daten.Vhs is { } v && (v.Logo is not null || v.Website is not null))
+        {
+            var e = db.Einrichtungen.Local.FirstOrDefault() ?? await db.Einrichtungen.OrderBy(x => x.Id).FirstOrDefaultAsync(abbruch);
+            var logoDatei = v.Logo is null || ordner is null ? null : Path.Combine(ordner, v.Logo);
+            if (e is not null && e.Logo is null && logoDatei is not null && File.Exists(logoDatei))
+            {
+                e.LogoSetzen(await File.ReadAllBytesAsync(logoDatei, abbruch));
+                einrichtungNeu = true;
+            }
+
+            if (e is not null && e.Website is null && v.Website is not null)
+            {
+                e.WebsiteSetzen(v.Website);
+                einrichtungNeu = true;
+            }
         }
 
         var vorhandeneFb = await db.Fachbereiche.Select(f => f.Nr).ToListAsync(abbruch);
@@ -143,6 +161,11 @@ public sealed class VhsEintrag
     public string Kurz { get; set; } = string.Empty;
 
     public List<string> Orte { get; set; } = [];
+
+    /// <summary>Dateiname des Logos neben der Startdaten-Datei (optional).</summary>
+    public string? Logo { get; set; }
+
+    public string? Website { get; set; }
 
     public string? Bundesland { get; set; }
 }

@@ -8,6 +8,9 @@
 @inject Vorgang Vorgang
 @inject TimeProvider Uhr
 @inject NavigationManager Navigation
+@inject VibeVHS.Application.Betrieb.Startabgleich Abgleich
+@using VibeVHS.Application.Betrieb
+@implements IDisposable
 
 <PageTitle>Start · VibeVHS</PageTitle>
 
@@ -23,18 +26,28 @@
     <div class="vhs-row">
         <BegruendeterButton Text="Person anlegen" Icon="person_add" Click="@(() => Navigation.NavigateTo("personen?neu=1"))" />
         <BegruendeterButton Text="Kurs anlegen" Icon="add" ButtonStyle="ButtonStyle.Light"
-                            Freigabe="@KursAnlegen" />
+                            Freigabe="@KursAnlegen" Click="@(() => Navigation.NavigateTo("kurse/neu"))" />
     </div>
 </div>
 
 <h2 style="margin:8px 0 0">Was steht an?</h2>
+
+@if (Abgleich.Laeuft)
+{
+    var schritte = Abgleich.Schritte;
+    <div class="vhs-alert vhs-info" role="status" aria-live="polite">
+        <b>Abgleich nach dem Serverstart läuft</b> – Aufgaben, Eskalationen und Prüfungen können sich in den nächsten Sekunden noch ändern.
+        Die Übersicht aktualisiert sich von selbst.
+        <span class="vhs-small">(@schritte.Count(s => s.Zustand is Schrittzustand.Fertig or Schrittzustand.Fehler) von @schritte.Count@(schritte.FirstOrDefault(s => s.Zustand == Schrittzustand.Laeuft) is { } l ? $" · gerade: {l.Anzeige}" : ""))</span>
+    </div>
+}
 
 @if (uebersicht is { } u)
 {
     @if (u.UeberfaelligJeGruppe.Count > 0 || u.Eskaliert.Count > 0)
     {
         <section class="vhs-card" aria-labelledby="h-leitung">
-            <div class="vhs-head"><h2 id="h-leitung">Überfällig in den Körben<span class="vhs-zahl">@u.UeberfaelligJeGruppe.Sum(g => g.Ueberfaellig)</span></h2>
+            <div class="vhs-head"><h2 id="h-leitung">Überfällig in den Körben <span class="vhs-zahl">@u.UeberfaelligJeGruppe.Sum(g => g.Ueberfaellig)</span></h2>
                 <span class="vhs-small vhs-muted">Überblick für die Leitung; eskalierte Aufgaben kann die Leitung übernehmen oder zuweisen</span></div>
             <div class="vhs-list">
                 @foreach (var g in u.UeberfaelligJeGruppe)
@@ -60,7 +73,7 @@
     @if (u.InVertretung is { Count: > 0 } iv)
     {
         <section class="vhs-card" aria-labelledby="h-vertretung">
-            <div class="vhs-head"><h2 id="h-vertretung">In Vertretung<span class="vhs-zahl">@iv.Count</span></h2>
+            <div class="vhs-head"><h2 id="h-vertretung">In Vertretung <span class="vhs-zahl">@iv.Count</span></h2>
                 <span class="vhs-small vhs-muted">Aufgaben abwesender Kolleg:innen, die Sie vertreten</span></div>
             <AufgabenListe Aufgaben="@iv" Benutzer="@benutzer" Geaendert="LadenAsync" />
         </section>
@@ -68,40 +81,41 @@
 
     <div class="vhs-wsa">
         <section class="vhs-card" aria-labelledby="h-meine">
-            <div class="vhs-head"><h2 id="h-meine">Meine Aufgaben<span class="vhs-zahl">@u.Meine.Count</span></h2></div>
+            <div class="vhs-head"><h2 id="h-meine">Meine Aufgaben <span class="vhs-zahl">@u.Meine.Count</span></h2></div>
             <AufgabenListe Aufgaben="@u.Meine" Benutzer="@benutzer" Geaendert="LadenAsync"
                            Leertext="Keine Aufgaben in Ihrer Liste. Übernehmen Sie eine aus dem Gruppenkorb." />
         </section>
         <section class="vhs-card" aria-labelledby="h-korb">
-            <div class="vhs-head"><h2 id="h-korb">Gruppenkorb<span class="vhs-zahl">@u.Gruppenkorb.Count</span></h2>
+            <div class="vhs-head"><h2 id="h-korb">Gruppenkorb <span class="vhs-zahl">@u.Gruppenkorb.Count</span></h2>
                 <span class="vhs-small vhs-muted vhs-why" tabindex="0" data-why="Aufgaben der aktiven Rolle (bei Fachbereichsleitungen nur der eigenen Fachbereiche), die noch niemand übernommen hat. Rolle oben rechts wechseln, um andere Körbe zu sehen.">@u.Korbname</span></div>
             <AufgabenListe Aufgaben="@u.Gruppenkorb" Benutzer="@benutzer" Geaendert="LadenAsync" Leertext="Der Korb ist leer." />
         </section>
         <section class="vhs-card" aria-labelledby="h-kollegen">
-            <div class="vhs-head"><h2 id="h-kollegen">Bei Kolleg:innen<span class="vhs-zahl">@u.BeiKollegen.Count</span></h2>
+            <div class="vhs-head"><h2 id="h-kollegen">Bei Kolleg:innen <span class="vhs-zahl">@u.BeiKollegen.Count</span></h2>
                 <span class="vhs-small vhs-muted">übernommen oder zugewiesen</span></div>
             <AufgabenListe Aufgaben="@u.BeiKollegen" Benutzer="@benutzer" Geaendert="LadenAsync" Leertext="Niemand aus Ihrem Korb bearbeitet gerade etwas." />
         </section>
-        <section class="vhs-card" aria-labelledby="h-auto">
-            <div class="vhs-head"><h2 id="h-auto">Heute automatisch erledigt<span class="vhs-zahl">@(u.HeuteGeschlossen.Count + u.HeuteAutomatisch.Count)</span></h2>
-                <a class="vhs-small" href="protokoll">Protokoll</a></div>
-            @if (u.HeuteGeschlossen.Count + u.HeuteAutomatisch.Count == 0)
-            {
-                <div class="vhs-small vhs-muted">Heute hat die Automatik noch nichts erledigt.</div>
-            }
-            <div class="vhs-list">
-                @foreach (var a in u.HeuteGeschlossen.Take(8))
-                {
-                    <div><StatusPille Stil="gut">geschlossen</StatusPille><span class="vhs-grow">@a.Titel<br /><span class="vhs-small vhs-muted">@a.Vermerk</span></span></div>
-                }
-                @foreach (var e in u.HeuteAutomatisch.Take(8))
-                {
-                    <div><span class="vhs-mono vhs-small vhs-muted vhs-zeit">@e.Zeitpunkt.ToLocalTime().ToString("HH:mm")</span><span class="vhs-grow">@e.Beschreibung</span>
-                        <StatusPille Stil="@(e.Erfolgreich ? "gut" : "warn")">@(e.Erfolgreich ? "erledigt" : "Prüfung nötig")</StatusPille></div>
-                }
-            </div>
-        </section>
     </div>
+    <section class="vhs-card" aria-labelledby="h-auto">
+        <div class="vhs-head"><h2 id="h-auto">Heute automatisch erledigt <span class="vhs-zahl">@(u.HeuteGeschlossen.Count + u.HeuteAutomatisch.Count)</span></h2>
+            <span class="vhs-small vhs-muted">gleichartige Schritte zusammengefasst</span></div>
+        @if (u.HeuteGeschlossen.Count + u.HeuteAutomatisch.Count == 0)
+        {
+            <div class="vhs-small vhs-muted">Heute hat die Automatik noch nichts erledigt.</div>
+        }
+        <div class="vhs-list">
+            @foreach (var z in AutomatikZeilen(u).Take(5))
+            {
+                <div><span class="vhs-mono vhs-small vhs-muted vhs-zeit">@z.Zuletzt.ToLocalTime().ToString("HH:mm")</span>
+                    <span class="vhs-grow">@z.Titel @if (z.Anzahl > 1) { <span class="vhs-zahl">@z.Anzahl</span> }<br /><span class="vhs-small vhs-muted">@(z.Anzahl > 1 ? "zuletzt: " : "")@z.Beispiel</span></span>
+                    <StatusPille Stil="@(z.Fehler ? "warn" : "gut")">@(z.Fehler ? "Prüfung nötig" : z.Geschlossen ? "geschlossen" : "erledigt")</StatusPille></div>
+            }
+        </div>
+        @if (AutomatikZeilen(u).Count > 5)
+        {
+            <div><a class="vhs-small" href="protokoll?wer=automatik&seit=heute">Alle @(u.HeuteGeschlossen.Count + u.HeuteAutomatisch.Count) Einträge im Protokoll anzeigen</a></div>
+        }
+    </section>
 }
 
 <div class="vhs-kpis">
@@ -154,8 +168,8 @@
     private IReadOnlyList<Fachbereich> fachbereiche = [];
     private IReadOnlyList<Fachbereich> eigeneFachbereiche = [];
 
-    private Freigabe KursAnlegen => Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Leitung)
-        .Und(() => Freigabe.Geplant("Das Anlegen von Kursen"));
+    // Gleiche Regel wie auf der Kursseite: Kurse planen Fachbereichsleitung und Leitung.
+    private Freigabe KursAnlegen => Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Leitung);
 
     [CascadingParameter]
     private Task<AuthenticationState>? Anmeldung { get; set; }
@@ -170,6 +184,11 @@
 
         benutzer = await Vorgang.BenutzerAsync();
         rolle = benutzer.Rolle;
+        if (Abgleich.Laeuft)
+        {
+            Abgleich.Geaendert += AbgleichGeaendert;
+        }
+
         await LadenAsync();
         Schritte = WasStehtAn.Fuer(benutzer, fachbereiche, new WasStehtAn.Lage(fehlgeschlagen));
         eigeneFachbereiche = benutzer.Rolle == Rolle.Fachbereichsleitung ? WasStehtAn.EigeneFachbereiche(benutzer, fachbereiche) : [];
@@ -191,6 +210,58 @@
             uebersicht = await d.GetRequiredService<AufgabenDienst>().UebersichtAsync();
         });
     }
+
+    // Nach jedem Schritt des Startabgleichs neu laden, damit Körbe, Eskalationen und Zähler stimmen.
+    private void AbgleichGeaendert() => _ = InvokeAsync(async () =>
+    {
+        await LadenAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Abgleich.Geaendert -= AbgleichGeaendert;
+
+    private sealed record AutomatikZeile(string Titel, int Anzahl, DateTimeOffset Zuletzt, string Beispiel, bool Fehler, bool Geschlossen);
+
+    private IReadOnlyList<AutomatikZeile>? automatikZeilen;
+    private Aufgabenuebersicht? automatikFuer;
+
+    /// <summary>Gleichartige automatische Schritte zusammengefasst (z. B. „Belege festgeschrieben 120“), neueste zuerst.</summary>
+    private IReadOnlyList<AutomatikZeile> AutomatikZeilen(Aufgabenuebersicht u)
+    {
+        if (automatikZeilen is not null && ReferenceEquals(automatikFuer, u))
+        {
+            return automatikZeilen;
+        }
+
+        var aufgaben = u.HeuteGeschlossen.GroupBy(a => a.Typ)
+            .Select(g => new AutomatikZeile(g.Count() > 1 ? $"Aufgaben geschlossen: {g.First().Titel.Split(':')[0]}" : g.First().Titel, g.Count(),
+                g.Max(a => a.ErledigtAm) ?? DateTimeOffset.MinValue, g.OrderByDescending(a => a.ErledigtAm).First().Vermerk ?? "", false, true));
+        var protokoll = u.HeuteAutomatisch.GroupBy(e => e.Aktion.StartsWith("Demodaten.", StringComparison.Ordinal) ? "Demodaten" : e.Aktion)
+            .Select(g =>
+            {
+                var neuester = g.OrderByDescending(e => e.Zeitpunkt).First();
+                return new AutomatikZeile(g.Count() > 1 ? Sammeltitel(g.Key) : neuester.Beschreibung, g.Count(), neuester.Zeitpunkt,
+                    g.Count() > 1 ? neuester.Beschreibung : "", g.Any(e => !e.Erfolgreich), false);
+            });
+        automatikFuer = u;
+        return automatikZeilen = aufgaben.Concat(protokoll).OrderByDescending(z => z.Fehler).ThenByDescending(z => z.Zuletzt).ToList();
+    }
+
+    private static string Sammeltitel(string aktion) => aktion switch
+    {
+        "Finanzen.Beleg" => "Belege festgeschrieben",
+        "Dokument.Erstellt" => "Dokumente erstellt (Briefe, Bescheinigungen, Rechnungen)",
+        "Finanzen.Mandat" => "SEPA-Mandate erfasst",
+        "Finanzen.Honorarvertrag" => "Honorarverträge angelegt",
+        "Finanzen.Bankverbindung" => "Bankverbindungen erfasst",
+        "Finanzen.Mahnvorschlag" => "Mahnvorschläge erstellt",
+        "Integration.Berechtigung" => "Teilnahmeberechtigungen erfasst",
+        "Integration.Ausweis" => "Ausweisprüfungen erfasst",
+        "Integration.Lichtbild" => "Lichtbilder gespeichert",
+        "Integration.Kursdaten" => "Integrationskursdaten erfasst",
+        "Demodaten" => "Demodaten angelegt",
+        _ => aktion,
+    };
 
     private string KorbAnzeige(UeberfaelligeGruppe g)
     {

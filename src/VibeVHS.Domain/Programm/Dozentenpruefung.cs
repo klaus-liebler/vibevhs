@@ -119,7 +119,8 @@ public static class Dozentenpruefung
         {
             var (schluessel, wert) = Anforderung.Zerlegen(anforderung);
             var vorhanden = person.QualifikationAm(schluessel, tag, bekanntAm);
-            if (vorhanden is not null && Anforderung.WertPasst(vorhanden.WertText, wert))
+            var abweichung = vorhanden is null ? null : Anforderung.Abweichung(anforderung, katalog.GetValueOrDefault(schluessel), vorhanden.WertText);
+            if (vorhanden is not null && abweichung is null)
             {
                 continue;
             }
@@ -137,7 +138,7 @@ public static class Dozentenpruefung
             {
                 // Freigabe vorhanden, aber für einen anderen Wert (z. B. Spanisch statt Englisch)
                 code = Schlechter(code, Eignungscode.MerkmalFehlt);
-                gruende.Add($"„{merkmal?.Name ?? schluessel}“ liegt nur für {vorhanden.WertText ?? "(ohne Angabe)"} vor, nicht für {wert}.");
+                gruende.Add(abweichung!);
                 continue;
             }
 
@@ -192,14 +193,85 @@ public static class Anforderung
 {
     private static readonly char[] Trenner = [',', ';', '/'];
 
-    public static (string Schluessel, string? Wert) Zerlegen(string anforderung)
+    /// <summary>
+    /// Bedingung lesen: „schluessel“ (vorhanden), „schluessel=Wert“ (Auswahl enthält Wert) oder „schluessel&gt;=12“ (Ganzzahl mindestens).
+    /// </summary>
+    public static Bedingung Lesen(string anforderung)
     {
         ArgumentNullException.ThrowIfNull(anforderung);
+        var m = anforderung.IndexOf(">=", StringComparison.Ordinal);
+        if (m > 0)
+        {
+            return new Bedingung(anforderung[..m].Trim(), Vergleich.Mindestens, anforderung[(m + 2)..].Trim());
+        }
+
         var i = anforderung.IndexOf('=', StringComparison.Ordinal);
-        return i < 0 ? (anforderung, null) : (anforderung[..i], anforderung[(i + 1)..].Trim());
+        return i < 0 ? new Bedingung(anforderung.Trim(), Vergleich.Vorhanden, null) : new Bedingung(anforderung[..i].Trim(), Vergleich.Gleich, anforderung[(i + 1)..].Trim());
     }
 
-    public static string Basis(string anforderung) => Zerlegen(anforderung).Schluessel;
+    /// <summary>Schlüssel und (bei „=“) verlangter Wert; „&gt;=“-Bedingungen liefern keinen Wert.</summary>
+    public static (string Schluessel, string? Wert) Zerlegen(string anforderung)
+    {
+        var b = Lesen(anforderung);
+        return (b.Schluessel, b.Vergleich == Vergleich.Gleich ? b.Wert : null);
+    }
+
+    public static string Basis(string anforderung) => Lesen(anforderung).Schluessel;
+
+    public static string Mindestens(string schluessel, int wert) => $"{schluessel}>={wert.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+
+    /// <summary>
+    /// Ist die Bedingung mit dem vorhandenen Wert erfüllt? Liefert null oder die konkrete Abweichung,
+    /// z. B. „nur 8 statt mind. 12 PC-Arbeitsplätze“ oder „„Tafel“ ist Kreide, nicht Smartboard“.
+    /// </summary>
+    public static string? Abweichung(string anforderung, Merkmal? merkmal, string? vorhandenerWert)
+    {
+        var b = Lesen(anforderung);
+        var name = merkmal?.Name ?? b.Schluessel;
+        switch (b.Vergleich)
+        {
+            case Vergleich.Gleich when !WertPasst(vorhandenerWert, b.Wert):
+                return $"„{name}“ liegt nur für {vorhandenerWert ?? "(ohne Angabe)"} vor, nicht für {b.Wert}.";
+            case Vergleich.Mindestens:
+                var noetig = int.TryParse(b.Wert, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n) ? n : 0;
+                var ist = int.TryParse(vorhandenerWert, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : (int?)null;
+                if (ist is { } x && x >= noetig)
+                {
+                    return null;
+                }
+
+                return merkmal?.Einheit is { } e
+                    ? $"„{name}“: nur {ist?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "ohne Angabe"} statt mind. {noetig} {e}."
+                    : $"nur {ist?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "ohne Angabe"} statt mind. {noetig} {name}.";
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>Bedingung prüfen, bevor eine Kursart sie stellt: passt sie zum Typ des Merkmals?</summary>
+    public static string Pruefen(string anforderung, IReadOnlyDictionary<string, Merkmal> katalog)
+    {
+        var b = Lesen(anforderung);
+        var m = katalog.GetValueOrDefault(b.Schluessel) ?? throw new ArgumentException($"Merkmal „{b.Schluessel}“ steht nicht im Katalog.");
+        if (!m.AlsBedingung)
+        {
+            throw new ArgumentException($"„{m.Name}“ ist ein Textmerkmal und kann keine Bedingung sein.");
+        }
+
+        switch (b.Vergleich)
+        {
+            case Vergleich.Mindestens when m.Typ != Merkmalstyp.Ganzzahl:
+                throw new ArgumentException($"„mindestens“ geht nur bei Zahlenmerkmalen, „{m.Name}“ ist {MerkmalstypAnzeige.Text(m.Typ)}.");
+            case Vergleich.Mindestens when !int.TryParse(b.Wert, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out _):
+                throw new ArgumentException($"Für „{m.Name}“ bitte eine ganze Zahl als Mindestwert angeben.");
+            case Vergleich.Gleich when m.Typ != Merkmalstyp.Auswahl:
+                throw new ArgumentException($"Ein bestimmter Wert geht nur bei Auswahlmerkmalen, „{m.Name}“ ist {MerkmalstypAnzeige.Text(m.Typ)}.");
+            case Vergleich.Gleich when !m.Werte.Contains(b.Wert, StringComparer.OrdinalIgnoreCase):
+                throw new ArgumentException($"„{b.Wert}“ ist kein Wert von „{m.Name}“.");
+        }
+
+        return anforderung.Trim();
+    }
 
     public static string Bilden(string schluessel, string? wert) => string.IsNullOrWhiteSpace(wert) ? schluessel : $"{schluessel}={wert.Trim()}";
 
@@ -209,14 +281,30 @@ public static class Anforderung
     public static bool WertPasst(string? vorhanden, string? verlangt)
         => verlangt is null || Werte(vorhanden).Contains(verlangt, StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>„Lehrfreigabe Sprachkurs: Englisch“.</summary>
+    /// <summary>„Lehrfreigabe Sprachkurs: Englisch“, „PC-Arbeitsplätze: mind. 12“.</summary>
     public static string Anzeige(string anforderung, IReadOnlyDictionary<string, Merkmal> katalog)
     {
-        var (schluessel, wert) = Zerlegen(anforderung);
-        var name = katalog.GetValueOrDefault(schluessel)?.Name ?? schluessel;
-        return wert is null ? name : $"{name}: {wert}";
+        var b = Lesen(anforderung);
+        var m = katalog.GetValueOrDefault(b.Schluessel);
+        var name = m?.Name ?? b.Schluessel;
+        return b.Vergleich switch
+        {
+            Vergleich.Gleich => $"{name}: {b.Wert}",
+            Vergleich.Mindestens => $"{name}: mind. {b.Wert}{(m?.Einheit is { } e ? $" {e}" : "")}",
+            _ => name,
+        };
     }
 }
+
+public enum Vergleich
+{
+    Vorhanden,
+    Gleich,
+    Mindestens,
+}
+
+/// <summary>Bedingung einer Kursart an ein Merkmal (Ort oder Person).</summary>
+public sealed record Bedingung(string Schluessel, Vergleich Vergleich, string? Wert);
 
 /// <summary>
 /// Lehrfreigabe für Sprachkurse (Eignungsprüfung bzw. Freigabe der vhs je Sprache). Verlangt die Kursart die Freigabe ohne Sprache,

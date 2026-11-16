@@ -37,6 +37,8 @@ public static class Registrierung
         dienste.AddScoped<StammdatenSpeicher>();
         dienste.AddScoped<IStammdaten>(d => d.GetRequiredService<StammdatenSpeicher>());
         dienste.AddScoped<IBenutzerkonten>(d => d.GetRequiredService<StammdatenSpeicher>());
+        dienste.AddScoped<IEinrichtungAendern>(d => d.GetRequiredService<StammdatenSpeicher>());
+        dienste.AddScoped<IBenutzerkontenPflege>(d => d.GetRequiredService<StammdatenSpeicher>());
         dienste.AddScoped<StartdatenLader>();
         dienste.AddScoped<DublettenSuche>();
         dienste.AddScoped<IDublettenSuche>(d => d.GetRequiredService<DublettenSuche>());
@@ -81,7 +83,7 @@ public static class Registrierung
                 .StartNow()
                 .WithSimpleSchedule(s => s.WithInterval(TimeSpan.FromSeconds(takt)).RepeatForever()));
 
-            // Täglich nachts sowie einmal kurz nach dem Start.
+            // Täglich nachts; einmal nach dem Start in fester Reihenfolge über den StartabgleichDienst.
             q.AddJob<TermineFortschreibenJob>(j => j.WithIdentity(TermineFortschreibenJob.Schluessel));
             q.AddJob<MerkmalAblaufJob>(j => j.WithIdentity(MerkmalAblaufJob.Schluessel));
             q.AddJob<LoeschlaufJob>(j => j.WithIdentity(LoeschlaufJob.Schluessel));
@@ -93,18 +95,15 @@ public static class Registrierung
             foreach (var schluessel in new[] { TermineFortschreibenJob.Schluessel, MerkmalAblaufJob.Schluessel, QualifikationJob.Schluessel, AnwesenheitJob.Schluessel })
             {
                 q.AddTrigger(t => t.ForJob(schluessel).WithIdentity(schluessel.Name + "-nacht", "automatik").WithCronSchedule("0 15 2 * * ?"));
-                q.AddTrigger(t => t.ForJob(schluessel).WithIdentity(schluessel.Name + "-start", "automatik").StartAt(DateTimeOffset.UtcNow.AddSeconds(20)));
             }
 
-            // Aufgaben-Routinen stündlich und kurz nach dem Start (nach den nächtlichen Prüfungen), Erinnerungen morgens.
+            // Aufgaben-Routinen stündlich (nach dem Start als letzter Schritt des Startabgleichs), Erinnerungen morgens.
             q.AddJob<AufgabenJob>(j => j.WithIdentity(AufgabenJob.Schluessel));
             q.AddTrigger(t => t.ForJob(AufgabenJob.Schluessel).WithIdentity("aufgaben-stuendlich", "automatik").WithCronSchedule("0 10 * * * ?"));
-            q.AddTrigger(t => t.ForJob(AufgabenJob.Schluessel).WithIdentity("aufgaben-start", "automatik").StartAt(DateTimeOffset.UtcNow.AddSeconds(40)));
             q.AddJob<ErinnerungJob>(j => j.WithIdentity(ErinnerungJob.Schluessel));
             q.AddTrigger(t => t.ForJob(ErinnerungJob.Schluessel).WithIdentity("erinnerung-morgens", "automatik").WithCronSchedule("0 0 7 * * ?"));
             q.AddJob<IntegrationJob>(j => j.WithIdentity(IntegrationJob.Schluessel));
             q.AddTrigger(t => t.ForJob(IntegrationJob.Schluessel).WithIdentity("integration-nachts", "automatik").WithCronSchedule("0 45 2 * * ?"));
-            q.AddTrigger(t => t.ForJob(IntegrationJob.Schluessel).WithIdentity("integration-start", "automatik").StartAt(DateTimeOffset.UtcNow.AddSeconds(75)));
             if (konfiguration.GetValue("Sicherung:Aktiv", true))
             {
                 q.AddJob<SicherungJob>(j => j.WithIdentity(SicherungJob.Schluessel));
@@ -117,9 +116,11 @@ public static class Registrierung
 
             q.AddJob<FinanzJob>(j => j.WithIdentity(FinanzJob.Schluessel));
             q.AddTrigger(t => t.ForJob(FinanzJob.Schluessel).WithIdentity("finanzen-morgens", "automatik").WithCronSchedule("0 30 6 * * ?"));
-            q.AddTrigger(t => t.ForJob(FinanzJob.Schluessel).WithIdentity("finanzen-start", "automatik").StartAt(DateTimeOffset.UtcNow.AddSeconds(60)));
         });
         dienste.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
+        dienste.AddSingleton(d => new Application.Betrieb.Startabgleich(d.GetRequiredService<TimeProvider>(),
+            StartabgleichDienst.Reihenfolge.Select(s => (s.Schluessel.ToString(), s.Anzeige))));
+        dienste.AddHostedService<StartabgleichDienst>();
         return dienste;
     }
 }

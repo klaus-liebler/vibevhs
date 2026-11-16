@@ -46,32 +46,7 @@
 
     <section class="vhs-card">
         <h2>Katalog: Merkmale an Personen</h2>
-        <div class="vhs-list">
-            @foreach (var m in merkmale)
-            {
-                <div>
-                    <span class="vhs-grow"><b>@m.Name</b> <span class="vhs-small vhs-muted">@m.Schluessel · @m.Gruppe</span>
-                        @if (m.Werte.Count > 0) { <br /><span class="vhs-small">Werte: @string.Join(" / ", m.Werte)</span> }
-                    </span>
-                    @if (m.Gesetzlich) { <span class="vhs-why" tabindex="0" data-why="Gesetzlich vorgeschrieben: Die Fachbereichsleitung kann keine Ausnahme erteilen."><StatusPille Stil="krit">gesetzlich</StatusPille></span> }
-                    @if (m.NachweisPflicht) { <StatusPille Stil="neutral">Nachweis Pflicht</StatusPille> }
-                    <StatusPille Stil="info">Aufgabe @m.VorlaufTage Tage vor Ablauf</StatusPille>
-                </div>
-            }
-        </div>
-        <h3>Merkmal aufnehmen</h3>
-        <div class="vhs-fields">
-            <RadzenFormField Text="Schlüssel (z. B. pruefer-dsd)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nSchluessel" /></RadzenFormField>
-            <RadzenFormField Text="Name" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nName" /></RadzenFormField>
-            <RadzenFormField Text="Gruppe" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nGruppe" /></RadzenFormField>
-            <RadzenFormField Text="Werte (mit / getrennt, optional)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nWerte" /></RadzenFormField>
-        </div>
-        <div class="vhs-row">
-            <label><input type="checkbox" @bind="nNachweis" /> Nachweis Pflicht</label>
-            <label><input type="checkbox" @bind="nGesetzlich" /> gesetzlich vorgeschrieben (keine Ausnahme)</label>
-        </div>
-        <BegruendeterButton Text="Aufnehmen" Icon="add" Click="AufnehmenAsync"
-                            Freigabe="@(Freigabe.NurFuer(rolle, Rolle.Verwaltungsleitung, Rolle.Leitung, Rolle.Systemverwaltung).Und(() => string.IsNullOrWhiteSpace(nSchluessel) || string.IsNullOrWhiteSpace(nName) ? Freigabe.Nein("Schlüssel und Name sind Pflicht.") : Freigabe.Ja))" />
+        <MerkmalKatalogPflege Bezug="MerkmalBezug.Person" Rolle="@rolle" Geaendert="LadenAsync" />
     </section>
 </div>
 
@@ -82,9 +57,6 @@
     private IReadOnlyList<Kursart> kursarten = [];
     private readonly Dictionary<Guid, HashSet<string>> auswahlen = [];
     private Rolle? rolle;
-    private string? nSchluessel, nName, nWerte;
-    private string nGruppe = "Qualifikation";
-    private bool nNachweis = true, nGesetzlich;
 
     private Freigabe Pflegen => Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Verwaltungsleitung, Rolle.Leitung);
 
@@ -129,20 +101,5 @@
         }
     }
 
-    private async Task AufnehmenAsync()
-    {
-        try
-        {
-            var werte = (nWerte ?? "").Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            var m = new Merkmal(nSchluessel!, nName!, nGruppe, false, nNachweis, null, MerkmalBezug.Person, nGesetzlich, werte);
-            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<QualifikationsDienst>().MerkmalAufnehmenAsync(m));
-            Hinweise.Notify(NotificationSeverity.Success, "Aufgenommen", $"„{m.Name}“ steht jetzt im Katalog.");
-            nSchluessel = nName = nWerte = null;
-            await LadenAsync();
-        }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
-        {
-            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
-        }
-    }
+
 }

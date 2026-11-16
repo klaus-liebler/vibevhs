@@ -13,6 +13,12 @@ public interface IQualifikationsSpeicher
 {
     Task<IReadOnlyDictionary<string, Merkmal>> KatalogAsync(CancellationToken abbruch = default);
 
+    /// <summary>Katalogeintrag verfolgt (zum Ändern).</summary>
+    Task<Merkmal?> MerkmalLadenAsync(string schluessel, CancellationToken abbruch = default);
+
+    /// <summary>Schlüssel, die schon verwendet werden: Eintrag an einem Ort oder einer Person, oder Bedingung einer Kursart.</summary>
+    Task<IReadOnlySet<string>> VerwendeteMerkmaleAsync(CancellationToken abbruch = default);
+
     Task<IReadOnlyList<Qualifikationsausnahme>> AusnahmenAsync(Guid kursId, CancellationToken abbruch = default);
 
     /// <summary>Kursart verfolgt (für Änderungen).</summary>
@@ -162,6 +168,8 @@ public sealed class QualifikationsDienst(
     public async Task KursartAnforderungenSetzenAsync(Guid kursartId, IReadOnlyList<string> schluessel, CancellationToken abbruch = default)
     {
         await RolleAsync([Rolle.Fachbereichsleitung, Rolle.Verwaltungsleitung, Rolle.Leitung], abbruch);
+        var katalogFuerPruefung = await speicher.KatalogAsync(abbruch);
+        schluessel = schluessel.Select(s => Anforderung.Pruefen(s, katalogFuerPruefung)).ToList();
         var art = await speicher.KursartLadenAsync(kursartId, abbruch) ?? throw new InvalidOperationException("Kursart nicht gefunden.");
         var alt = art.BenoetigteDozierendenmerkmale.ToList();
         art.MitDozierendenmerkmalen(schluessel);

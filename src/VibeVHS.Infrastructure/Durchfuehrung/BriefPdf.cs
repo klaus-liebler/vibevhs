@@ -7,7 +7,7 @@ using VibeVHS.Application.Dokumente;
 namespace VibeVHS.Infrastructure.Durchfuehrung;
 
 /// <summary>Briefe als PDF (MigraDoc) mit QR-Code „Translate this letter in your language“ in der Fußzeile jeder Seite.</summary>
-internal sealed class BriefPdf(IQrCode qr) : IBriefPdf
+internal sealed class BriefPdf(IQrCode qr, VibeVHS.Application.Stammdaten.Briefkopf? briefkopf = null) : IBriefPdf
 {
     static BriefPdf()
     {
@@ -51,12 +51,24 @@ internal sealed class BriefPdf(IQrCode qr) : IBriefPdf
         ft.Format.Font.Size = 8;
         fz.Cells[1].VerticalAlignment = VerticalAlignment.Center;
 
-        // Kopf
-        var kopf = s.AddParagraph();
+        // Kopf: Absender links, Logo der Einrichtung rechts (Einstellungen → Einrichtung)
+        var kt = s.AddTable();
+        kt.AddColumn(Unit.FromCentimeter(10));
+        kt.AddColumn(Unit.FromCentimeter(6.5));
+        var kz = kt.AddRow();
+        kz.BottomPadding = Unit.FromCentimeter(1.0);
+        var kopf = kz.Cells[0].AddParagraph();
         kopf.AddFormattedText(brief.Absender, new Font { Size = 13, Bold = true });
         kopf.AddLineBreak();
         kopf.AddFormattedText(brief.AbsenderZusatz, new Font { Size = 9, Color = Colors.Gray });
-        kopf.Format.SpaceAfter = Unit.FromCentimeter(1.2);
+        if (briefkopf?.Logo is { } logo)
+        {
+            var la = kz.Cells[1].AddParagraph();
+            la.Format.Alignment = ParagraphAlignment.Right;
+            var lb = la.AddImage("base64:" + Convert.ToBase64String(logo));
+            lb.Height = Unit.FromCentimeter(1.1);
+            lb.LockAspectRatio = true;
+        }
 
         // Anschrift und Datum
         var ad = s.AddTable();

@@ -11,6 +11,17 @@
         <AuthorizeView>
             <Authorized>
                 <span class="vhs-small">@context.User.Identity?.Name</span>
+                @if (VibeVHS.Adapters.Mocks.MockAnmeldung.AlsBenutzer(context.User) is { } ich
+                     && ich.Rollen.Contains(VibeVHS.Application.Sicherheit.Rolle.Teilnehmende) && ich.Rollen.Contains(VibeVHS.Application.Sicherheit.Rolle.Dozierende))
+                {
+                    @* Beide Rollen: zwischen „Meine vhs“ und Dozierendenportal wechseln *@
+                    <form method="post" action="rolle-wechseln" style="display:inline">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="rolle" value="@(Teilnehmende ? "Dozierende" : "Teilnehmende")" />
+                        <input type="hidden" name="zurueck" value="@(Teilnehmende ? "portal/dozierende" : "portal/teilnehmende")" />
+                        <button type="submit" class="vhs-linkbutton">@(Teilnehmende ? "Zum Dozierendenportal" : "Zu „Meine vhs“")</button>
+                    </form>
+                }
                 <form method="post" action="abmelden" style="display:inline">
                     <AntiforgeryToken />
                     <button type="submit" class="vhs-linkbutton">Abmelden</button>

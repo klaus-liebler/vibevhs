@@ -15,7 +15,7 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261115122359_ImportArt";
+    public override string LastMigrationId => "20261115164000_MerkmalTypen";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -2975,6 +2975,10 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(20)
                     .HasColumnType("TEXT");
 
+                b.Property<string>("Einheit")
+                    .HasMaxLength(30)
+                    .HasColumnType("TEXT");
+
                 b.Property<bool>("Gesetzlich")
                     .HasColumnType("INTEGER");
 
@@ -2983,7 +2987,17 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(60)
                     .HasColumnType("TEXT");
 
+                b.PrimitiveCollection<string>("InaktiveWerte")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<int?>("Max")
+                    .HasColumnType("INTEGER");
+
                 b.Property<bool>("Mehrfach")
+                    .HasColumnType("INTEGER");
+
+                b.Property<int?>("Min")
                     .HasColumnType("INTEGER");
 
                 b.Property<bool>("NachweisPflicht")
@@ -2992,6 +3006,11 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.Property<string>("Name")
                     .IsRequired()
                     .HasMaxLength(200)
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Typ")
+                    .IsRequired()
+                    .HasMaxLength(20)
                     .HasColumnType("TEXT");
 
                 b.Property<bool>("Vererbbar")
@@ -3471,6 +3490,9 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(50)
                     .HasColumnType("TEXT");
 
+                b.Property<byte[]>("Logo")
+                    .HasColumnType("BLOB");
+
                 b.Property<string>("Name")
                     .IsRequired()
                     .HasMaxLength(200)
@@ -3478,6 +3500,10 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
 
                 b.PrimitiveCollection<string>("Orte")
                     .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("Website")
+                    .HasMaxLength(200)
                     .HasColumnType("TEXT");
 
                 b.HasKey("Id");

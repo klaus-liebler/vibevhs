@@ -1,4 +1,4 @@
-@page "/kurse/{Id:guid}"
+﻿@page "/kurse/{Id:guid}"
 @using VibeVHS.Application.Programm
 @using VibeVHS.Domain.Programm
 @inject Vorgang Vorgang
@@ -14,6 +14,7 @@
     return;
 }
 
+<ZurueckZurListe Liste="kurse" />
 <div class="vhs-head">
     <div>
         <h1>@kurs.Kursnummer @kurs.Titel</h1>
@@ -42,6 +43,21 @@
 }
 
 <NaechsteSchritte Titel="Wie geht es weiter?" Schritte="@folgeschritte" />
+
+@if (nachrichtTermin is { } nt)
+{
+    @* Nach einem Ausfall: Nachricht an die Teilnehmenden des Termins (Postausgang, mit Übersetzungslink) *@
+    <section class="vhs-card" id="teilnehmende-informieren" aria-labelledby="h-nachricht">
+        <div class="vhs-head"><h2 id="h-nachricht">Teilnehmende informieren</h2>
+            <span class="vhs-small vhs-muted">Termin @nt.Nummer am @nt.Beginn.ToString("dd.MM.yyyy HH:mm") · Mail über den Postausgang, mit Übersetzungslink</span></div>
+        <RadzenFormField Text="Betreff" Variant="Variant.Outlined" Style="width:100%"><RadzenTextBox @bind-Value="nachrichtBetreff" /></RadzenFormField>
+        <RadzenFormField Text="Text (Anrede und Gruß werden ergänzt)" Variant="Variant.Outlined" Style="width:100%"><RadzenTextArea @bind-Value="nachrichtText" Rows="6" /></RadzenFormField>
+        <div class="vhs-row">
+            <BegruendeterButton Text="An Teilnehmende senden" Icon="send" Freigabe="@NachrichtFreigabe" Click="NachrichtSendenAsync" />
+            <RadzenButton Text="Nicht senden" ButtonStyle="ButtonStyle.Light" Click="@(() => nachrichtTermin = null)" />
+        </div>
+    </section>
+}
 
 <div class="vhs-grid-2">
     <section class="vhs-card">
@@ -221,7 +237,7 @@
                 {
                     var konflikt = konflikte.FirstOrDefault(k => k.A.VeranstaltungId == v.Id || k.B.VeranstaltungId == v.Id);
                     <tr class="vhs-klickzeile @(gewaehlt?.Id == v.Id ? "vhs-gewaehlt" : "") @(v.Ausgefallen ? "vhs-ersetzt" : "")" @onclick="@(() => Waehlen(v))">
-                        <td class="vhs-mono"><a href="@($"anwesenheit/{v.Id}")" title="Anwesenheitsliste" @onclick:stopPropagation="true">@v.Nummer</a></td>
+                        <td class="vhs-mono"><a href="@Ruecksprung.Detail($"anwesenheit/{v.Id}", Ruecksprung.Aktuell(Navigation))" title="Anwesenheitsliste" @onclick:stopPropagation="true">@v.Nummer</a></td>
                         <td>@v.Beginn.ToString("ddd dd.MM.yyyy")</td>
                         <td class="vhs-mono">@v.Beginn.ToString("HH:mm")–@v.Ende.ToString("HH:mm")</td>
                         <td>@string.Join(" + ", v.Orte.Select(o => o.OrtName))</td>
@@ -295,8 +311,8 @@
                     @foreach (var t in teilnehmende.Where(t => alleBelegungen || t.Belegung.Offen))
                     {
                         var bl = t.Belegung;
-                        <tr class="vhs-klickzeile" @onclick="@(() => Navigation.NavigateTo($"belegungen/{bl.Id}"))">
-                            <td><a href="@($"belegungen/{bl.Id}")">@t.Name</a></td>
+                        <tr class="vhs-klickzeile" @onclick="@(() => Navigation.NavigateTo(Ruecksprung.Detail($"belegungen/{bl.Id}", Ruecksprung.Aktuell(Navigation))))">
+                            <td><a href="@Ruecksprung.Detail($"belegungen/{bl.Id}", Ruecksprung.Aktuell(Navigation))" @onclick:stopPropagation="true">@t.Name</a></td>
                             <td>
                                 <StatusPille Stil="@(bl.Status == VibeVHS.Domain.Anmeldung.Belegungsstatus.Angemeldet ? "gut" : bl.Offen ? "warn" : "neutral")">@VibeVHS.Domain.Anmeldung.BelegungAnzeige.Status(bl.Status)@(t.Warteplatz is { } wp ? $" ({wp})" : "")</StatusPille>
                                 @if (bl.AngebotBis is { } ab) { <span class="vhs-small vhs-muted">bis @ab.ToLocalTime().ToString("dd.MM. HH:mm")</span> }
@@ -416,6 +432,13 @@
     private IReadOnlyList<Ort> buchbareOrte = [];
     private IReadOnlyList<Konflikt> konflikte = [];
     private Veranstaltung? gewaehlt;
+    private Veranstaltung? nachrichtTermin;
+    private string? nachrichtBetreff, nachrichtText;
+
+    private Freigabe NachrichtFreigabe => Freigabe.NurFuer(rolle, Terminnachricht.Rollen)
+        .Und(() => string.IsNullOrWhiteSpace(nachrichtBetreff) || string.IsNullOrWhiteSpace(nachrichtText)
+            ? Freigabe.Nein("Bitte Betreff und Text eingeben.")
+            : Freigabe.Ja);
     private Rolle? rolle;
     private string modus = "einzeln";
     private DateOnly aDatum = DateOnly.FromDateTime(DateTime.Today);
@@ -549,11 +572,42 @@
 
     private async Task AusfallenAsync()
     {
-        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().AusfallenLassenAsync(Id, gewaehlt!.Id, aBemerkung ?? "ohne Angabe"));
+        var terminId = gewaehlt!.Id;
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().AusfallenLassenAsync(Id, terminId, aBemerkung ?? "ohne Angabe"));
         Hinweise.Notify(NotificationSeverity.Info, "Fällt aus", "Der Termin ist als ausgefallen markiert.");
         gewaehlt = null;
         await LadenAsync();
-        folgeschritte = [new("Teilnehmende informieren", "#", Freigabe: Freigabe.Geplant("Die Benachrichtigung bei Terminausfall", "I5"), Hauptschritt: true)];
+        // Nachricht vorbereiten: Text mit Datum und Grund, die Verwaltung kann ihn anpassen.
+        nachrichtTermin = kurs?.Veranstaltungen.FirstOrDefault(v => v.Id == terminId);
+        if (nachrichtTermin is not null && kurs is not null)
+        {
+            nachrichtBetreff = $"Termin am {nachrichtTermin.Beginn:dd.MM.yyyy} fällt aus";
+            nachrichtText = Terminnachricht.AusfallText(kurs, nachrichtTermin);
+        }
+
+        folgeschritte =
+        [
+            new("Teilnehmende informieren", $"kurse/{Id}#teilnehmende-informieren", "Mail mit Übersetzungslink über den Postausgang, Text unten anpassen",
+                Freigabe: Freigabe.NurFuer(rolle, Terminnachricht.Rollen), Hauptschritt: true),
+            new("Ersatztermin anlegen", $"kurse/{Id}", "Oben „Termin hinzufügen“ wählen"),
+        ];
+    }
+
+    private async Task NachrichtSendenAsync()
+    {
+        try
+        {
+            var (versandt, ohneMail) = await Vorgang.AusfuehrenAsync(d =>
+                d.GetRequiredService<Terminnachricht>().SendenAsync(Id, nachrichtTermin!.Id, nachrichtBetreff!, nachrichtText!));
+            Hinweise.Notify(NotificationSeverity.Success, "Nachricht eingereiht",
+                $"{versandt} Mail(s) im Postausgang{(ohneMail > 0 ? $"; {ohneMail} Teilnehmende ohne E-Mail-Adresse – bitte anrufen oder anschreiben" : "")}.");
+            nachrichtTermin = null;
+            folgeschritte = [new("Postausgang ansehen", "postausgang", Hauptschritt: true), new("Protokoll ansehen", "protokoll")];
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht gesendet", ex.Message);
+        }
     }
 
     private async Task StatusAsync(Kursstatus status)
