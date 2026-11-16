@@ -1,6 +1,6 @@
 # Bereitstellung auf liebler.iui.hs-osnabrueck.de
 
-Runbook für den Umzug von „Apache auf 443 + Node-RED auf 1880“ zu **nginx als Reverse Proxy** mit Let's Encrypt,
+Runbook für den Umzug von „Apache auf 443 + Node-RED auf 1880“ zu **nginx als Reverse Proxy** mit dem Hochschulzertifikat (GEANT/HARICA),
 **Node-RED unter `/nodered`** und **VibeVHS unter `/vibevhs`**. Jeder Schritt, der root braucht, ist ein eigenes Skript in
 `schritte/`: idempotent, mit Sicherung vorher (`/root/vibevhs-sicherung/<Zeit>-<Schritt>`), Prüfung danach und Rückweg.
 
@@ -9,11 +9,10 @@ Runbook für den Umzug von „Apache auf 443 + Node-RED auf 1880“ zu **nginx a
 | Server | Ubuntu 26.04.1 LTS, x86_64 · Benutzer `srvadmin` (sudo mit Passwort) |
 | Adressen | 131.173.241.60 · 2001:638:513:f10::83ad:f13c (IPv6 – nginx und ufw gelten für beide) |
 | Heute | Apache 2.4.66 auf 80/443 (statisch `/var/www/html`: `index.html`, `rgb/`, `simplesorter/`), Node-RED auf 1880 (HTTPS), OpenSSH 10.2 |
-| Zertifikat | certbot (snap) mit webroot `/var/www/html`, `snap.certbot.renew.timer` aktiv; ausgeliefert wird aber GEANT (bis 07.02.2027) aus dem LE-Pfad |
-| Weitere Dienste | mosquitto (8883 TLS), influxdb3 (8181), nagios-nrpe (5666), Docker als snap (9443, 8000) – bleiben unverändert |
+| Zertifikat | heute: GEANT (bis 07.02.2027), von Hand im Let's-Encrypt-Pfad abgelegt; certbot (snap) + Timer laufen ungenutzt mit · **künftig:** nur das Hochschulzertifikat in `/etc/ssl/liebler` für nginx und mosquitto, kein Let's Encrypt |
+| Weitere Dienste | mosquitto (8883 TLS, bisher Zertifikat der eigenen Root-CA), influxdb3 (8181), nagios-nrpe (5666), Docker als snap (9443, 8000) – bleiben erreichbar |
 | Firewall | ufw schon **aktiv** (Standard DROP) – Schritt 07 ergänzt nur, nichts wird zurückgesetzt |
-| Ziel | 443 nginx (+80 für Let's Encrypt und Umleitung) · 22 nur aus dem VPN · 1880 zu |
-| CAA | keine Einträge – Let's Encrypt darf ausstellen; Port 80 ist von außen offen |
+| Ziel | 443 nginx (+80 nur Umleitung) · 22 nur aus dem VPN · 1880 zu · 8883/8181/5666/9443/8000 wie bisher |
 
 Bestandsaufnahme (nur lesend, alle Befehle wörtlich): [`protokoll/2026-11-16-erkundung.md`](protokoll/2026-11-16-erkundung.md).
 
@@ -25,7 +24,7 @@ ECDSA   SHA256:Es80ZFNAUByLJLQ3McI9vbLR6loVR9aaMWktcjoPEvQ
 RSA     SHA256:EkK0c7hZFTd/bvy/LcZgrAJkIDSQnMzTGvuGS1rVHCo
 ```
 
-**Reihenfolge:** A → 01 → 02 → 03 → 04 → 05 → 06 → Ausrollen → 07. **Jeden Schritt startet Klaus selbst** (bzw. gibt ihn frei). Bei jedem Schritt eine **zweite SSH-Sitzung offen
+**Reihenfolge:** A → 01 → 02 → 03 → 04 → 05 → 06 → Ausrollen → 07 → (später) 08. **Jeden Schritt startet Klaus selbst** (bzw. gibt ihn frei). Bei jedem Schritt eine **zweite SSH-Sitzung offen
 lassen** (Rettungsanker). Alle Kommandos stammen aus Windows-PowerShell auf dem Entwicklungsrechner, im VPN.
 
 ---
@@ -89,7 +88,7 @@ befristet (danach `sudo rm /etc/sudoers.d/srvadmin`).
 
 `ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/02-pakete.sh"`
 
-nginx, certbot, ufw, apache2-utils (htpasswd), at, sqlite3, curl und die passende `libicuNN` für .NET. nginx wird **nicht**
+nginx, ufw, apache2-utils (htpasswd), at, sqlite3, curl, openssl und die passende `libicuNN` für .NET (kein certbot). nginx wird **nicht**
 gestartet (Apache belegt 80/443 noch). **Prüfen:** Ausgabe zeigt Versionen und „Apache läuft weiter“. Rückweg: nicht nötig.
 
 VibeVHS braucht **kein .NET auf dem Server**: `deploy.ps1` baut self-contained für linux-x64 (für Ubuntu 26.04 gibt es noch
@@ -103,7 +102,10 @@ keine verlässliche Microsoft-Paketquelle).
 
 1. **Bestand:** zeigt, was Apache ausliefert (Sites, Module, Inhalte unter `/var/www`), sichert `/etc/apache2` und `/etc/nginx`.
    Liefert Apache mehr als die Standardseite aus, fragt das Skript nach (**Bisherige Inhalte** unten).
-2. **Zertifikat:** übernimmt vorerst das Hochschul-Zertifikat von Apache → kein Zertifikatswechsel beim Umschalten.
+2. **Zertifikat:** nimmt das Hochschulzertifikat, das Apache heute nutzt, prüft es (Aussteller GEANT/HARICA, gilt für den Hostnamen,
+   nicht abgelaufen, **Schlüssel passt** per Vergleich der öffentlichen Schlüssel, Kette vorhanden) und legt es zentral ab:
+   `/etc/ssl/liebler/fullchain.pem` und `privkey.pem` (root:ssl-cert, Schlüssel 0640). nginx nutzt nur noch diesen Ort;
+   `/etc/letsencrypt` bleibt bis Schritt 08 unangetastet. Dazu die **Ablaufwarnung** (`zertifikat-ablauf.timer`, siehe unten).
 3. **Konfiguration:** `nginx/liebler.conf` (+ Snippets) nach `/etc/nginx`, Standard-Site aus, `nginx -t`.
 4. **Zugangspasswort** für `/vibevhs` (Benutzer `vhs-test`, Passwort fragt `htpasswd`).
 5. **Umschalten:** Apache stoppen und deaktivieren (nicht deinstallieren), nginx starten – startet nginx nicht, kommt Apache sofort zurück.
@@ -113,7 +115,6 @@ keine verlässliche Microsoft-Paketquelle).
 
 **Bisherige Inhalte:** Apache liefert nur statische Seiten aus `/var/www/html` (`index.html`, `rgb/`, `simplesorter/`, kein PHP,
 keine Proxys). nginx liefert dasselbe Verzeichnis unverändert aus (`root /var/www/html`); das Skript prüft `/rgb/` und `/simplesorter/`.
-Schritt 03 legt außerdem den certbot-Hook „nginx neu laden“ an (neben dem vorhandenen `nodered-cert-copy.sh`).
 
 ---
 
@@ -121,13 +122,15 @@ Schritt 03 legt außerdem den certbot-Hook „nginx neu laden“ an (neben dem v
 
 `ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/04-nodered-lokal.sh"`
 
-Node-RED läuft als `nodered.service` (Benutzer `nodered`, v4.1.0, `/home/nodered/.node-red/settings.js`) mit eigenem HTTPS
-(`requireHttps`, Zertifikat kopiert der certbot-Hook) und `adminAuth`. Das Skript setzt (mit Sicherung) `uiHost: "127.0.0.1"`,
-`httpAdminRoot` und `httpNodeRoot` = `"/nodered"`, prüft die Syntax und startet Node-RED neu. HTTPS und Anmeldung bleiben;
-nginx verbindet sich per `https://127.0.0.1:1880`. Danach ist 1880 nur noch lokal.
+Node-RED läuft als `nodered.service` (Benutzer `nodered`, v4.1.0, `/home/nodered/.node-red/settings.js`) heute mit eigenem HTTPS
+(`requireHttps`, Zertifikat aus `/etc/nodered/certs`, das der certbot-Hook kopiert) und `adminAuth`. Das Skript hängt (mit Sicherung)
+einen markierten Block an `settings.js` an: `uiHost: "127.0.0.1"`, `httpAdminRoot`/`httpNodeRoot` = `"/nodered"`,
+`requireHttps: false`, eigenes `https` aus. HTTPS nach außen macht nginx mit dem Hochschulzertifikat; nginx spricht Node-RED
+lokal per `http://127.0.0.1:1880` an – **Node-RED braucht kein eigenes Zertifikat mehr**. Die Anmeldung (`adminAuth`) bleibt,
+das Skript warnt, falls sie fehlt. Danach ist 1880 nur noch lokal.
 
-**Achtung:** HTTP-Endpunkte der Flows heißen danach `https://liebler…/nodered/<pfad>` statt `…:1880/<pfad>` – Geräte oder
-Skripte, die Node-RED direkt auf 1880 ansprechen, vorher umstellen. MQTT (mosquitto) ist nicht betroffen.
+**Achtung:** HTTP-Endpunkte der Flows (und ein Dashboard) heißen danach `https://liebler…/nodered/<pfad>` statt `…:1880/<pfad>`.
+Laut Klaus spricht von außen niemand Node-RED direkt an. MQTT (mosquitto) ist nicht betroffen.
 
 - **Prüfen:** `https://liebler.iui.hs-osnabrueck.de/nodered/` öffnet den Editor. HTTP-Endpunkte der Flows heißen jetzt `/nodered/<pfad>`.
 - Findet das Skript `settings.js` nicht: `ssh -t liebler "sudo NODERED_SETTINGS=/pfad/settings.js bash /tmp/vibevhs-kit/schritte/04-nodered-lokal.sh"`.
@@ -135,25 +138,24 @@ Skripte, die Node-RED direkt auf 1880 ansprechen, vorher umstellen. MQTT (mosqui
 
 ---
 
-## 05 · Let's Encrypt mit automatischer Erneuerung
+## 05 · mosquitto auf das Hochschulzertifikat
 
-`ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/05-zertifikat.sh"`
+`ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/05-mosquitto-zertifikat.sh"`
 
-certbot ist schon eingerichtet (snap, webroot `/var/www/html`, `snap.certbot.renew.timer` zweimal täglich). Der Dienst, der das
-Zertifikat erneuert, heißt also **certbot** – „Let's Encrypt“ ist die Zertifizierungsstelle, die es ausstellt. Im Let's-Encrypt-Pfad
-liegt derzeit aber das GEANT-Zertifikat. Das Skript zeigt `certbot certificates`, macht einen Probelauf und holt nach Rückfrage
-ein echtes Let's-Encrypt-Zertifikat (`certbot renew --force-renewal`). Danach erneuert der Timer automatisch; die Hooks laden
-nginx neu und kopieren das Zertifikat für Node-RED. **Prüfen:** Ausgabe zeigt Aussteller „Let's Encrypt“,
-Ablaufdatum und „Erneuerung (Probelauf) klappt“. **Rückweg:** `05-zurueck.sh` (wieder das Hochschul-Zertifikat).
+mosquitto (8883) nutzt bisher ein Zertifikat der eigenen Root-CA („AAA Klaus Liebler personal Root CA“). Laut Klaus vertrauen alle
+Geräte öffentlichen Wurzeln und akzeptieren damit das GEANT-/HARICA-Zertifikat.
 
-**Voraussetzung: Port 80 von außen erreichbar.** Aus dem VPN ist 80 offen; ob auch von außen, bitte ohne VPN prüfen
-(z. B. Handy im Mobilnetz: `http://liebler.iui.hs-osnabrueck.de` muss auf HTTPS umleiten). Falls nicht:
+1. Prüft das Hochschulzertifikat in `/etc/ssl/liebler` und zeigt die bisherigen TLS-Einstellungen und das bisherige Zertifikat.
+2. Nach Rückfrage: sichert `/etc/mosquitto` komplett, nimmt den Benutzer `mosquitto` in die Gruppe `ssl-cert` auf und stellt
+   `certfile`/`keyfile` auf `/etc/ssl/liebler` um. `cafile` bleibt (prüft ggf. Client-Zertifikate der Geräte).
+3. **Test vor dem Neustart:** kann `mosquitto` die Dateien lesen? Probestart mit derselben TLS-Konfiguration auf `127.0.0.1:18883`
+   und TLS-Handshake dagegen (mosquitto 2 hat keinen reinen Konfigurationstest). Scheitert das, wird die Konfiguration
+   zurückgespielt, ohne dass der laufende Broker angefasst wurde.
+4. Neustart, dann `openssl s_client -connect liebler.iui.hs-osnabrueck.de:8883 -servername liebler.iui.hs-osnabrueck.de`
+   (Aussteller GEANT/HARICA, Ablaufdatum). Klappt das nicht, kommt die vorige Konfiguration sofort zurück.
 
-1. **Port 80 bei der Hochschul-IT freigeben lassen (empfohlen).** nginx beantwortet dort nur die Prüfung und leitet alles andere auf HTTPS um.
-2. **TLS-ALPN-01 über 443** (lego oder acme.sh): braucht vor nginx ein `stream`-Modul mit `ssl_preread`, das ALPN `acme-tls/1`
-   an den ACME-Client weiterreicht – aufwendiger, aber ohne Port 80.
-3. **DNS-01**, falls die Hochschule eine DNS-API bzw. eine delegierte Zone `_acme-challenge.liebler…` anbietet.
-4. **Hochschul-Zertifikat behalten** (GEANT/HARICA über die DFN-PKI, jährlich manuell verlängern) – Schritt 05 dann auslassen.
+**Prüfen:** Senden die Geräte weiter? (`journalctl -u mosquitto -f`, Node-RED-Flows)
+**Rückweg:** `05-zurueck.sh` (vorige Konfiguration mit eigenem Zertifikat, Gruppe `ssl-cert` wieder entfernt).
 
 ---
 
@@ -215,19 +217,63 @@ zurückgesetzt. **Rettungsanker:** nach 10 Minuten kommt der vorige Stand automa
 `sudo atrm $(atq | awk '{print $1}')` entfernt wird. **Prüfen** (neues Fenster, im VPN): `ssh liebler`, `https://…/`.
 **Rückweg:** `07-zurueck.sh` (vorige Regeln). Hinweis: Docker (snap) veröffentlicht Ports an ufw vorbei.
 
-Die Hochschul-Firewall davor filtert zusätzlich: **Port 1880 dort schließen lassen**, 80 öffnen (falls Schritt 05 per HTTP-01).
+8883, 8181 und 5666 bleiben wie bisher erreichbar: vorhandene Regeln bleiben unverändert; fehlt eine, fragt das Skript, ob es
+`ufw allow <port>/tcp` ergänzen soll (Docker 9443/8000 laufen ohnehin an ufw vorbei). Gelöscht wird nur nach Rückfrage
+(offenes 22 bzw. 1880). Die Hochschul-Firewall davor filtert zusätzlich: **Port 1880 dort schließen lassen**.
+
+---
+
+## 08 · certbot und Let's Encrypt aufräumen (später)
+
+`ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/08-certbot-aufraeumen.sh"`
+
+Erst, wenn nginx das Hochschulzertifikat aus `/etc/ssl/liebler` ausliefert und Apache aus ist (das Skript prüft beides und sucht
+restliche Verweise auf `/etc/letsencrypt` bzw. `/etc/nodered/certs` in nginx, mosquitto, Apache und Node-RED). Sichert
+`/etc/letsencrypt` und `/etc/nodered/certs` komplett als tar und fragt **einzeln**: Timer `snap.certbot.renew.timer` abschalten ·
+certbot-snap entfernen · `/etc/letsencrypt` löschen (inkl. Hook `nodered-cert-copy.sh`) · `/etc/nodered/certs` löschen.
+Danach kommt Let's Encrypt auf dem Server nicht mehr vor. **Rückweg:** `08-zurueck.sh` (Dateien aus dem tar, certbot-snap und Timer wieder an).
+
+---
+
+## Zertifikat tauschen (jährlich) und Ablaufwarnung
+
+Das Hochschulzertifikat (GEANT TCS über HARICA, beantragt bei der Hochschul-IT) wird **von Hand** erneuert:
+
+```powershell
+scp liebler.fullchain.pem liebler.key liebler:/tmp/
+ssh -t liebler "sudo bash /tmp/vibevhs-kit/werkzeuge/zertifikat-tauschen.sh /tmp/liebler.fullchain.pem /tmp/liebler.key"
+```
+
+Fehlt die Kette in der Zertifikatsdatei, die Datei mit den Zwischenzertifikaten als drittes Argument angeben. Das Werkzeug prüft
+(Hostname, Ablauf, Schlüssel passt, Kette), sichert das alte Zertifikat, legt das neue nach `/etc/ssl/liebler`, lädt nginx neu,
+startet mosquitto neu und zeigt, was auf 443 und 8883 ausgeliefert wird. Danach die hochgeladenen Dateien löschen.
+**Rückweg:** `zertifikat-tauschen.sh --zurueck`.
+
+**Ablaufwarnung:** `zertifikat-ablauf.timer` prüft täglich um 07:30 und schreibt ins Journal (`journalctl -t zertifikat-ablauf`);
+ab 30 Tagen vor Ablauf als Warnung. Mit `MAIL_AN=…` in `/etc/default/zertifikat-ablauf` zusätzlich per Mail – das braucht ein
+Mailprogramm mit Relay auf dem Server (heute keines eingerichtet). Von Hand: `zertifikat-ablauf --kurz`.
+Da `nagios-nrpe` läuft, bietet sich zusätzlich ein Check im Monitoring an, z. B. `check_ssl_cert -H liebler.iui.hs-osnabrueck.de -w 30`
+bzw. `check_http -H liebler.iui.hs-osnabrueck.de -S --sni -C 30,14` (auch für Port 8883 mit `check_ssl_cert -p 8883`).
+
+**Option für später (nicht umgesetzt):** GEANT TCS bei HARICA bietet nach unserem Kenntnisstand auch **ACME mit EAB-Zugangsdaten**
+(External Account Binding) an. Stellt die Hochschul-IT solche Zugangsdaten bereit, könnte ein ACME-Client (z. B. certbot mit
+`--server <HARICA-ACME-URL> --eab-kid … --eab-hmac-key …`) das **Hochschulzertifikat** automatisch erneuern – ohne Let's Encrypt.
+Bei der Hochschul-IT nachfragen.
 
 ---
 
 ## Danach
 
-- **HSTS** einschalten, wenn alles über HTTPS läuft und Let's Encrypt erneuert: in `liebler.conf` die Zeile `Strict-Transport-Security` einkommentieren, `sudo nginx -t && sudo systemctl reload nginx`.
+- **HSTS** einschalten, wenn alles über HTTPS läuft: in `liebler.conf` die Zeile `Strict-Transport-Security` einkommentieren, `sudo nginx -t && sudo systemctl reload nginx`.
 - Apache deinstallieren, wenn nichts mehr fehlt: `sudo apt purge apache2` (Konfiguration liegt gesichert unter `/root/vibevhs-sicherung/`).
-- Zertifikatsablauf beobachten: `sudo certbot certificates`; Erneuerungs-Timer: `systemctl list-timers certbot.timer`.
+- Zertifikatsablauf: `zertifikat-ablauf --kurz`, Timer: `systemctl list-timers zertifikat-ablauf.timer`.
 - Logs: `journalctl -u vibevhs -f`, `/var/log/vibevhs/`, `/var/log/nginx/`.
 
 ## Offene Punkte
 
-1. Wer spricht Node-RED heute direkt auf Port 1880 an (Geräte, Skripte)? Diese Adressen ändern sich auf `/nodered/…`.
-2. Sollen 8181 (influxdb3), 9443/8000 (Docker) und 5666 (nagios) von außen erreichbar bleiben? (Heute filtert die Hochschul-Firewall.)
-3. Wie kam das GEANT-Zertifikat in den Let's-Encrypt-Pfad? Schritt 05 ersetzt es nach Rückfrage.
+1. Mail auf dem Server für die Ablaufwarnung (Relay der Hochschule)? Sonst nur Journal und ggf. Nagios-Check.
+2. ACME mit EAB bei HARICA über die Hochschul-IT (automatische Erneuerung des Hochschulzertifikats) – optional.
+
+Geklärt (16.11.2026): Von außen kommt nur MQTT (8883) – Node-RED 1880 wird geschlossen. 8181, 9443, 8000, 5666, 8883 bleiben
+erreichbar. Kein Let's Encrypt: Hochschulzertifikat für nginx und mosquitto; alle Geräte vertrauen öffentlichen Wurzeln.
+Nur `srvadmin` meldet sich per SSH an (`AllowUsers srvadmin` bleibt).

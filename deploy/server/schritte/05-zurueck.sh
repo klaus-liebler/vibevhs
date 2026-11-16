@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Rückweg zu Schritt 05: vorheriges Zertifikat-Snippet (z. B. Hochschul-Zertifikat) wiederherstellen.
+# Rückweg zu Schritt 05: mosquitto-Konfiguration von vor Schritt 05 (eigenes Zertifikat) wiederherstellen; Gruppe ssl-cert wieder entfernen.
 source "$(dirname "$0")/gemeinsam.sh"
 als_root
-letzte="$(ls -1d /root/vibevhs-sicherung/*-05-zertifikat 2>/dev/null | tail -1)"
-[[ -n "$letzte" && -f "$letzte/etc/nginx/snippets/liebler-zertifikat.conf" ]] || fehler "Keine Sicherung des Zertifikat-Snippets gefunden."
-cp -a "$letzte/etc/nginx/snippets/liebler-zertifikat.conf" /etc/nginx/snippets/liebler-zertifikat.conf
-nginx -t && systemctl reload nginx
-ok "Vorheriges Zertifikat wieder aktiv. (Das Let's-Encrypt-Zertifikat bleibt in /etc/letsencrypt; löschen mit: certbot delete --cert-name $HOST)"
+letzte="$(ls -1d /root/vibevhs-sicherung/*-05-mosquitto-zertifikat 2>/dev/null | tail -1)"
+[[ -n "$letzte" && -d "$letzte/etc/mosquitto" ]] || fehler "Keine Sicherung von Schritt 05 gefunden."
+cp -a "$letzte/etc/mosquitto/." /etc/mosquitto/
+gpasswd -d mosquitto ssl-cert >/dev/null 2>&1 || true
+systemctl restart mosquitto
+systemctl is-active --quiet mosquitto && ok "mosquitto läuft wieder mit der vorigen Konfiguration (aus $letzte)" || fehler "mosquitto startet nicht: journalctl -u mosquitto"
+echo | openssl s_client -connect 127.0.0.1:8883 2>/dev/null | openssl x509 -noout -subject -issuer | sed 's/^/   /'

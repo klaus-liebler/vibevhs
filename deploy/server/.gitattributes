@@ -6,3 +6,5 @@
 *.js text eol=lf
 *.env text eol=lf
 *.beispiel text eol=lf
+*.default text eol=lf
+*.timer text eol=lf

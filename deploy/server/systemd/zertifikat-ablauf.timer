@@ -1,0 +1,10 @@
+# Täglich um 07:30 – Ziel: /etc/systemd/system/zertifikat-ablauf.timer (Schritt 03)
+[Unit]
+Description=Ablauf des Hochschulzertifikats täglich prüfen
+
+[Timer]
+OnCalendar=*-*-* 07:30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -29,7 +29,7 @@ function Kit-Hochladen {
     # tar statt scp -r: Zielordner wird jedes Mal sauber ersetzt; Zeilenenden bleiben LF (.gitattributes)
     tar -czf $kit -C (Join-Path $wurzel "deploy\server") .
     scp @sshArgs $kit "${Ziel}:/tmp/vibevhs-kit.tar.gz"
-    ssh @sshArgs $Ziel "rm -rf /tmp/vibevhs-kit && mkdir -p /tmp/vibevhs-kit && tar -xzf /tmp/vibevhs-kit.tar.gz -C /tmp/vibevhs-kit && rm /tmp/vibevhs-kit.tar.gz && chmod +x /tmp/vibevhs-kit/schritte/*.sh"
+    ssh @sshArgs $Ziel "rm -rf /tmp/vibevhs-kit && mkdir -p /tmp/vibevhs-kit && tar -xzf /tmp/vibevhs-kit.tar.gz -C /tmp/vibevhs-kit && rm /tmp/vibevhs-kit.tar.gz && chmod +x /tmp/vibevhs-kit/schritte/*.sh /tmp/vibevhs-kit/werkzeuge/*.sh"
 }
 
 if ($NurKit) { Kit-Hochladen; return }

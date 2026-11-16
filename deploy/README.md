@@ -1,6 +1,6 @@
 # Bereitstellung
 
-Testsystem auf **https://liebler.iui.hs-osnabrueck.de/vibevhs** (nginx als Reverse Proxy, Let's Encrypt, Node-RED unter
+Testsystem auf **https://liebler.iui.hs-osnabrueck.de/vibevhs** (nginx als Reverse Proxy, Hochschulzertifikat, Node-RED unter
 `/nodered`). Alles dafür liegt in [`server/`](server/README-server.md):
 
 - `server/README-server.md` – Runbook Schritt für Schritt (SSH-Schlüssel, Härtung, nginx statt Apache, Node-RED, Zertifikat, Dienst, Firewall)

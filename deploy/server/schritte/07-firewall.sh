@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Schritt 07: Firewall (ufw) – 443 und 80 frei, SSH nur aus dem VPN, 1880 zu. ufw ist auf diesem Server SCHON AKTIV
+# Schritt 07: Firewall (ufw) – 443 und 80 frei, SSH nur aus dem VPN, 1880 zu; 8883/8181/5666 (und Docker 9443/8000) bleiben wie bisher. ufw ist auf diesem Server SCHON AKTIV
 # (Standard DROP, eigene Regeln z. B. für MQTT 8883): Es wird nichts zurückgesetzt, nur ergänzt; Löschen nur nach Rückfrage.
 # Start (eduVPN der Hochschule, aus Klaus' Verbindung ermittelt):
 #   ssh -t liebler "sudo VPN_NETZ=172.22.192.0/21 VPN_NETZ6=2001:638:513:fe02::/64 bash /tmp/vibevhs-kit/schritte/07-firewall.sh"
@@ -31,7 +31,7 @@ echo "cp -a $SICHERUNG/etc/ufw/. /etc/ufw/ && ufw reload" | at now + 10 minutes 
 
 # Ergänzen (ufw überspringt vorhandene gleiche Regeln)
 ufw allow 443/tcp comment 'HTTPS nginx'
-ufw allow 80/tcp comment 'HTTP: Lets Encrypt und Umleitung'
+ufw allow 80/tcp comment 'HTTP: Umleitung auf HTTPS'
 ufw allow from "$VPN_NETZ" to any port 22 proto tcp comment 'SSH nur aus dem VPN'
 [[ -n "${VPN_NETZ6:-}" ]] && ufw allow from "$VPN_NETZ6" to any port 22 proto tcp comment 'SSH nur aus dem VPN (IPv6)'
 
@@ -40,6 +40,15 @@ mapfile -t weg < <(ufw status numbered | grep -E '^\[ *[0-9]+\]' | grep -E '(^|\
 for ((i=${#weg[@]}-1; i>=0; i--)); do
     nr=$(sed -E 's/^\[ *([0-9]+)\].*/\1/' <<<"${weg[$i]}")
     if frage "Regel löschen? ${weg[$i]}"; then ufw --force delete "$nr"; fi
+done
+
+# Weitere Dienste bleiben wie bisher erreichbar (Klaus, 16.11.2026): nichts löschen; fehlt eine Regel, nur nach Rückfrage ergänzen.
+# Docker (snap) veröffentlicht 9443/8000 an ufw vorbei – dort ist keine ufw-Regel nötig.
+status="$(ufw status)"
+for port in 8883 8181 5666; do
+    if grep -qE "^$port(/tcp)?\s" <<<"$status"; then ok "Port $port: Regel vorhanden (bleibt unverändert)"
+    elif frage "Port $port hat keine ufw-Regel. 'ufw allow $port/tcp' ergänzen (dann von überall erreichbar)?"; then ufw allow "$port/tcp" comment 'wie bisher erreichbar'
+    else warn "Port $port bleibt ohne eigene Regel"; fi
 done
 
 ufw reload

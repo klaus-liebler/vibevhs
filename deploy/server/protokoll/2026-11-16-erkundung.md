@@ -345,3 +345,28 @@ apache2-utils 2.4.66-2ubuntu2.8
   `nodered-cert-copy.sh` kopiert das Zertifikat für Node-RED.
 - **Node-RED:** `nodered.service`, Benutzer `nodered`, v4.1.0, `/home/nodered/.node-red/settings.js`, HTTPS mit `requireHttps`,
   `adminAuth` gesetzt, `uiHost`/`httpAdminRoot`/`httpNodeRoot` noch nicht gesetzt.
+
+## 08:20 MEZ – TLS-Abfrage von außen (ohne Anmeldung, wie ein Browser)
+
+Vom Entwicklungsrechner (Git-Bash, im VPN), kein ssh, keine Änderung:
+
+```
+for p in 8883 8181 9443 1880; do echo "--- $p"; echo | timeout 8 openssl s_client -connect liebler.iui.hs-osnabrueck.de:$p -servername liebler.iui.hs-osnabrueck.de 2>/dev/null | openssl x509 -noout -subject -issuer -enddate 2>&1 | head -3; done
+```
+
+```
+--- 8883
+subject=C=Germany, ST=NRW, L=Greven, O=Klaus Liebler personal, OU=none, CN=HTTPS Server on ESP32
+issuer=C=Germany, ST=NRW, L=Greven, O=Klaus Liebler personal, OU=none, CN=AAA Klaus Liebler personal Root CA
+--- 8181
+Could not find certificate from <stdin>      (kein TLS)
+--- 9443
+Could not find certificate from <stdin>      (kein TLS bzw. keine Antwort)
+--- 1880
+subject=C=DE, ST=Niedersachsen, O=Hochschule Osnabrueck, CN=liebler.iui.hs-osnabrueck.de
+issuer=C=GR, O=Hellenic Academic and Research Institutions CA, CN=GEANT TLS ECC 1
+```
+
+Folgerung: mosquitto nutzt heute ein Zertifikat der **eigenen Root-CA** („AAA Klaus Liebler personal Root CA“), nicht das
+Hochschulzertifikat. Geräte, die diese eigene CA fest hinterlegt haben (z. B. ESP32), würden ein GEANT-Zertifikat ablehnen –
+deshalb ist die Umstellung von mosquitto ein eigener, optionaler Schritt (05) mit Rückfrage.

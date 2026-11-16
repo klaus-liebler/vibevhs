@@ -93,10 +93,10 @@ Virenscanner und Übersetzer (heute Mocks), interne Lehrfreigaben/Eignungsprüfu
 
 ## Laufende Arbeit: Bereitstellung
 
-Ziel: https://liebler.iui.hs-osnabrueck.de/vibevhs (Testsystem, nginx statt Apache, Let's Encrypt via certbot-snap,
-Node-RED unter /nodered). Branch **deploy-vorbereitung** (main hineingemergt): Pfad-Basis /vibevhs, `/gesund`, Testsystem-Banner,
-Kit `deploy/server` (Runbook, `schritte/01–07` mit Sicherung/Prüfung/Rückweg, `deploy.ps1`).
+Ziel: https://liebler.iui.hs-osnabrueck.de/vibevhs (Testsystem, nginx statt Apache, Hochschulzertifikat GEANT/HARICA in
+/etc/ssl/liebler für nginx und mosquitto – kein Let's Encrypt, Node-RED unter /nodered nur lokal per http). Branch **deploy-vorbereitung** (main hineingemergt): Pfad-Basis /vibevhs, `/gesund`, Testsystem-Banner,
+Kit `deploy/server` (Runbook, `schritte/01–08` mit Sicherung/Prüfung/Rückweg, `werkzeuge/zertifikat-tauschen.sh`, `deploy.ps1`).
 Erkundung (lesend) erledigt: `deploy/server/protokoll/2026-11-16-erkundung.md`. SSH: `ssh liebler` (Benutzer srvadmin,
 Schlüssel `id_ed25519_liebler_iui_hs_osnabrueck`, sudo mit Passwort).
-Nächste Schritte: Kit hochladen (`deploy.ps1 -NurKit`), dann 01 SSH härten → 02 Pakete → 03 nginx → 04 Node-RED → 05 Zertifikat →
-06 Dienst + `deploy.ps1` → 07 Firewall – **jeweils erst nach Klaus' Go**. Danach deploy-vorbereitung nach main mergen.
+Nächste Schritte: Kit hochladen (`deploy.ps1 -NurKit`), dann 01 SSH härten → 02 Pakete → 03 nginx → 04 Node-RED → 05 mosquitto-Zertifikat →
+06 Dienst + `deploy.ps1` → 07 Firewall → später 08 certbot aufräumen – **jeweils erst nach Klaus' Go**. Danach deploy-vorbereitung nach main mergen.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Schritt 03: nginx übernimmt 80/443 von Apache – zunächst mit dem vorhandenen Hochschul-Zertifikat (kein Ausfall beim Wechsel).
+# Schritt 03: nginx übernimmt 80/443 von Apache – mit dem Hochschulzertifikat, das ab jetzt zentral in /etc/ssl/liebler liegt.
 # Start: ssh -t srvadmin@liebler.iui.hs-osnabrueck.de "sudo bash /tmp/vibevhs-kit/schritte/03-nginx-statt-apache.sh"
 # Rückweg: sudo bash /tmp/vibevhs-kit/schritte/03-zurueck.sh  (nginx aus, Apache wieder an)
 source "$(dirname "$0")/gemeinsam.sh"
@@ -31,25 +31,44 @@ else
     ok "Apache liefert nur statische Seiten aus /var/www/html – nginx übernimmt sie unverändert"
 fi
 
-# ---------- 2. Zertifikat: vorerst das bisherige von Apache ----------
-zert_snippet=/etc/nginx/snippets/liebler-zertifikat.conf
-if [[ -f "$zert_snippet" ]]; then
-    ok "Zertifikat-Snippet existiert schon: $(grep -oE '/[^ ;]+' "$zert_snippet" | head -1)"
+# ---------- 2. Zertifikat: Hochschulzertifikat zentral nach /etc/ssl/liebler ----------
+# Heute liegt das GEANT-Zertifikat (von Hand) im Let's-Encrypt-Pfad, den Apache nutzt. Es wird geprüft und nach $ZERT_DIR kopiert;
+# nginx (und nach Schritt 05 mosquitto) nutzen nur noch diesen Ort. /etc/letsencrypt bleibt bis Schritt 08 unangetastet.
+if [[ -f "$ZERT_VOLL" && -f "$ZERT_KEY" ]]; then
+    zert_pruefen "$ZERT_VOLL" "$ZERT_KEY"
 else
-    datei=$(grep -hoE '^\s*SSLCertificateFile\s+\S+' /etc/apache2/sites-enabled/* /etc/apache2/conf-enabled/* 2>/dev/null | awk '{print $2}' | head -1)
-    schluessel=$(grep -hoE '^\s*SSLCertificateKeyFile\s+\S+' /etc/apache2/sites-enabled/* /etc/apache2/conf-enabled/* 2>/dev/null | awk '{print $2}' | head -1)
-    kette=$(grep -hoE '^\s*SSLCertificateChainFile\s+\S+' /etc/apache2/sites-enabled/* /etc/apache2/conf-enabled/* 2>/dev/null | awk '{print $2}' | head -1 || true)
-    [[ -f "$datei" && -f "$schluessel" ]] || fehler "Zertifikat von Apache nicht gefunden (SSLCertificateFile=$datei). Bitte erst Schritt 05 (Let's Encrypt) oder Pfade manuell in $zert_snippet eintragen."
-    voll="$datei"
-    if [[ -n "$kette" && -f "$kette" ]]; then
-        # nginx erwartet Zertifikat + Zwischenzertifikate in einer Datei
-        install -d -m 0750 /etc/nginx/ssl
-        cat "$datei" "$kette" > /etc/nginx/ssl/liebler-fullchain.pem
-        voll=/etc/nginx/ssl/liebler-fullchain.pem
-    fi
-    printf '# Zertifikat wie bisher bei Apache (Schritt 03; die certbot-Erneuerung aktualisiert die Dateien, der Hook lädt nginx neu).\nssl_certificate %s;\nssl_certificate_key %s;\n' "$voll" "$schluessel" > "$zert_snippet"
-    ok "Zertifikat übernommen: $voll · Ablauf: $(openssl x509 -enddate -noout -in "$datei" | cut -d= -f2)"
+    datei=$(grep -hoE '^\s*SSLCertificateFile\s+\S+' /etc/apache2/sites-enabled/* 2>/dev/null | awk '{print $2}' | head -1)
+    schluessel=$(grep -hoE '^\s*SSLCertificateKeyFile\s+\S+' /etc/apache2/sites-enabled/* 2>/dev/null | awk '{print $2}' | head -1)
+    kette=$(grep -hoE '^\s*SSLCertificateChainFile\s+\S+' /etc/apache2/sites-enabled/* 2>/dev/null | awk '{print $2}' | head -1 || true)
+    [[ -f "$datei" && -f "$schluessel" ]] || fehler "Zertifikat von Apache nicht gefunden (SSLCertificateFile=$datei). Hochschulzertifikat bitte mit werkzeuge/zertifikat-tauschen.sh einspielen."
+    info "Apache nutzt: $datei (→ $(readlink -f "$datei"))"
+    tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+    cat "$datei" > "$tmp/fullchain.pem"
+    # Kette anhängen, falls Apache sie getrennt führt und sie nicht schon in der Datei steckt
+    if [[ -n "$kette" && -f "$kette" ]] && [[ $(grep -c 'BEGIN CERTIFICATE' "$datei") -lt 2 ]]; then cat "$kette" >> "$tmp/fullchain.pem"; fi
+    cp "$schluessel" "$tmp/privkey.pem"
+    aussteller=$(openssl x509 -noout -issuer -in "$tmp/fullchain.pem")
+    grep -qiE "GEANT|HARICA|Hellenic|DFN|Sectigo" <<<"$aussteller" || { warn "Unerwarteter Aussteller: $aussteller"; frage "Dieses Zertifikat trotzdem als Hochschulzertifikat übernehmen?" || fehler "Abgebrochen – Apache läuft unverändert weiter."; }
+    zert_ablegen "$tmp/fullchain.pem" "$tmp/privkey.pem" || true
+    rm -rf "$tmp"; trap - EXIT
 fi
+zert_snippet=/etc/nginx/snippets/liebler-zertifikat.conf
+neu="# Hochschulzertifikat (GEANT/HARICA), zentral in $ZERT_DIR – tauschen mit werkzeuge/zertifikat-tauschen.sh
+ssl_certificate $ZERT_VOLL;
+ssl_certificate_key $ZERT_KEY;"
+if [[ "$(cat "$zert_snippet" 2>/dev/null)" != "$neu" ]]; then
+    sichern "$zert_snippet"; install -d /etc/nginx/snippets; printf '%s\n' "$neu" > "$zert_snippet"; ok "nginx nutzt $ZERT_VOLL"
+fi
+# nginx-Worker (www-data) lesen den Schlüssel nicht selbst (das macht der root-Masterprozess) – keine Gruppenmitgliedschaft nötig.
+
+# Tägliche Ablaufwarnung (ab 30 Tagen vor Ablauf ins Journal, optional per Mail – siehe /etc/default/zertifikat-ablauf)
+einspielen werkzeuge/zertifikat-ablauf.sh /usr/local/sbin/zertifikat-ablauf 0755 || true
+[[ -f /etc/default/zertifikat-ablauf ]] || install -m 0644 "$KIT/werkzeuge/zertifikat-ablauf.default" /etc/default/zertifikat-ablauf
+geaendert=0
+einspielen systemd/zertifikat-ablauf.service /etc/systemd/system/zertifikat-ablauf.service && geaendert=1 || true
+einspielen systemd/zertifikat-ablauf.timer /etc/systemd/system/zertifikat-ablauf.timer && geaendert=1 || true
+[[ $geaendert -eq 1 ]] && systemctl daemon-reload
+systemctl enable --now zertifikat-ablauf.timer >/dev/null 2>&1 && ok "Ablaufwarnung aktiv: $(/usr/local/sbin/zertifikat-ablauf --kurz)"
 
 # ---------- 3. nginx-Konfiguration ----------
 einspielen nginx/liebler.conf /etc/nginx/sites-available/liebler.conf || true
@@ -90,13 +109,9 @@ curl -fsS -o /dev/null -w '   https://%{url.host}/ → HTTP %{http_code}\n' --re
 curl -sS -o /dev/null -w '   http://%{url.host}/  → HTTP %{http_code} (erwartet 301)\n' --resolve "$HOST:80:127.0.0.1" "http://$HOST/" || true
 curl -sS -o /dev/null -w '   /vibevhs/ → HTTP %{http_code} (erwartet 401 ohne Passwort; 502 bis Schritt 06)\n' --resolve "$HOST:443:127.0.0.1" "https://$HOST/vibevhs/" || true
 for s in /rgb/ /simplesorter/; do curl -sS -o /dev/null -w "   $s → HTTP %{http_code}\n" --resolve "$HOST:443:127.0.0.1" "https://$HOST$s" || true; done
-# Erneuerung soll nach dem Wechsel nginx neu laden (zusätzlich zum vorhandenen Node-RED-Hook)
-install -d /etc/letsencrypt/renewal-hooks/deploy
-printf '#!/bin/sh\nsystemctl reload nginx\n' > /etc/letsencrypt/renewal-hooks/deploy/nginx-neu-laden.sh && chmod 755 /etc/letsencrypt/renewal-hooks/deploy/nginx-neu-laden.sh
-ok "certbot-Hook: nginx wird nach jeder Erneuerung neu geladen"
 ss -ltnp | grep -E ':(80|443) ' | sed 's/^/   /'
 cat <<HINWEIS
 
-Im Browser prüfen: https://$HOST/  (Übersicht), Zertifikat wie bisher.
+Im Browser prüfen: https://$HOST/  (bisherige Seiten), Zertifikat wie bisher (GEANT).
 Node-RED ist bis Schritt 04 weiter direkt unter :1880 erreichbar; /nodered/ funktioniert erst nach Schritt 04.
 HINWEIS
