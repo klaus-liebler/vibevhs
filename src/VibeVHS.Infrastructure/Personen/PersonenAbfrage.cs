@@ -220,9 +220,10 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
             q = q.Where(p => p.Fachbereiche.Contains(fb));
         }
 
-        if (PersonenSuchindex.Ausdruck(filter.Suche) is { } ausdruck)
+        // Suche direkt in den Versionen (kein Suchindex, keine Kopie): jedes Wort muss als Wortanfang vorkommen.
+        foreach (var wort in Domain.Gemeinsam.Suchtext.Woerter(filter.Suche))
         {
-            var treffer = PersonenSuchindex.Treffer(db, ausdruck);
+            var treffer = db.MitSuchwort(wort);
             q = q.Where(p => treffer.Contains(p.Id));
         }
 

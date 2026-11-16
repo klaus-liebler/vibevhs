@@ -14,7 +14,7 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261116215700_SortierungPerCollation";
+    public override string LastMigrationId => "20261116220733_SucheOhneIndex";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -3551,24 +3551,6 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.HasKey("Schluessel");
 
                 b.ToTable("Vorlagen");
-            });
-
-        modelBuilder.Entity("VibeVHS.Infrastructure.Personen.Suchindexeintrag", b =>
-            {
-                b.Property<byte[]>("PersonId")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("BLOB");
-
-                b.Property<string>("Text")
-                    .IsRequired()
-                    .HasColumnType("TEXT");
-
-                b.HasKey("PersonId");
-
-                b.ToTable("PersonSuche", t =>
-                    {
-                        t.ExcludeFromMigrations();
-                    });
             });
 
         modelBuilder.Entity("VibeVHS.Domain.Anmeldung.KontingentEreignis", b =>

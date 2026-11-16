@@ -39,7 +39,6 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
 
     public DbSet<DublettenAusschluss> DublettenAusschluesse => Set<DublettenAusschluss>();
 
-    public DbSet<Suchindexeintrag> Suchindex => Set<Suchindexeintrag>();
 
     public DbSet<VibeVHS.Domain.Programm.Semester> Semester => Set<VibeVHS.Domain.Programm.Semester>();
 
@@ -83,6 +82,9 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
         modelBuilder.HasDbFunction(typeof(SqlFunktionen).GetMethod(nameof(SqlFunktionen.Ganzzahl))!)
             .HasTranslation(a => new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlUnaryExpression(ExpressionType.Convert, a[0], typeof(long),
                 new Microsoft.EntityFrameworkCore.Storage.LongTypeMapping("INTEGER")));
+        modelBuilder.HasDbFunction(typeof(SqlFunktionen).GetMethod(nameof(SqlFunktionen.Suchtext))!)
+            .HasTranslation(a => new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFunctionExpression("suchtext", a, nullable: true,
+                argumentsPropagateNullability: [true], typeof(string), new Microsoft.EntityFrameworkCore.Storage.StringTypeMapping("TEXT", System.Data.DbType.String)));
         modelBuilder.HasDbFunction(typeof(SqlFunktionen).GetMethod(nameof(SqlFunktionen.Hex))!)
             .HasTranslation(a => new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFunctionExpression("hex", a, nullable: true,
                 argumentsPropagateNullability: [true], typeof(string), new Microsoft.EntityFrameworkCore.Storage.StringTypeMapping("TEXT", System.Data.DbType.String)));
@@ -222,13 +224,6 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
         Version<VibeVHS.Domain.Programm.KursEntgelt>(modelBuilder, "KursEntgelte", _ => { }, "KursId");
         Version<VibeVHS.Domain.Programm.OrtMerkmal>(modelBuilder, "OrtMerkmale", b => b.Property(m => m.Schluessel).HasMaxLength(40), "OrtId");
 
-        // FTS5-Volltextindex; wird per SQL in der Migration angelegt und von SaveChanges gepflegt.
-        modelBuilder.Entity<Suchindexeintrag>(b =>
-        {
-            b.ToTable("PersonSuche", t => t.ExcludeFromMigrations());
-            b.HasKey(s => s.PersonId);
-        });
-
         Version<EMailAdresse>(modelBuilder, "PersonEMails", b =>
         {
             b.Property(e => e.Adresse).HasMaxLength(320);
@@ -346,25 +341,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
         }
 
-        var eigeneTransaktion = Database.CurrentTransaction is null ? await Database.BeginTransactionAsync(cancellationToken) : null;
-        try
-        {
-            var anzahl = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-            await PersonenSuchindex.AktualisierenAsync(this, geaendert, cancellationToken);
-            if (eigeneTransaktion is not null)
-            {
-                await eigeneTransaktion.CommitAsync(cancellationToken);
-            }
-
-            return anzahl;
-        }
-        finally
-        {
-            if (eigeneTransaktion is not null)
-            {
-                await eigeneTransaktion.DisposeAsync();
-            }
-        }
+        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
     /// <summary>Personen, deren Daten (oder Unterlisten) sich in diesem Speichervorgang ändern.</summary>

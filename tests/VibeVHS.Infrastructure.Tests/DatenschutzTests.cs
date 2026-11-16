@@ -205,7 +205,7 @@ public class DatenschutzTests
     }
 
     [Fact]
-    public async Task Suchindex_enthaelt_nach_Anonymisierung_keine_Altdaten()
+    public async Task Suche_findet_nach_Anonymisierung_keine_Altdaten()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var t = await TestDatenbank.ErzeugenAsync();
@@ -216,12 +216,12 @@ public class DatenschutzTests
 
         await dienst.LoeschenAsync(mehmet.Id, "Test", ct);
 
-        var text = (await db.Database.SqlQuery<string>($"SELECT Text AS Value FROM PersonSuche WHERE PersonId = {PersonenSuchindex.Schluessel(mehmet.Id)}")
-            .ToListAsync(ct)).Single();
-        text.ShouldNotContain("mehmet");
-        text.ShouldNotContain("yilmaz");
-        text.ShouldNotContain("1988");
-        text.ShouldNotContain("example.org");
+        // Keine Suchtabelle mehr: gesucht wird direkt in den (anonymisierten) Versionen – alte Werte sind nicht mehr auffindbar.
+        foreach (var alt in new[] { "yilmaz", "example.org" })
+        {
+            (await abfrage.SeiteAsync(new PersonenFilter(alt), null, 10, ct)).ShouldNotContain(z => z.Id == mehmet.Id, alt);
+        }
+
         (await abfrage.SeiteAsync(new PersonenFilter("mehmet", Datenschutz: Datenschutzstatus.Anonymisiert), null, 10, ct)).ShouldBeEmpty();
         (await abfrage.SeiteAsync(new PersonenFilter("geloschte", Datenschutz: Datenschutzstatus.Anonymisiert), null, 10, ct)).ShouldHaveSingleItem();
     }

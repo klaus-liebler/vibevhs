@@ -221,7 +221,7 @@ public partial class _20261115063016_PersonenListeUndBeziehungen : Migration
             table: "PersonVollmachten",
             columns: new[] { "PersonId", "GueltigVon" });
     
-        migrationBuilder.Sql(VibeVHS.Infrastructure.Personen.PersonenSuchindex.TabelleAnlegen);
+        migrationBuilder.Sql("CREATE VIRTUAL TABLE IF NOT EXISTS PersonSuche USING fts5(PersonId UNINDEXED, Text, tokenize = 'unicode61 remove_diacritics 2')");
     }
 
     /// <inheritdoc />

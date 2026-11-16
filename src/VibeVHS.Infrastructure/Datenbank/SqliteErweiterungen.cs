@@ -6,7 +6,8 @@ using VibeVHS.Domain.Gemeinsam;
 namespace VibeVHS.Infrastructure.Datenbank;
 
 /// <summary>
-/// Eigene SQLite-Erweiterungen der Anwendung: Collation <c>DIN5007_2</c> (Sortierung von Namen nach DIN 5007-2). Microsoft.Data.Sqlite
+/// Eigene SQLite-Erweiterungen der Anwendung: Collation <c>DIN5007_2</c> (Sortierung von Namen nach DIN 5007-2) und Funktion
+/// <c>suchtext(x)</c> (normalisierte Schreibweise für die Suche). Microsoft.Data.Sqlite
 /// merkt sich die Registrierung an der Verbindung und wendet sie bei jedem Öffnen an – auch bei Verbindungen, die von außen geöffnet
 /// übergeben werden (Tests, Sicherung). Werkzeuge ohne diese Collation (z. B. ein DB-Browser) können Tabellen mit ihr zwar lesen, aber
 /// nicht danach sortieren und keine Namensversionen schreiben (der Index braucht die Collation).
@@ -24,7 +25,11 @@ public static class SqliteErweiterungen
     }
 
     public static void Registrieren(SqliteConnection verbindung)
-        => verbindung.CreateCollation(Din5007.Collation, (a, b) => Din5007.Vergleichen(a, b));
+    {
+        verbindung.CreateCollation(Din5007.Collation, (a, b) => Din5007.Vergleichen(a, b));
+        // suchtext(x): gleiche Normalisierung wie Suchbegriffe (Groß/klein, Akzente, ä/ae, ß/ss …) – für die Suche direkt in den Versionen.
+        verbindung.CreateFunction("suchtext", (string? text) => Suchtext.Normalisieren(text), isDeterministic: true);
+    }
 }
 
 /// <summary>Registriert die Erweiterungen an jeder Verbindung, die EF selbst anlegt und öffnet (Verbindungszeichenfolge).</summary>

@@ -70,6 +70,29 @@ public static class Personensicht
     public static IQueryable<Guid> MitNamen(this VibeVhsDbContext db, string vorname, string nachname, DateOnly tag)
         => db.NamenAm(tag).Where(n => n.Vorname == vorname && n.Nachname == nachname).Select(n => EF.Property<Guid>(n, "PersonId"));
 
+    /// <summary>
+    /// Personen, auf die ein Suchwort passt (Wortanfang, normalisiert), direkt in den Versionstabellen – ohne eigene Suchtabelle und ohne
+    /// Kopie. Durchsucht werden alle Versionen (auch frühere Namen und Adressen): Name, Titel, Geburtsdatum (TT.MM.JJJJ), Wohnort, E-Mail.
+    /// </summary>
+    public static IQueryable<Guid> MitSuchwort(this VibeVhsDbContext db, string wort)
+    {
+        var muster = " " + wort;
+        var namen = db.Set<PersonName>()
+            .Where(n => (" " + SqlFunktionen.Suchtext(n.Vorname + " " + n.Vorsatz + " " + n.Nachname + " " + n.Zusatz)).Contains(muster))
+            .Select(n => EF.Property<Guid>(n, "PersonId"));
+        var titel = db.Set<PersonMerkmal>().Where(m => m.Art == MerkmalArt.Titel && (" " + SqlFunktionen.Suchtext(m.Inhalt)).Contains(muster))
+            .Select(m => EF.Property<Guid>(m, "PersonId"));
+        var orte = db.Set<Postadresse>().Where(a => (" " + SqlFunktionen.Suchtext(a.Ort)).Contains(muster)).Select(a => EF.Property<Guid>(a, "PersonId"));
+        var mails = db.Set<EMailAdresse>().Where(e => (" " + SqlFunktionen.Suchtext(e.Adresse)).Contains(muster)).Select(e => EF.Property<Guid>(e, "PersonId"));
+        var treffer = namen.Union(titel).Union(orte).Union(mails);
+        if (DateOnly.TryParseExact(wort, "dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var datum))
+        {
+            treffer = treffer.Union(db.MitGeburtsdatum(datum));
+        }
+
+        return treffer;
+    }
+
     /// <summary>Anzeigenamen (Titel + Name) zum Stichtag für viele Personen in zwei Abfragen.</summary>
     public static async Task<Dictionary<Guid, string>> AnzeigenamenAsync(this VibeVhsDbContext db, IReadOnlyCollection<Guid> ids, DateOnly tag,
         CancellationToken abbruch = default)
@@ -108,6 +131,9 @@ public static class SqlFunktionen
 {
     /// <summary>CAST(text AS INTEGER) – z. B. die Rollen-Bitmaske im Merkmal Rollen.</summary>
     public static long Ganzzahl(string text) => throw new InvalidOperationException("Nur in Datenbankabfragen verwendbar.");
+
+    /// <summary>suchtext(x) – normalisierte Schreibweise (siehe <see cref="Domain.Gemeinsam.Suchtext"/>), als SQLite-Funktion registriert.</summary>
+    public static string Suchtext(string? text) => throw new InvalidOperationException("Nur in Datenbankabfragen verwendbar.");
 
     /// <summary>hex(id) – die 16 Bytes der Id als Großbuchstaben-Hex (Speicherreihenfolge), z. B. für Seitenschlüssel.</summary>
     public static string Hex(Guid id) => throw new InvalidOperationException("Nur in Datenbankabfragen verwendbar.");

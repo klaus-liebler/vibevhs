@@ -125,6 +125,15 @@ public sealed class MessungTests
             _ = p!.StandAm(heute, jetzt);
         });
         await Messen($"Kursliste ({kurse} Kurse mit Terminen)", async db => _ = await db.Kurse.AsNoTracking().Include(k => k.Veranstaltungen).OrderBy(k => k.Kursnummer).ThenBy(k => k.Id).ToListAsync(ct));
+        await Messen("davon: Kurse ohne Termine", async db => _ = await db.Kurse.AsNoTracking().OrderBy(k => k.Kursnummer).ThenBy(k => k.Id).ToListAsync(ct));
+        await Messen("davon: alle Termine (mit Orten)", async db => _ = await db.Veranstaltungen.AsNoTracking().ToListAsync(ct));
+        await Messen("Probe: alle Termine mit Orten (eine Abfrage)", async db => _ = await db.Veranstaltungen.AsNoTracking().AsSingleQuery().ToListAsync(ct));
+        await Messen("Probe: Orte als Objekte (SelectMany)", async db => _ = await db.Veranstaltungen.AsNoTracking().SelectMany(v => v.Orte).ToListAsync(ct));
+        await Messen("Probe: alle Termine mit Orten, verfolgt", async db => _ = await db.Veranstaltungen.ToListAsync(ct));
+        await Messen("Probe: Orte allein (Projektion)", async db => _ = await db.Veranstaltungen.AsNoTracking().SelectMany(v => v.Orte).Select(o => o.OrtId).ToListAsync(ct));
+        await Messen("davon: alle Termine ohne Orte (Projektion)", async db => _ = await db.Veranstaltungen.AsNoTracking().Select(v => new { v.Id, v.KursId, v.Beginn, v.Ende, v.DozentId }).ToListAsync(ct));
+        await Messen("Kursliste der Oberfläche (alle Kurse des Semesters, Kennzahlen)", async db =>
+            _ = await new ProgrammSpeicher(db).KurseAsync(new VibeVHS.Application.Programm.KursFilter(), ct));
         await Messen("Raumplan einer Woche", async db => _ = await new ProgrammSpeicher(db).TermineAsync(jetzt.Date, jetzt.Date.AddDays(7), ct));
         await Messen("Rundschreiben-Empfänger (alle Teilnehmenden)", async db =>
         {

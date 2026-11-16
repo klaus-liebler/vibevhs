@@ -126,7 +126,6 @@ Zum Prüfen deshalb die lesbaren Sichten bzw. die Anwendung verwenden; Änderung
 - [PersonOrganisationen](#personorganisationen) – Organisationszugehoerigkeit
 - [PersonQualifikationen](#personqualifikationen) – PersonQualifikation
 - [PersonRufnummern](#personrufnummern) – Rufnummer
-- [PersonSuche](#personsuche) – Suchindexeintrag
 - [PersonVollmachten](#personvollmachten) – Buchungsvollmacht
 - [Personen](#personen) – Person
 - [Portalanliegen](#portalanliegen) – Portalantrag
@@ -1019,15 +1018,6 @@ Klasse: `VibeVHS.Domain.Personen.Rufnummer`
 | Nummer | TEXT(50) | ja |  |  |
 | NummerId | BLOB | ja | Index |  |
 | PersonId | BLOB | ja | → Personen, Index |  |
-
-## PersonSuche
-
-Klasse: `VibeVHS.Infrastructure.Personen.Suchindexeintrag`
-
-| Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
-|---|---|---|---|---|
-| PersonId | BLOB | ja | PK |  |
-| Text | TEXT | ja |  |  |
 
 ## PersonVollmachten
 
