@@ -73,6 +73,18 @@ public sealed class Benutzerkonto
         Fachbereiche = fachbereiche.Distinct().Order().ToList();
     }
 
+    /// <summary>Kontoname aus der verknüpften Person nachziehen (Lese-Cache, z. B. nach Heirat).</summary>
+    public bool NameNachziehen(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name) || Name == name.Trim())
+        {
+            return false;
+        }
+
+        Name = name.Trim();
+        return true;
+    }
+
     public void Deaktivieren() => Aktiv = false;
 
     public void Aktivieren() => Aktiv = true;

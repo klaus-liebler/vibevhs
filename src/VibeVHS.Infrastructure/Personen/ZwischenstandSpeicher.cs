@@ -36,4 +36,36 @@ internal sealed class ZwischenstandSpeicher(VibeVhsDbContext db, TimeProvider uh
     }
 
     public Task SpeichernAsync(CancellationToken abbruch = default) => db.SaveChangesAsync(abbruch);
+
+    public async Task<int> NamenskopienAbgleichenAsync(DateTimeOffset jetzt, CancellationToken abbruch = default)
+    {
+        var geaendert = 0;
+        var kurse = await db.Kurse.Include(k => k.Veranstaltungen).Where(k => k.ArchiviertAm == null).OrderBy(k => k.Id).ToListAsync(abbruch);
+        var personIds = kurse.SelectMany(k => k.Team.Select(d => d.PersonId)).Distinct().ToList();
+        var konten = await db.Benutzerkonten.Where(k => k.PersonId != null).OrderBy(k => k.Id).ToListAsync(abbruch);
+        personIds.AddRange(konten.Select(k => k.PersonId!.Value));
+        personIds.AddRange(kurse.SelectMany(k => k.Veranstaltungen).Where(v => v.DozentId is not null).Select(v => v.DozentId!.Value));
+        var ids = personIds.Distinct().ToList();
+        var personen = await db.Personen.AsNoTracking().AsSplitQuery()
+            .Where(p => ids.Contains(p.Id) && p.Datenschutz != VibeVHS.Domain.Datenschutz.Datenschutzstatus.Anonymisiert)
+            .OrderBy(p => p.Id).ToDictionaryAsync(p => p.Id, abbruch);
+        string? NameAm(Guid id, DateOnly tag) => personen.TryGetValue(id, out var p) ? p.StandAm(tag, jetzt).NameMitTitel : null;
+        var heute = DateOnly.FromDateTime(jetzt.Date);
+        var namen = personen.ToDictionary(p => p.Key, p => p.Value.Anzeigename);
+        var organisationen = await db.Organisationen.AsNoTracking().Select(o => new { o.Id, o.Name }).ToDictionaryAsync(o => o.Id, o => o.Name, abbruch);
+        foreach (var kurs in kurse)
+        {
+            var anders = kurs.NamenskopienAbgleichen(NameAm, heute);
+            if (kurs.AuftraggeberId is { } org && organisationen.TryGetValue(org, out var orgName) && kurs.AuftraggeberNameNachziehen(orgName))
+            {
+                anders = true;
+            }
+
+            geaendert += anders ? 1 : 0;
+        }
+
+        geaendert += konten.Count(k => namen.TryGetValue(k.PersonId!.Value, out var name) && k.NameNachziehen(name));
+        await db.SaveChangesAsync(abbruch);
+        return geaendert;
+    }
 }

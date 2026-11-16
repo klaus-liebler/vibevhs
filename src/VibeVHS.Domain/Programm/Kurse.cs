@@ -517,6 +517,49 @@ public sealed class Kurs
         return EntgeltAm(beginn > heute ? beginn : heute, stand) ?? EntgeltAm(beginn, stand);
     }
 
+    /// <summary>
+    /// Namenskopien der Lehrkräfte (Lese-Caches) abgleichen. Regel: Die Kopie entspricht dem Namen der Person zum Datum des jeweiligen
+    /// Termins – vergangene Termine behalten den damaligen Namen, eine Namenskorrektur für einen vergangenen Zeitraum wirkt auch dort.
+    /// Im Team gilt der Name zum letzten Termin, bei laufenden und künftigen Kursen der von heute.
+    /// <paramref name="nameAm"/> liefert den Namen (mit Titel) einer Person zu einem Datum oder <c>null</c> (unbekannt, anonymisiert).
+    /// </summary>
+    public bool NamenskopienAbgleichen(Func<Guid, DateOnly, string?> nameAm, DateOnly heute)
+    {
+        ArgumentNullException.ThrowIfNull(nameAm);
+        var geaendert = false;
+        foreach (var v in _veranstaltungen.Where(v => v.DozentId is not null))
+        {
+            if (nameAm(v.DozentId!.Value, DateOnly.FromDateTime(v.Beginn)) is { } name && name != v.DozentName)
+            {
+                v.DozentUmbenennen(v.DozentId.Value, name);
+                geaendert = true;
+            }
+        }
+
+        var letzter = _veranstaltungen.Count == 0 ? heute : DateOnly.FromDateTime(_veranstaltungen.Max(v => v.Beginn));
+        var stichtag = letzter < heute ? letzter : heute;
+        var team = Team.Select(d => nameAm(d.PersonId, stichtag) is { } n && n != d.Name ? d with { Name = n } : d).ToList();
+        if (!team.SequenceEqual(Team))
+        {
+            Team = team;
+            geaendert = true;
+        }
+
+        return geaendert;
+    }
+
+    /// <summary>Namenskopie (Lese-Cache) des Auftraggebers nachziehen (Umfirmierung).</summary>
+    public bool AuftraggeberNameNachziehen(string name)
+    {
+        if (AuftraggeberId is null || AuftraggeberName == name)
+        {
+            return false;
+        }
+
+        AuftraggeberName = name;
+        return true;
+    }
+
     /// <summary>Nach Anonymisierung einer Dozentin: Platzhalter statt Name im Team und an den Terminen; die Verknüpfung bleibt.</summary>
     public void DozentAnonymisieren(Guid personId, string platzhalter)
     {

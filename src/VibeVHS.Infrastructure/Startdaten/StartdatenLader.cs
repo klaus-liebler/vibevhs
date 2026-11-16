@@ -86,16 +86,13 @@ public sealed class StartdatenLader(VibeVhsDbContext db, IAuditProtokoll protoko
                 rollen.Add(rolle);
             }
 
-            var person = await db.Personen.FirstOrDefaultAsync(p => p.Benutzerkennung == login, abbruch);
-            if (person is null)
-            {
-                var (titel, vorname, nachname) = NameZerlegen(b.Name);
-                person = Person.Anlegen(vorname, nachname, heute, jetzt, von: "Startdaten");
-                person.TitelSetzen(titel);
-                person.AlsMitarbeitendeVerknuepfen(login, heute, Erfassung.Erst(jetzt, "Startdaten", "Benutzerkonto aus den Startdaten"));
-                db.Personen.Add(person);
-                neuePersonen++;
-            }
+            // Die Verknüpfung Konto ↔ Person steht nur am Konto (Benutzerkonten.PersonId); ein neues Konto bekommt eine neue Person.
+            var (titel, vorname, nachname) = NameZerlegen(b.Name);
+            var person = Person.Anlegen(vorname, nachname, heute, jetzt, von: "Startdaten");
+            person.TitelSetzen(titel);
+            person.AlsMitarbeitendeVerknuepfen(heute, Erfassung.Erst(jetzt, "Startdaten", "Benutzerkonto aus den Startdaten"));
+            db.Personen.Add(person);
+            neuePersonen++;
 
             db.Benutzerkonten.Add(new Benutzerkonto(login, b.Name, b.Funktion, rollen, b.Fachbereiche, person.Id, b.Hinweis));
             neueKonten++;

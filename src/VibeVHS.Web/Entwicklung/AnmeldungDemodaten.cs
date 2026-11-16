@@ -34,9 +34,10 @@ internal static class AnmeldungDemodaten
             .Select(n => new Buchender(n, null, "Teilnehmerservice")).ToArray();
         var ikTeam = new Buchender(Name("sylvia.beckmann", "Sylvia Beckmann"), "sylvia.beckmann", "Integrationskurs-Team");
 
+        var kontoPersonen = await db.Benutzerkonten.AsNoTracking().Where(k => k.PersonId != null).Select(k => k.PersonId!.Value).ToListAsync();
         var teilnehmende = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
             .Where(p => (p.Rollen & Personenrolle.Teilnehmende) == Personenrolle.Teilnehmende && p.Status == Personenstatus.Aktiv
-                        && p.Datenschutz == VibeVHS.Domain.Datenschutz.Datenschutzstatus.Aktiv && p.Benutzerkennung == null)
+                        && p.Datenschutz == VibeVHS.Domain.Datenschutz.Datenschutzstatus.Aktiv && !kontoPersonen.Contains(p.Id))
             .OrderBy(p => p.Sortierschluessel).Select(p => new { p.Id, p.Anzeigename }).Take(4000).ToListAsync();
         if (teilnehmende.Count == 0)
         {

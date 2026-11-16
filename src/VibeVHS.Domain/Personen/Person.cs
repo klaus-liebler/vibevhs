@@ -43,9 +43,6 @@ public sealed class Person
 
     public Personenrolle Rollen { get; private set; }
 
-    /// <summary>Anmeldename, wenn die Person ein Benutzerkonto hat (Mitarbeitende).</summary>
-    public string? Benutzerkennung { get; private set; }
-
     public IReadOnlyCollection<PersonName> Namen => _namen;
 
     public IReadOnlyCollection<PersonMerkmal> Merkmale => _merkmale;
@@ -335,13 +332,8 @@ public sealed class Person
     public Personenrolle RollenAm(DateOnly tag, DateTimeOffset bekanntAm)
         => _merkmale.Where(m => m.Art == MerkmalArt.Rollen).AlsStichtag(tag, bekanntAm)?.AlsRollen() ?? Personenrolle.Keine;
 
-    /// <summary>Verknüpft die Person mit einem Benutzerkonto und macht sie zur Mitarbeitenden.</summary>
-    public void AlsMitarbeitendeVerknuepfen(string benutzerkennung, DateOnly ab, Erfassung erfassung)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(benutzerkennung);
-        Benutzerkennung = benutzerkennung.Trim();
-        RolleHinzufuegen(Personenrolle.Mitarbeitende, ab, erfassung);
-    }
+    /// <summary>Macht die Person zur Mitarbeitenden (die Verknüpfung zum Benutzerkonto steht nur am Konto: Benutzerkonten.PersonId).</summary>
+    public void AlsMitarbeitendeVerknuepfen(DateOnly ab, Erfassung erfassung) => RolleHinzufuegen(Personenrolle.Mitarbeitende, ab, erfassung);
 
     // ---------- Adressen ----------
 
@@ -640,7 +632,6 @@ public sealed class Person
         }
 
         Titel = null;
-        Benutzerkennung = null;
         Geburtsdatum = null;
         EMail = null;
         Sprache = string.Empty;

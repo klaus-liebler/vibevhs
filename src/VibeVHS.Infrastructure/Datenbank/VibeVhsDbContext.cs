@@ -77,8 +77,6 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(p => p.Sprache).HasMaxLength(10);
             b.Property(p => p.Titel).HasMaxLength(50);
             b.Property(p => p.Rollen).HasConversion<int>();
-            b.Property(p => p.Benutzerkennung).HasMaxLength(100);
-            b.HasIndex(p => p.Benutzerkennung).IsUnique();
             b.Property(p => p.Status).HasMaxLength(30);
             b.Property(p => p.Anzeigename).HasMaxLength(300);
             b.Property(p => p.Sortiername).HasMaxLength(300);

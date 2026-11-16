@@ -78,8 +78,11 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
     public async Task<IReadOnlyList<PersonAktivitaet>> InaktivePersonenAsync(DateTimeOffset vor, CancellationToken abbruch = default)
     {
         var heute = DateOnly.FromDateTime(DateTime.Today);
+        // Mitarbeitende (Person an einem Verwaltungskonto) fallen nicht unter den Löschlauf; Portalkonten zählen nicht.
+        var mitarbeitende = (await db.Benutzerkonten.AsNoTracking().Where(k => k.PersonId != null).ToListAsync(abbruch))
+            .Where(k => !k.IstPortalkonto).Select(k => k.PersonId!.Value).ToHashSet();
         var kandidaten = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
-            .Where(p => p.Benutzerkennung == null && p.Status != Personenstatus.Zusammengefuehrt
+            .Where(p => !mitarbeitende.Contains(p.Id) && p.Status != Personenstatus.Zusammengefuehrt
                         && (p.Datenschutz == Datenschutzstatus.Aktiv || p.Datenschutz == Datenschutzstatus.Archiviert
                             || (p.Datenschutz == Datenschutzstatus.Gesperrt && p.GesperrtBis < heute)))
             .Select(p => new { p.Id, p.Anzeigename, p.AngelegtAm, p.Datenschutz })

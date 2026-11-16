@@ -16,9 +16,15 @@ public interface IZwischenstandSpeicher
     Task<DateOnly?> LetzterLaufAsync(CancellationToken abbruch = default);
 
     Task SpeichernAsync(CancellationToken abbruch = default);
+
+    /// <summary>
+    /// Namenskopien abgleichen (Lese-Caches): Lehrkraft-Namen in Kursteams und künftigen Terminen, Auftraggeber-Namen in Kursen,
+    /// Kontonamen von Konten mit Person. Liefert die Zahl der geänderten Datensätze.
+    /// </summary>
+    Task<int> NamenskopienAbgleichenAsync(DateTimeOffset jetzt, CancellationToken abbruch = default);
 }
 
-public sealed record Zwischenstandlauf(int Geprueft, int Geaendert, DateOnly Bis);
+public sealed record Zwischenstandlauf(int Geprueft, int Geaendert, DateOnly Bis, int Namenskopien = 0);
 
 /// <summary>
 /// Täglich (00:05 und im Startabgleich): Lese-Caches der Personentabelle fortschreiben. Die führenden Daten sind bitemporal; die Caches
@@ -55,9 +61,11 @@ public sealed class Zwischenstaende(IZwischenstandSpeicher speicher, IAuditProto
             await speicher.SpeichernAsync(abbruch);
         }
 
+        var kopien = await speicher.NamenskopienAbgleichenAsync(jetzt, abbruch);
         await protokoll.ProtokollierenAsync(Aktion,
-            $"Zwischenstände der Personen fortgeschrieben (Stand {heute:dd.MM.yyyy}): {ids.Count} geprüft, {geaendert} aktualisiert", abbruch: abbruch);
+            $"Zwischenstände der Personen fortgeschrieben (Stand {heute:dd.MM.yyyy}): {ids.Count} geprüft, {geaendert} aktualisiert, {kopien} Namenskopien nachgezogen",
+            abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
-        return new Zwischenstandlauf(ids.Count, geaendert, heute);
+        return new Zwischenstandlauf(ids.Count, geaendert, heute, kopien);
     }
 }
