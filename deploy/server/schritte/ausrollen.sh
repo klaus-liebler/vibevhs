@@ -20,8 +20,12 @@ archiv="${1:?Pfad zum Archiv fehlt}"
 [[ -f "$archiv" ]] || fehler "Archiv $archiv fehlt"
 neu=$(mktemp -d /opt/vibevhs.neu.XXXX)
 tar -xzf "$archiv" -C "$neu" --strip-components=1
-[[ -x "$neu/VibeVHS.Web" ]] || { rm -rf "$neu"; fehler "Archiv enthält kein ausführbares VibeVHS.Web"; }
-chown -R root:root "$neu" && chmod 755 "$neu"
+[[ -f "$neu/VibeVHS.Web" ]] || { rm -rf "$neu"; fehler "Archiv enthält kein VibeVHS.Web"; }
+# Unter Windows gebaute Archive tragen keine Unix-Rechte (alles 666/777): Rechte hier festlegen
+chown -R root:root "$neu"
+find "$neu" -type d -exec chmod 755 {} +
+find "$neu" -type f -exec chmod 644 {} +
+chmod 755 "$neu/VibeVHS.Web"; [[ -f "$neu/createdump" ]] && chmod 755 "$neu/createdump"
 
 # Datenbank vor dem Update sichern (Migrationen laufen beim Start)
 if [[ -f /var/lib/vibevhs/vibevhs.db ]]; then
