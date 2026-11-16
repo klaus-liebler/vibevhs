@@ -55,9 +55,9 @@ public sealed class Stammdatenaenderung(IPersonenSpeicher speicher, IAuditProtok
             throw new ArgumentException("Bitte einen Grund bzw. Nachweis angeben (steht in der Datenhistorie).");
         }
 
-        if (string.IsNullOrWhiteSpace(neu.Vorname) || string.IsNullOrWhiteSpace(neu.Nachname))
+        if (string.IsNullOrWhiteSpace(neu.Nachname))
         {
-            throw new ArgumentException("Vor- und Nachname sind Pflicht.");
+            throw new ArgumentException("Der Nachname ist Pflicht (bei nur einem Namen laut Ausweis steht er dort, der Vorname bleibt leer).");
         }
 
         var person = await speicher.LadenAsync(personId, abbruch) ?? throw new InvalidOperationException("Person nicht gefunden.");
@@ -79,8 +79,8 @@ public sealed class Stammdatenaenderung(IPersonenSpeicher speicher, IAuditProtok
         if (nameNeu)
         {
             _ = korrektur
-                ? person.NameKorrigieren(neu.Vorname.Trim(), neu.Nachname.Trim(), datum, g, jetzt, von)
-                : person.NameAendernAb(neu.Vorname.Trim(), neu.Nachname.Trim(), datum, g, jetzt, von);
+                ? person.NameKorrigieren((neu.Vorname ?? "").Trim(), neu.Nachname.Trim(), datum, g, jetzt, von)
+                : person.NameAendernAb((neu.Vorname ?? "").Trim(), neu.Nachname.Trim(), datum, g, jetzt, von);
             geaendert.Add("Name");
         }
 

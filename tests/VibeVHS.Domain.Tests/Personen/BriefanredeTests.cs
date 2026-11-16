@@ -76,4 +76,18 @@ public class BriefanredeTests
         p.Merkmale.Single(m => m.Art == MerkmalArt.Titel).Inhalt.ShouldBeEmpty();
         p.Titel.ShouldBeNull();
     }
+
+    [Fact]
+    public void Nur_ein_Name_laut_Ausweis_Anzeige_Sortierung_und_Anrede()
+    {
+        var jetzt = new DateTimeOffset(2026, 11, 16, 10, 0, 0, TimeSpan.FromHours(1));
+        var p = Person.Anlegen("", "Rahimi", new DateOnly(2025, 1, 1), jetzt.AddYears(-1));
+        var name = p.AktuellerName(jetzt);
+        (name.NurEinName, name.Anzeige, p.Anzeigename, p.Sortiername).ShouldBe((true, "Rahimi", "Rahimi", "rahimi"));
+        p.Briefanrede(jetzt).ShouldBe("Guten Tag Rahimi");
+        p.AngabeAendern(MerkmalArt.Anrede, "Herr", new DateOnly(2025, 1, 1), VibeVHS.Domain.Gemeinsam.Erfassung.Erst(jetzt), korrektur: true);
+        p.Briefanrede(jetzt).ShouldBe("Sehr geehrter Herr Rahimi");
+        Briefanrede.Bilden("Herr", null, "", "Rahimi", Anredestil.Informell, du: true).ShouldBe("Hallo Rahimi");
+        Should.Throw<ArgumentException>(() => Person.Anlegen("Kai", "", new DateOnly(2025, 1, 1), jetzt)); // Nachname bleibt Pflicht
+    }
 }

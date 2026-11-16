@@ -41,8 +41,14 @@
         <h2>Neue Person</h2>
         <div class="vhs-fields">
             <RadzenFormField Text="Titel" Variant="Variant.Outlined" Style="max-width:9em"><RadzenTextBox @bind-Value="titel" Placeholder="z. B. Dr." /></RadzenFormField>
-            <RadzenFormField Text="Vorname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="vorname" @bind-Value:after="DublettenPruefenAsync" /></RadzenFormField>
+            <RadzenFormField Text="@(nurEinName ? "Vorname (keiner)" : "Vorname *")" Variant="Variant.Outlined">
+                <RadzenTextBox @bind-Value="vorname" @bind-Value:after="DublettenPruefenAsync" Disabled="@nurEinName"
+                               title="@(nurEinName ? "Nur ein Name laut Ausweis: Der Name steht im Feld Nachname, ein Vorname wird nicht erfasst." : null)" />
+            </RadzenFormField>
             <RadzenFormField Text="Nachname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nachname" @bind-Value:after="DublettenPruefenAsync" /></RadzenFormField>
+            <label class="vhs-small" style="align-self:center" title="z. B. bei Ausweisen aus Indonesien oder Afghanistan: Der einzige Name kommt ins Feld Nachname.">
+                <input type="checkbox" @bind="nurEinName" @bind:after="NurEinNameGeaendertAsync" data-testid="nur-ein-name" /> Nur ein Name laut Ausweis
+            </label>
             <RadzenFormField Text="Geburtsdatum" Variant="Variant.Outlined">
                 <RadzenDatePicker TValue="DateOnly?" @bind-Value="geburtsdatum" @bind-Value:after="DublettenPruefenAsync" DateFormat="dd.MM.yyyy" />
             </RadzenFormField>
@@ -261,6 +267,7 @@
 
     private bool formularOffen, speichert, dublettenGeprueft;
     private string? titel, vorname, nachname, eMail, fehler;
+    private bool nurEinName;
     private string sprache = "de";
     private DateOnly? geburtsdatum;
     private IReadOnlyList<DublettenKandidat> kandidaten = [];
@@ -275,8 +282,8 @@
     private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
 
     private Freigabe SpeichernFreigabe =>
-        string.IsNullOrWhiteSpace(vorname) || string.IsNullOrWhiteSpace(nachname)
-            ? Freigabe.Nein("Bitte zuerst Vor- und Nachnamen eintragen (Pflichtfelder).")
+        (!nurEinName && string.IsNullOrWhiteSpace(vorname)) || string.IsNullOrWhiteSpace(nachname)
+            ? Freigabe.Nein(nurEinName ? "Bitte den Namen laut Ausweis im Feld Nachname eintragen." : "Bitte zuerst Vor- und Nachnamen eintragen (Pflichtfelder) – oder „Nur ein Name laut Ausweis“ ankreuzen.")
             : kandidaten.Count > 0 && !dublettenGeprueft
                 ? Freigabe.Nein("Es gibt eine mögliche Dublette. Bitte prüfen und bestätigen, dass es eine andere Person ist – oder die vorhandene Person öffnen.")
                 : Freigabe.Ja;
@@ -410,6 +417,16 @@
         _ => "info",
     };
 
+    private async Task NurEinNameGeaendertAsync()
+    {
+        if (nurEinName)
+        {
+            vorname = null;
+        }
+
+        await DublettenPruefenAsync();
+    }
+
     private async Task TitelUebernehmenAsync()
     {
         var (erkannt, v, n) = Titelerkennung.Abtrennen(vorname, nachname);
@@ -427,9 +444,9 @@
     private async Task DublettenPruefenAsync()
     {
         dublettenGeprueft = false;
-        kandidaten = string.IsNullOrWhiteSpace(vorname) || string.IsNullOrWhiteSpace(nachname)
+        kandidaten = (!nurEinName && string.IsNullOrWhiteSpace(vorname)) || string.IsNullOrWhiteSpace(nachname)
             ? []
-            : await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IDublettenSuche>().KandidatenAsync(vorname!, nachname!, geburtsdatum));
+            : await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IDublettenSuche>().KandidatenAsync(nurEinName ? "" : vorname!, nachname!, geburtsdatum));
     }
 
     private async Task SpeichernAsync()
@@ -439,7 +456,7 @@
         try
         {
             var person = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<PersonenDienst>()
-                .AnlegenAsync(vorname!, nachname!, geburtsdatum, eMail, sprache, titel: titel));
+                .AnlegenAsync(nurEinName ? "" : vorname!, nachname!, geburtsdatum, eMail, sprache, titel: titel));
             var name = person.Anzeigename;
             Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", $"{name} wurde angelegt und protokolliert.");
             folgeTitel = $"{name} wurde angelegt. Wie geht es weiter?";
@@ -450,6 +467,7 @@
                 new("Weitere Person anlegen", "personen?neu=1"),
             ];
             titel = vorname = nachname = eMail = null;
+            nurEinName = false;
             geburtsdatum = null;
             sprache = "de";
             kandidaten = [];

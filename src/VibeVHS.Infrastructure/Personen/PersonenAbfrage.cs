@@ -170,7 +170,7 @@ internal sealed class DublettenSuche(VibeVhsDbContext db) : IDublettenSuche
     public async Task<IReadOnlyList<DublettenKandidat>> KandidatenAsync(string vorname, string nachname, DateOnly? geburtsdatum,
         Guid? ausser = null, CancellationToken abbruch = default)
     {
-        if (geburtsdatum is null || string.IsNullOrWhiteSpace(vorname) || string.IsNullOrWhiteSpace(nachname))
+        if (geburtsdatum is null || string.IsNullOrWhiteSpace(nachname)) // Vorname leer = nur ein Name laut Ausweis
         {
             return [];
         }

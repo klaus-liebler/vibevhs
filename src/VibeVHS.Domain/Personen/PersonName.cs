@@ -14,9 +14,9 @@ public sealed class PersonName : BitemporaleVersion<PersonName>
     public PersonName(string vorname, string nachname, DateOnly gueltigVon, DateOnly? gueltigBis, Erfassung erfassung)
         : base(gueltigVon, gueltigBis, erfassung)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(vorname);
+        // Vorname leer = „nur ein Name laut Ausweis“ (z. B. indonesische oder afghanische Dokumente); der Name steht dann im Nachnamen.
         ArgumentException.ThrowIfNullOrWhiteSpace(nachname);
-        Vorname = vorname.Trim();
+        Vorname = vorname?.Trim() ?? string.Empty;
         Nachname = nachname.Trim();
     }
 
@@ -30,7 +30,10 @@ public sealed class PersonName : BitemporaleVersion<PersonName>
 
     public string Nachname { get; private set; }
 
-    public string Anzeige => $"{Vorname} {Nachname}";
+    /// <summary>Kennzeichen „nur ein Name laut Ausweis“: kein Vorname, der einzige Name steht im Nachnamen.</summary>
+    public bool NurEinName => Vorname.Length == 0;
+
+    public string Anzeige => NurEinName ? Nachname : $"{Vorname} {Nachname}";
 
     internal void Anonymisieren(string vorname, string nachname)
     {

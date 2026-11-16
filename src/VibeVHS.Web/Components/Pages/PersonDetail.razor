@@ -358,7 +358,10 @@ else if (dubletten.Count > 0)
     <div class="vhs-fields">
         <RadzenFormField Text="Anrede" Variant="Variant.Outlined"><RadzenDropDown TValue="string" @bind-Value="sdAnrede" Data="@VibeVHS.Application.Personen.Stammdatenaenderung.Anreden" AllowClear="true" /></RadzenFormField>
         <RadzenFormField Text="Titel" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="sdTitel" Placeholder="z. B. Dr." /></RadzenFormField>
-        <RadzenFormField Text="Vorname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="neuVorname" /></RadzenFormField>
+        <RadzenFormField Text="@(sdNurEinName ? "Vorname (keiner)" : "Vorname *")" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="neuVorname" Disabled="@sdNurEinName" /></RadzenFormField>
+        <label class="vhs-small" style="align-self:center" title="Der einzige Name laut Ausweis steht im Feld Nachname.">
+            <input type="checkbox" @bind="sdNurEinName" @bind:after="@(() => { if (sdNurEinName) { neuVorname = null; } })" /> Nur ein Name laut Ausweis
+        </label>
         <RadzenFormField Text="Nachname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="neuNachname" /></RadzenFormField>
         <RadzenFormField Text="Geburtsname" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="sdGeburtsname" /></RadzenFormField>
         <RadzenFormField Text="Geburtsdatum" Variant="Variant.Outlined">
@@ -713,6 +716,7 @@ else if (dubletten.Count > 0)
 
     private bool istKorrektur, speichert, nameOffen;
     private string? neuVorname, neuNachname, grund, fehler;
+    private bool sdNurEinName;
     private string? sdAnrede, sdTitel, sdGeburtsname, sdGeschlecht, sdSprache, sdZusatz, sdStrasse, sdPlz, sdOrt, sdTelefon, sdEMail;
     private DateOnly? sdGeburtsdatum;
     private bool sdVorbelegt;
@@ -728,6 +732,7 @@ else if (dubletten.Count > 0)
         var a = VibeVHS.Application.Personen.StammdatenEingabe.Aus(stand);
         (sdAnrede, sdTitel, neuVorname, neuNachname, sdGeburtsname, sdGeburtsdatum, sdGeschlecht, sdSprache) =
             (a.Anrede, a.Titel, a.Vorname, a.Nachname, a.Geburtsname, a.Geburtsdatum, a.Geschlecht, a.Sprache ?? "de");
+        sdNurEinName = string.IsNullOrEmpty(a.Vorname);
         (sdZusatz, sdStrasse, sdPlz, sdOrt, sdTelefon, sdEMail) = (a.AdressZusatz, a.Strasse, a.Postleitzahl, a.Ort, a.Telefon, a.EMail);
         sdVorbelegt = true;
         fehler = null;
@@ -767,8 +772,8 @@ else if (dubletten.Count > 0)
         : Freigabe.Ja;
 
     private Freigabe AenderungFreigabe => !Schreibschutz.Erlaubt ? Schreibschutz :
-        string.IsNullOrWhiteSpace(neuVorname) || string.IsNullOrWhiteSpace(neuNachname)
-            ? Freigabe.Nein("Bitte Vor- und Nachnamen eintragen.")
+        (!sdNurEinName && string.IsNullOrWhiteSpace(neuVorname)) || string.IsNullOrWhiteSpace(neuNachname)
+            ? Freigabe.Nein(sdNurEinName ? "Bitte den Namen laut Ausweis im Feld Nachname eintragen." : "Bitte Vor- und Nachnamen eintragen – oder „Nur ein Name laut Ausweis“ ankreuzen.")
             : aenderungsdatum is null
                 ? Freigabe.Nein(istKorrektur ? "Bitte angeben, für welchen Tag die zu korrigierende Version gilt." : "Bitte das Datum angeben, ab dem die Änderung gilt.")
                 : string.IsNullOrWhiteSpace(grund)
@@ -825,7 +830,7 @@ else if (dubletten.Count > 0)
         speichert = true;
         try
         {
-            var eingabe = new VibeVHS.Application.Personen.StammdatenEingabe(sdAnrede, sdTitel, neuVorname!, neuNachname!, sdGeburtsname, sdGeburtsdatum, sdGeschlecht,
+            var eingabe = new VibeVHS.Application.Personen.StammdatenEingabe(sdAnrede, sdTitel, sdNurEinName ? "" : neuVorname!, neuNachname!, sdGeburtsname, sdGeburtsdatum, sdGeschlecht,
                 sdSprache, sdZusatz, sdStrasse, sdPlz, sdOrt, sdTelefon, sdEMail);
             var ergebnis = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Personen.Stammdatenaenderung>()
                 .AendernAsync(Id, eingabe, istKorrektur, aenderungsdatum!.Value, grund!));
