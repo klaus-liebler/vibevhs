@@ -1,0 +1,26 @@
+{
+  "//": "Vorlage für den späteren Echtbetrieb (ASPNETCORE_ENVIRONMENT=Production). Ohne Geheimnisse: Passwörter, Schlüssel und Zugangsdaten nur als Umgebungsvariablen (/etc/vibevhs/vibevhs.env).",
+  "OeffentlicheAdresse": "https://liebler.iui.hs-osnabrueck.de/vibevhs/",
+  "PathBase": "/vibevhs",
+  "ReverseProxy": {
+    "Aktiv": true,
+    "Host": "liebler.iui.hs-osnabrueck.de"
+  },
+  "Demodaten": {
+    "Anlegen": false
+  },
+  "Testsystem": {
+    "Aktiv": false
+  },
+  "Anmeldung": {
+    "ZugangscodeErforderlich": true
+  },
+  "Sicherung": {
+    "Aktiv": true,
+    "Zeitplan": "0 30 1 * * ?",
+    "Behalten": 14
+  },
+  "Shop": {
+    "ErlaubteOrigins": [ "https://www.vhs-egs.de" ]
+  }
+}

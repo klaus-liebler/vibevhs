@@ -5,11 +5,11 @@
 # Voraussetzung: VibeVHS betreibt SQLite im WAL-Modus (Standard von EF Core/Microsoft.Data.Sqlite: ja, sobald
 # „PRAGMA journal_mode=WAL“ gesetzt ist – siehe docs/betrieb.md).
 dbs:
-  - path: /var/lib/vibevhs/data/vibevhs.db
+  - path: /var/lib/vibevhs/vibevhs.db
     replicas:
       # 1) Lokale Kopie auf einem zweiten Datenträger (einfachster Start)
       - type: file
-        path: /mnt/sicherung/vibevhs
+        path: /var/backups/vibevhs/litestream
         retention: 336h          # 14 Tage
         snapshot-interval: 24h
       # 2) Optional: S3-kompatibler Speicher des kommunalen Rechenzentrums (Zugangsdaten nur als Umgebungsvariablen)
@@ -21,5 +21,5 @@ dbs:
       #   access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
       #   secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
 # Wiederherstellung (Probe regelmäßig!):
-#   litestream restore -config /etc/litestream.yml -o /tmp/vibevhs-probe.db /var/lib/vibevhs/data/vibevhs.db
+#   litestream restore -config /etc/litestream.yml -o /tmp/vibevhs-probe.db /var/lib/vibevhs/vibevhs.db
 #   sqlite3 /tmp/vibevhs-probe.db "PRAGMA integrity_check;"

@@ -1,0 +1,47 @@
+# VibeVHS (Testsystem) als systemd-Dienst – Ziel: /etc/systemd/system/vibevhs.service (Schritt 06)
+# Self-contained Linux-Build in /opt/vibevhs (kein .NET auf dem Server nötig), Daten getrennt in /var/lib/vibevhs.
+# Geheimnisse (z. B. Anmeldung__Zugangscode) stehen nur in /etc/vibevhs/vibevhs.env (root, 0640), nie im Repository.
+[Unit]
+Description=VibeVHS Verwaltung (Testsystem)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=vibevhs
+Group=vibevhs
+WorkingDirectory=/opt/vibevhs
+ExecStart=/opt/vibevhs/VibeVHS.Web
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+Environment=ASPNETCORE_ENVIRONMENT=Testsystem
+# Nur lokal: nach außen spricht ausschließlich nginx
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5080
+Environment=DOTNET_NOLOGO=1
+Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+Environment=ConnectionStrings__VibeVHS=Data Source=/var/lib/vibevhs/vibevhs.db
+Environment=Speicher__Dokumente=/var/lib/vibevhs/dokumente
+Environment=Speicher__Schluessel=/var/lib/vibevhs/schluessel
+Environment=Speicher__Logs=/var/log/vibevhs
+Environment=Sicherung__Ordner=/var/backups/vibevhs
+Environment=ReverseProxy__Aktiv=true
+Environment=ReverseProxy__Host=liebler.iui.hs-osnabrueck.de
+EnvironmentFile=-/etc/vibevhs/vibevhs.env
+
+# Härtung
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/var/lib/vibevhs /var/log/vibevhs /var/backups/vibevhs
+
+[Install]
+WantedBy=multi-user.target

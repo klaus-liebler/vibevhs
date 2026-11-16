@@ -1,37 +1,12 @@
 # Bereitstellung
 
-> Stand: noch nicht ausgerollt. Zuerst wird lokal und nativ entwickelt; der Umzug auf den Server folgt später.
+Testsystem auf **https://liebler.iui.hs-osnabrueck.de/vibevhs** (nginx als Reverse Proxy, Let's Encrypt, Node-RED unter
+`/nodered`). Alles dafür liegt in [`server/`](server/README-server.md):
 
-## Testsystem: https://liebler.iui.hs-osnabrueck.de/vibevhs (nativ, ohne Docker)
+- `server/README-server.md` – Runbook Schritt für Schritt (SSH-Schlüssel, Härtung, nginx statt Apache, Node-RED, Zertifikat, Dienst, Firewall)
+- `server/schritte/` – je sudo-Schritt ein Skript mit Sicherung, Prüfung und Rückweg
+- `server/deploy.ps1` – VibeVHS bauen (self-contained linux-x64) und ausrollen
+- `server/nginx/`, `server/systemd/`, `server/ssh/`, `server/nodered/`, `server/litestream/` – Konfigurationsvorlagen
 
-Umgebung `Testsystem` (`src/VibeVHS.Web/appsettings.Testsystem.json`): Pfad-Basis `/vibevhs`, Betrieb hinter
-Reverse Proxy, Demodaten an, Startdaten der vhs EGS (Benutzerkonten des Teams).
-
-**Schutz:** Weil die Testanmeldung kein Passwort je Konto kennt und die Konten echte Namen tragen, steht davor ein
-gemeinsames Zugangspasswort am Webserver (Basic Auth, siehe `linux/nginx-vibevhs.conf`). Optional kann die
-Anwendung zusätzlich einen Zugangscode abfragen (`Anmeldung__Zugangscode` in `/etc/vibevhs.env`, nie im Repository).
-
-### Einmalig auf dem Server (als root)
-
-```bash
-useradd --system --home /var/lib/vibevhs --shell /usr/sbin/nologin vibevhs
-install -d -o vibevhs -g vibevhs /var/lib/vibevhs
-touch /etc/vibevhs.env && chmod 600 /etc/vibevhs.env
-cp linux/vibevhs.service /etc/systemd/system/ && systemctl daemon-reload && systemctl enable vibevhs
-htpasswd -c /etc/nginx/vibevhs.htpasswd vhs-test
-# linux/nginx-vibevhs.conf in den bestehenden 443-server-Block übernehmen, dann:
-nginx -t && systemctl reload nginx
-```
-
-### Ausrollen (vom Entwicklungsrechner)
-
-```powershell
-.\deploy\veroeffentlichen.ps1 -Ziel klaus@liebler.iui.hs-osnabrueck.de
-```
-
-Baut eine self-contained Linux-Version (kein .NET auf dem Server nötig), kopiert sie nach `/opt/vibevhs`
-und startet den Dienst neu. Datenbank, Logs und Schlüssel liegen getrennt unter `/var/lib/vibevhs` und bleiben erhalten.
-
-## Docker
-
-Docker-Image (mehrstufig, SQLite und Dokumente in einem Volume) und `docker-compose.yml` mit Mailpit folgen später.
+Geheimnisse (Zugangscode, Passwörter, Schlüssel) stehen nie im Repository, sondern nur auf dem Server
+(`/etc/vibevhs/vibevhs.env`, `/etc/nginx/vibevhs.htpasswd`).
