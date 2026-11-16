@@ -29,3 +29,16 @@ internal sealed class MerkmalAblaufJob(ProgrammDienst programm, ILogger<MerkmalA
         log.LogInformation("Ablaufende Merkmale: {Ergebnis}", ergebnis);
     }
 }
+
+/// <summary>Täglich 00:05 (und als erster Schritt des Startabgleichs): Lese-Caches der Personen auf den Stand des Tages bringen.</summary>
+[DisallowConcurrentExecution]
+internal sealed class ZwischenstandJob(VibeVHS.Application.Personen.Zwischenstaende zwischenstaende, ILogger<ZwischenstandJob> log) : IJob
+{
+    public static readonly JobKey Schluessel = new("zwischenstaende", "automatik");
+
+    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
+    {
+        var lauf = await zwischenstaende.FortschreibenAsync(cancellationToken);
+        log.LogInformation("Personen-Zwischenstände: {Geprueft} geprüft, {Geaendert} aktualisiert", lauf.Geprueft, lauf.Geaendert);
+    }
+}

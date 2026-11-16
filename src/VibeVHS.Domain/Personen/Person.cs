@@ -749,6 +749,18 @@ public sealed class Person
 
     private static string NormierteSprache(string? sprache) => string.IsNullOrWhiteSpace(sprache) ? "de" : sprache.Trim().ToLowerInvariant();
 
+    /// <summary>
+    /// Lese-Caches (Anzeigename, Sortierung, Rollen, E-Mail, Sprache, Geburtsdatum, Wohnort) auf den Stand von heute bringen.
+    /// Nötig, wenn eine früher erfasste Änderung mit Datum in der Zukunft (z. B. „Rolle endet am …“, „Umzug ab …“) heute wirksam wird.
+    /// Liefert <c>true</c>, wenn sich ein Cache geändert hat.
+    /// </summary>
+    public bool ZwischenstandFortschreiben(DateTimeOffset jetzt)
+    {
+        var vorher = (Anzeigename, Sortierschluessel, Rollen, EMail, Sprache, Geburtsdatum, Wohnort);
+        ZwischenstandAktualisieren(jetzt);
+        return vorher != (Anzeigename, Sortierschluessel, Rollen, EMail, Sprache, Geburtsdatum, Wohnort);
+    }
+
     private void ZwischenstandAktualisieren(DateTimeOffset jetzt)
     {
         if (IstAnonymisiert)

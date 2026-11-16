@@ -93,6 +93,7 @@ public static class Registrierung
         dienste.AddScoped<Application.Betrieb.IImportSpeicher, Betrieb.ImportSpeicher>();
         dienste.AddScoped<Application.Finanzen.IFinanzprotokoll, Finanzen.Finanzprotokoll>();
         dienste.AddScoped<Application.Portal.IPortalSpeicher, Portal.PortalSpeicher>();
+        dienste.AddScoped<Application.Personen.IZwischenstandSpeicher, Personen.ZwischenstandSpeicher>();
         dienste.AddScoped<Shop.ShopSpeicher>();
         dienste.AddScoped<Application.Shop.IShopSpeicher>(d => d.GetRequiredService<Shop.ShopSpeicher>());
         dienste.AddScoped<Application.Anmeldung.IPlatzreservierungen>(d => d.GetRequiredService<Shop.ShopSpeicher>());
@@ -111,6 +112,8 @@ public static class Registrierung
                 .WithSimpleSchedule(s => s.WithInterval(TimeSpan.FromSeconds(takt)).RepeatForever()));
 
             // Täglich nachts; einmal nach dem Start in fester Reihenfolge über den StartabgleichDienst.
+            q.AddJob<ZwischenstandJob>(j => j.WithIdentity(ZwischenstandJob.Schluessel));
+            q.AddTrigger(t => t.ForJob(ZwischenstandJob.Schluessel).WithIdentity("zwischenstaende-nacht", "automatik").WithCronSchedule("0 5 0 * * ?"));
             q.AddJob<TermineFortschreibenJob>(j => j.WithIdentity(TermineFortschreibenJob.Schluessel));
             q.AddJob<MerkmalAblaufJob>(j => j.WithIdentity(MerkmalAblaufJob.Schluessel));
             q.AddJob<LoeschlaufJob>(j => j.WithIdentity(LoeschlaufJob.Schluessel));
