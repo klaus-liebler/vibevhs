@@ -12,13 +12,16 @@ namespace VibeVHS.Infrastructure.Tests;
 /// <summary>SQLite im Arbeitsspeicher mit echten Migrationen; je Test frisch.</summary>
 internal sealed class TestDatenbank : IAsyncDisposable
 {
-    private readonly SqliteConnection _verbindung = new("Data Source=:memory:");
+    private readonly SqliteConnection _verbindung;
+
+    private TestDatenbank(string quelle = "Data Source=:memory:") => _verbindung = new SqliteConnection(quelle);
 
     public FakeTimeProvider Uhr { get; } = new(new DateTimeOffset(2026, 11, 15, 8, 0, 0, TimeSpan.FromHours(1)));
 
-    public static async Task<TestDatenbank> ErzeugenAsync()
+    /// <param name="datei">Optional eine Datenbankdatei (für Messungen wie im Betrieb); sonst im Arbeitsspeicher.</param>
+    public static async Task<TestDatenbank> ErzeugenAsync(string? datei = null)
     {
-        var t = new TestDatenbank();
+        var t = datei is null ? new TestDatenbank() : new TestDatenbank($"Data Source={datei}");
         await t._verbindung.OpenAsync();
         await using var db = t.NeuerKontext();
         await db.Database.MigrateAsync();
