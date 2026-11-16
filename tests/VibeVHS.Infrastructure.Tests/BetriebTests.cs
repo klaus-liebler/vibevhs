@@ -210,7 +210,7 @@ public class BetriebTests
         var dienst = new ImportDienst(new DublettenSuche(db), new PersonenSpeicher(db), new ImportSpeicher(db), protokoll, b, t.Uhr);
         var probe = await dienst.ProbelaufAsync(datei, zuordnung, ct);
         (probe.Neu, probe.Dubletten, probe.Fehler).ShouldBe((4, 2, 2));
-        probe.Zeilen.Single(z => z.Nr == 7).Hinweis.ShouldContain("Vor- oder Nachname");
+        probe.Zeilen.Single(z => z.Nr == 7).Hinweis.ShouldContain("Nachname fehlt");
         probe.Zeilen.Single(z => z.Nr == 8).Hinweis.ShouldContain("Postleitzahl");
         probe.Zeilen.Single(z => z.Nr == 6).Status.ShouldBe(Importstatus.DubletteInDatei);
         probe.Zeilen.Single(z => z.Nr == 9).Status.ShouldBe(Importstatus.Dublette);
@@ -226,6 +226,28 @@ public class BetriebTests
         var hildegard = await db.Personen.Include(p => p.Adressen).SingleAsync(p => p.Id == lauf.Zuordnungen[2].PersonId, ct);
         hildegard.Adressen.Single().Strasse.ShouldBe("Kirchweg 5; Hinterhaus");
         await Should.ThrowAsync<InvalidOperationException>(() => dienst.ImportierenAsync(datei, zuordnung, ct)); // gleiche Datei
+    }
+
+    [Fact]
+    public async Task Import_nimmt_Personen_mit_nur_einem_Namen_an_und_weist_sie_aus()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var t = await TestDatenbank.ErzeugenAsync();
+        await using var db = t.NeuerKontext();
+        var b = new TestBenutzer(System);
+        var dienst = new ImportDienst(new DublettenSuche(db), new PersonenSpeicher(db), new ImportSpeicher(db), new AuditProtokoll(db, b, t.Uhr), b, t.Uhr);
+        var datei = ImportDienst.Lesen("e.csv", Encoding.UTF8.GetBytes("Nr;Name;Vorname;NurEinName\n1;Rahimi;;\n2;Sukarno;;ja\n3;Widerspruch;Kai;ja\n4;Muster;Eva;\n"));
+        var zuordnung = ImportDienst.ZuordnungVorschlagen(datei.Spalten);
+        zuordnung.Values.ShouldContain(Importfeld.NurEinName);
+        var probe = await dienst.ProbelaufAsync(datei, zuordnung, ct);
+        (probe.Neu, probe.Fehler, probe.NurEinName).ShouldBe((3, 1, 2));
+        probe.Zeilen[0].Hinweis.ShouldContain("nur ein Name laut Ausweis");
+        probe.Zeilen[2].Hinweis.ShouldContain("Vorname angegeben");
+
+        await dienst.ImportierenAsync(datei, zuordnung, ct);
+        var jetzt = t.Uhr.GetLocalNow();
+        var namen = (await db.Personen.Include(p => p.Namen).AsNoTracking().ToListAsync(ct)).Select(p => p.AktuellerName(jetzt)).ToList();
+        namen.Where(n => n.NurEinName).Select(n => n.Nachname).Order().ShouldBe(["Rahimi", "Sukarno"]);
     }
 
     [Fact]

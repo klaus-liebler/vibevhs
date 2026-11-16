@@ -87,6 +87,10 @@ else
             </div>
             <div class="vhs-row">
                 <StatusPille Stil="gut">@p.Neu neu</StatusPille><StatusPille Stil="warn">@p.Dubletten Dubletten</StatusPille><StatusPille Stil="krit">@p.Fehler Fehler</StatusPille>
+                @if (p.NurEinName > 0)
+                {
+                    <StatusPille Stil="warn">@p.NurEinName mit nur einem Namen – bitte prüfen</StatusPille>
+                }
                 @if (p.Ausgefuehrt) { <StatusPille Stil="info">@p.Angelegt angelegt</StatusPille> }
             </div>
             <div class="vhs-tbl">
