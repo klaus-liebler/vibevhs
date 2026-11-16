@@ -8,13 +8,7 @@ namespace VibeVHS.Infrastructure.Datenschutz;
 /// <summary>Auskunft nach Art. 15 DSGVO als PDF (MigraDoc).</summary>
 internal sealed class AuskunftPdf(Application.Dokumente.IQrCode qr) : IAuskunftPdf
 {
-    static AuskunftPdf()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            GlobalFontSettings.UseWindowsFontsUnderWindows = true;
-        }
-    }
+    static AuskunftPdf() => VibeVHS.Infrastructure.Dokumente.Schriften.Einrichten();
 
     public byte[] Erzeugen(Auskunft a, Uri? uebersetzungslink = null)
     {

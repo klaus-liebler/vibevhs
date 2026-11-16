@@ -26,13 +26,7 @@ internal sealed class KursQrBogen(IQrCode qr, Briefkopf? briefkopf = null) : IKu
     private const double Abstand = 0.6;
     private const double KarteHoehe = 5.3;
 
-    static KursQrBogen()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            GlobalFontSettings.UseWindowsFontsUnderWindows = true;
-        }
-    }
+    static KursQrBogen() => VibeVHS.Infrastructure.Dokumente.Schriften.Einrichten();
 
     public byte[] Erzeugen(string ueberschrift, IReadOnlyList<KursQrEintrag> kurse, KursQrBogenOptionen? optionen = null)
     {

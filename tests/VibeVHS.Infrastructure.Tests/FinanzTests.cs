@@ -42,7 +42,7 @@ public class FinanzTests
     private sealed record Welt(FinanzDienst Finanzen, ZahlungsDienst Zahlungen, MahnDienst Mahnungen, HonorarDienst Honorare, GobdDienst Gobd, FinanzRoutinen Routinen,
         AnmeldungDienst Anmeldung, DatenschutzDienst Datenschutz);
 
-    private static Welt Erzeugen(TestDatenbank t, VibeVhsDbContext db, Benutzer wer)
+    private static Welt Erzeugen(TestDatenbank t, VibeVhsDbContext db, Benutzer wer, IBriefPdf? briefPdf = null)
     {
         var benutzer = new TestBenutzer(wer);
         var protokoll = new AuditProtokoll(db, benutzer, t.Uhr);
@@ -54,7 +54,7 @@ public class FinanzTests
         var anmeldung = new AnmeldungDienst(anmeldungSpeicher, new ProgrammSpeicher(db), new PersonenSpeicher(db), anmeldungSpeicher, new StammdatenSpeicher(db), post, protokoll,
             benutzer, t.Uhr, zugang, new QrCodeErzeuger());
         var dokumente = new DokumentDienst(new DokumentSpeicher(db), anmeldungSpeicher, new ProgrammSpeicher(db), new PersonenSpeicher(db), new DurchfuehrungSpeicher(db),
-            new StammdatenSpeicher(db), new BriefPdf(new QrCodeErzeuger()), links, zugang, protokoll, benutzer, t.Uhr);
+            new StammdatenSpeicher(db), briefPdf ?? new BriefPdf(new QrCodeErzeuger()), links, zugang, protokoll, benutzer, t.Uhr);
         var speicher = new FinanzSpeicher(db);
         var fp = new Finanzprotokoll(db, benutzer, t.Uhr);
         var finanzen = new FinanzDienst(speicher, fp, new PersonenSpeicher(db), new ProgrammSpeicher(db), new StammdatenSpeicher(db), dokumente, post, protokoll, benutzer, t.Uhr);
@@ -120,6 +120,59 @@ public class FinanzTests
     {
         await using var db = t.NeuerKontext();
         return await Erzeugen(t, db, Benutzer.Automatik).Finanzen.RechnungslaufAsync(abbruch: TestContext.Current.CancellationToken);
+    }
+
+    private sealed class DefektesPdf : IBriefPdf
+    {
+        public byte[] Erzeugen(Brief brief) => throw new InvalidOperationException("No appropriate font found for family name 'Courier New'.");
+    }
+
+    [Fact]
+    public async Task Gescheiterter_Belegdruck_hinterlaesst_keine_Luecke_und_wird_nachgeholt()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var t = await TestDatenbank.ErzeugenAsync();
+        var (kurs, p, _) = await KursAsync(t, 3);
+        foreach (var person in p)
+        {
+            await AnmeldenAsync(t, kurs, person);
+        }
+
+        // Wie auf dem Linux-Server ohne Schriften: der Druck scheitert nach dem Festschreiben der ersten Rechnung, der Lauf bricht ab.
+        await using (var db = t.NeuerKontext())
+        {
+            await Should.ThrowAsync<InvalidOperationException>(() => Erzeugen(t, db, Benutzer.Automatik, new DefektesPdf()).Finanzen.RechnungslaufAsync(abbruch: ct));
+        }
+
+        await using (var db = t.NeuerKontext())
+        {
+            var belege = await db.Set<Beleg>().Where(b => b.Art == Belegart.Rechnung).ToListAsync(ct);
+            belege.Count.ShouldBe(1);
+            belege[0].Festgeschrieben.ShouldBeTrue();
+            belege[0].Laufnummer.ShouldBe(1);
+            belege[0].DokumentId.ShouldBeNull();
+        }
+
+        // Nächster Tageslauf mit funktionierendem Druck: Druckstück nachholen, restliche Rechnungen erstellen – lückenlos, keine doppelt.
+        await using (var db = t.NeuerKontext())
+        {
+            await Erzeugen(t, db, Benutzer.Automatik).Routinen.TaeglichAsync(abbruch: ct);
+        }
+
+        await using (var db = t.NeuerKontext())
+        {
+            var belege = await db.Set<Beleg>().Where(b => b.Art == Belegart.Rechnung).OrderBy(b => b.Laufnummer).ToListAsync(ct);
+            belege.Select(b => b.Laufnummer).ShouldBe([1, 2, 3]);
+            belege.ShouldAllBe(b => b.DokumentId != null);
+            belege.Select(b => b.PersonId).Distinct().Count().ShouldBe(3);
+            (await db.Postausgang.CountAsync(n => n.Betreff.StartsWith("Rechnung"), ct)).ShouldBe(3);
+            (await db.Protokoll.CountAsync(e => e.Beschreibung.Contains("Druckstück nachgeholt"), ct)).ShouldBe(1);
+        }
+
+        await using (var db = t.NeuerKontext())
+        {
+            (await Erzeugen(t, db, Benutzer.Automatik).Finanzen.DruckstueckeNachholenAsync(abbruch: ct)).ShouldBe(0);
+        }
     }
 
     [Fact]

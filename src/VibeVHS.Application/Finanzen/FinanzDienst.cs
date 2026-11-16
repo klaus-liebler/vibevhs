@@ -139,28 +139,69 @@ public sealed class FinanzDienst(
 
         if (empfaenger is not null)
         {
-            var einst = await EinstellungenAsync(abbruch);
-            var einrichtung = (await stammdaten.EinrichtungAsync(abbruch))?.Name ?? "Volkshochschule";
-            var bezug = b.BezugBelegId is { } bid ? (await speicher.BelegAsync(bid, abbruch))?.Nummer : null;
-            var dok = await dokumente.FinanzbelegArchivierenAsync(empfaenger.ParteiId, $"{BelegartInfo.Name(b.Art)} {b.Nummer}",
-                JsonSerializer.Serialize(new { b.Nummer, Art = b.Art.ToString(), b.Belegdatum, b.Faellig, b.BetragCent, b.Sha256 }, Json), empfaenger.Sprache,
-                link => Belegdruck.Brief(b, empfaenger, einst, einrichtung, bezug, link), abbruch);
-            b.DokumenteAblegen(dok.Id, xml);
-            await speicher.SpeichernAsync(abbruch);
-
-            if (mailen && empfaenger.EMail is { Length: > 0 } mail && mail != "–")
-            {
-                List<Mailanhang> anhaenge = [new($"{b.Nummer}.pdf", "application/pdf;base64", Convert.ToBase64String(dok.Pdf))];
-                if (xml is not null)
-                {
-                    anhaenge.Add(new($"{b.Nummer}-xrechnung.xml", "application/xml", xml));
-                }
-
-                await post.KundenmailEinreihenAsync(mail, empfaenger.Name, $"{BelegartInfo.Name(b.Art)} {b.Nummer}", Belegdruck.Mailtext(b, empfaenger, einst, einrichtung, bezug),
-                    empfaenger.Sprache, empfaenger.PersonId, abbruch, weitere: anhaenge);
-                await speicher.SpeichernAsync(abbruch);
-            }
+            await DruckstueckAblegenAsync(b, empfaenger, mailen, xml, abbruch);
         }
+    }
+
+    /// <summary>
+    /// Druckstück (PDF mit Übersetzungs-QR) archivieren, mit dem Beleg verknüpfen und auf Wunsch per Mail verschicken.
+    /// Nummer, Prüfsumme und Hash-Kette sind zu diesem Zeitpunkt schon gespeichert; scheitert das Druckstück (z. B. PDF-Fehler),
+    /// bleibt der Beleg lückenlos festgeschrieben und <see cref="DruckstueckeNachholenAsync"/> holt es beim nächsten Lauf nach.
+    /// </summary>
+    private async Task DruckstueckAblegenAsync(Beleg b, Belegempfaenger empfaenger, bool mailen, string? xml, CancellationToken abbruch)
+    {
+        var einst = await EinstellungenAsync(abbruch);
+        var einrichtung = (await stammdaten.EinrichtungAsync(abbruch))?.Name ?? "Volkshochschule";
+        var bezug = b.BezugBelegId is { } bid ? (await speicher.BelegAsync(bid, abbruch))?.Nummer : null;
+        var dok = await dokumente.FinanzbelegArchivierenAsync(empfaenger.ParteiId, $"{BelegartInfo.Name(b.Art)} {b.Nummer}",
+            JsonSerializer.Serialize(new { b.Nummer, Art = b.Art.ToString(), b.Belegdatum, b.Faellig, b.BetragCent, b.Sha256 }, Json), empfaenger.Sprache,
+            link => Belegdruck.Brief(b, empfaenger, einst, einrichtung, bezug, link), abbruch);
+        b.DokumenteAblegen(dok.Id, xml);
+        await speicher.SpeichernAsync(abbruch);
+
+        if (mailen && empfaenger.EMail is { Length: > 0 } mail && mail != "–")
+        {
+            List<Mailanhang> anhaenge = [new($"{b.Nummer}.pdf", "application/pdf;base64", Convert.ToBase64String(dok.Pdf))];
+            if ((xml ?? b.Xml) is { } x)
+            {
+                anhaenge.Add(new($"{b.Nummer}-xrechnung.xml", "application/xml", x));
+            }
+
+            await post.KundenmailEinreihenAsync(mail, empfaenger.Name, $"{BelegartInfo.Name(b.Art)} {b.Nummer}", Belegdruck.Mailtext(b, empfaenger, einst, einrichtung, bezug),
+                empfaenger.Sprache, empfaenger.PersonId, abbruch, weitere: anhaenge);
+            await speicher.SpeichernAsync(abbruch);
+        }
+    }
+
+    /// <summary>
+    /// Festgeschriebene Belege ohne Druckstück (Druck beim Festschreiben gescheitert) nachträglich drucken, archivieren und – wie
+    /// beim regulären Lauf – versenden. Zahlungsein- und -ausgänge haben bewusst kein Druckstück. Die Belegdaten selbst bleiben
+    /// unverändert (das Druckstück gehört nicht zur Prüfsumme); jede Nachholung wird protokolliert.
+    /// </summary>
+    public async Task<int> DruckstueckeNachholenAsync(bool mailen = true, CancellationToken abbruch = default)
+    {
+        await PruefenAsync(Finanzrollen.Buchen, abbruch);
+        var offen = (await speicher.BelegeAsync(abbruch: abbruch))
+            .Where(b => b.Festgeschrieben && b.DokumentId is null && b.AnonymisiertAm is null && b.Art is not (Belegart.Zahlungseingang or Belegart.Zahlungsausgang))
+            .OrderBy(b => b.Nummer, StringComparer.Ordinal).ThenBy(b => b.Id)
+            .Select(b => b.Id)
+            .ToList();
+        var nachgeholt = 0;
+        foreach (var id in offen)
+        {
+            if (await speicher.BelegAsync(id, abbruch) is not { DokumentId: null } b || await EmpfaengerZuAsync(b, abbruch) is not { } empf)
+            {
+                continue;
+            }
+
+            var xml = b.Xml is null && b.OrganisationId is not null && b.Art == Belegart.Rechnung ? XRechnung.Erzeugen(b, empf, await EinstellungenAsync(abbruch)) : null;
+            await DruckstueckAblegenAsync(b, empf, mailen, xml, abbruch);
+            await protokoll.ProtokollierenAsync("Finanzen.Beleg", $"{b.Nummer}: Druckstück nachgeholt (beim Festschreiben gescheitert)", nameof(Beleg), b.Id, abbruch: abbruch);
+            await speicher.SpeichernAsync(abbruch);
+            nachgeholt++;
+        }
+
+        return nachgeholt;
     }
 
     /// <summary>Storno statt Änderung (FA-126): Stornobeleg mit Begründung und Verweis, Ursprungsbeleg bleibt unverändert.</summary>
