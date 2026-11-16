@@ -5,9 +5,9 @@
 - Täglich um **01:30 Uhr** (`Sicherung:Zeitplan`, Quartz-Cron) sichert VibeVHS die SQLite-Datenbank mit der
   **Online-Backup-API** von SQLite: konsistent, auch während Benutzer arbeiten.
 - Ziel: `Sicherung:Ordner` (Standard: Ordner `sicherung` neben der Datenbank). Je Sicherung eine Datei
-  `vibevhs-JJJJMMTT-HHMMSS.db` und eine `.json` mit **SHA-256**, Größe, Migrationsstand und Testergebnis.
+  `vibevhs-JJJJMMTT-HHMMSS.db` und eine `.json` mit **SHA-256**, Größe, Schemaversion und Testergebnis.
 - Direkt danach läuft der **Wiederherstellungstest**: Prüfsumme vergleichen, Kopie in einen temporären Ordner
-  „wiederherstellen“, öffnen, `PRAGMA integrity_check`, Migrationsstand mit der laufenden Datenbank vergleichen,
+  „wiederherstellen“, öffnen, `PRAGMA integrity_check` (mit registrierter Collation), Schemaversion mit der laufenden Datenbank vergleichen,
   Zeilen der Kerntabellen zählen. Das Ergebnis steht im Protokoll und auf der Seite **Betrieb**.
 - Es bleiben die letzten `Sicherung:Behalten` (Standard 14) Sicherungen. `Sicherung:Aktiv=false` schaltet den Job ab.
 - **Wichtig:** Der Sicherungsordner liegt standardmäßig auf demselben Datenträger. Für echten Schutz den Ordner auf
@@ -19,7 +19,7 @@
 2. Auf der Seite **Betrieb** die jüngste Sicherung mit „Wiederherstellungstest ok“ wählen (oder „erneut prüfen“).
 3. Prüfsumme vergleichen: `Get-FileHash vibevhs-….db -Algorithm SHA256` muss dem Wert in der `.json` entsprechen.
 4. Die laufende `vibevhs.db` (und ggf. `-wal`/`-shm`) beiseitelegen, die Sicherung als `vibevhs.db` einsetzen.
-5. Anwendung starten. Migrationen laufen beim Start automatisch nach, falls die Sicherung älter ist.
+5. Anwendung starten. Passt die Schemaversion der Sicherung nicht zur Anwendung, meldet der Start „Datenbankschema veraltet“ (siehe unten).
 6. Im Protokoll vermerken, was verloren ist (Zeitraum seit der Sicherung); Postausgang prüfen.
 
 ## Später unter Linux: Litestream
@@ -57,5 +57,26 @@ sudo timedatectl set-timezone Europe/Berlin
 ```
 
 Serientermine werden je Termin aus der Ortszeit („dienstags 18:00“) nach UTC umgerechnet und bleiben so nach der Zeitumstellung um 18:00
-Ortszeit. Die Umstellung der Bestandsdaten (Migration „SpeicherformateUmwandeln“) setzt voraus, dass bisher in Europe/Berlin gearbeitet wurde.
+Ortszeit.
+
+## Datenbankschema (Entwicklungsphase: ohne Migrationen)
+
+Solange es nur Testdaten gibt, entsteht die Datenbank beim ersten Start komplett neu aus dem Modell (`EnsureCreated`), danach legt die
+Anwendung die lesbaren Sichten `v_…` an und vermerkt die Schemaversion (Prüfsumme über das Schema) in der Tabelle `Schemainfo`;
+anschließend kommen Start- und Demodaten. Passt eine vorhandene Datenbankdatei nicht zum aktuellen Modell (ältere Version, Datei aus der
+Zeit mit Migrationen), bricht der Start mit einer klaren Meldung ab:
+
+> Datenbankschema veraltet (…: Version …, erwartet …). Bitte die Datenbankdatei löschen oder beiseitelegen und die Anwendung neu starten –
+> sie wird dann neu aus Start- und Demodaten aufgebaut.
+
+Dann die Datei `data/vibevhs.db` (mit `-wal` und `-shm`) löschen oder umbenennen und neu starten.
+
+**Vor dem ersten Produktivbetrieb werden wieder EF-Migrationen eingeführt** (Anfangsmigration aus dem dann aktuellen Modell, Sichten und
+Collation-Index per SQL in der Migration), damit Daten bei Updates erhalten bleiben.
+
+## Werkzeuge und Collation
+
+Namen sortieren in der Datenbank per Collation `DIN5007_2`, die Suche nutzt die Funktion `suchtext()` – beide registriert die Anwendung bei
+jeder Verbindung. Ein DB-Browser ohne diese Erweiterungen kann die Datenbank lesen (am besten über die Sichten `v_…`), aber nicht nach
+Namen sortieren, keine Namensversionen schreiben und kein `PRAGMA integrity_check` ausführen. Daten deshalb nur über die Anwendung ändern.
 

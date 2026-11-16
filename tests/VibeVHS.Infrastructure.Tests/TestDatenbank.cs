@@ -9,7 +9,7 @@ using VibeVHS.Infrastructure.Startdaten;
 
 namespace VibeVHS.Infrastructure.Tests;
 
-/// <summary>SQLite im Arbeitsspeicher mit echten Migrationen; je Test frisch.</summary>
+/// <summary>SQLite im Arbeitsspeicher, Schema wie im Betrieb (EnsureCreated + Sichten); je Test frisch.</summary>
 internal sealed class TestDatenbank : IAsyncDisposable
 {
     private readonly SqliteConnection _verbindung;
@@ -24,7 +24,7 @@ internal sealed class TestDatenbank : IAsyncDisposable
         var t = datei is null ? new TestDatenbank() : new TestDatenbank($"Data Source={datei}");
         await t._verbindung.OpenAsync();
         await using var db = t.NeuerKontext();
-        await db.Database.MigrateAsync();
+        await Schema.AnlegenOderPruefenAsync(db, datei ?? ":memory:");
         return t;
     }
 

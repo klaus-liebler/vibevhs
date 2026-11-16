@@ -8,7 +8,8 @@ namespace VibeVHS.Infrastructure.Datenbank;
 public static class DatenbankInitialisierung
 {
     /// <summary>
-    /// Legt das Datenverzeichnis an, spielt Migrationen ein und schaltet SQLite in den WAL-Modus
+    /// Legt das Datenverzeichnis an, legt die Datenbank bei Bedarf neu an (bzw. prüft die Schemaversion, siehe <see cref="Schema"/>) und
+    /// schaltet SQLite in den WAL-Modus
     /// (paralleles Lesen während geschrieben wird; die Einstellung bleibt in der Datei gespeichert).
     /// </summary>
     public static async Task InitialisierenAsync(IServiceProvider dienste, CancellationToken abbruch = default)
@@ -25,7 +26,11 @@ public static class DatenbankInitialisierung
             Directory.CreateDirectory(verzeichnis);
         }
 
-        await db.Database.MigrateAsync(abbruch);
+        if (await Schema.AnlegenOderPruefenAsync(db, datei, abbruch))
+        {
+            log.LogInformation("Datenbank {Datei} neu angelegt (Schemaversion {Version})", datei, Schema.Version(db));
+        }
+
         var modus = await db.Database.SqlQueryRaw<string>("PRAGMA journal_mode=WAL").ToListAsync(abbruch);
         log.LogInformation("Datenbank {Datei} bereit, Journal-Modus {Modus}", datei, modus.FirstOrDefault());
     }

@@ -47,9 +47,23 @@ public sealed class Benutzerkonto
 
     public string? Funktion { get; private set; }
 
-    public List<Rolle> Rollen { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="VibeVHS.Domain.Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<Rolle> Rollen
+    {
+        get => VibeVHS.Domain.Gemeinsam.Listenwerte.Werte(_rollen);
+        private set => _rollen = VibeVHS.Domain.Gemeinsam.Listenwerte.Von(value);
+    }
 
-    public List<int> Fachbereiche { get; private set; } = [];
+    private List<VibeVHS.Domain.Gemeinsam.Listenwert<Rolle>> _rollen = [];
+
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="VibeVHS.Domain.Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<int> Fachbereiche
+    {
+        get => VibeVHS.Domain.Gemeinsam.Listenwerte.Werte(_fachbereiche);
+        private set => _fachbereiche = VibeVHS.Domain.Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<VibeVHS.Domain.Gemeinsam.Listenwert<int>> _fachbereiche = [];
 
     /// <summary>Verknüpfte Person (Rolle Mitarbeitende).</summary>
     public Guid? PersonId { get; private set; }

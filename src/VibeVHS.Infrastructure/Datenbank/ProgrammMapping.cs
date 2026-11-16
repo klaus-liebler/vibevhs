@@ -1,3 +1,4 @@
+using VibeVHS.Domain.Gemeinsam;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
@@ -43,9 +44,13 @@ internal static class ProgrammMapping
             b.HasKey(k => k.Id);
             b.Property(k => k.Id).ValueGeneratedNever();
             b.Property(k => k.Name).HasMaxLength(200);
-            b.PrimitiveCollection(k => k.BenoetigteMerkmale);
-            b.PrimitiveCollection(k => k.BenoetigteDozierendenmerkmale);
-            b.Property(k => k.Richtlinie).AlsJson();
+            b.FeldAlsTabelle<Kursart, Listenwert<string>>("_benoetigteMerkmale", nameof(Kursart.BenoetigteMerkmale), "KursartRaumanforderungen", "KursartId", 100);
+            b.FeldAlsTabelle<Kursart, Listenwert<string>>("_benoetigteDozierendenmerkmale", nameof(Kursart.BenoetigteDozierendenmerkmale), "KursartLehranforderungen", "KursartId", 100);
+            b.OwnsOne(k => k.Richtlinie, r =>
+            {
+                r.AlsTabelle<Kursart, Buchungsrichtlinie, Buchungsrecht>(x => x.Rechte, "KursartBuchungsrechte", "KursartId");
+            });
+            b.Navigation(k => k.Richtlinie).IsRequired();
         });
 
         mb.Entity<Qualifikationsausnahme>(b =>
@@ -69,17 +74,27 @@ internal static class ProgrammMapping
             b.Property(k => k.Titel).HasMaxLength(300);
             b.Property(k => k.Bildungsurlaub).HasMaxLength(100);
             b.HasIndex(k => k.SemesterId);
-            b.PrimitiveCollection(k => k.BenoetigteMerkmale);
-            b.PrimitiveCollection(k => k.BenoetigteDozierendenmerkmale);
-            b.Property(k => k.Richtlinie).AlsJson();
-            b.Property(k => k.Serie).AlsJson();
+            b.FeldAlsTabelle<Kurs, Listenwert<string>>("_benoetigteMerkmale", nameof(Kurs.BenoetigteMerkmale), "KursRaumanforderungen", "KursId", 100);
+            b.FeldAlsTabelle<Kurs, Listenwert<string>>("_benoetigteDozierendenmerkmale", nameof(Kurs.BenoetigteDozierendenmerkmale), "KursLehranforderungen", "KursId", 100);
+            b.OwnsOne(k => k.Richtlinie, r =>
+            {
+                r.AlsTabelle<Kurs, Buchungsrichtlinie, Buchungsrecht>(x => x.Rechte, "KursBuchungsrechte", "KursId");
+            });
+            b.Navigation(k => k.Richtlinie).IsRequired();
+            // Serienregel als Spalten des Kurses (Serie_…), Wochentage und Orte als eigene Tabellen.
+            b.OwnsOne(k => k.Serie, r =>
+            {
+                r.Ignore(x => x.Unbefristet);
+                r.FeldAlsTabelle<Kurs, Serienregel, Listenwert<DayOfWeek>>("_wochentage", nameof(Serienregel.Wochentage), "KursSerieWochentage", "KursId");
+                r.FeldAlsTabelle<Kurs, Serienregel, Listenwert<Guid>>("_ortIds", nameof(Serienregel.OrtIds), "KursSerieOrte", "KursId");
+            });
             // Kursteam als eigene Tabelle (statt JSON mit Namenskopie): KursId + PersonId, Leitung.
             b.OwnsMany(k => k.Team, t =>
             {
                 t.ToTable("KursTeam");
                 t.WithOwner().HasForeignKey("KursId");
                 // Eigener Schlüssel: Einträge sind unveränderliche Werte und werden beim Ändern ersetzt (löschen + einfügen).
-                t.Property<Guid>("Id").ValueGeneratedOnAdd();
+                t.Property<Guid>("Id").HasValueGenerator<V7Erzeuger>();
                 t.HasKey("Id");
                 t.HasIndex("KursId");
                 t.HasIndex(d => d.PersonId);
@@ -103,7 +118,7 @@ internal static class ProgrammMapping
             {
                 o.ToTable("VeranstaltungOrte");
                 o.WithOwner().HasForeignKey("VeranstaltungId");
-                o.Property<Guid>("Id").ValueGeneratedOnAdd();
+                o.Property<Guid>("Id").HasValueGenerator<V7Erzeuger>();
                 o.HasKey("Id");
                 o.HasIndex("VeranstaltungId");
                 o.HasIndex(x => x.OrtId);
@@ -121,10 +136,10 @@ internal static class ProgrammMapping
             b.Property(m => m.Gruppe).HasMaxLength(60);
             b.Property(m => m.Ausschlussgruppe).HasMaxLength(60);
             b.Property(m => m.Bezug).HasMaxLength(20);
-            b.PrimitiveCollection(m => m.Werte);
+            b.FeldAlsTabelle<Merkmal, Listenwert<string>>("_werte", nameof(Merkmal.Werte), "MerkmalWerte", "MerkmalSchluessel", 200);
             b.Property(m => m.Typ).HasMaxLength(20);
             b.Property(m => m.Einheit).HasMaxLength(30);
-            b.PrimitiveCollection(m => m.InaktiveWerte);
+            b.FeldAlsTabelle<Merkmal, Listenwert<string>>("_inaktiveWerte", nameof(Merkmal.InaktiveWerte), "MerkmalInaktiveWerte", "MerkmalSchluessel", 200);
         });
 
         mb.Entity<Ort>(b =>
@@ -139,7 +154,7 @@ internal static class ProgrammMapping
             b.Property(o => o.Stadt).HasMaxLength(100);
             b.Property(o => o.Lage).HasMaxLength(1000);
             b.Property(o => o.Zugang).HasMaxLength(500);
-            b.Property(o => o.Kapazitaeten).AlsJson();
+            b.AlsTabelle(o => o.Kapazitaeten, "OrtKapazitaeten", "OrtId");
             b.HasIndex(o => o.ElternId);
             b.HasMany(o => o.Merkmale).WithOne().HasForeignKey("OrtId").IsRequired().OnDelete(DeleteBehavior.Restrict);
             b.Navigation(o => o.Merkmale).HasField("_merkmale").UsePropertyAccessMode(PropertyAccessMode.Field).AutoInclude();
@@ -156,6 +171,8 @@ internal static class ProgrammMapping
 
         mb.Entity<Abwesenheit>(b =>
         {
+            b.Ignore(a => a.Name); // Namen aus den Benutzerkonten, keine Kopie
+            b.Ignore(a => a.VertretungName);
             b.ToTable("Abwesenheiten");
             b.HasKey(x => x.Id);
             b.Property(x => x.Id).ValueGeneratedNever();
@@ -176,7 +193,7 @@ internal static class ProgrammMapping
             b.Property(a => a.Status).HasConversion<string>().HasMaxLength(40);
             b.Property(a => a.Dringlichkeit).HasConversion<string>().HasMaxLength(40);
             b.Property(a => a.BearbeiterKennung).HasMaxLength(100);
-            b.Property(a => a.BearbeiterName).HasMaxLength(200);
+            b.Ignore(a => a.BearbeiterName); // Name aus dem Benutzerkonto, keine Kopie
             b.Property(a => a.ErledigtVon).HasMaxLength(200);
             b.Property(a => a.Vermerk).HasMaxLength(1000);
         });

@@ -96,7 +96,12 @@ public sealed class Aufgabe
     /// <summary>Anmeldename der Person, die die Aufgabe bearbeitet.</summary>
     public string? BearbeiterKennung { get; private set; }
 
+    /// <summary>Name der bearbeitenden Person (beim Laden aus dem Benutzerkonto gesetzt, nicht gespeichert).</summary>
     public string? BearbeiterName { get; private set; }
+
+    /// <summary>Namen zu Anmeldenamen ergänzen (keine Kopie in der Datenbank).</summary>
+    public void NamenSetzen(IReadOnlyDictionary<string, string> namen)
+        => BearbeiterName = BearbeiterKennung is { } k ? namen.GetValueOrDefault(k, k) : null;
 
     public DateTimeOffset? UebernommenAm { get; private set; }
 
@@ -338,6 +343,13 @@ public sealed class Abwesenheit
     public string? VertretungLogin { get; private set; }
 
     public string? VertretungName { get; private set; }
+
+    /// <summary>Namen zu Anmeldenamen ergänzen (keine Kopie in der Datenbank).</summary>
+    public void NamenSetzen(IReadOnlyDictionary<string, string> namen)
+    {
+        Name = namen.GetValueOrDefault(Login, Login);
+        VertretungName = VertretungLogin is { } v ? namen.GetValueOrDefault(v, v) : null;
+    }
 
     /// <summary>Freiwillige Angabe; keine Gesundheitsdaten eintragen (nur „abwesend“).</summary>
     public string? Grund { get; private set; }

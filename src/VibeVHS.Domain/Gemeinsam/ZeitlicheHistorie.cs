@@ -48,7 +48,7 @@ public static class ZeitlicheHistorie
     {
         ArgumentNullException.ThrowIfNull(versionen);
         ArgumentNullException.ThrowIfNull(neu);
-        AbgrenzenAb(versionen, neu.GueltigVon, neu.ErfasstAm, neu.ErfasstVon, neu.Grund, v => v.Gegenstand == neu.Gegenstand);
+        AbgrenzenAb(versionen, neu.GueltigVon, neu.ErfasstDurch, v => v.Gegenstand == neu.Gegenstand);
         versionen.Add(neu);
     }
 
@@ -71,8 +71,7 @@ public static class ZeitlicheHistorie
             throw new InvalidOperationException("Es gibt keinen gültigen Wert, der beendet werden könnte.");
         }
 
-        AbgrenzenAb(versionen, endemarke.GueltigVon, endemarke.ErfasstAm, endemarke.ErfasstVon, endemarke.Grund,
-            v => v.Gegenstand == endemarke.Gegenstand);
+        AbgrenzenAb(versionen, endemarke.GueltigVon, endemarke.ErfasstDurch, v => v.Gegenstand == endemarke.Gegenstand);
         versionen.Add(endemarke);
     }
 
@@ -101,13 +100,60 @@ public static class ZeitlicheHistorie
             throw new InvalidOperationException("Eine Korrektur muss denselben Gegenstand betreffen.");
         }
 
-        alt.Ersetzen(jetzt);
+        alt.Ersetzen(neu.ErfasstDurch);
         versionen.Add(neu);
         return neu;
     }
 
-    private static void AbgrenzenAb<T>(ICollection<T> versionen, DateOnly ab, DateTimeOffset jetzt, string von, string grund,
-        Func<T, bool> betrifft)
+    /// <summary>
+    /// Korrektur einer Gültigkeitsgrenze (z. B. „Umzugsdatum korrigieren“, „Heirat war schon am 01.06.“): Die Version eines Gegenstands,
+    /// die bis <paramref name="alteGrenze"/> galt, gilt korrigiert bis <paramref name="neueGrenze"/>, die folgende ab dort. Beide werden
+    /// als Korrektur ersetzt (strenges Modell: alte Zeilen bleiben mit „ersetzt durch“ erhalten). Gibt es keine Vorgängerin, wird nur der
+    /// Beginn verschoben, gibt es keine Nachfolgerin, nur das Ende.
+    /// </summary>
+    public static void GrenzeKorrigieren<T>(ICollection<T> versionen, Func<T, bool> betrifft, DateOnly alteGrenze, DateOnly neueGrenze, Erfassung erfassung)
+        where T : BitemporaleVersion<T>
+    {
+        ArgumentNullException.ThrowIfNull(versionen);
+        ArgumentNullException.ThrowIfNull(erfassung);
+        if (alteGrenze == neueGrenze)
+        {
+            return;
+        }
+
+        var aktuell = versionen.Where(v => v.IstAktuellerWissensstand && betrifft(v)).ToList();
+        var vor = aktuell.SingleOrDefault(v => v.GueltigBis == alteGrenze);
+        var nach = aktuell.SingleOrDefault(v => v.GueltigVon == alteGrenze);
+        if (vor is null && nach is null)
+        {
+            throw new InvalidOperationException($"Am {alteGrenze:dd.MM.yyyy} beginnt oder endet keine Angabe – bitte das bisherige Datum prüfen.");
+        }
+
+        if (vor is not null && neueGrenze <= vor.GueltigVon)
+        {
+            throw new InvalidOperationException($"Das neue Datum muss nach dem Beginn der vorherigen Angabe ({vor.GueltigVon:dd.MM.yyyy}) liegen.");
+        }
+
+        if (nach is { GueltigBis: { } bis } && neueGrenze >= bis)
+        {
+            throw new InvalidOperationException($"Das neue Datum muss vor dem Ende der folgenden Angabe ({bis:dd.MM.yyyy}) liegen.");
+        }
+
+        var korrektur = erfassung with { Art = Erfassungsart.Korrektur };
+        if (vor is not null)
+        {
+            vor.Ersetzen(erfassung.Vorgang);
+            versionen.Add(vor.KopieMit(vor.GueltigVon, neueGrenze, vor.IstEndemarke ? erfassung with { Art = Erfassungsart.Beendet } : korrektur));
+        }
+
+        if (nach is not null)
+        {
+            nach.Ersetzen(erfassung.Vorgang);
+            versionen.Add(nach.KopieMit(neueGrenze, nach.GueltigBis, nach.IstEndemarke ? erfassung with { Art = Erfassungsart.Beendet } : korrektur));
+        }
+    }
+
+    private static void AbgrenzenAb<T>(ICollection<T> versionen, DateOnly ab, Aenderungsvorgang vorgang, Func<T, bool> betrifft)
         where T : BitemporaleVersion<T>
     {
         foreach (var alt in versionen.Where(v => v.IstAktuellerWissensstand && betrifft(v)).ToList())
@@ -118,12 +164,15 @@ public static class ZeitlicheHistorie
                 continue;
             }
 
-            alt.Ersetzen(jetzt);
+            alt.Ersetzen(vorgang);
             if (alt.GueltigVon < ab)
             {
+                // Abgrenzung gehört zum selben Aenderungsvorgang wie die Änderung (Grund steht einmal im Aenderungsvorgang).
                 versionen.Add(alt.KopieMit(alt.GueltigVon, ab,
-                    new Erfassung(jetzt, von, alt.IstEndemarke ? Erfassungsart.Beendet : Erfassungsart.Abgrenzung,
-                        alt.IstEndemarke ? alt.Grund : $"Ende der Gültigkeit: {grund}")));
+                    new Erfassung(vorgang.Am, vorgang.Von, alt.IstEndemarke ? Erfassungsart.Beendet : Erfassungsart.Abgrenzung, vorgang.Grund)
+                    {
+                        Vorgang = vorgang,
+                    }));
             }
         }
     }

@@ -79,6 +79,16 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Aenderungsvorgang>(b =>
+        {
+            b.ToTable("Aenderungsvorgaenge");
+            b.HasKey(v => v.Id);
+            b.Property(v => v.Id).ValueGeneratedNever();
+            b.Property(v => v.Von).HasMaxLength(200);
+            b.Property(v => v.Grund).HasMaxLength(500);
+            b.HasIndex(v => v.Am);
+        });
+
         modelBuilder.HasDbFunction(typeof(SqlFunktionen).GetMethod(nameof(SqlFunktionen.Ganzzahl))!)
             .HasTranslation(a => new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlUnaryExpression(ExpressionType.Convert, a[0], typeof(long),
                 new Microsoft.EntityFrameworkCore.Storage.LongTypeMapping("INTEGER")));
@@ -105,7 +115,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Ignore(p => p.Geburtsdatum);
             b.Ignore(p => p.Stichzeit);
             b.Property(p => p.Status).HasMaxLength(30);
-            b.PrimitiveCollection(p => p.Fachbereiche);
+            b.FeldAlsTabelle<Person, Listenwert<int>>("_fachbereiche", nameof(Person.Fachbereiche), "PersonFachbereiche", "PersonId");
             b.HasIndex(p => p.Status);
             b.Property(p => p.Datenschutz).HasMaxLength(20);
             b.HasIndex(p => p.Datenschutz);
@@ -132,7 +142,8 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Ignore(n => n.Sortierschluessel);
             b.Property(n => n.Vorsatz).HasMaxLength(30);
             b.Property(n => n.Zusatz).HasMaxLength(20);
-            b.HasIndex(n => new { n.Nachname, n.Vorname }).HasDatabaseName("IX_PersonNamen_Sortierung");
+            // Sortierindex beginnt mit „nicht ersetzt“ (ErsetztDurchVorgangId IS NULL), damit SQLite filtern und in Namensfolge lesen kann.
+            b.HasIndex("ErsetztDurchVorgangId", nameof(PersonName.Nachname), nameof(PersonName.Vorname)).HasDatabaseName("IX_PersonNamen_Sortierung");
         });
         Version<PersonMerkmal>(modelBuilder, "PersonMerkmale", b => b.Property(m => m.Inhalt).HasMaxLength(200));
         Version<Postadresse>(modelBuilder, "PersonAdressen", b =>
@@ -144,7 +155,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(a => a.Land).HasMaxLength(2);
             b.HasIndex(a => a.AdressId);
         });
-        Version<AdressKennzeichen>(modelBuilder, "PersonAdressKennzeichen", b => b.Property(k => k.AdressAnzeige).HasMaxLength(500));
+        Version<AdressKennzeichen>(modelBuilder, "PersonAdressKennzeichen", b => b.Ignore(k => k.AdressAnzeige));
         Version<Rufnummer>(modelBuilder, "PersonRufnummern", b =>
         {
             b.Property(r => r.Nummer).HasMaxLength(50);
@@ -153,7 +164,9 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
         });
         Version<Organisationszugehoerigkeit>(modelBuilder, "PersonOrganisationen", b =>
         {
-            b.Property(o => o.OrganisationName).HasMaxLength(300);
+            b.Ignore(o => o.OrganisationName);
+            b.HasOne(o => o.Organisation).WithMany().HasForeignKey(o => o.OrganisationId).OnDelete(DeleteBehavior.Restrict);
+            b.Navigation(o => o.Organisation).AutoInclude();
             b.Property(o => o.Funktion).HasMaxLength(200);
             b.HasIndex(o => o.OrganisationId);
         });
@@ -219,7 +232,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(l => l.Freigabe2Name).HasMaxLength(200);
             b.Property(l => l.Freigabe1Kennung).HasMaxLength(100);
             b.Property(l => l.Freigabe2Kennung).HasMaxLength(100);
-            b.PrimitiveCollection(l => l.PersonIds);
+            b.FeldAlsTabelle<VibeVHS.Domain.Datenschutz.Loeschlauf, Listenwert<Guid>>("_personIds", nameof(VibeVHS.Domain.Datenschutz.Loeschlauf.PersonIds), "LoeschlaufPersonen", "LoeschlaufId");
         });
         Version<VibeVHS.Domain.Programm.KursEntgelt>(modelBuilder, "KursEntgelte", _ => { }, "KursId");
         Version<VibeVHS.Domain.Programm.OrtMerkmal>(modelBuilder, "OrtMerkmale", b => b.Property(m => m.Schluessel).HasMaxLength(40), "OrtId");
@@ -276,7 +289,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(e => e.Kurzname).HasMaxLength(50);
             b.Property(e => e.Bundesland).HasMaxLength(50);
             b.Property(e => e.Website).HasMaxLength(200);
-            b.PrimitiveCollection(e => e.Orte);
+            b.FeldAlsTabelle<VibeVHS.Domain.Stammdaten.Einrichtung, Listenwert<string>>("_orte", nameof(VibeVHS.Domain.Stammdaten.Einrichtung.Orte), "EinrichtungOrte", "EinrichtungId", 100);
         });
 
         modelBuilder.Entity<Fachbereich>(b =>
@@ -298,8 +311,8 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property<string?>("_name").HasColumnName("Name").HasMaxLength(200);
             b.Property(k => k.Funktion).HasMaxLength(300);
             b.Property(k => k.Hinweis).HasMaxLength(500);
-            b.PrimitiveCollection(k => k.Rollen);
-            b.PrimitiveCollection(k => k.Fachbereiche);
+            b.FeldAlsTabelle<Benutzerkonto, Listenwert<Rolle>>("_rollen", nameof(Benutzerkonto.Rollen), "BenutzerkontoRollen", "BenutzerkontoId");
+            b.FeldAlsTabelle<Benutzerkonto, Listenwert<int>>("_fachbereiche", nameof(Benutzerkonto.Fachbereiche), "BenutzerkontoFachbereiche", "BenutzerkontoId");
         });
     }
 
@@ -319,8 +332,15 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.ToTable(tabelle);
             b.HasKey(v => v.Id);
             b.Property(v => v.Id).ValueGeneratedNever();
-            b.Property(v => v.Grund).HasMaxLength(500);
-            b.Property(v => v.ErfasstVon).HasMaxLength(200);
+            // Zeitpunkt, Person und Grund stehen im Änderungsvorgang (Tabelle Aenderungsvorgaenge), nicht in jeder Zeile.
+            b.HasOne(v => v.ErfasstDurch).WithMany().HasForeignKey("ErfasstDurchVorgangId").IsRequired().OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(v => v.ErsetztDurch).WithMany().HasForeignKey("ErsetztDurchVorgangId").OnDelete(DeleteBehavior.Restrict);
+            b.Navigation(v => v.ErfasstDurch).AutoInclude();
+            b.Navigation(v => v.ErsetztDurch).AutoInclude();
+            b.Ignore(v => v.ErfasstAm);
+            b.Ignore(v => v.ErfasstVon);
+            b.Ignore(v => v.ErsetztAm);
+            b.Ignore(v => v.Grund);
             b.HasIndex(fremdschluessel, nameof(BitemporaleVersion<T>.GueltigVon));
             weiter(b);
         });
@@ -335,33 +355,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         NurAnfuegenPruefen();
-        var geaendert = GeaendertePersonen();
-        if (geaendert.Count == 0)
-        {
-            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-        }
-
         return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-    }
-
-    /// <summary>Personen, deren Daten (oder Unterlisten) sich in diesem Speichervorgang ändern.</summary>
-    private List<Person> GeaendertePersonen()
-    {
-        var ids = new HashSet<Guid>();
-        foreach (var e in ChangeTracker.Entries().Where(e => e.State is EntityState.Added or EntityState.Modified))
-        {
-            if (e.Entity is Person p)
-            {
-                ids.Add(p.Id);
-            }
-            else if (e.Entity is IHistorienwert && e.Metadata.FindProperty("PersonId") is not null
-                     && e.Property("PersonId").CurrentValue is Guid personId)
-            {
-                ids.Add(personId);
-            }
-        }
-
-        return ChangeTracker.Entries<Person>().Select(e => e.Entity).Where(p => ids.Contains(p.Id)).ToList();
     }
 
     /// <summary>Protokolleinträge und Namensversionen dürfen nur angefügt, nie gelöscht werden.</summary>

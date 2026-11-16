@@ -12,10 +12,10 @@ namespace VibeVHS.Infrastructure.Personen;
 public static class Personensicht
 {
     public static IQueryable<PersonName> NamenAm(this VibeVhsDbContext db, DateOnly tag)
-        => db.Set<PersonName>().Where(n => n.ErsetztAm == null && n.GueltigVon <= tag && (n.GueltigBis == null || n.GueltigBis > tag));
+        => db.Set<PersonName>().Where(n => EF.Property<Guid?>(n, "ErsetztDurchVorgangId") == null && n.GueltigVon <= tag && (n.GueltigBis == null || n.GueltigBis > tag));
 
     public static IQueryable<PersonMerkmal> MerkmaleAm(this VibeVhsDbContext db, MerkmalArt art, DateOnly tag)
-        => db.Set<PersonMerkmal>().Where(m => m.Art == art && m.ErsetztAm == null && m.GueltigVon <= tag && (m.GueltigBis == null || m.GueltigBis > tag));
+        => db.Set<PersonMerkmal>().Where(m => m.Art == art && EF.Property<Guid?>(m, "ErsetztDurchVorgangId") == null && m.GueltigVon <= tag && (m.GueltigBis == null || m.GueltigBis > tag));
 
     /// <summary>Personen, die am Stichtag die Rolle(n) haben (Bitmaske im Merkmal Rollen).</summary>
     public static IQueryable<Guid> MitRolle(this VibeVhsDbContext db, Personenrolle rolle, DateOnly tag)
@@ -27,7 +27,7 @@ public static class Personensicht
     public static IQueryable<Guid> MitGeburtsdatum(this VibeVhsDbContext db, DateOnly geburtsdatum)
     {
         var text = PersonMerkmal.DatumText(geburtsdatum);
-        return db.Set<PersonMerkmal>().Where(m => m.Art == MerkmalArt.Geburtsdatum && m.ErsetztAm == null && m.Inhalt == text)
+        return db.Set<PersonMerkmal>().Where(m => m.Art == MerkmalArt.Geburtsdatum && EF.Property<Guid?>(m, "ErsetztDurchVorgangId") == null && m.Inhalt == text)
             .Select(m => EF.Property<Guid>(m, "PersonId"));
     }
 
@@ -36,7 +36,7 @@ public static class Personensicht
     {
         var mail = eMail.Trim().ToLowerInvariant();
         return db.Set<EMailAdresse>()
-            .Where(e => e.ErsetztAm == null && e.GueltigVon <= tag && (e.GueltigBis == null || e.GueltigBis > tag) && e.Adresse.ToLower() == mail)
+            .Where(e => EF.Property<Guid?>(e, "ErsetztDurchVorgangId") == null && e.GueltigVon <= tag && (e.GueltigBis == null || e.GueltigBis > tag) && e.Adresse.ToLower() == mail)
             .Select(e => EF.Property<Guid>(e, "PersonId"));
     }
 

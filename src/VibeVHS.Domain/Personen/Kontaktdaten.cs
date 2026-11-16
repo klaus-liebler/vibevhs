@@ -75,13 +75,12 @@ public enum AdressKennzeichenArt
 
 /// <summary>
 /// Zeitlich gültiges Kennzeichen, welche Adresse der übliche Aufenthaltsort bzw. die Korrespondenzadresse ist.
-/// Beide wechseln unabhängig voneinander. Der Adresstext wird zur Nachvollziehbarkeit mitgespeichert.
+/// Beide wechseln unabhängig voneinander. Der Adresstext steht nur an der Adresse (keine Kopie).
 /// </summary>
 public sealed class AdressKennzeichen : BitemporaleVersion<AdressKennzeichen>
 {
     private AdressKennzeichen()
     {
-        AdressAnzeige = string.Empty;
     }
 
     public AdressKennzeichen(AdressKennzeichenArt art, Guid adressId, string adressAnzeige, DateOnly gueltigVon, DateOnly? gueltigBis,
@@ -90,16 +89,21 @@ public sealed class AdressKennzeichen : BitemporaleVersion<AdressKennzeichen>
     {
         Art = art;
         AdressId = adressId;
-        AdressAnzeige = adressAnzeige;
+        _anzeige = adressAnzeige;
     }
 
     public AdressKennzeichenArt Art { get; private set; }
 
     public Guid AdressId { get; private set; }
 
-    public string AdressAnzeige { get; private set; }
+    private string? _anzeige;
 
-    internal void Anonymisieren() => AdressAnzeige = "–";
+    /// <summary>Text der gekennzeichneten Adresse (aus der Adresse der Person, nicht gespeichert).</summary>
+    public string AdressAnzeige => _anzeige ?? "Adresse";
+
+    internal void AnzeigeSetzen(string anzeige) => _anzeige = anzeige;
+
+    internal void Anonymisieren() => _anzeige = "–";
 
     public override string Datenart => "Adressen";
 

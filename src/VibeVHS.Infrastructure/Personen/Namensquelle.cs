@@ -21,10 +21,10 @@ internal sealed class Namensquelle(VibeVhsDbContext db) : INamensquelle
         var ergebnis = new Dictionary<Guid, IReadOnlyList<Namensversion>>();
         if (pIds.Count > 0)
         {
-            var namen = await db.Set<PersonName>().AsNoTracking().Where(n => n.ErsetztAm == null && pIds.Contains(EF.Property<Guid>(n, "PersonId")))
+            var namen = await db.Set<PersonName>().AsNoTracking().Where(n => EF.Property<Guid?>(n, "ErsetztDurchVorgangId") == null && pIds.Contains(EF.Property<Guid>(n, "PersonId")))
                 .Select(n => new { PersonId = EF.Property<Guid>(n, "PersonId"), Version = n }).ToListAsync(abbruch);
             var titel = await db.Set<PersonMerkmal>().AsNoTracking()
-                .Where(m => m.Art == MerkmalArt.Titel && m.ErsetztAm == null && pIds.Contains(EF.Property<Guid>(m, "PersonId")))
+                .Where(m => m.Art == MerkmalArt.Titel && EF.Property<Guid?>(m, "ErsetztDurchVorgangId") == null && pIds.Contains(EF.Property<Guid>(m, "PersonId")))
                 .Select(m => new { PersonId = EF.Property<Guid>(m, "PersonId"), m.Inhalt, m.GueltigVon, m.GueltigBis }).ToListAsync(abbruch);
             var anonymisiert = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
                 .Where(p => pIds.Contains(p.Id) && p.Datenschutz == Datenschutzstatus.Anonymisiert).Select(p => p.Id).ToListAsync(abbruch);

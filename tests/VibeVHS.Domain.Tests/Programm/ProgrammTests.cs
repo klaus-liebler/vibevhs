@@ -225,7 +225,9 @@ public class KursUndPlanungTests
     public void Kapazitaet_hybrid_summiert_Orte_und_begrenzt_auf_Kurshoechstzahl()
     {
         var (v, _, raum, online, _) = Orte();
-        var vortrag = new Kurs("26H-110", "Vortrag Klimaanpassung", Herbst, 1, new Kursart("Vortrag", Nutzungsart.Vortrag, [], Buchungsrichtlinie.Oeffentlich), 0, 150);
+        var vortragsart = new Kursart("Vortrag", Nutzungsart.Vortrag, [], Buchungsrichtlinie.Oeffentlich);
+        var vortrag = new Kurs("26H-110", "Vortrag Klimaanpassung", Herbst, 1, vortragsart, 0, 150);
+        v = new Ortsverzeichnis(v.Alle, v.Katalog.Values, [vortragsart]); // Nutzungsart kommt aus der Kursart (keine Kopie am Kurs)
         var termin = vortrag.EinzelveranstaltungHinzufuegen(new DateTime(2026, 11, 26, 19, 0, 0), new DateTime(2026, 11, 26, 20, 30, 0),
             [new VeranstaltungsOrt(raum.Id), new VeranstaltungsOrt(online.Id)], null);
 

@@ -6,6 +6,25 @@ namespace VibeVHS.Domain.Programm;
 /// </summary>
 public sealed record Serienregel
 {
+    public Serienregel()
+    {
+    }
+
+    /// <summary>Kopie (auch für <c>with</c>): eigene Listeneinträge, damit zwei Regeln nie dieselben gespeicherten Zeilen teilen.</summary>
+    private Serienregel(Serienregel original)
+    {
+        Start = original.Start;
+        Ende = original.Ende;
+        Anzahl = original.Anzahl;
+        Beginn = original.Beginn;
+        DauerMinuten = original.DauerMinuten;
+        IntervallWochen = original.IntervallWochen;
+        FerienAuslassen = original.FerienAuslassen;
+        DozentId = original.DozentId;
+        _wochentage = Gemeinsam.Listenwerte.Von(original.Wochentage);
+        _ortIds = Gemeinsam.Listenwerte.Von(original.OrtIds);
+    }
+
     public DateOnly Start { get; init; }
 
     /// <summary>Letzter möglicher Tag (einschließlich).</summary>
@@ -14,7 +33,13 @@ public sealed record Serienregel
     /// <summary>Anzahl stattfindender Termine (ausgelassene zählen nicht).</summary>
     public int? Anzahl { get; init; }
 
-    public List<DayOfWeek> Wochentage { get; init; } = [];
+    public List<DayOfWeek> Wochentage
+    {
+        get => Gemeinsam.Listenwerte.Werte(_wochentage);
+        init => _wochentage = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<DayOfWeek>> _wochentage = [];
 
     public TimeOnly Beginn { get; init; }
 
@@ -26,7 +51,13 @@ public sealed record Serienregel
     /// <summary>Pausiert die Serie in den Schulferien? Vorgabe aus der Kursart; viele Kurse laufen in den Ferien weiter.</summary>
     public bool FerienAuslassen { get; init; }
 
-    public List<Guid> OrtIds { get; init; } = [];
+    public List<Guid> OrtIds
+    {
+        get => Gemeinsam.Listenwerte.Werte(_ortIds);
+        init => _ortIds = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<Guid>> _ortIds = [];
 
     public Guid? DozentId { get; init; }
 

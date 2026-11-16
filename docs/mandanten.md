@@ -30,7 +30,7 @@ dass weitere ohne Umbau des Datenmodells hinzukommen können.
 2. Singletons mit Mandantendaten auf „je Mandant“ umstellen: `Briefkopf` (Logo/Name für PDFs), `OeffentlicheAdresse`/`Uebersetzungslinks`
    (Basisadresse), `ShopZwischenspeicher`, `Startabgleich` (Fortschritt), Data-Protection-Schlüssel (je Mandant eigener Ordner).
 3. Hintergrundjobs (Quartz): jeder Job läuft je Mandant in einem eigenen Scope mit gesetztem Mandantenkontext.
-4. Startdaten, Migrationen und Sicherung je Mandant (beim Start alle Datenbanken migrieren; Sicherungsordner je Mandant).
+4. Startdaten, Schema und Sicherung je Mandant (beim Start jede Datenbank anlegen bzw. Schemaversion prüfen – später: migrieren; Sicherungsordner je Mandant).
 5. Anmeldung: Benutzerkonten sind je Mandant; ein Konto gilt nur in „seiner“ VHS (Cookie-Name bzw. -Pfad je Mandant).
 6. Speicherorte (Dokumente, Logs) je Mandant trennen.
 7. Zeitzone je Mandant: heute eine Einstellung „Zeitzone“ für die ganze Anwendung (`Domain.Gemeinsam.Zeitzone`, statisch); beim Einschalten

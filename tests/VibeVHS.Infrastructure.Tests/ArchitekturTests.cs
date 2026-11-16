@@ -90,8 +90,9 @@ public sealed class ArchitekturTests
 
         fehler.ShouldBeEmpty();
 
-        // Belege, Vollmachten, Organisationszugehörigkeiten u. Ä. halten den Namen zum Erfassungszeitpunkt bewusst fest.
-        static bool IstEingefroren(string tabelle) => tabelle is "Belege" or "PersonVollmachten" or "PersonOrganisationen" or "Belegungen" or "Belegpositionen"
+        // Belege, Mahn- und Zahlungsläufe (Posten = Abbild des freigegebenen Laufs bzw. der SEPA-Datei) u. Ä. halten den Namen zum
+        // Erfassungszeitpunkt bewusst fest.
+        static bool IstEingefroren(string tabelle) => tabelle is "Belege" or "Mahnposten" or "Zahlungsposten" or "PersonVollmachten" or "PersonOrganisationen" or "Belegungen" or "Belegpositionen"
             or "Ermaessigungen" or "Anwesenheiten" or "Listenabschluesse" or "Schnellanmeldungen" or "Honorarvertraege";
     }
 

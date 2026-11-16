@@ -65,7 +65,7 @@ public sealed class IntegrationDienst(
     {
         await RechtAsync(abbruch);
         var kurs = await programm.KursLadenAsync(kursId, abbruch) ?? throw new InvalidOperationException("Kurs nicht gefunden.");
-        if (kurs.Nutzungsart != Nutzungsart.Integrationskurs)
+        if ((await programm.OrtsverzeichnisAsync(abbruch)).NutzungsartVon(kurs) != Nutzungsart.Integrationskurs)
         {
             throw new InvalidOperationException($"{kurs.Kursnummer} ist kein Integrationskurs (Kursart prüfen).");
         }

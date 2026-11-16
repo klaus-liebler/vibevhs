@@ -53,7 +53,24 @@ public sealed class Person
 
     public IReadOnlyCollection<Postadresse> Adressen => _adressen;
 
-    public IReadOnlyCollection<AdressKennzeichen> AdressKennzeichen => _kennzeichen;
+    public IReadOnlyCollection<AdressKennzeichen> AdressKennzeichen
+    {
+        get
+        {
+            // Anzeige aus der Adresse selbst (gültig zum Beginn des Kennzeichens), keine gespeicherte Kopie.
+            foreach (var k in _kennzeichen)
+            {
+                var adresse = _adressen.Where(a => a.AdressId == k.AdressId && a.IstAktuellerWissensstand && !a.IstEndemarke)
+                    .OrderBy(a => a.GueltigVon > k.GueltigVon ? 1 : 0).ThenByDescending(a => a.GueltigVon).FirstOrDefault();
+                if (adresse is not null)
+                {
+                    k.AnzeigeSetzen(adresse.Anzeige);
+                }
+            }
+
+            return _kennzeichen;
+        }
+    }
 
     public IReadOnlyCollection<Rufnummer> Rufnummern => _rufnummern;
 
@@ -70,7 +87,14 @@ public sealed class Person
     public Personenstatus Status { get; private set; }
 
     /// <summary>Fachbereiche, denen die Person zugeordnet ist (v. a. Dozierende).</summary>
-    public List<int> Fachbereiche { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<int> Fachbereiche
+    {
+        get => Gemeinsam.Listenwerte.Werte(_fachbereiche);
+        private set => _fachbereiche = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<int>> _fachbereiche = [];
 
     /// <summary>„Titel Vorname Vorsatz Nachname Zusatz“ nach heutigem Stand (keine Spalte).</summary>
     public string Anzeigename => IstAnonymisiert
@@ -418,6 +442,53 @@ public sealed class Person
         AdressKennzeichnenAb(AdressKennzeichenArt.UeblicherAufenthaltsort, neu, ab, erfassung);
         AdresseAufgebenAb(alteAdressId, ab, erfassung);
         return neu;
+    }
+
+    // ---------- Gültigkeit korrigieren (Datum war falsch erfasst) ----------
+
+    /// <summary>
+    /// Umzugsdatum korrigieren: Die neue Adresse gilt ab <paramref name="neuesDatum"/> statt ab ihrem bisherigen Beginn; die vorherige
+    /// Adresse (die zu diesem Datum aufgegeben wurde) und das Kennzeichen „üblicher Aufenthaltsort“ werden mit korrigiert.
+    /// </summary>
+    public void UmzugsdatumKorrigieren(Guid neueAdressId, DateOnly neuesDatum, Erfassung erfassung)
+    {
+        var neu = _adressen.Where(a => a.AdressId == neueAdressId && a.IstAktuellerWissensstand && !a.IstEndemarke).OrderBy(a => a.GueltigVon).FirstOrDefault()
+                  ?? throw new InvalidOperationException("Die Adresse ist nicht bekannt.");
+        var alt = neu.GueltigVon;
+        ZeitlicheHistorie.GrenzeKorrigieren(_adressen, a => a.AdressId == neueAdressId, alt, neuesDatum, erfassung);
+        foreach (var vorher in _adressen.Where(a => a.IstAktuellerWissensstand && a.IstEndemarke && a.GueltigVon == alt && a.AdressId != neueAdressId)
+                     .Select(a => a.AdressId).Distinct().ToList())
+        {
+            ZeitlicheHistorie.GrenzeKorrigieren(_adressen, a => a.AdressId == vorher, alt, neuesDatum, erfassung);
+        }
+
+        foreach (var art in _kennzeichen.Where(k => k.IstAktuellerWissensstand && k.AdressId == neueAdressId && k.GueltigVon == alt).Select(k => k.Art).Distinct().ToList())
+        {
+            ZeitlicheHistorie.GrenzeKorrigieren(_kennzeichen, k => k.Art == art, alt, neuesDatum, erfassung);
+        }
+
+        ZwischenstandAktualisieren(erfassung.Am);
+    }
+
+    /// <summary>Datum einer Namensänderung korrigieren (z. B. Heirat war schon am 01.06.).</summary>
+    public void NamensaenderungsdatumKorrigieren(DateOnly bisher, DateOnly neu, Erfassung erfassung)
+    {
+        ZeitlicheHistorie.GrenzeKorrigieren(_namen, _ => true, bisher, neu, erfassung);
+        ZwischenstandAktualisieren(erfassung.Am);
+    }
+
+    /// <summary>Datum einer Änderung einer Angabe (Merkmal, z. B. Titel, Rollen) korrigieren.</summary>
+    public void AngabedatumKorrigieren(MerkmalArt art, DateOnly bisher, DateOnly neu, Erfassung erfassung)
+    {
+        ZeitlicheHistorie.GrenzeKorrigieren(_merkmale, m => m.Art == art, bisher, neu, erfassung);
+        ZwischenstandAktualisieren(erfassung.Am);
+    }
+
+    /// <summary>Datum eines Adresskennzeichens korrigieren (ab wann welche Adresse üblicher Aufenthaltsort bzw. Briefanschrift ist).</summary>
+    public void KennzeichendatumKorrigieren(AdressKennzeichenArt art, DateOnly bisher, DateOnly neu, Erfassung erfassung)
+    {
+        ZeitlicheHistorie.GrenzeKorrigieren(_kennzeichen, k => k.Art == art, bisher, neu, erfassung);
+        ZwischenstandAktualisieren(erfassung.Am);
     }
 
     // ---------- Rufnummern und E-Mail ----------

@@ -32,7 +32,14 @@ public sealed class Einrichtung
     public string Kurzname { get; private set; }
 
     /// <summary>Standorte (z. B. Emsdetten, Greven, Saerbeck).</summary>
-    public List<string> Orte { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<string> Orte
+    {
+        get => Gemeinsam.Listenwerte.Werte(_orte);
+        private set => _orte = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<string>> _orte = [];
 
     public string Bundesland { get; private set; }
 

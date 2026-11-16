@@ -225,7 +225,14 @@ public sealed class Loeschlauf
     public string ErstelltVon { get; private set; }
 
     /// <summary>Treffer bis zur Ausführung; danach geleert (Löschprotokoll ohne Personendaten).</summary>
-    public List<Guid> PersonIds { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<Guid> PersonIds
+    {
+        get => Gemeinsam.Listenwerte.Werte(_personIds);
+        private set => _personIds = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<Guid>> _personIds = [];
 
     public int ZuAnonymisieren { get; private set; }
 

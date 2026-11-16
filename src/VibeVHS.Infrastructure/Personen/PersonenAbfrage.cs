@@ -72,7 +72,7 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
     {
         var tag = Heute;
         var mitAdresse = db.Set<EMailAdresse>()
-            .Where(e => e.ErsetztAm == null && e.GueltigVon <= tag && (e.GueltigBis == null || e.GueltigBis > tag) && e.Adresse != "–" && e.Adresse != "")
+            .Where(e => EF.Property<Guid?>(e, "ErsetztDurchVorgangId") == null && e.GueltigVon <= tag && (e.GueltigBis == null || e.GueltigBis > tag) && e.Adresse != "–" && e.Adresse != "")
             .Select(e => EF.Property<Guid>(e, "PersonId"));
         return personen.Where(p => mitAdresse.Contains(p.Id));
     }
@@ -82,7 +82,7 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
     {
         var tag = Heute;
         var erteilt = db.Set<Einwilligung>()
-            .Where(w => w.ErsetztAm == null && w.GueltigVon <= tag && (w.GueltigBis == null || w.GueltigBis > tag)
+            .Where(w => EF.Property<Guid?>(w, "ErsetztDurchVorgangId") == null && w.GueltigVon <= tag && (w.GueltigBis == null || w.GueltigBis > tag)
                         && w.Kanal == Kontaktkanal.EMail && w.Zweck == zweck && w.Erteilt)
             .Select(w => EF.Property<Guid>(w, "PersonId"));
         return personen.Where(p => erteilt.Contains(p.Id));
@@ -217,7 +217,7 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
 
         if (filter.Fachbereich is { } fb)
         {
-            q = q.Where(p => p.Fachbereiche.Contains(fb));
+            q = q.Where(p => EF.Property<List<Domain.Gemeinsam.Listenwert<int>>>(p, "_fachbereiche").Any(f => f.Wert == fb));
         }
 
         // Suche direkt in den Versionen (kein Suchindex, keine Kopie): jedes Wort muss als Wortanfang vorkommen.
@@ -273,7 +273,7 @@ internal sealed class DublettenSuche(VibeVhsDbContext db) : IDublettenSuche
         var aktiv = db.Personen.IgnoreAutoIncludes().Where(p => p.Status != Personenstatus.Zusammengefuehrt && p.Datenschutz == Domain.Datenschutz.Datenschutzstatus.Aktiv)
             .Select(p => p.Id);
         var geburt = (await db.Set<PersonMerkmal>().AsNoTracking()
-                .Where(m => m.Art == MerkmalArt.Geburtsdatum && m.ErsetztAm == null && aktiv.Contains(EF.Property<Guid>(m, "PersonId")))
+                .Where(m => m.Art == MerkmalArt.Geburtsdatum && EF.Property<Guid?>(m, "ErsetztDurchVorgangId") == null && aktiv.Contains(EF.Property<Guid>(m, "PersonId")))
                 .Select(m => new { PersonId = EF.Property<Guid>(m, "PersonId"), m.Inhalt }).ToListAsync(abbruch))
             .GroupBy(m => m.PersonId).ToDictionary(g => g.Key, g => g.First().Inhalt);
         var namen = await db.NamenAm(heute).AsNoTracking().Where(n => aktiv.Contains(EF.Property<Guid>(n, "PersonId")))

@@ -32,8 +32,8 @@ Dann im Browser <http://localhost:5189> öffnen und bei der **Testanmeldung** ei
 wechselt die aktive Rolle oben rechts (Leitung, Verwaltungsleitung, Fachbereichsleitung, Teilnehmerservice,
 Buchhaltung, Integrationskurs-Team, Systemverwaltung).
 
-Beim ersten Start wird die SQLite-Datenbank `src/VibeVHS.Web/data/vibevhs.db` angelegt (WAL-Modus, Migrationen
-werden automatisch eingespielt). Danach werden die **Startdaten** der Pilot-VHS geladen (idempotent, nur was fehlt):
+Beim ersten Start wird die SQLite-Datenbank `src/VibeVHS.Web/data/vibevhs.db` neu aus dem Modell angelegt (WAL-Modus,
+lesbare Sichten `v_…`, Schemaversion; derzeit ohne Migrationen – bei geändertem Modell die Datei löschen, siehe docs/betrieb.md). Danach werden die **Startdaten** der Pilot-VHS geladen (idempotent, nur was fehlt):
 Briefkopf, Fachbereiche 1 bis 8 und die Benutzerkonten samt zugehöriger Person (Rolle Mitarbeitende).
 In der Entwicklungsumgebung kommen fünf fiktive Beispielpersonen dazu, darunter Anna Becker mit Namenshistorie.
 
@@ -69,7 +69,7 @@ den Sortierschlüssel, der die Id enthält). In Entwicklung und Tests bricht ein
 |---|---|
 | `src/VibeVHS.Domain` | Fachkern ohne Abhängigkeiten: bitemporale Versionen (`BitemporaleVersion`, `ZeitlicheHistorie.AlsStichtag`), `Geld` in Cent, GUID v7, `Person` mit versioniertem Namen |
 | `src/VibeVHS.Application` | Anwendungsfälle und Ports: Rollen, `Freigabe` (gesperrt immer mit Begründung), `NaechsterSchritt`, Postausgang (Outbox) mit Übersetzungslink, Audit-Protokoll, Personendienst |
-| `src/VibeVHS.Infrastructure` | EF Core + SQLite (WAL), Migrationen, Speicher, Quartz-Job für die Zustellung |
+| `src/VibeVHS.Infrastructure` | EF Core + SQLite (WAL), Schema per EnsureCreated, Speicher, Quartz-Job für die Zustellung |
 | `src/VibeVHS.Adapters.Mocks` | Mock-Anmeldung (Konto + Rolle), simulierte Mail- und Schnittstellenkanäle |
 | `src/VibeVHS.Web` | Blazor Web App (Interactive Server, Radzen), deutsche Oberfläche |
 | `tests/*` | xUnit v3 + Shouldly |

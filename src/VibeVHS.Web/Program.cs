@@ -124,7 +124,17 @@ foreach (var plugin in honorarPlugins)
     app.Logger.LogInformation("Honorarmodell-Plugin geladen: {Plugin}", plugin);
 }
 
-await DatenbankInitialisierung.InitialisierenAsync(app.Services);
+try
+{
+    await DatenbankInitialisierung.InitialisierenAsync(app.Services);
+}
+catch (DatenbankschemaVeraltetException fehler)
+{
+    // Entwicklungsphase ohne Migrationen: klare Meldung statt Absturz mit unverständlichen SQL-Fehlern.
+    app.Logger.LogCritical("{Meldung}", fehler.Message);
+    Console.Error.WriteLine(fehler.Message);
+    return 2;
+}
 
 // Startdaten der VHS (Briefkopf, Fachbereiche, Benutzerkonten). Idempotent: lädt nur, was noch fehlt.
 var startdaten = app.Configuration["Startdaten:Datei"] ?? Path.Combine("Startdaten", "testbenutzer-vhs-egs.json");

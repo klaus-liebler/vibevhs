@@ -138,7 +138,7 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
         where T : BitemporaleVersion<T>
     {
         var roh = await db.Set<T>().AsNoTracking()
-            .Select(v => new { Id = EF.Property<Guid>(v, "PersonId"), v.ErfasstAm })
+            .Select(v => new { Id = EF.Property<Guid>(v, "PersonId"), ErfasstAm = v.ErfasstDurch.Am })
             .ToListAsync(abbruch);
         return roh.GroupBy(x => x.Id).Select(g => (g.Key, g.Max(x => x.ErfasstAm)));
     }

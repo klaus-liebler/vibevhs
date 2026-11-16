@@ -20,7 +20,7 @@
         <h1>@kurs.Kursnummer @kurs.Titel</h1>
         <p class="vhs-sub">
             <StatusPille Stil="@(kurs.Status == Kursstatus.Veroeffentlicht ? "gut" : kurs.Status == Kursstatus.Abgesagt ? "krit" : "neutral")">@KursAnzeige.Status(kurs.Status)</StatusPille>
-            FB @kurs.Fachbereich · @NutzungsartAnzeige.Text(kurs.Nutzungsart) · @KursAnzeige.Sichtbarkeit(kurs.Sichtbarkeit)@(namen.Organisation(kurs.AuftraggeberId) is { } ag ? $" für {ag}" : "")
+            FB @kurs.Fachbereich · @NutzungsartAnzeige.Text(verzeichnis!.NutzungsartVon(kurs)) · @KursAnzeige.Sichtbarkeit(kurs.Sichtbarkeit)@(namen.Organisation(kurs.AuftraggeberId) is { } ag ? $" für {ag}" : "")
             · @kurs.MinTeilnehmende–@kurs.MaxTeilnehmende Teilnehmende
         </p>
     </div>

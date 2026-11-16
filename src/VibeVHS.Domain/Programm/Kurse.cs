@@ -111,6 +111,29 @@ public sealed record Buchungsrecht(Buchungsweg Weg, bool DarfBuchen, bool DarfUe
 /// <summary>Buchungsrichtlinie eines Kurses (Vorlage aus der Kursart, je Kurs anpassbar).</summary>
 public sealed record Buchungsrichtlinie
 {
+    public Buchungsrichtlinie()
+    {
+    }
+
+    /// <summary>Kopie (auch für <c>with</c>): eigene Einträge der Rechte, damit zwei Richtlinien nie dieselben gespeicherten Zeilen teilen.</summary>
+    private Buchungsrichtlinie(Buchungsrichtlinie original)
+    {
+        Rechte = original.Rechte.Select(r => r with { }).ToList();
+        Belegung = original.Belegung;
+        KontingentAnzahl = original.KontingentAnzahl;
+        KontingentGueltigMonate = original.KontingentGueltigMonate;
+        VorabEinbuchung = original.VorabEinbuchung;
+        Warteliste = original.Warteliste;
+        StornofristTage = original.StornofristTage;
+        BearbeitungsgebuehrCent = original.BearbeitungsgebuehrCent;
+        UmbuchungsgebuehrCent = original.UmbuchungsgebuehrCent;
+        NachrueckfristTage = original.NachrueckfristTage;
+        EinbuchungsfristStunden = original.EinbuchungsfristStunden;
+        AustragefristStunden = original.AustragefristStunden;
+        NichterscheinenZaehlt = original.NichterscheinenZaehlt;
+        SelbstCheckin = original.SelbstCheckin;
+    }
+
     public List<Buchungsrecht> Rechte { get; init; } = [];
 
     public Belegungsart Belegung { get; init; } = Belegungsart.AlleVeranstaltungen;
@@ -195,7 +218,7 @@ public sealed class Kursart
     private Kursart()
     {
         Name = string.Empty;
-        Richtlinie = Buchungsrichtlinie.Oeffentlich;
+        Richtlinie = Buchungsrichtlinie.Oeffentlich with { };
     }
 
     public Kursart(string name, Nutzungsart nutzungsart, IEnumerable<string> merkmale, Buchungsrichtlinie richtlinie,
@@ -206,7 +229,7 @@ public sealed class Kursart
         Name = name.Trim();
         Nutzungsart = nutzungsart;
         BenoetigteMerkmale = merkmale.ToList();
-        Richtlinie = richtlinie;
+        Richtlinie = richtlinie with { };
         Sichtbarkeit = sichtbarkeit;
         FerienAuslassen = ferienAuslassen;
     }
@@ -218,7 +241,14 @@ public sealed class Kursart
     public Nutzungsart Nutzungsart { get; private set; }
 
     /// <summary>Merkmalsschlüssel, die jeder Ort haben muss (z. B. "bamf" für Integrationskurse).</summary>
-    public List<string> BenoetigteMerkmale { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<string> BenoetigteMerkmale
+    {
+        get => Gemeinsam.Listenwerte.Werte(_benoetigteMerkmale);
+        private set => _benoetigteMerkmale = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<string>> _benoetigteMerkmale = [];
 
     public Buchungsrichtlinie Richtlinie { get; private set; }
 
@@ -228,7 +258,14 @@ public sealed class Kursart
     public bool FerienAuslassen { get; private set; }
 
     /// <summary>Qualifikationen, die Dozierende am Veranstaltungstag haben müssen (z. B. "bamf-lk" für Integrationskurse).</summary>
-    public List<string> BenoetigteDozierendenmerkmale { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<string> BenoetigteDozierendenmerkmale
+    {
+        get => Gemeinsam.Listenwerte.Werte(_benoetigteDozierendenmerkmale);
+        private set => _benoetigteDozierendenmerkmale = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<string>> _benoetigteDozierendenmerkmale = [];
 
     public Kursart MitDozierendenmerkmalen(IEnumerable<string> schluessel)
     {
@@ -375,7 +412,7 @@ public sealed class Kurs
     {
         Kursnummer = string.Empty;
         Titel = string.Empty;
-        Richtlinie = Buchungsrichtlinie.Oeffentlich;
+        Richtlinie = Buchungsrichtlinie.Oeffentlich with { };
     }
 
     public Kurs(string kursnummer, string titel, Semester semester, int fachbereich, Kursart kursart, int minTeilnehmende, int maxTeilnehmende)
@@ -395,10 +432,9 @@ public sealed class Kurs
         SemesterId = semester.Id;
         Fachbereich = fachbereich;
         KursartId = kursart.Id;
-        Nutzungsart = kursart.Nutzungsart;
         BenoetigteMerkmale = [.. kursart.BenoetigteMerkmale];
         BenoetigteDozierendenmerkmale = [.. kursart.BenoetigteDozierendenmerkmale];
-        Richtlinie = kursart.Richtlinie;
+        Richtlinie = kursart.Richtlinie with { };
         Sichtbarkeit = kursart.Sichtbarkeit;
         MinTeilnehmende = minTeilnehmende;
         MaxTeilnehmende = maxTeilnehmende;
@@ -419,12 +455,25 @@ public sealed class Kurs
 
     public Guid KursartId { get; private set; }
 
-    public Nutzungsart Nutzungsart { get; private set; }
 
-    public List<string> BenoetigteMerkmale { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<string> BenoetigteMerkmale
+    {
+        get => Gemeinsam.Listenwerte.Werte(_benoetigteMerkmale);
+        private set => _benoetigteMerkmale = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<string>> _benoetigteMerkmale = [];
 
     /// <summary>Qualifikationen der Dozierenden (aus der Kursart, je Kurs ergänzbar, z. B. Alpha-Zusatzqualifikation).</summary>
-    public List<string> BenoetigteDozierendenmerkmale { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<string> BenoetigteDozierendenmerkmale
+    {
+        get => Gemeinsam.Listenwerte.Werte(_benoetigteDozierendenmerkmale);
+        private set => _benoetigteDozierendenmerkmale = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<string>> _benoetigteDozierendenmerkmale = [];
 
     public Kurs MitDozierendenmerkmalen(IEnumerable<string> schluessel)
     {
@@ -522,7 +571,7 @@ public sealed class Kurs
 
     public Kurs MitRichtlinie(Buchungsrichtlinie richtlinie)
     {
-        Richtlinie = richtlinie;
+        Richtlinie = richtlinie with { };
         return this;
     }
 
@@ -552,7 +601,7 @@ public sealed class Kurs
             throw new ArgumentException("Bitte mindestens einen Ort wählen.");
         }
 
-        Serie = regel;
+        Serie = regel with { };
         Umfang = regel.Unbefristet ? Kursumfang.Unbefristet : Kursumfang.Begrenzt;
         _veranstaltungen.RemoveAll(v => v.AusSerie && !v.Ausnahme);
         var termine = Seriengenerator.Erzeugen(regel, kalender, regel.Unbefristet ? horizont : null);
@@ -649,12 +698,11 @@ public sealed class Kurs
             SemesterId = ziel.Id,
             Fachbereich = Fachbereich,
             KursartId = KursartId,
-            Nutzungsart = Nutzungsart,
             BenoetigteMerkmale = [.. BenoetigteMerkmale],
             BenoetigteDozierendenmerkmale = [.. BenoetigteDozierendenmerkmale],
             Sichtbarkeit = Sichtbarkeit,
             AuftraggeberId = AuftraggeberId,
-            Richtlinie = Richtlinie,
+            Richtlinie = Richtlinie with { },
             MinTeilnehmende = MinTeilnehmende,
             MaxTeilnehmende = MaxTeilnehmende,
             Status = Kursstatus.Entwurf,

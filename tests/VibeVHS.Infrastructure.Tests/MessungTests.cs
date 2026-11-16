@@ -39,16 +39,18 @@ public sealed class MessungTests
         var heute = DateOnly.FromDateTime(jetzt.Date);
         var aufbau = Stopwatch.StartNew();
         var daten = new VibeVHS.Adapters.Mocks.Testdaten.Massendaten().Erzeugen(anzahl, jetzt);
-        foreach (var paket in daten.Personen.Chunk(2000))
-        {
-            await using var db = t.NeuerKontext();
-            db.Personen.AddRange(paket);
-            await db.SaveChangesAsync(ct);
-        }
-
+        // Organisationen zuerst (Zugehörigkeiten der Personen verweisen per Fremdschlüssel darauf).
         await using (var db = t.NeuerKontext())
         {
             db.Organisationen.AddRange(daten.Organisationen);
+            await db.SaveChangesAsync(ct);
+        }
+
+        foreach (var paket in daten.Personen.Chunk(2000))
+        {
+            await using var db = t.NeuerKontext();
+            db.AttachRange(daten.Organisationen.Cast<object>());
+            db.Personen.AddRange(paket);
             await db.SaveChangesAsync(ct);
         }
 
@@ -170,6 +172,13 @@ public sealed class MessungTests
             }
         }
 
+        // Dateigröße nach Checkpoint (WAL in die Datei übernommen)
+        await using (var db = t.NeuerKontext())
+        {
+            await db.Database.ExecuteSqlRawAsync("PRAGMA wal_checkpoint(TRUNCATE)", ct);
+        }
+
+        ergebnisse.Add(($"Dateigröße (MB, nach Checkpoint)", new FileInfo(datei).Length / 1024.0 / 1024.0));
         var zeilen = string.Join("\n", ergebnisse.Select(e => $"| {e.Name} | {e.Median:0} ms |"));
         var bericht = $"MESSUNG {anzahl} Personen, {kurse} Kurse (Aufbau {aufbau.Elapsed.TotalSeconds:0} s)\n{zeilen}\nPLAN\n{string.Join("\n", plaene)}";
         File.WriteAllText(Path.Combine(Path.GetTempPath(), $"vibevhs-messung-{anzahl}.txt"), bericht);

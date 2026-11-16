@@ -62,7 +62,8 @@ internal static class DurchfuehrungDemodaten
         var kurse = await db.Kurse.Include(k => k.Veranstaltungen).Where(k => k.Status != Kursstatus.Entwurf).ToListAsync();
 
         // Integrationskurse: abrechnungsrelevante Anwesenheit → Selbst-Check-in nur mit Bestätigung durch die Kursleitung
-        foreach (var ik in kurse.Where(k => k.Nutzungsart == Nutzungsart.Integrationskurs && k.Richtlinie.SelbstCheckin == SelbstCheckin.Erlaubt))
+        var integrationsarten = await db.Kursarten.Where(a => a.Nutzungsart == Nutzungsart.Integrationskurs).Select(a => a.Id).ToListAsync();
+        foreach (var ik in kurse.Where(k => integrationsarten.Contains(k.KursartId) && k.Richtlinie.SelbstCheckin == SelbstCheckin.Erlaubt))
         {
             ik.MitRichtlinie(ik.Richtlinie with { SelbstCheckin = SelbstCheckin.MitBestaetigung });
         }

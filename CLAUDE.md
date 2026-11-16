@@ -23,10 +23,10 @@ PDFsharp/MigraDoc, QRCoder, html5-qrcode. **Nicht verwenden:** QuestPDF, Nager.D
 ```
 src/VibeVHS.Domain          Fachmodell (bitemporal: BitemporaleVersion, ZeitlicheHistorie), keine Abhängigkeiten
 src/VibeVHS.Application     Dienste/Anwendungsfälle, Ports (I…Speicher), Rechteprüfung, Protokoll
-src/VibeVHS.Infrastructure  EF Core (VibeVhsDbContext, Migrationen in Datenbank/Migrationen), Quartz-Jobs, PDF, Startdaten
+src/VibeVHS.Infrastructure  EF Core (VibeVhsDbContext, Schema per EnsureCreated – derzeit keine Migrationen), Quartz-Jobs, PDF, Startdaten
 src/VibeVHS.Adapters.Mocks  Testanmeldung, Mail/Schnittstellen, Übersetzer, Virenprüfung, Geokodierer, BAMF (Mocks)
 src/VibeVHS.Web             Blazor-Seiten (Components/Pages, Bausteine, Layout), Shop-API, Portale, Demodaten (Entwicklung/)
-tests/…                     Domain, Application, Infrastructure (SQLite in-memory mit Migrationen), Web (ShopTestHost), Shop.Komponente (Headless-Edge)
+tests/…                     Domain, Application, Infrastructure (SQLite in-memory, Schema wie im Betrieb), Web (ShopTestHost), Shop.Komponente (Headless-Edge)
 tools/Testdaten             Startdaten vhs EGS (testbenutzer-vhs-egs.json, logo), Beispiel-CSV für Importe
 deploy/server               Bereitstellungs-Kit (nur Branch deploy-vorbereitung)
 ```
@@ -36,7 +36,6 @@ deploy/server               Bereitstellungs-Kit (nur Branch deploy-vorbereitung)
 ```powershell
 dotnet build VibeVHS.slnx                                    # TreatWarningsAsErrors
 dotnet test --project tests/VibeVHS.Web.Tests [--filter-class "*Name*"]
-dotnet ef migrations add Name -p src/VibeVHS.Infrastructure -s src/VibeVHS.Infrastructure -o Datenbank/Migrationen
 node tests/Shop.Komponente/komponententest.mjs http://localhost:5199
 ```
 
@@ -60,10 +59,16 @@ Eigene Testinstanz: Port **5199**, eigene Datenbank (`ConnectionStrings__VibeVHS
 - **Gesperrte Aktionen erklären:** `BegruendeterButton` mit `Freigabe` (Nein + Grund als Tooltip), z. B. „Bitte zuerst …“.
 - **Folgeschritte anbieten:** nach jeder Aktion `NaechsteSchritte` (Hauptschritt markiert); Anker brauchen den Seitenpfad (`personen/{id}#…`).
 - **Bitemporal:** Stammdaten, Rollen, Merkmale, Adressen … nie überschreiben – „Änderung ab Datum“ vs. „Korrektur“, mit Grund; Datenhistorie zeigt alles.
+- **Datenbank ohne Migrationen (Entwicklungsphase, nur Testdaten):** Schema per `EnsureCreated` aus dem Modell, danach Sichten `v_…` und
+  Schemaversion (`Schemainfo`, Prüfsumme). Passt eine vorhandene Datei nicht zum Modell, bricht der Start mit „Datenbankschema veraltet –
+  Datei löschen oder beiseitelegen“ ab. **Vor dem ersten Produktivbetrieb werden wieder EF-Migrationen eingeführt.**
+- **Normalisiert (11/2026):** keine Kopien (Namen, Anzeigetexte, Stände werden zur Laufzeit gelesen: `INamensquelle`, `Personensicht`),
+  keine JSON-Spalten (Listen als eigene Tabellen, `Wertlisten`/`Listenwert<T>`), Erfassungsangaben im `Aenderungsvorgang`. Speicherformate:
+  Ids 16 Byte (UUIDv7 über `Ids.Neu`), Tage JJJJMMTT, Zeitpunkte/Termine UTC-ms (Anzeige über `Zeitzone`). Namen sortieren per Collation
+  `DIN5007_2` (registriert in `SqliteErweiterungen`, ebenso `suchtext()`); Suche direkt in den Versionen (kein Suchindex).
 - **Stammdaten-Spalten (Grundreinigung 11/2026):** neue Personenangabe = versioniertes Merkmal (`MerkmalArt`, `AngabeAendern`), nie eine
   überschreibbare Spalte. Spalten der Stammdatentabellen stehen mit Einstufung in `Infrastructure/Datenbank/Spalteneinstufung.cs`
-  (Führend / Cache / Anonymisierungsrest); Caches nie direkt schreiben – der Job „Personen-Zwischenstände“ (00:05, Startabgleich) schreibt
-  sie fort, Namenskopien folgen „Name zum Termindatum“. Statistik rechnet zur Laufzeit (Geschlecht zum Kursdatum, Alter zum 31.12.).
+  (Führend / Anonymisierungsrest – Lese-Caches gibt es nicht mehr). Statistik rechnet zur Laufzeit (Geschlecht zum Kursdatum, Alter zum 31.12.).
   `ArchitekturTests` A/B/C sichern das ab.
 - **Zurück zur Liste:** Listen schreiben Filter in die URL, Detail-Links tragen `?zurueck=` (`Ruecksprung`), Detailseiten `ZurueckZurListe`; zuletzt geöffnete Zeile wird markiert.
 - **Datenschutz:** keine Personendaten in Logs/Protokoll (Pseudonyme `Pseudonym.Person(id)`), Exporte und Zugriffe auf Gesperrte protokollieren.

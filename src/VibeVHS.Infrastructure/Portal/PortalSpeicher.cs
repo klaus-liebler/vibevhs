@@ -1,3 +1,4 @@
+using VibeVHS.Domain.Gemeinsam;
 using Microsoft.EntityFrameworkCore;
 using VibeVHS.Application.Portal;
 using VibeVHS.Application.Sicherheit;
@@ -34,7 +35,7 @@ internal static class PortalMapping
             b.Property(x => x.Id).ValueGeneratedNever();
             b.HasIndex(x => x.PersonId);
             b.HasIndex(x => x.Status);
-            b.Property(x => x.Daten).AlsJson();
+            b.FeldAlsTabelle<Portalantrag, Eintrag>("_daten", nameof(Portalantrag.Daten), "PortalanliegenAngaben", "PortalanliegenId", 1000);
         });
     }
 }

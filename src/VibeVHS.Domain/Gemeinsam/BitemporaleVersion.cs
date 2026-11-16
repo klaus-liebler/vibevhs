@@ -15,8 +15,7 @@ public abstract class BitemporaleVersion<TSelf> : IHistorienwert
     /// <summary>Nur für EF Core.</summary>
     protected BitemporaleVersion()
     {
-        Grund = string.Empty;
-        ErfasstVon = string.Empty;
+        ErfasstDurch = null!;
     }
 
     protected BitemporaleVersion(DateOnly gueltigVon, DateOnly? gueltigBis, Erfassung erfassung)
@@ -31,10 +30,8 @@ public abstract class BitemporaleVersion<TSelf> : IHistorienwert
         Id = Ids.Neu();
         GueltigVon = gueltigVon;
         GueltigBis = gueltigBis;
-        ErfasstAm = erfassung.Am;
-        ErfasstVon = string.IsNullOrWhiteSpace(erfassung.Von) ? Erfassung.System : erfassung.Von;
+        ErfasstDurch = erfassung.Vorgang;
         Erfassungsart = erfassung.Art;
-        Grund = erfassung.Grund;
     }
 
     public Guid Id { get; private set; }
@@ -45,19 +42,22 @@ public abstract class BitemporaleVersion<TSelf> : IHistorienwert
     /// <summary>Fachlich gültig bis vor diesen Tag (exklusive); <c>null</c> = unbefristet.</summary>
     public DateOnly? GueltigBis { get; private set; }
 
-    /// <summary>Zeitpunkt, ab dem das System diese Version kennt.</summary>
-    public DateTimeOffset ErfasstAm { get; private set; }
+    /// <summary>Aenderungsvorgang, der diese Zeile angelegt hat (Zeitpunkt, Person, Grund).</summary>
+    public Aenderungsvorgang ErfasstDurch { get; private set; }
 
-    /// <summary>Wer die Version erfasst hat (Name und Rolle oder "Automatik").</summary>
-    public string ErfasstVon { get; private set; }
+    /// <summary>Aenderungsvorgang, durch den diese Zeile ersetzt wurde (neueres Wissen); <c>null</c> = aktueller Wissensstand.</summary>
+    public Aenderungsvorgang? ErsetztDurch { get; private set; }
+
+    public DateTimeOffset ErfasstAm => ErfasstDurch.Am;
+
+    public string ErfasstVon => ErfasstDurch.Von;
 
     public Erfassungsart Erfassungsart { get; private set; }
 
-    /// <summary>Zeitpunkt, ab dem diese Version durch eine andere ersetzt ist; <c>null</c> = aktueller Wissensstand.</summary>
-    public DateTimeOffset? ErsetztAm { get; private set; }
+    public DateTimeOffset? ErsetztAm => ErsetztDurch?.Am;
 
-    /// <summary>Grund bzw. Nachweis (Pflicht, für die Nachvollziehbarkeit).</summary>
-    public string Grund { get; private set; }
+    /// <summary>Grund des Vorgangs; eine Abgrenzung (Ende der Gültigkeit wegen einer Änderung) nennt den Grund der Änderung.</summary>
+    public string Grund => Erfassungsart == Erfassungsart.Abgrenzung ? $"Ende der Gültigkeit: {ErfasstDurch.Grund}" : ErfasstDurch.Grund;
 
     public bool IstAktuellerWissensstand => ErsetztAm is null;
 
@@ -80,21 +80,22 @@ public abstract class BitemporaleVersion<TSelf> : IHistorienwert
     protected internal abstract TSelf KopieMit(DateOnly gueltigVon, DateOnly? gueltigBis, Erfassung erfassung);
 
     /// <summary>Anonymisierung: Grund/Nachweis kann Personendaten enthalten und wird überschrieben.</summary>
-    internal void GrundAnonymisieren() => Grund = "anonymisiert";
+    internal void GrundAnonymisieren() => ErfasstDurch = new Aenderungsvorgang(ErfasstDurch.Am, ErfasstDurch.Von, "anonymisiert");
 
-    internal void Ersetzen(DateTimeOffset zeitpunkt)
+    internal void Ersetzen(Aenderungsvorgang durch)
     {
-        if (ErsetztAm is not null)
+        ArgumentNullException.ThrowIfNull(durch);
+        if (ErsetztDurch is not null)
         {
             throw new InvalidOperationException("Diese Version ist bereits ersetzt.");
         }
 
-        if (zeitpunkt < ErfasstAm)
+        if (durch.Am < ErfasstAm)
         {
             throw new InvalidOperationException("Eine Version kann nicht vor ihrer Erfassung ersetzt werden.");
         }
 
-        ErsetztAm = zeitpunkt;
+        ErsetztDurch = durch;
     }
 }
 

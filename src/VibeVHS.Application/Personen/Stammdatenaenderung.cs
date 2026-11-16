@@ -129,6 +129,65 @@ public sealed class Stammdatenaenderung(IPersonenSpeicher speicher, IAuditProtok
         return new StammdatenErgebnis(geaendert, nameNeu);
     }
 
+    public static readonly Rolle[] DatumKorrigierenRollen =
+        [Rolle.Teilnehmerservice, Rolle.IntegrationskursTeam, Rolle.Fachbereichsleitung, Rolle.Verwaltungsleitung, Rolle.Leitung];
+
+    /// <summary>Was an einer Gültigkeitsgrenze korrigiert wird.</summary>
+    public enum Datumskorrektur
+    {
+        Umzug,
+        Name,
+        Angabe,
+        Kennzeichen,
+    }
+
+    /// <summary>
+    /// Gültigkeitsbeginn bzw. -ende korrigieren (Datum war falsch erfasst), z. B. „Umzugsdatum korrigieren“. Strenges Modell: die bisherigen
+    /// Zeilen bleiben als ersetzt erhalten, die Korrektur steht mit Grund in der Datenhistorie.
+    /// </summary>
+    /// <param name="bezug">Umzug: AdressId der neuen Adresse; Angabe: <see cref="MerkmalArt"/>; Kennzeichen: <see cref="AdressKennzeichenArt"/>.</param>
+    public async Task DatumKorrigierenAsync(Guid personId, Datumskorrektur was, string? bezug, DateOnly bisher, DateOnly neu, string grund,
+        CancellationToken abbruch = default)
+    {
+        if (string.IsNullOrWhiteSpace(grund))
+        {
+            throw new ArgumentException("Bitte einen Grund bzw. Nachweis angeben (steht in der Datenhistorie).");
+        }
+
+        var wer = await benutzer.ErmittelnAsync(abbruch);
+        if (wer.Rolle is not { } rolle || !DatumKorrigierenRollen.Contains(rolle))
+        {
+            throw new UnauthorizedAccessException("Daten korrigieren dürfen Teilnehmerservice, Integrationskurs-Team, Verwaltungs- und Fachbereichsleitung sowie Leitung.");
+        }
+
+        var person = await speicher.LadenAsync(personId, abbruch) ?? throw new InvalidOperationException("Person nicht gefunden.");
+        if (person.Datenschutz != Datenschutzstatus.Aktiv)
+        {
+            throw new InvalidOperationException("Die Person ist gesperrt oder anonymisiert; Stammdaten sind schreibgeschützt.");
+        }
+
+        var e = Erfassung.Korrektur(uhr.GetLocalNow(), grund.Trim(), wer.Anzeige);
+        switch (was)
+        {
+            case Datumskorrektur.Umzug:
+                person.UmzugsdatumKorrigieren(Guid.Parse(bezug ?? throw new ArgumentException("Bitte die neue Adresse angeben.")), neu, e);
+                break;
+            case Datumskorrektur.Name:
+                person.NamensaenderungsdatumKorrigieren(bisher, neu, e);
+                break;
+            case Datumskorrektur.Angabe:
+                person.AngabedatumKorrigieren(Enum.Parse<MerkmalArt>(bezug ?? throw new ArgumentException("Bitte die Angabe wählen.")), bisher, neu, e);
+                break;
+            default:
+                person.KennzeichendatumKorrigieren(Enum.Parse<AdressKennzeichenArt>(bezug ?? throw new ArgumentException("Bitte das Kennzeichen wählen.")), bisher, neu, e);
+                break;
+        }
+
+        await protokoll.ProtokollierenAsync("Person.DatumKorrigiert",
+            $"{Pseudonym.Person(personId)}: {was} – Datum {bisher:dd.MM.yyyy} korrigiert auf {neu:dd.MM.yyyy}", nameof(Person), personId, abbruch: abbruch);
+        await speicher.SpeichernAsync(abbruch);
+    }
+
     private static void AnschriftUebernehmen(Person person, StammdatenEingabe alt, StammdatenEingabe neu, bool korrektur, DateOnly datum, Erfassung e,
         List<string> geaendert)
     {

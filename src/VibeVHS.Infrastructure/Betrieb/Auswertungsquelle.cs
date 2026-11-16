@@ -93,6 +93,7 @@ internal sealed class Auswertungsquelle(VibeVhsDbContext db, TimeProvider uhr) :
                 .Where(k => k.Status == Kursstatus.Veroeffentlicht).ToListAsync(abbruch))
             .Where(k => k.Veranstaltungen.Any(v => !v.Ausgefallen && v.Beginn.Year == jahr)).ToDictionary(k => k.Id);
         var arten = await db.Kursarten.AsNoTracking().ToDictionaryAsync(a => a.Id, a => a.Name, abbruch);
+        var integration = (await db.Kursarten.AsNoTracking().Where(a => a.Nutzungsart == Nutzungsart.Integrationskurs).Select(a => a.Id).ToListAsync(abbruch)).ToHashSet();
         var ids = kurse.Keys.ToList();
         var faelle = await db.Belegungen.IgnoreAutoIncludes().AsNoTracking()
             .Where(b => ids.Contains(b.KursId) && b.Status == Belegungsstatus.Angemeldet)
@@ -100,7 +101,7 @@ internal sealed class Auswertungsquelle(VibeVhsDbContext db, TimeProvider uhr) :
             .ToListAsync(abbruch);
         var geburtIds = faelle.Select(f => f.PersonId).Distinct().ToList();
         var geburtsdaten = (await db.Set<PersonMerkmal>().AsNoTracking()
-                .Where(m => m.Art == MerkmalArt.Geburtsdatum && m.ErsetztAm == null && geburtIds.Contains(EF.Property<Guid>(m, "PersonId")))
+                .Where(m => m.Art == MerkmalArt.Geburtsdatum && EF.Property<Guid?>(m, "ErsetztDurchVorgangId") == null && geburtIds.Contains(EF.Property<Guid>(m, "PersonId")))
                 .Select(m => new { PersonId = EF.Property<Guid>(m, "PersonId"), Version = m }).ToListAsync(abbruch))
             .GroupBy(x => x.PersonId).ToDictionary(g => g.Key, g => g.First().Version.AlsDatum());
 
@@ -123,7 +124,7 @@ internal sealed class Auswertungsquelle(VibeVhsDbContext db, TimeProvider uhr) :
             var altersgruppe = geburtsdaten.GetValueOrDefault(f.PersonId) is { } geb
                 ? Domain.Datenschutz.Statistik.Altersgruppe(geb, stichtag)
                 : Domain.Datenschutz.Statistik.AltersgruppeAusKohorte(f.AnonymisiertGeburtskohorte, stichtag);
-            return new Statistikfall(k.Fachbereich, arten.GetValueOrDefault(k.KursartId, ""), ue, geschlecht, altersgruppe, k.Nutzungsart == Nutzungsart.Integrationskurs);
+            return new Statistikfall(k.Fachbereich, arten.GetValueOrDefault(k.KursartId, ""), ue, geschlecht, altersgruppe, integration.Contains(k.KursartId));
         }).ToList();
     }
 

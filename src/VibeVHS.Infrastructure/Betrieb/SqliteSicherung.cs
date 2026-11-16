@@ -105,7 +105,7 @@ internal sealed class SqliteSicherung(VibeVhsDbContext db, IConfiguration konfig
 
     /// <summary>
     /// Prüfsumme vergleichen, Kopie in einen temporären Ordner „wiederherstellen“, öffnen, PRAGMA integrity_check,
-    /// Migrationsstand und Zeilenzahlen der Kerntabellen auslesen. Die laufende Datenbank bleibt unberührt.
+    /// Schemaversion und Zeilenzahlen der Kerntabellen auslesen. Die laufende Datenbank bleibt unberührt.
     /// </summary>
     private async Task<Sicherungseintrag> TestenAsync(Sicherungseintrag e, CancellationToken abbruch)
     {
@@ -131,18 +131,18 @@ internal sealed class SqliteSicherung(VibeVhsDbContext db, IConfiguration konfig
                 VibeVHS.Infrastructure.Datenbank.SqliteErweiterungen.Registrieren(c); // integrity_check prüft auch den Index mit Collation DIN5007_2
                 await c.OpenAsync(abbruch);
                 var integritaet = (await Skalar(c, "PRAGMA integrity_check", abbruch))?.ToString();
-                migration = (await Skalar(c, "SELECT MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId DESC LIMIT 1", abbruch))?.ToString();
+                migration = (await Skalar(c, "SELECT Version FROM Schemainfo LIMIT 1", abbruch))?.ToString();
                 var zaehlung = new List<string>();
                 foreach (var t in Kerntabellen)
                 {
                     zaehlung.Add($"{t} {await Skalar(c, $"SELECT COUNT(*) FROM \"{t}\"", abbruch)}");
                 }
 
-                var aktuell = (await db.Database.SqlQueryRaw<string>("SELECT MigrationId AS Value FROM __EFMigrationsHistory ORDER BY MigrationId DESC LIMIT 1").ToListAsync(abbruch))
+                var aktuell = (await db.Database.SqlQueryRaw<string>("SELECT Version AS Value FROM Schemainfo LIMIT 1").ToListAsync(abbruch))
                     .FirstOrDefault();
                 ok = integritaet == "ok" && migration == aktuell;
-                ergebnis = ok ? $"ok – Integrität geprüft, Migrationsstand {migration}, {string.Join(", ", zaehlung)}"
-                    : integritaet != "ok" ? $"Integritätsprüfung: {integritaet}" : $"Migrationsstand {migration} weicht vom laufenden Stand {aktuell} ab (ältere Version)";
+                ergebnis = ok ? $"ok – Integrität geprüft, Schemaversion {migration}, {string.Join(", ", zaehlung)}"
+                    : integritaet != "ok" ? $"Integritätsprüfung: {integritaet}" : $"Schemaversion {migration} weicht vom laufenden Stand {aktuell} ab (ältere Version)";
             }
             catch (SqliteException ex)
             {
