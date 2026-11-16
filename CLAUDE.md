@@ -60,6 +60,11 @@ Eigene Testinstanz: Port **5199**, eigene Datenbank (`ConnectionStrings__VibeVHS
 - **Gesperrte Aktionen erklären:** `BegruendeterButton` mit `Freigabe` (Nein + Grund als Tooltip), z. B. „Bitte zuerst …“.
 - **Folgeschritte anbieten:** nach jeder Aktion `NaechsteSchritte` (Hauptschritt markiert); Anker brauchen den Seitenpfad (`personen/{id}#…`).
 - **Bitemporal:** Stammdaten, Rollen, Merkmale, Adressen … nie überschreiben – „Änderung ab Datum“ vs. „Korrektur“, mit Grund; Datenhistorie zeigt alles.
+- **Stammdaten-Spalten (Grundreinigung 11/2026):** neue Personenangabe = versioniertes Merkmal (`MerkmalArt`, `AngabeAendern`), nie eine
+  überschreibbare Spalte. Spalten der Stammdatentabellen stehen mit Einstufung in `Infrastructure/Datenbank/Spalteneinstufung.cs`
+  (Führend / Cache / Anonymisierungsrest); Caches nie direkt schreiben – der Job „Personen-Zwischenstände“ (00:05, Startabgleich) schreibt
+  sie fort, Namenskopien folgen „Name zum Termindatum“. Statistik rechnet zur Laufzeit (Geschlecht zum Kursdatum, Alter zum 31.12.).
+  `ArchitekturTests` A/B/C sichern das ab.
 - **Zurück zur Liste:** Listen schreiben Filter in die URL, Detail-Links tragen `?zurueck=` (`Ruecksprung`), Detailseiten `ZurueckZurListe`; zuletzt geöffnete Zeile wird markiert.
 - **Datenschutz:** keine Personendaten in Logs/Protokoll (Pseudonyme `Pseudonym.Person(id)`), Exporte und Zugriffe auf Gesperrte protokollieren.
 - **Mehrsprachigkeit:** jede Mail an Kundinnen/Kunden mit Übersetzungslink, jeder Brief mit QR-Code „Translate this letter in your language“ (Dokumentarchiv mit SHA-256).
