@@ -93,7 +93,6 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(p => p.Sperrgrund).HasMaxLength(2000);
             b.Property(p => p.StatistikAltersgruppe).HasMaxLength(30);
             b.Property(p => p.StatistikGebiet).HasMaxLength(100);
-            b.Property(p => p.StatistikGeschlecht).HasMaxLength(30);
             Unterliste(b, p => p.Namen, "_namen");
             Unterliste(b, p => p.Merkmale, "_merkmale");
             Unterliste(b, p => p.Adressen, "_adressen");

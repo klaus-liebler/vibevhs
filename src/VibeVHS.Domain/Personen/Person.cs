@@ -38,7 +38,7 @@ public sealed class Person
 
     public DateTimeOffset AngelegtAm { get; private set; }
 
-    /// <summary>Akademischer Grad oder Titel, z. B. "Dr." (nicht Teil des versionierten Namens).</summary>
+    /// <summary>Lese-Cache des versionierten Merkmals <see cref="MerkmalArt.Titel"/> (Stand heute), z. B. „Dr.“ – nie direkt schreiben.</summary>
     public string? Titel { get; private set; }
 
     public Personenrolle Rollen { get; private set; }
@@ -124,7 +124,7 @@ public sealed class Person
             gueltigAm,
             bekanntAm,
             _namen.AlsStichtag(gueltigAm, bekanntAm),
-            Titel,
+            _merkmale.Any(m => m.Art == MerkmalArt.Titel) ? Leer(Merkmal(MerkmalArt.Titel)?.Inhalt) : Titel,
             Merkmal(MerkmalArt.Geburtsdatum)?.AlsDatum(),
             Merkmal(MerkmalArt.Sprache)?.Inhalt,
             Merkmal(MerkmalArt.Rollen)?.AlsRollen() ?? Personenrolle.Keine,
@@ -233,13 +233,24 @@ public sealed class Person
         return neu;
     }
 
+    /// <summary>
+    /// Titel bei der Ersterfassung (Anlegen, Import, Webshop): gilt ab Beginn des ersten Namens. Spätere Änderungen laufen bitemporal
+    /// über <see cref="AngabeAendern"/> mit <see cref="MerkmalArt.Titel"/> („Änderung ab Datum“ oder „Korrektur“).
+    /// </summary>
     public void TitelSetzen(string? titel)
     {
-        Titel = string.IsNullOrWhiteSpace(titel) ? null : titel.Trim();
-        if (_namen.AktuellerVerlauf().LastOrDefault() is { } n)
+        if (string.IsNullOrWhiteSpace(titel))
         {
-            Anzeigename = Titel is null ? n.Anzeige : $"{Titel} {n.Anzeige}";
+            return;
         }
+
+        if (_merkmale.Any(m => m.Art == MerkmalArt.Titel))
+        {
+            throw new InvalidOperationException("Der Titel ist schon erfasst – Änderungen bitte als „Änderung ab Datum“ oder „Korrektur“.");
+        }
+
+        var n = _namen.OrderBy(x => x.GueltigVon).First();
+        AngabeAendern(MerkmalArt.Titel, titel, n.GueltigVon, Erfassung.Erst(n.ErfasstAm, n.ErfasstVon), korrektur: false);
     }
 
     // ---------- Merkmale ----------
@@ -264,9 +275,9 @@ public sealed class Person
     /// <summary>Anrede, Geschlecht oder Geburtsname: Änderung ab Datum oder Korrektur der am Datum gültigen Angabe (leer = keine Angabe).</summary>
     public void AngabeAendern(MerkmalArt art, string? wert, DateOnly datum, Erfassung erfassung, bool korrektur)
     {
-        if (art is not (MerkmalArt.Anrede or MerkmalArt.Geschlecht or MerkmalArt.Geburtsname or MerkmalArt.Ansprache))
+        if (art is not (MerkmalArt.Anrede or MerkmalArt.Geschlecht or MerkmalArt.Geburtsname or MerkmalArt.Ansprache or MerkmalArt.Titel))
         {
-            throw new ArgumentException("Nur Anrede, Geschlecht, Geburtsname und Ansprache sind freie Angaben.", nameof(art));
+            throw new ArgumentException("Nur Anrede, Geschlecht, Geburtsname, Ansprache und Titel sind freie Angaben.", nameof(art));
         }
 
         var inhalt = wert?.Trim() ?? string.Empty;
@@ -282,11 +293,6 @@ public sealed class Person
         else
         {
             ZeitlicheHistorie.AendernAb(_merkmale, new PersonMerkmal(art, inhalt, datum, null, erfassung));
-        }
-
-        if (art == MerkmalArt.Geschlecht)
-        {
-            StatistikGeschlecht = inhalt.Length == 0 ? "nicht erfasst" : inhalt;
         }
 
         ZwischenstandAktualisieren(erfassung.Am);
@@ -487,8 +493,6 @@ public sealed class Person
 
     public string? StatistikGebiet { get; private set; }
 
-    public string StatistikGeschlecht { get; private set; } = "nicht erfasst";
-
     public bool IstAnonymisiert => Datenschutz == VibeVHS.Domain.Datenschutz.Datenschutzstatus.Anonymisiert;
 
     /// <summary>Archivieren: aus Standardlisten ausgeblendet, schreibgeschützt, rückgängig machbar.</summary>
@@ -587,9 +591,18 @@ public sealed class Person
             n.Anonymisieren("Gelöschte", $"Person {kurz}");
         }
 
+        // Geschlecht bleibt für die Statistik, aber ohne Verlauf: alle Versionen tragen den letzten Wert (eine Änderung wäre identifizierend).
+        var geschlecht = stand.Geschlecht;
         foreach (var m in _merkmale.Where(m => m.Art != MerkmalArt.Rollen))
         {
-            m.InhaltLeeren();
+            if (m.Art == MerkmalArt.Geschlecht && geschlecht is not null)
+            {
+                m.InhaltErsetzen(geschlecht);
+            }
+            else
+            {
+                m.InhaltLeeren();
+            }
         }
 
         foreach (var a in _adressen)
@@ -756,9 +769,9 @@ public sealed class Person
     /// </summary>
     public bool ZwischenstandFortschreiben(DateTimeOffset jetzt)
     {
-        var vorher = (Anzeigename, Sortierschluessel, Rollen, EMail, Sprache, Geburtsdatum, Wohnort);
+        var vorher = (Anzeigename, Sortierschluessel, Rollen, EMail, Sprache, Geburtsdatum, Wohnort, Titel);
         ZwischenstandAktualisieren(jetzt);
-        return vorher != (Anzeigename, Sortierschluessel, Rollen, EMail, Sprache, Geburtsdatum, Wohnort);
+        return vorher != (Anzeigename, Sortierschluessel, Rollen, EMail, Sprache, Geburtsdatum, Wohnort, Titel);
     }
 
     private void ZwischenstandAktualisieren(DateTimeOffset jetzt)
@@ -794,6 +807,11 @@ public sealed class Person
         {
             EMail = (stand.EMails.Where(e => e.Adresse != "–").FirstOrDefault(e => e.Bevorzugt) ?? stand.EMails.FirstOrDefault(e => e.Adresse != "–"))?.Adresse;
         }
+        if (_merkmale.Any(m => m.Art == MerkmalArt.Titel))
+        {
+            Titel = stand.Titel;
+        }
+
         var name = stand.Name ?? _namen.AktuellerVerlauf().LastOrDefault();
         if (name is not null)
         {

@@ -48,4 +48,32 @@ public class BriefanredeTests
         Ansprache.Lesen("Quatsch").ShouldBeNull();
         new Ansprache(true, Anredestil.Informell).Text("Sie haben", "du hast").ShouldBe("du hast");
     }
+
+    [Fact]
+    public void Titel_ist_versioniert_Promotion_ab_Datum_und_Korrektur()
+    {
+        var jetzt = new DateTimeOffset(2026, 11, 16, 10, 0, 0, TimeSpan.FromHours(1));
+        var p = Person.Anlegen("Eva", "Muster", new DateOnly(2020, 1, 1), jetzt.AddYears(-5));
+        p.AngabeAendern(MerkmalArt.Titel, "Dr.", new DateOnly(2026, 12, 1), VibeVHS.Domain.Gemeinsam.Erfassung.Aenderung(jetzt, "Promotion"), korrektur: false);
+        p.StandAm(new DateOnly(2026, 11, 30), jetzt).Titel.ShouldBeNull();
+        p.StandAm(new DateOnly(2026, 12, 1), jetzt).Titel.ShouldBe("Dr.");
+        p.Titel.ShouldBeNull(); // Cache: heute noch ohne Titel, ab 01.12. schreibt der Fortschreib-Job ihn nach
+        p.ZwischenstandFortschreiben(jetzt.AddDays(20)).ShouldBeTrue();
+        (p.Titel, p.Anzeigename).ShouldBe(("Dr.", "Dr. Eva Muster"));
+        Should.Throw<InvalidOperationException>(() => p.TitelSetzen("Prof."));
+    }
+
+    [Fact]
+    public void Anonymisierung_behaelt_nur_das_letzte_Geschlecht_ohne_Verlauf()
+    {
+        var jetzt = new DateTimeOffset(2026, 11, 16, 10, 0, 0, TimeSpan.FromHours(1));
+        var p = Person.Anlegen("Kim", "Muster", new DateOnly(2020, 1, 1), jetzt.AddYears(-5));
+        p.TitelSetzen("Dr.");
+        p.AngabeAendern(MerkmalArt.Geschlecht, "männlich", new DateOnly(2020, 1, 1), VibeVHS.Domain.Gemeinsam.Erfassung.Erst(jetzt.AddYears(-5)), korrektur: false);
+        p.AngabeAendern(MerkmalArt.Geschlecht, "weiblich", new DateOnly(2025, 1, 1), VibeVHS.Domain.Gemeinsam.Erfassung.Aenderung(jetzt.AddYears(-2), "x"), korrektur: false);
+        p.Anonymisieren(jetzt);
+        p.Merkmale.Where(m => m.Art == MerkmalArt.Geschlecht).Select(m => m.Inhalt).Distinct().ShouldBe(["weiblich"]);
+        p.Merkmale.Single(m => m.Art == MerkmalArt.Titel).Inhalt.ShouldBeEmpty();
+        p.Titel.ShouldBeNull();
+    }
 }

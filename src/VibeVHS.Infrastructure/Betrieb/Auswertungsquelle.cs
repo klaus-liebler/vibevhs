@@ -4,6 +4,8 @@ using VibeVHS.Domain.Anmeldung;
 using VibeVHS.Domain.Aufgaben;
 using VibeVHS.Domain.Durchfuehrung;
 using VibeVHS.Domain.Finanzen;
+using VibeVHS.Domain.Gemeinsam;
+using VibeVHS.Domain.Personen;
 using VibeVHS.Domain.Programm;
 using VibeVHS.Infrastructure.Datenbank;
 
@@ -94,15 +96,29 @@ internal sealed class Auswertungsquelle(VibeVhsDbContext db, TimeProvider uhr) :
         var ids = kurse.Keys.ToList();
         var faelle = await db.Belegungen.IgnoreAutoIncludes().AsNoTracking()
             .Where(b => ids.Contains(b.KursId) && b.Status == Belegungsstatus.Angemeldet)
-            .Join(db.Personen.AsNoTracking(), b => b.PersonId, p => p.Id, (b, p) => new { b.KursId, p.StatistikGeschlecht, p.Geburtsdatum, p.StatistikAltersgruppe })
+            .Join(db.Personen.AsNoTracking(), b => b.PersonId, p => p.Id, (b, p) => new { b.KursId, b.PersonId, p.Geburtsdatum, p.StatistikAltersgruppe })
             .ToListAsync(abbruch);
-        var heute = DateOnly.FromDateTime(uhr.GetLocalNow().Date);
+
+        // Geschlecht zum Kursdatum aus dem versionierten Merkmal (nicht der heutige Stand); Alter zum Stichtag des Berichtsjahrs (31.12.).
+        var personIds = faelle.Select(f => f.PersonId).Distinct().ToList();
+        var geschlechter = (await db.Set<PersonMerkmal>().AsNoTracking()
+                .Where(m => m.Art == MerkmalArt.Geschlecht && personIds.Contains(EF.Property<Guid>(m, "PersonId")))
+                .Select(m => new { PersonId = EF.Property<Guid>(m, "PersonId"), Version = m })
+                .ToListAsync(abbruch))
+            .ToLookup(x => x.PersonId, x => x.Version);
+        var jetzt = uhr.GetLocalNow();
+        var stichtag = new DateOnly(jahr, 12, 31);
         return faelle.Select(f =>
         {
             var k = kurse[f.KursId];
-            var ue = Math.Round(k.Veranstaltungen.Where(v => !v.Ausgefallen && v.Beginn.Year == jahr).Sum(v => (decimal)(v.Ende - v.Beginn).TotalMinutes) / 45m, 2);
-            return new Statistikfall(k.Fachbereich, arten.GetValueOrDefault(k.KursartId, ""), ue, f.StatistikGeschlecht,
-                f.StatistikAltersgruppe ?? Domain.Datenschutz.Statistik.Altersgruppe(f.Geburtsdatum, heute), k.Nutzungsart == Nutzungsart.Integrationskurs);
+            var termine = k.Veranstaltungen.Where(v => !v.Ausgefallen && v.Beginn.Year == jahr).ToList();
+            var ue = Math.Round(termine.Sum(v => (decimal)(v.Ende - v.Beginn).TotalMinutes) / 45m, 2);
+            var kursdatum = DateOnly.FromDateTime(termine.Min(v => v.Beginn));
+            var geschlecht = geschlechter[f.PersonId].AlsStichtag(kursdatum, jetzt)?.Inhalt is { Length: > 0 } g ? g : "nicht erfasst";
+            var altersgruppe = f.Geburtsdatum is { } geb
+                ? Domain.Datenschutz.Statistik.Altersgruppe(geb, stichtag)
+                : f.StatistikAltersgruppe ?? Domain.Datenschutz.Statistik.Altersgruppe(null, stichtag);
+            return new Statistikfall(k.Fachbereich, arten.GetValueOrDefault(k.KursartId, ""), ue, geschlecht, altersgruppe, k.Nutzungsart == Nutzungsart.Integrationskurs);
         }).ToList();
     }
 

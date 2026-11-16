@@ -84,14 +84,9 @@ public sealed class Stammdatenaenderung(IPersonenSpeicher speicher, IAuditProtok
             geaendert.Add("Name");
         }
 
-        if (Anders(alt.Titel, neu.Titel))
-        {
-            person.TitelSetzen(neu.Titel);
-            geaendert.Add("Titel");
-        }
-
         foreach (var (art, a, n, feld) in new[]
                  {
+                     (MerkmalArt.Titel, alt.Titel, neu.Titel, "Titel"),
                      (MerkmalArt.Anrede, alt.Anrede, neu.Anrede, "Anrede"),
                      (MerkmalArt.Geschlecht, alt.Geschlecht, neu.Geschlecht, "Geschlecht"),
                      (MerkmalArt.Geburtsname, alt.Geburtsname, neu.Geburtsname, "Geburtsname"),

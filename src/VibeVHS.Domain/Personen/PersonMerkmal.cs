@@ -15,6 +15,9 @@ public enum MerkmalArt
 
     /// <summary>Persönliche Ansprache (Du/Sie, förmlich/freundlich) in Oberfläche und Mails, siehe <see cref="Personen.Ansprache"/>.</summary>
     Ansprache,
+
+    /// <summary>Akademischer Grad oder Titel („Dr.“) – zeitlich versioniert (z. B. Promotion ab einem Datum).</summary>
+    Titel,
 }
 
 /// <summary>
@@ -71,6 +74,8 @@ public sealed class PersonMerkmal : BitemporaleVersion<PersonMerkmal>
     };
 
     internal void InhaltLeeren() => Inhalt = string.Empty;
+
+    internal void InhaltErsetzen(string inhalt) => Inhalt = inhalt;
 
     public DateOnly? AlsDatum() => DateOnly.TryParseExact(Inhalt, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
 

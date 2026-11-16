@@ -73,6 +73,30 @@ public class BetriebTests
     }
 
     [Fact]
+    public async Task Statistik_nimmt_Geschlecht_zum_Kursdatum_und_Alter_zum_Jahresende()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var t = await TestDatenbank.ErzeugenAsync();
+        await DatenAsync(t, personen: 6);
+        var jetzt = t.Uhr.GetLocalNow();
+        await using (var db = t.NeuerKontext())
+        {
+            // V1 (geb. 01.03.1955): Geschlecht „männlich“ zum Kursbeginn (02.11.2026), ab 01.12.2026 „weiblich“ – die Statistik 2026 zählt „männlich“.
+            var p = await db.Personen.SingleAsync(x => x.Anzeigename == "V1 N1", ct);
+            p.AngabeAendern(MerkmalArt.Geschlecht, "männlich", new DateOnly(2025, 1, 1), Erfassung.Erst(jetzt), korrektur: false);
+            p.AngabeAendern(MerkmalArt.Geschlecht, "weiblich", new DateOnly(2026, 12, 1), Erfassung.Aenderung(jetzt, "Personenstand geändert"), korrektur: false);
+            await db.SaveChangesAsync(ct);
+        }
+
+        await using var db2 = t.NeuerKontext();
+        var faelle = await new Auswertungsquelle(db2, t.Uhr).StatistikfaelleAsync(2026, ct);
+        faelle.Count(f => f.Geschlecht == "männlich").ShouldBe(2); // in beiden Kursen (FB 5 und 8)
+        faelle.ShouldNotContain(f => f.Geschlecht == "weiblich");
+        // Altersgruppe zum 31.12.2026 (nicht „heute“): V1 ist dann 71.
+        faelle.Select(f => f.Altersgruppe).ShouldContain(VibeVHS.Domain.Datenschutz.Statistik.Altersgruppe(new DateOnly(1955, 3, 1), new DateOnly(2026, 12, 31)));
+    }
+
+    [Fact]
     public async Task Auswertungen_Fachbereichsfilter_Statistik_und_Export()
     {
         var ct = TestContext.Current.CancellationToken;
