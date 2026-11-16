@@ -87,8 +87,9 @@ public sealed class StartdatenLader(VibeVhsDbContext db, IAuditProtokoll protoko
             }
 
             // Die Verknüpfung Konto ↔ Person steht nur am Konto (Benutzerkonten.PersonId); ein neues Konto bekommt eine neue Person.
-            var (titel, vorname, nachname) = NameZerlegen(b.Name);
-            var person = Person.Anlegen(vorname, nachname, heute, jetzt, von: "Startdaten");
+            var (titel, vornameRoh, nachnameRoh) = NameZerlegen(b.Name);
+            var (vorname, vorsatz, nachname, zusatz) = Namensvorsatz.Zerlegen(vornameRoh, nachnameRoh);
+            var person = Person.Anlegen(vorname, nachname, heute, jetzt, von: "Startdaten", vorsatz: vorsatz, zusatz: zusatz);
             person.TitelSetzen(titel);
             person.AlsMitarbeitendeVerknuepfen(heute, Erfassung.Erst(jetzt, "Startdaten", "Benutzerkonto aus den Startdaten"));
             db.Personen.Add(person);

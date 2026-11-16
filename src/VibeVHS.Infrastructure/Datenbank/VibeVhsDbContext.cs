@@ -107,6 +107,8 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
         {
             b.Property(n => n.Vorname).HasMaxLength(200);
             b.Property(n => n.Nachname).HasMaxLength(200);
+            b.Property(n => n.Vorsatz).HasMaxLength(30);
+            b.Property(n => n.Zusatz).HasMaxLength(20);
             b.HasIndex(n => n.Nachname);
         });
         Version<PersonMerkmal>(modelBuilder, "PersonMerkmale", b => b.Property(m => m.Inhalt).HasMaxLength(200));

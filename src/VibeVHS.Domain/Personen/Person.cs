@@ -89,11 +89,11 @@ public sealed class Person
             .Concat(_organisationen).Concat(_vollmachten).Concat(_einwilligungen).Concat(_qualifikationen);
 
     public static Person Anlegen(string vorname, string nachname, DateOnly nameGueltigAb, DateTimeOffset jetzt,
-        DateOnly? geburtsdatum = null, string? eMail = null, string sprache = "de", string? von = null)
+        DateOnly? geburtsdatum = null, string? eMail = null, string sprache = "de", string? von = null, string? vorsatz = null, string? zusatz = null)
     {
         var person = new Person { Id = Ids.Neu(), AngelegtAm = jetzt };
         var erst = Erfassung.Erst(jetzt, von);
-        person._namen.Add(new PersonName(vorname, nachname, nameGueltigAb, null, erst));
+        person._namen.Add(new PersonName(vorname, nachname, nameGueltigAb, null, erst, vorsatz, zusatz));
         person._merkmale.Add(new PersonMerkmal(MerkmalArt.Sprache, NormierteSprache(sprache), nameGueltigAb, null, erst));
         if (geburtsdatum is { } g)
         {
@@ -213,19 +213,21 @@ public sealed class Person
     // ---------- Name ----------
 
     /// <summary>Namensänderung ab einem Datum (z. B. Heirat). Ältere Dokumente behalten den alten Namen.</summary>
-    public PersonName NameAendernAb(string vorname, string nachname, DateOnly ab, string grund, DateTimeOffset jetzt, string? von = null)
+    public PersonName NameAendernAb(string vorname, string nachname, DateOnly ab, string grund, DateTimeOffset jetzt, string? von = null,
+        string? vorsatz = null, string? zusatz = null)
     {
-        var neu = new PersonName(vorname, nachname, ab, null, Erfassung.Aenderung(jetzt, grund, von));
+        var neu = new PersonName(vorname, nachname, ab, null, Erfassung.Aenderung(jetzt, grund, von), vorsatz, zusatz);
         ZeitlicheHistorie.AendernAb(_namen, neu);
         ZwischenstandAktualisieren(jetzt);
         return neu;
     }
 
     /// <summary>Korrektur eines falsch erfassten Namens für dessen gesamten Gültigkeitszeitraum.</summary>
-    public PersonName NameKorrigieren(string vorname, string nachname, DateOnly betroffenAm, string grund, DateTimeOffset jetzt, string? von = null)
+    public PersonName NameKorrigieren(string vorname, string nachname, DateOnly betroffenAm, string grund, DateTimeOffset jetzt, string? von = null,
+        string? vorsatz = null, string? zusatz = null)
     {
         var neu = ZeitlicheHistorie.Korrigieren(_namen, betroffenAm,
-            (gv, gb) => new PersonName(vorname, nachname, gv, gb, Erfassung.Korrektur(jetzt, grund, von)), jetzt);
+            (gv, gb) => new PersonName(vorname, nachname, gv, gb, Erfassung.Korrektur(jetzt, grund, von), vorsatz, zusatz), jetzt);
         ZwischenstandAktualisieren(jetzt);
         return neu;
     }
@@ -809,7 +811,7 @@ public sealed class Person
         if (name is not null)
         {
             Anzeigename = string.IsNullOrEmpty(Titel) ? name.Anzeige : $"{Titel} {name.Anzeige}";
-            Sortiername = Suchtext.Normalisieren($"{name.Nachname} {name.Vorname}");
+            Sortiername = Suchtext.Normalisieren(name.Sortierform);
             Sortierschluessel = $"{Sortiername}|{Id:N}";
         }
 
@@ -854,7 +856,7 @@ public sealed record PersonenStand(
     public string Briefanrede(Anredestil stil = Anredestil.Foermlich)
         => Name is null
             ? "Guten Tag"
-            : Personen.Briefanrede.Bilden(Anrede, Titel, Name.Vorname, Name.Nachname, Ansprache?.Stil ?? stil, Ansprache?.Du ?? false);
+            : Personen.Briefanrede.Bilden(Anrede, Titel, Name.Vorname, Name.NachnameMitVorsatz, Ansprache?.Stil ?? stil, Ansprache?.Du ?? false);
 
     public Postadresse? Aufenthaltsort => Adressen.FirstOrDefault(a => a.AdressId == AufenthaltsortId);
 

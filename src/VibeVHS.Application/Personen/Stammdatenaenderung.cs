@@ -21,7 +21,9 @@ public sealed record StammdatenEingabe(
     string? Postleitzahl,
     string? Ort,
     string? Telefon,
-    string? EMail)
+    string? EMail,
+    string? Vorsatz = null,
+    string? Zusatz = null)
 {
     /// <summary>Die Anschrift, die der Dialog zeigt und ändert: üblicher Aufenthaltsort, sonst Briefanschrift, sonst die erste.</summary>
     public static Postadresse? Hauptanschrift(PersonenStand s) => s.Aufenthaltsort ?? s.BriefAn ?? s.Adressen.FirstOrDefault();
@@ -30,7 +32,8 @@ public sealed record StammdatenEingabe(
         s.Anrede, s.Titel, s.Name?.Vorname ?? "", s.Name?.Nachname ?? "", s.Geburtsname, s.Geburtsdatum, s.Geschlecht, s.Sprache,
         Hauptanschrift(s)?.Zusatz, Hauptanschrift(s)?.Strasse, Hauptanschrift(s)?.Postleitzahl, Hauptanschrift(s)?.Ort,
         (s.Rufnummern.FirstOrDefault(r => r.Bevorzugt) ?? s.Rufnummern.FirstOrDefault())?.Nummer,
-        (s.EMails.FirstOrDefault(e => e.Bevorzugt) ?? s.EMails.FirstOrDefault())?.Adresse);
+        (s.EMails.FirstOrDefault(e => e.Bevorzugt) ?? s.EMails.FirstOrDefault())?.Adresse,
+        s.Name?.Vorsatz ?? "", s.Name?.Zusatz ?? "");
 }
 
 /// <param name="Geaendert">Bezeichnungen der geänderten Felder (ohne Werte, für Meldung und Protokoll).</param>
@@ -75,12 +78,12 @@ public sealed class Stammdatenaenderung(IPersonenSpeicher speicher, IAuditProtok
         var geaendert = new List<string>();
         static bool Anders(string? a, string? b) => !string.Equals((a ?? "").Trim(), (b ?? "").Trim(), StringComparison.Ordinal);
 
-        var nameNeu = Anders(alt.Vorname, neu.Vorname) || Anders(alt.Nachname, neu.Nachname);
+        var nameNeu = Anders(alt.Vorname, neu.Vorname) || Anders(alt.Nachname, neu.Nachname) || Anders(alt.Vorsatz, neu.Vorsatz) || Anders(alt.Zusatz, neu.Zusatz);
         if (nameNeu)
         {
             _ = korrektur
-                ? person.NameKorrigieren((neu.Vorname ?? "").Trim(), neu.Nachname.Trim(), datum, g, jetzt, von)
-                : person.NameAendernAb((neu.Vorname ?? "").Trim(), neu.Nachname.Trim(), datum, g, jetzt, von);
+                ? person.NameKorrigieren((neu.Vorname ?? "").Trim(), neu.Nachname.Trim(), datum, g, jetzt, von, neu.Vorsatz, neu.Zusatz)
+                : person.NameAendernAb((neu.Vorname ?? "").Trim(), neu.Nachname.Trim(), datum, g, jetzt, von, neu.Vorsatz, neu.Zusatz);
             geaendert.Add("Name");
         }
 

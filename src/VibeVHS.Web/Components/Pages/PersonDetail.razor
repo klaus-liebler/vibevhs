@@ -359,6 +359,8 @@ else if (dubletten.Count > 0)
         <RadzenFormField Text="Anrede" Variant="Variant.Outlined"><RadzenDropDown TValue="string" @bind-Value="sdAnrede" Data="@VibeVHS.Application.Personen.Stammdatenaenderung.Anreden" AllowClear="true" /></RadzenFormField>
         <RadzenFormField Text="Titel" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="sdTitel" Placeholder="z. B. Dr." /></RadzenFormField>
         <RadzenFormField Text="@(sdNurEinName ? "Vorname (keiner)" : "Vorname *")" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="neuVorname" Disabled="@sdNurEinName" /></RadzenFormField>
+        <RadzenFormField Text="Vorsatz" Variant="Variant.Outlined" Style="max-width:8em"><RadzenTextBox @bind-Value="sdVorsatz" Placeholder="z. B. von" /></RadzenFormField>
+        <RadzenFormField Text="Namenszusatz" Variant="Variant.Outlined" Style="max-width:8em"><RadzenTextBox @bind-Value="sdNamenszusatz" Placeholder="z. B. jun." /></RadzenFormField>
         <label class="vhs-small" style="align-self:center" title="Der einzige Name laut Ausweis steht im Feld Nachname.">
             <input type="checkbox" @bind="sdNurEinName" @bind:after="@(() => { if (sdNurEinName) { neuVorname = null; } })" /> Nur ein Name laut Ausweis
         </label>
@@ -717,6 +719,7 @@ else if (dubletten.Count > 0)
     private bool istKorrektur, speichert, nameOffen;
     private string? neuVorname, neuNachname, grund, fehler;
     private bool sdNurEinName;
+    private string? sdVorsatz, sdNamenszusatz;
     private string? sdAnrede, sdTitel, sdGeburtsname, sdGeschlecht, sdSprache, sdZusatz, sdStrasse, sdPlz, sdOrt, sdTelefon, sdEMail;
     private DateOnly? sdGeburtsdatum;
     private bool sdVorbelegt;
@@ -733,6 +736,7 @@ else if (dubletten.Count > 0)
         (sdAnrede, sdTitel, neuVorname, neuNachname, sdGeburtsname, sdGeburtsdatum, sdGeschlecht, sdSprache) =
             (a.Anrede, a.Titel, a.Vorname, a.Nachname, a.Geburtsname, a.Geburtsdatum, a.Geschlecht, a.Sprache ?? "de");
         sdNurEinName = string.IsNullOrEmpty(a.Vorname);
+        (sdVorsatz, sdNamenszusatz) = (a.Vorsatz, a.Zusatz);
         (sdZusatz, sdStrasse, sdPlz, sdOrt, sdTelefon, sdEMail) = (a.AdressZusatz, a.Strasse, a.Postleitzahl, a.Ort, a.Telefon, a.EMail);
         sdVorbelegt = true;
         fehler = null;
@@ -831,7 +835,7 @@ else if (dubletten.Count > 0)
         try
         {
             var eingabe = new VibeVHS.Application.Personen.StammdatenEingabe(sdAnrede, sdTitel, sdNurEinName ? "" : neuVorname!, neuNachname!, sdGeburtsname, sdGeburtsdatum, sdGeschlecht,
-                sdSprache, sdZusatz, sdStrasse, sdPlz, sdOrt, sdTelefon, sdEMail);
+                sdSprache, sdZusatz, sdStrasse, sdPlz, sdOrt, sdTelefon, sdEMail, sdVorsatz, sdNamenszusatz);
             var ergebnis = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Personen.Stammdatenaenderung>()
                 .AendernAsync(Id, eingabe, istKorrektur, aenderungsdatum!.Value, grund!));
             Hinweise.Notify(NotificationSeverity.Success, "Gespeichert",
