@@ -140,7 +140,8 @@ public sealed class Person
             _qualifikationen.AlleAmStichtag(gueltigAm, bekanntAm),
             Leer(Merkmal(MerkmalArt.Anrede)?.Inhalt),
             Leer(Merkmal(MerkmalArt.Geschlecht)?.Inhalt),
-            Leer(Merkmal(MerkmalArt.Geburtsname)?.Inhalt));
+            Leer(Merkmal(MerkmalArt.Geburtsname)?.Inhalt),
+            Personen.Ansprache.Lesen(Merkmal(MerkmalArt.Ansprache)?.Inhalt));
 
         static string? Leer(string? s) => string.IsNullOrWhiteSpace(s) ? null : s;
     }
@@ -263,9 +264,9 @@ public sealed class Person
     /// <summary>Anrede, Geschlecht oder Geburtsname: Änderung ab Datum oder Korrektur der am Datum gültigen Angabe (leer = keine Angabe).</summary>
     public void AngabeAendern(MerkmalArt art, string? wert, DateOnly datum, Erfassung erfassung, bool korrektur)
     {
-        if (art is not (MerkmalArt.Anrede or MerkmalArt.Geschlecht or MerkmalArt.Geburtsname))
+        if (art is not (MerkmalArt.Anrede or MerkmalArt.Geschlecht or MerkmalArt.Geburtsname or MerkmalArt.Ansprache))
         {
-            throw new ArgumentException("Nur Anrede, Geschlecht und Geburtsname sind freie Angaben.", nameof(art));
+            throw new ArgumentException("Nur Anrede, Geschlecht, Geburtsname und Ansprache sind freie Angaben.", nameof(art));
         }
 
         var inhalt = wert?.Trim() ?? string.Empty;
@@ -814,7 +815,8 @@ public sealed record PersonenStand(
     IReadOnlyList<PersonQualifikation>? Qualifikationen = null,
     string? Anrede = null,
     string? Geschlecht = null,
-    string? Geburtsname = null)
+    string? Geburtsname = null,
+    Ansprache? Ansprache = null)
 {
     /// <summary>Liegt für Kanal und Zweck eine Einwilligung vor? Ohne Angabe: nein.</summary>
     public bool Erlaubt(Kontaktkanal kanal, Kontaktzweck zweck)
@@ -822,9 +824,14 @@ public sealed record PersonenStand(
 
     public string NameMitTitel => Name is null ? "(unbekannt)" : string.IsNullOrEmpty(Titel) ? Name.Anzeige : $"{Titel} {Name.Anzeige}";
 
-    /// <summary>Briefanrede ohne Komma, z. B. „Sehr geehrte Frau Dr. Muster“.</summary>
+    /// <summary>
+    /// Briefanrede ohne Komma, z. B. „Sehr geehrte Frau Dr. Muster“. Eine persönliche <see cref="Ansprache"/> der Person geht dem Stil der
+    /// Vorlage vor („Hallo Kim“ bei Du).
+    /// </summary>
     public string Briefanrede(Anredestil stil = Anredestil.Foermlich)
-        => Name is null ? "Guten Tag" : Personen.Briefanrede.Bilden(Anrede, Titel, Name.Vorname, Name.Nachname, stil);
+        => Name is null
+            ? "Guten Tag"
+            : Personen.Briefanrede.Bilden(Anrede, Titel, Name.Vorname, Name.Nachname, Ansprache?.Stil ?? stil, Ansprache?.Du ?? false);
 
     public Postadresse? Aufenthaltsort => Adressen.FirstOrDefault(a => a.AdressId == AufenthaltsortId);
 

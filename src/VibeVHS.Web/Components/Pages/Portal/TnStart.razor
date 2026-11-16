@@ -15,11 +15,11 @@
 else
 {
     <h1 style="font-size:22px;margin:0">Meine nächsten Termine</h1>
-    <p class="vhs-small vhs-muted" style="margin:0">Die nächsten sechs Wochen. Wenn sich Raum oder Zeit ändern, sehen Sie es hier in Orange.</p>
+    <p class="vhs-small vhs-muted" style="margin:0">@A.Text("Die nächsten sechs Wochen. Wenn sich Raum oder Zeit ändern, sehen Sie es hier in Orange.", "Die nächsten sechs Wochen. Wenn sich Raum oder Zeit ändern, siehst du es hier in Orange.")</p>
 
     <section class="vhs-portal-karte">
         <h2 style="font-size:17px">Einchecken im Kurs</h2>
-        <p class="vhs-small">So melden Sie sich im Kursraum an: Öffnen Sie Ihren Check-in-Link und scannen Sie den QR-Code am Aushang. Oder zeigen Sie der Kursleitung Ihren Ausweis.</p>
+        <p class="vhs-small">@A.Text("So melden Sie sich im Kursraum an: Öffnen Sie Ihren Check-in-Link und scannen Sie den QR-Code am Aushang. Oder zeigen Sie der Kursleitung Ihren Ausweis.", "So meldest du dich im Kursraum an: Öffne deinen Check-in-Link und scanne den QR-Code am Aushang. Oder zeig der Kursleitung deinen Ausweis.")</p>
         <div class="vhs-row">
             <form method="post" @formname="checkin" @onsubmit="CheckinAsync"><AntiforgeryToken /><button type="submit" class="vhs-btn">📷 Check-in-Link öffnen</button></form>
             <form method="post" @formname="ausweis" @onsubmit="AusweisAsync"><AntiforgeryToken /><button type="submit" class="vhs-btn">🪪 Mein Ausweis</button></form>
@@ -28,7 +28,7 @@ else
         {
             <div style="text-align:center;margin-top:8px">
                 <img src="@($"data:image/png;base64,{Convert.ToBase64String(ausweisPng)}")" alt="QR-Code Ihres Teilnehmerausweises" style="width:220px;height:220px" />
-                <p class="vhs-small">Speichern Sie das Bild auf Ihrem Handy (lange drücken) oder laden Sie das PDF.</p>
+                <p class="vhs-small">@A.Text("Speichern Sie das Bild auf Ihrem Handy (lange drücken) oder laden Sie das PDF.", "Speichere das Bild auf deinem Handy (lange drücken) oder lade das PDF.")</p>
                 <a class="vhs-btn" href="@($"portal/teilnehmende/dokumente/{ausweisDokument}.pdf")">Ausweis als PDF</a>
             </div>
         }
@@ -36,7 +36,7 @@ else
 
     @if (termine.Count == 0)
     {
-        <div class="vhs-portal-karte">In den nächsten Wochen haben Sie keine Termine. <a href="shop/kurs.html">Kurse ansehen</a></div>
+        <div class="vhs-portal-karte">@A.Text("In den nächsten Wochen haben Sie keine Termine.", "In den nächsten Wochen hast du keine Termine.") <a href="shop/kurs.html">Kurse ansehen</a></div>
     }
     @foreach (var t in termine)
     {
@@ -50,7 +50,7 @@ else
             <div>📍 @t.Orte</div>
             @if (t.Wegbeschreibung is not null)
             {
-                <details><summary>So finden Sie hin</summary><p class="vhs-small" style="white-space:pre-line">@t.Wegbeschreibung</p></details>
+                <details><summary>@A.Text("So finden Sie hin", "So findest du hin")</summary><p class="vhs-small" style="white-space:pre-line">@t.Wegbeschreibung</p></details>
             }
             <a class="vhs-btn" style="margin-top:6px" href="@($"portal/teilnehmende/termin/{t.VeranstaltungId}.ics")" download>In meinen Kalender</a>
         </article>
@@ -59,6 +59,8 @@ else
 }
 
 @code {
+    [CascadingParameter] private VibeVHS.Domain.Personen.Ansprache A { get; set; } = VibeVHS.Domain.Personen.Ansprache.Standard;
+
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
 

@@ -12,6 +12,9 @@ public enum MerkmalArt
     Anrede,
     Geschlecht,
     Geburtsname,
+
+    /// <summary>Persönliche Ansprache (Du/Sie, förmlich/freundlich) in Oberfläche und Mails, siehe <see cref="Personen.Ansprache"/>.</summary>
+    Ansprache,
 }
 
 /// <summary>

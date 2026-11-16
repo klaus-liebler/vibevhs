@@ -27,4 +27,25 @@ public class BriefanredeTests
         p.Briefanrede(jetzt).ShouldBe("Sehr geehrte Frau Dr. Muster");
         p.Briefanrede(jetzt, Anredestil.Informell).ShouldBe("Guten Tag Frau Dr. Muster");
     }
+
+    [Theory]
+    [InlineData("Frau", Anredestil.Informell, "Hallo Kim")]
+    [InlineData("Frau", Anredestil.Foermlich, "Liebe Kim")]
+    [InlineData("Herr", Anredestil.Foermlich, "Lieber Kim")]
+    [InlineData(null, Anredestil.Foermlich, "Hallo Kim")]
+    public void Du_spricht_mit_Vornamen_an(string? anrede, Anredestil stil, string erwartet)
+        => Briefanrede.Bilden(anrede, "Dr.", "Kim", "Muster", stil, du: true).ShouldBe(erwartet);
+
+    [Fact]
+    public void Ansprache_wird_gelesen_und_geschrieben()
+    {
+        foreach (var a in new[] { new Ansprache(false, Anredestil.Foermlich), new Ansprache(true, Anredestil.Informell) })
+        {
+            Ansprache.Lesen(a.Speicherwert).ShouldBe(a);
+        }
+
+        Ansprache.Lesen(null).ShouldBeNull();
+        Ansprache.Lesen("Quatsch").ShouldBeNull();
+        new Ansprache(true, Anredestil.Informell).Text("Sie haben", "du hast").ShouldBe("du hast");
+    }
 }

@@ -16,7 +16,7 @@
 
 <div class="vhs-head">
     <div>
-        <h1>Guten Tag@(Anrede is null ? "" : ", " + Anrede)</h1>
+        <h1>@(Anrede ?? "Guten Tag")</h1>
         <p class="vhs-sub">@Uhr.GetLocalNow().ToString("dddd, d. MMMM yyyy")@if (einrichtung is not null) { <span> · @einrichtung.Name · @einrichtung.OrteAnzeige</span> }</p>
         @if (eigeneFachbereiche.Count > 0)
         {
@@ -179,7 +179,10 @@
         if (Anmeldung is not null)
         {
             var zustand = await Anmeldung;
-            Anrede = zustand.User.FindFirst(VibeVHS.Adapters.Mocks.MockAnmeldung.AnredeClaim)?.Value;
+            if (zustand.User.Identity?.IsAuthenticated == true)
+            {
+                Anrede = (await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Personen.AnspracheDienst>().MeineAsync())).Begruessung;
+            }
         }
 
         benutzer = await Vorgang.BenutzerAsync();

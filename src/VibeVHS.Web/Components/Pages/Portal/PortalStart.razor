@@ -18,7 +18,7 @@ else
         <a href="portal/dozierende/daten#kalender">Alle Termine im eigenen Kalender abonnieren</a></p>
     @if (termine.Count == 0)
     {
-        <div class="vhs-portal-karte">In den nächsten vier Wochen haben Sie keine Termine.</div>
+        <div class="vhs-portal-karte">@A.Text("In den nächsten vier Wochen haben Sie keine Termine.", "In den nächsten vier Wochen hast du keine Termine.")</div>
     }
     @foreach (var t in termine)
     {
@@ -43,6 +43,8 @@ else
 }
 
 @code {
+    [CascadingParameter] private VibeVHS.Domain.Personen.Ansprache A { get; set; } = VibeVHS.Domain.Personen.Ansprache.Standard;
+
     private IReadOnlyList<PortalTermin> termine = [];
     private string? fehler;
 

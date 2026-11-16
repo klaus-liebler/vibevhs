@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Navigation
+@inject IServiceScopeFactory Bereiche
 
 @* Schlankes Layout des Dozierendenportals: mobil zuerst, statisch gerendert, große Ziele, keine Seitenleiste. *@
 
@@ -10,7 +11,7 @@
         <span class="vhs-small vhs-muted" style="flex:1">Volkshochschule</span>
         <AuthorizeView>
             <Authorized>
-                <span class="vhs-small">@context.User.Identity?.Name</span>
+                <span class="vhs-small" data-testid="portal-begruessung">@(begruessung ?? context.User.Identity?.Name)</span>
                 @if (VibeVHS.Adapters.Mocks.MockAnmeldung.AlsBenutzer(context.User) is { } ich
                      && ich.Rollen.Contains(VibeVHS.Application.Sicherheit.Rolle.Teilnehmende) && ich.Rollen.Contains(VibeVHS.Application.Sicherheit.Rolle.Dozierende))
                 {
@@ -40,11 +41,30 @@
         </Authorized>
     </AuthorizeView>
     <main class="vhs-portal-inhalt">
-        @Body
+        <CascadingValue Value="ansprache">@Body</CascadingValue>
     </main>
 </div>
 
 @code {
+    private string? begruessung;
+
+    /// <summary>Persönliche Ansprache (Du/Sie) für die Seiten des Portals; Standard: Sie, förmlich.</summary>
+    private VibeVHS.Domain.Personen.Ansprache ansprache = VibeVHS.Domain.Personen.Ansprache.Standard;
+
+    [CascadingParameter]
+    private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? Anmeldung { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Anmeldung is not null && (await Anmeldung).User.Identity?.IsAuthenticated == true)
+        {
+            await using var bereich = Bereiche.CreateAsyncScope();
+            var meine = await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Personen.AnspracheDienst>().MeineAsync();
+            begruessung = meine.Begruessung;
+            ansprache = meine.Ansprache;
+        }
+    }
+
     private static readonly (string Pfad, string Text)[] Navigationspunkte =
     [
         ("portal/dozierende", "Termine"),

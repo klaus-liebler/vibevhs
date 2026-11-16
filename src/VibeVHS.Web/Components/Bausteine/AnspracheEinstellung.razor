@@ -1,0 +1,76 @@
+@using VibeVHS.Application.Personen
+@using VibeVHS.Domain.Personen
+@inject IServiceScopeFactory Bereiche
+@inject NavigationManager Navigation
+
+@* Persönliche Ansprache (Du/Sie, förmlich/freundlich) – statisches Formular, funktioniert in Verwaltung und Portalen. *@
+
+<section class="@Klasse" id="ansprache">
+    <h2 style="font-size:18px">Wie möchten Sie angesprochen werden?</h2>
+    @if (meine is null)
+    {
+        <p class="vhs-small vhs-muted">Wird geladen …</p>
+    }
+    else if (meine.PersonId is null)
+    {
+        <p class="vhs-small vhs-muted">Ihr Benutzerkonto ist mit keiner Person verknüpft. Die Ansprache lässt sich erst einstellen, wenn die Systemverwaltung das Konto mit Ihrer Person verknüpft (Einstellungen → Benutzer).</p>
+    }
+    else
+    {
+        <p class="vhs-small">Gilt für Begrüßung und Hinweise hier, im Portal und für Mails an Sie. Jetzt: <b>@meine.Begruessung</b>@(meine.Gesetzt ? "" : " (Standard)")</p>
+        <form method="post" @formname="ansprache" @onsubmit="SpeichernAsync" data-testid="ansprache-formular">
+            <AntiforgeryToken />
+            @foreach (var a in Auswahl)
+            {
+                <label style="display:block;margin:4px 0">
+                    <input type="radio" name="Wahl" value="@a.Speicherwert" checked="@(a == meine.Ansprache)" /> @a.Anzeige
+                </label>
+            }
+            <button type="submit" class="vhs-btn">Speichern</button>
+        </form>
+        @if (gespeichert)
+        {
+            <div class="vhs-alert vhs-info" role="status">Gespeichert. So sprechen wir Sie ab jetzt an: <b>@meine.Begruessung</b></div>
+        }
+    }
+</section>
+
+@code {
+    private static readonly Ansprache[] Auswahl =
+    [
+        new(false, Anredestil.Foermlich), new(false, Anredestil.Informell), new(true, Anredestil.Informell), new(true, Anredestil.Foermlich),
+    ];
+
+    [Parameter]
+    public string Klasse { get; set; } = "vhs-card";
+
+    [SupplyParameterFromForm(FormName = "ansprache")]
+    private string? Wahl { get; set; }
+
+    private MeineAnsprache? meine;
+    private bool gespeichert;
+
+    protected override async Task OnInitializedAsync() => meine = await LadenAsync();
+
+    private async Task<MeineAnsprache> LadenAsync()
+    {
+        await using var bereich = Bereiche.CreateAsyncScope();
+        return await bereich.ServiceProvider.GetRequiredService<AnspracheDienst>().MeineAsync();
+    }
+
+    private async Task SpeichernAsync()
+    {
+        if (Ansprache.Lesen(Wahl) is not { } neu)
+        {
+            return;
+        }
+
+        await using (var bereich = Bereiche.CreateAsyncScope())
+        {
+            await bereich.ServiceProvider.GetRequiredService<AnspracheDienst>().SetzenAsync(neu);
+        }
+
+        meine = await LadenAsync();
+        gespeichert = true;
+    }
+}
