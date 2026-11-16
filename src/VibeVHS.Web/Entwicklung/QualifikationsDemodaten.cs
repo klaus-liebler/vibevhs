@@ -4,6 +4,7 @@ using VibeVHS.Domain.Gemeinsam;
 using VibeVHS.Domain.Personen;
 using VibeVHS.Domain.Programm;
 using VibeVHS.Infrastructure.Datenbank;
+using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Web.Entwicklung;
 
@@ -36,10 +37,12 @@ internal static class QualifikationsDemodaten
             return;
         }
 
+        var heuteTag = DateOnly.FromDateTime(uhr.GetLocalNow().Date);
+        var dozRolle = db.MitRolle(Personenrolle.Dozierende, heuteTag);
         var dozierende = await db.Personen
-            .Where(p => (p.Rollen & Personenrolle.Dozierende) == Personenrolle.Dozierende && p.Status != Personenstatus.Zusammengefuehrt
+            .Where(p => dozRolle.Contains(p.Id) && p.Status != Personenstatus.Zusammengefuehrt
                         && p.Datenschutz == VibeVHS.Domain.Datenschutz.Datenschutzstatus.Aktiv)
-            .OrderBy(p => p.Sortierschluessel).ToListAsync();
+            .NachNameSortiert(db, heuteTag).ToListAsync();
         var zufall = new Random(815);
 
         // Beschäftigungsart: etwa jede fünfte Person festangestellt, Anna Becker wechselt 2026 in die Festanstellung.
@@ -104,10 +107,10 @@ internal static class QualifikationsDemodaten
             {
                 Start = start, Anzahl = 24, Wochentage = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday],
                 Beginn = new TimeOnly(8, 30), DauerMinuten = 240, OrtIds = [raum.Id], FerienAuslassen = true,
-            }, kalender, _ => raum.Anzeige, heute.AddDays(12 * 7));
+            }, kalender, heute.AddDays(12 * 7));
             modul4.StatusSetzen(VibeVHS.Domain.Programm.Kursstatus.Veroeffentlicht);
             db.Kurse.Add(modul4);
-            notizen.Add($"{modul4.Kursnummer} mit {ablaufend.Name} ab {start:dd.MM.yyyy}");
+            notizen.Add($"{modul4.Kursnummer} ab {start:dd.MM.yyyy} (Lehrkraft mit ablaufender Zulassung)");
         }
 
         // Deutsch-Lehrkraft ohne BAMF-Zulassung (Sperre sichtbar), aber mit telc-Prüferlizenz

@@ -65,11 +65,11 @@ public sealed class MessungTests
             for (var i = 0; i < kurse; i++)
             {
                 var dozent = daten.Personen[(i * 7) % daten.Personen.Count];
-                var kurs = new Kurs($"26H-{i:0000}", $"Kurs {i}", semester, 1 + (i % 8), art, 6, 15).MitTeam([new KursDozent(dozent.Id, dozent.Anzeigename, true)]);
+                var kurs = new Kurs($"26H-{i:0000}", $"Kurs {i}", semester, 1 + (i % 8), art, 6, 15).MitTeam([new KursDozent(dozent.Id, true)]);
                 kurs.EntgeltSetzenAb(Geld.Euro(60 + (i % 40)), null, semester.Beginn, Erfassung.Erst(jetzt.AddMonths(-3)));
                 var start = heute.AddDays(-40 + (i % 60));
                 kurs.SerieFestlegen(new Serienregel { Start = start, Anzahl = 10, Wochentage = [start.DayOfWeek], Beginn = new TimeOnly(8 + (i % 12), 0), DauerMinuten = 90,
-                    OrtIds = [orte[i % orte.Count].Id], DozentId = dozent.Id }, Kalender.OhneFerien, id => orte.First(o => o.Id == id).Anzeige, heute.AddDays(120));
+                    OrtIds = [orte[i % orte.Count].Id], DozentId = dozent.Id }, Kalender.OhneFerien, heute.AddDays(120));
                 kurs.StatusSetzen(Kursstatus.Veroeffentlicht);
                 db.Kurse.Add(kurs);
                 for (var j = 0; j < 12; j++)
@@ -124,14 +124,10 @@ public sealed class MessungTests
             var b = new Automatik();
             var protokoll = new AuditProtokoll(db, b, t.Uhr);
             var post = new PostausgangDienst(new NachrichtenSpeicher(db), protokoll, b, new Uebersetzungslinks(new Uri("https://vhs.example/")), t.Uhr);
-            _ = await new Rundschreiben(new PersonenAbfrage(db, new DublettenSuche(db)), new PersonenSpeicher(db), post, new NachrichtenSpeicher(db), protokoll, t.Uhr)
+            _ = await new Rundschreiben(new PersonenAbfrage(db, new DublettenSuche(db), t.Uhr), post, new NachrichtenSpeicher(db), protokoll, t.Uhr)
                 .VorschauAsync(new PersonenFilter(Rolle: Personenrolle.Teilnehmende), Kontaktzweck.Kursorganisation, ct);
         });
-        await Messen("Startabgleich: Personen-Zwischenstände", async db =>
-        {
-            t.Uhr.Advance(TimeSpan.FromDays(1)); // je Lauf ein neuer Tag (Protokoll ist nur anfügbar)
-            await new Zwischenstaende(new ZwischenstandSpeicher(db, t.Uhr), new AuditProtokoll(db, new Automatik(), t.Uhr), t.Uhr).FortschreibenAsync(ct);
-        });
+        // Startabgleich: Der Fortschreib-Job der Personen-Kopien entfällt mit der Normalisierung (keine Kopien mehr).
 
         var zeilen = string.Join("\n", ergebnisse.Select(e => $"| {e.Name} | {e.Median:0} ms |"));
         var bericht = $"MESSUNG {anzahl} Personen, {kurse} Kurse (Aufbau {aufbau.Elapsed.TotalSeconds:0} s)\n{zeilen}";

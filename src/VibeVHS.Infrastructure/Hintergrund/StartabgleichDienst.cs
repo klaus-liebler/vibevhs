@@ -17,7 +17,6 @@ internal sealed class StartabgleichDienst(ISchedulerFactory fabrik, Startabgleic
     /// <summary>Reihenfolge des Abgleichs nach dem Start.</summary>
     public static readonly (JobKey Schluessel, string Anzeige)[] Reihenfolge =
     [
-        (ZwischenstandJob.Schluessel, "Personen-Zwischenstände (Rollen, Namen, Adressen ab heute)"),
         (TermineFortschreibenJob.Schluessel, "Termine fortschreiben"),
         (MerkmalAblaufJob.Schluessel, "Ablaufende Merkmale"),
         (QualifikationJob.Schluessel, "Qualifikationen und Lehrfreigaben"),

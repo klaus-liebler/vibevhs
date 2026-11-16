@@ -199,8 +199,8 @@ public class PersonenAbfrageTests
         bytes[0].ShouldBe((byte)'P'); // xlsx ist ein ZIP-Archiv
         using var mappe = new ClosedXML.Excel.XLWorkbook(new MemoryStream(bytes));
         var zeilen = mappe.Worksheet(1).RowsUsed().Count() - 1;
-        zeilen.ShouldBe(await db.Personen.CountAsync(p => (p.Rollen & Personenrolle.Teilnehmende) == Personenrolle.Teilnehmende
-                                                          && p.Status != Personenstatus.Zusammengefuehrt, ct));
+        zeilen.ShouldBe((await db.Personen.AsNoTracking().ToListAsync(ct)).Count(p => (p.Rollen & Personenrolle.Teilnehmende) == Personenrolle.Teilnehmende
+                                                          && p.Status != Personenstatus.Zusammengefuehrt));
     }
 
     [Fact]

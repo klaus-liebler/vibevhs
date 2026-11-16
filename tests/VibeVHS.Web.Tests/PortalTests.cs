@@ -54,8 +54,8 @@ public sealed class PortalTests
         var dozB = P("Bernd", "Fremd", "bernd@example.org", Personenrolle.Dozierende);
         var tn = P("Tina", "Teil", "tina@example.org", Personenrolle.Teilnehmende);
         var buch = P("Lina", "Buch", "lina@example.org", Personenrolle.Dozierende);
-        (await db.Kurse.SingleAsync(k => k.Id == a.Id, Ct)).MitTeam([new KursDozent(dozA.Id, "Dora Dozentin", true)]);
-        (await db.Kurse.SingleAsync(k => k.Id == b.Id, Ct)).MitTeam([new KursDozent(dozB.Id, "Bernd Fremd", true)]);
+        (await db.Kurse.SingleAsync(k => k.Id == a.Id, Ct)).MitTeam([new KursDozent(dozA.Id, true)]);
+        (await db.Kurse.SingleAsync(k => k.Id == b.Id, Ct)).MitTeam([new KursDozent(dozB.Id, true)]);
         db.Benutzerkonten.Add(new Benutzerkonto("doz.a", "Dora Dozentin", null, [Rolle.Dozierende], [8], dozA.Id));
         db.Benutzerkonten.Add(new Benutzerkonto("doz.b", "Bernd Fremd", null, [Rolle.Dozierende], [8], dozB.Id));
         db.Benutzerkonten.Add(new Benutzerkonto("lina.buch", "Lina Buch", null, [Rolle.Buchhaltung, Rolle.Dozierende], [], buch.Id));

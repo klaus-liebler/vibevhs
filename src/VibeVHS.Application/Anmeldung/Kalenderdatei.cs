@@ -9,7 +9,8 @@ public static class Kalenderdatei
 {
     private static readonly TimeZoneInfo Zeitzone = ZeitzoneFinden();
 
-    public static string Erzeugen(Kurs kurs, IEnumerable<Veranstaltung> termine, string einrichtung, DateTimeOffset jetzt)
+    /// <param name="namen">Orte und Lehrkräfte zur Laufzeit (siehe <see cref="Programm.Namen"/>).</param>
+    public static string Erzeugen(Kurs kurs, IEnumerable<Veranstaltung> termine, string einrichtung, DateTimeOffset jetzt, Programm.Namen namen)
     {
         ArgumentNullException.ThrowIfNull(kurs);
         var sb = new StringBuilder();
@@ -27,8 +28,9 @@ public static class Kalenderdatei
             Zeile(sb, "DTSTART:" + Utc(Lokal(v.Beginn)));
             Zeile(sb, "DTEND:" + Utc(Lokal(v.Ende)));
             Zeile(sb, "SUMMARY:" + Text($"{kurs.Titel} ({kurs.Kursnummer}), Termin {v.Nummer}"));
-            Zeile(sb, "LOCATION:" + Text(string.Join(" + ", v.Orte.Select(o => o.OrtName))));
-            Zeile(sb, "DESCRIPTION:" + Text($"{einrichtung}{(string.IsNullOrEmpty(v.DozentName) ? "" : $", Leitung: {v.DozentName}")}"));
+            Zeile(sb, "LOCATION:" + Text(namen.Orte(v.Orte)));
+            var dozent = namen.Dozent(v);
+            Zeile(sb, "DESCRIPTION:" + Text($"{einrichtung}{(string.IsNullOrEmpty(dozent) ? "" : $", Leitung: {dozent}")}"));
             Zeile(sb, "END:VEVENT");
         }
 
@@ -37,7 +39,8 @@ public static class Kalenderdatei
     }
 
     /// <summary>Kalender über mehrere Kurse (Kalender-Abo der Kursleitung); ausgefallene Termine erscheinen als abgesagt.</summary>
-    public static string Erzeugen(string name, IEnumerable<(Kurs Kurs, Veranstaltung Termin, string? Hinweis)> termine, string einrichtung, DateTimeOffset jetzt)
+    public static string Erzeugen(string name, IEnumerable<(Kurs Kurs, Veranstaltung Termin, string? Hinweis)> termine, string einrichtung, DateTimeOffset jetzt,
+        Programm.Namen namen)
     {
         var sb = new StringBuilder();
         Zeile(sb, "BEGIN:VCALENDAR");
@@ -55,7 +58,7 @@ public static class Kalenderdatei
             Zeile(sb, "DTSTART:" + Utc(Lokal(v.Beginn)));
             Zeile(sb, "DTEND:" + Utc(Lokal(v.Ende)));
             Zeile(sb, "SUMMARY:" + Text($"{(v.Ausgefallen ? "ENTFÄLLT: " : "")}{kurs.Titel} ({kurs.Kursnummer}), Termin {v.Nummer}"));
-            Zeile(sb, "LOCATION:" + Text(string.Join(" + ", v.Orte.Select(o => o.OrtName))));
+            Zeile(sb, "LOCATION:" + Text(namen.Orte(v.Orte)));
             Zeile(sb, "DESCRIPTION:" + Text(hinweis is null ? einrichtung : einrichtung + "\n" + hinweis));
             if (v.Ausgefallen)
             {

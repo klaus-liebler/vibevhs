@@ -67,15 +67,24 @@ internal static class ProgrammMapping
             b.Property(k => k.Kursnummer).HasMaxLength(30);
             b.HasIndex(k => k.Kursnummer).IsUnique();
             b.Property(k => k.Titel).HasMaxLength(300);
-            b.Property(k => k.AuftraggeberName).HasMaxLength(300);
             b.Property(k => k.Bildungsurlaub).HasMaxLength(100);
-            b.Property(k => k.Suchtext).HasMaxLength(400);
             b.HasIndex(k => k.SemesterId);
             b.PrimitiveCollection(k => k.BenoetigteMerkmale);
             b.PrimitiveCollection(k => k.BenoetigteDozierendenmerkmale);
             b.Property(k => k.Richtlinie).AlsJson();
             b.Property(k => k.Serie).AlsJson();
-            b.Property(k => k.Team).AlsJson();
+            // Kursteam als eigene Tabelle (statt JSON mit Namenskopie): KursId + PersonId, Leitung.
+            b.OwnsMany(k => k.Team, t =>
+            {
+                t.ToTable("KursTeam");
+                t.WithOwner().HasForeignKey("KursId");
+                // Eigener Schlüssel: Einträge sind unveränderliche Werte und werden beim Ändern ersetzt (löschen + einfügen).
+                t.Property<Guid>("Id").ValueGeneratedOnAdd();
+                t.HasKey("Id");
+                t.HasIndex("KursId");
+                t.HasIndex(d => d.PersonId);
+            });
+            b.Navigation(k => k.Team).UsePropertyAccessMode(PropertyAccessMode.Property);
             b.HasMany(k => k.Entgelte).WithOne().HasForeignKey("KursId").IsRequired().OnDelete(DeleteBehavior.Restrict);
             b.Navigation(k => k.Entgelte).HasField("_entgelte").UsePropertyAccessMode(PropertyAccessMode.Field).AutoInclude();
             b.HasMany(k => k.Veranstaltungen).WithOne().HasForeignKey(v => v.KursId).OnDelete(DeleteBehavior.Cascade);
@@ -87,9 +96,18 @@ internal static class ProgrammMapping
             b.ToTable("Veranstaltungen");
             b.HasKey(v => v.Id);
             b.Property(v => v.Id).ValueGeneratedNever();
-            b.Property(v => v.DozentName).HasMaxLength(300);
+            b.HasIndex(v => v.DozentId);
             b.Property(v => v.Bemerkung).HasMaxLength(500);
-            b.Property(v => v.Orte).AlsJson();
+            // Orte eines Termins als eigene Tabelle (statt JSON mit Ortsnamen-Kopie).
+            b.OwnsMany(v => v.Orte, o =>
+            {
+                o.ToTable("VeranstaltungOrte");
+                o.WithOwner().HasForeignKey("VeranstaltungId");
+                o.Property<Guid>("Id").ValueGeneratedOnAdd();
+                o.HasKey("Id");
+                o.HasIndex("VeranstaltungId");
+                o.HasIndex(x => x.OrtId);
+            });
             b.HasIndex(v => v.Beginn);
             b.HasIndex(v => v.KursId);
         });
@@ -121,7 +139,6 @@ internal static class ProgrammMapping
             b.Property(o => o.Stadt).HasMaxLength(100);
             b.Property(o => o.Lage).HasMaxLength(1000);
             b.Property(o => o.Zugang).HasMaxLength(500);
-            b.Property(o => o.Suchtext).HasMaxLength(500);
             b.Property(o => o.Kapazitaeten).AlsJson();
             b.HasIndex(o => o.ElternId);
             b.HasMany(o => o.Merkmale).WithOne().HasForeignKey("OrtId").IsRequired().OnDelete(DeleteBehavior.Restrict);

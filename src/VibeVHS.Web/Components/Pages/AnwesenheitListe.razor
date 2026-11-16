@@ -1,5 +1,6 @@
 @page "/anwesenheit/{Id:guid}"
 @using VibeVHS.Application.Durchfuehrung
+@using VibeVHS.Application.Programm
 @using VibeVHS.Application.Dokumente
 @using VibeVHS.Domain.Durchfuehrung
 @implements IAsyncDisposable
@@ -33,7 +34,7 @@
     <div>
         <p class="vhs-sub vhs-mono">@if (Portal) { @liste.Kurs.Kursnummer } else { <a href="@($"kurse/{liste.Kurs.Id}")">@liste.Kurs.Kursnummer</a> } · Termin @v.Nummer</p>
         <h1>@liste.Kurs.Titel</h1>
-        <p class="vhs-sub">@v.Beginn.ToString("dddd, dd.MM.yyyy · HH:mm")–@v.Ende.ToString("HH:mm") (@liste.Dauer Min. = @AnwesenheitAnzeige.Ue(liste.Dauer) UE) · @string.Join(" + ", v.Orte.Select(o => o.OrtName)) · @v.DozentName</p>
+        <p class="vhs-sub">@v.Beginn.ToString("dddd, dd.MM.yyyy · HH:mm")–@v.Ende.ToString("HH:mm") (@liste.Dauer Min. = @AnwesenheitAnzeige.Ue(liste.Dauer) UE) · @namen.Orte(v.Orte) · @namen.Dozent(v)</p>
     </div>
     <div class="vhs-row">
         <BegruendeterButton Text="@(scannt ? "Scanner stoppen" : "Ausweise scannen")" Icon="qr_code_scanner" ButtonStyle="ButtonStyle.Light" Click="ScannerAsync"
@@ -109,7 +110,7 @@
         <div class="vhs-row">
             @foreach (var o in v.Orte)
             {
-                <BegruendeterButton Text="@($"Termin-QR {o.OrtName}")" Icon="qr_code_2" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => RaumQrAsync(o.OrtId, o.OrtName))"
+                <BegruendeterButton Text="@($"Termin-QR {namen.Ort(o.OrtId)}")" Icon="qr_code_2" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => RaumQrAsync(o.OrtId, namen.Ort(o.OrtId)))"
                                     Freigabe="@(Bearbeiten.Und(() => v.Ausgefallen ? Freigabe.Nein("Die Veranstaltung fällt aus.") : liste.Kurs.Richtlinie.SelbstCheckin == VibeVHS.Domain.Programm.SelbstCheckin.Aus ? Freigabe.Nein("Selbst-Check-in ist für diesen Kurs abgeschaltet (abrechnungsrelevante Anwesenheit).") : Freigabe.Ja))" />
             }
         </div>
@@ -167,6 +168,7 @@
     public bool Portal { get; set; }
 
     private Anwesenheitsliste? liste;
+    private VibeVHS.Application.Programm.Namen namen = VibeVHS.Application.Programm.Namen.Leer;
     private string? zugriff, grund, raumQr, raumOrt, raumLink, handeingabe;
     private bool scannt;
     private CheckinAntwort? letzterScan;
@@ -225,6 +227,7 @@
         {
             var dienst = d.GetRequiredService<AnwesenheitDienst>();
             liste = await dienst.ListeAsync(Id);
+            namen = liste is null ? namen : await d.GetRequiredService<VibeVHS.Application.Programm.IProgrammSpeicher>().FuerTermineAsync([liste.Veranstaltung]);
             zugriff = liste is null ? null : await dienst.ZugriffVerweigertAsync(liste.Kurs, liste.Veranstaltung);
         });
     }

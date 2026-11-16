@@ -26,6 +26,10 @@ public sealed class DatenbankDokuTests
         sb.AppendLine("„Einstufung“: F = führend, C = Lese-Cache (Kopie), A = nur nach Anonymisierung (siehe `Spalteneinstufung.cs`). Spalten mit „JSON“ enthalten eine");
         sb.AppendLine("serialisierte Liste bzw. Struktur (Kandidaten für eigene Tabellen).");
         sb.AppendLine();
+        // Fest geschriebene Einleitung (bleibt bei jedem Neuerzeugen erhalten).
+        sb.Append(File.ReadAllText(Path.Combine(Path.GetDirectoryName(Pfad())!, "datenmodell-einleitung.md")).Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd());
+        sb.AppendLine();
+        sb.AppendLine();
         var typen = db.Model.GetEntityTypes().Where(e => e.GetTableName() is not null && !e.IsOwned())
             .GroupBy(e => e.GetTableName()!).OrderBy(g => g.Key, StringComparer.Ordinal).ToList();
         sb.AppendLine("## Übersicht");

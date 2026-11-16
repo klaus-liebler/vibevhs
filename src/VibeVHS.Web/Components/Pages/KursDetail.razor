@@ -1,4 +1,4 @@
-﻿@page "/kurse/{Id:guid}"
+@page "/kurse/{Id:guid}"
 @using VibeVHS.Application.Programm
 @using VibeVHS.Domain.Programm
 @inject Vorgang Vorgang
@@ -20,7 +20,7 @@
         <h1>@kurs.Kursnummer @kurs.Titel</h1>
         <p class="vhs-sub">
             <StatusPille Stil="@(kurs.Status == Kursstatus.Veroeffentlicht ? "gut" : kurs.Status == Kursstatus.Abgesagt ? "krit" : "neutral")">@KursAnzeige.Status(kurs.Status)</StatusPille>
-            FB @kurs.Fachbereich · @NutzungsartAnzeige.Text(kurs.Nutzungsart) · @KursAnzeige.Sichtbarkeit(kurs.Sichtbarkeit)@(kurs.AuftraggeberName is null ? "" : $" für {kurs.AuftraggeberName}")
+            FB @kurs.Fachbereich · @NutzungsartAnzeige.Text(kurs.Nutzungsart) · @KursAnzeige.Sichtbarkeit(kurs.Sichtbarkeit)@(namen.Organisation(kurs.AuftraggeberId) is { } ag ? $" für {ag}" : "")
             · @kurs.MinTeilnehmende–@kurs.MaxTeilnehmende Teilnehmende
         </p>
     </div>
@@ -63,7 +63,7 @@
     <section class="vhs-card">
         <h2>Kursdaten</h2>
         <dl class="vhs-kv">
-            <dt>Team</dt><dd>@(kurs.Team.Count == 0 ? "–" : string.Join(", ", kurs.Team.Select(t => t.Name + (t.Leitung ? " (Leitung)" : ""))))</dd><dd></dd>
+            <dt>Team</dt><dd>@(kurs.Team.Count == 0 ? "–" : string.Join(", ", kurs.Team.Select(t => namen.Team(kurs, t) + (t.Leitung ? " (Leitung)" : ""))))</dd><dd></dd>
             <dt>Serie</dt><dd>@SerieText</dd><dd></dd>
             <dt>Entgelt</dt>
             <dd>
@@ -138,11 +138,11 @@
                     var e = EignungAm(t.PersonId, AenderungsTag);
                     if (e is null || e.Geeignet)
                     {
-                        <button class="vhs-chip @(aDozent == t.PersonId ? "on" : "")" title="@(e?.Code == Eignungscode.Ausnahme ? "mit Ausnahme" : "geeignet")" @onclick="@(() => aDozent = t.PersonId)">@t.Name</button>
+                        <button class="vhs-chip @(aDozent == t.PersonId ? "on" : "")" title="@(e?.Code == Eignungscode.Ausnahme ? "mit Ausnahme" : "geeignet")" @onclick="@(() => aDozent = t.PersonId)">@namen.Team(kurs, t)</button>
                     }
                     else
                     {
-                        <span class="vhs-why" tabindex="0" data-why="@($"{t.Name} am {AenderungsTag:dd.MM.yyyy}: {e.Begruendung}")"><button class="vhs-chip" disabled>@t.Name</button></span>
+                        <span class="vhs-why" tabindex="0" data-why="@($"{namen.Team(kurs, t)} am {AenderungsTag:dd.MM.yyyy}: {e.Begruendung}")"><button class="vhs-chip" disabled>@namen.Team(kurs, t)</button></span>
                     }
                 }
             </div>
@@ -169,7 +169,7 @@
         {
             var e = teamEignung.FirstOrDefault(x => x.PersonId == t.PersonId);
             <div>
-                <span class="vhs-grow"><a href="@($"personen/{t.PersonId}")">@t.Name</a> @if (t.Leitung) { <StatusPille Stil="neutral">Leitung</StatusPille> }</span>
+                <span class="vhs-grow"><a href="@($"personen/{t.PersonId}")">@namen.Team(kurs, t)</a> @if (t.Leitung) { <StatusPille Stil="neutral">Leitung</StatusPille> }</span>
                 @if (e is null || kurs.BenoetigteDozierendenmerkmale.Count == 0) { }
                 else if (e.Geeignet)
                 {
@@ -223,7 +223,7 @@
     }
     @foreach (var a in ausnahmen)
     {
-        <p class="vhs-small vhs-muted" style="margin:0">Ausnahme: @(kurs.Team.FirstOrDefault(t => t.PersonId == a.PersonId)?.Name ?? "?") · „@(verzeichnis.Katalog.GetValueOrDefault(a.Schluessel)?.Name ?? a.Schluessel)“ · @a.Begruendung · @a.ErteiltVon, @a.ErteiltAm.ToLocalTime().ToString("dd.MM.yyyy")</p>
+        <p class="vhs-small vhs-muted" style="margin:0">Ausnahme: @namen.Person(a.PersonId) · „@(verzeichnis.Katalog.GetValueOrDefault(a.Schluessel)?.Name ?? a.Schluessel)“ · @a.Begruendung · @a.ErteiltVon, @a.ErteiltAm.ToLocalTime().ToString("dd.MM.yyyy")</p>
     }
 </section>
 
@@ -240,9 +240,9 @@
                         <td class="vhs-mono"><a href="@Ruecksprung.Detail($"anwesenheit/{v.Id}", Ruecksprung.Aktuell(Navigation))" title="Anwesenheitsliste" @onclick:stopPropagation="true">@v.Nummer</a></td>
                         <td>@v.Beginn.ToString("ddd dd.MM.yyyy")</td>
                         <td class="vhs-mono">@v.Beginn.ToString("HH:mm")–@v.Ende.ToString("HH:mm")</td>
-                        <td>@string.Join(" + ", v.Orte.Select(o => o.OrtName))</td>
+                        <td>@namen.Orte(v.Orte)</td>
                         <td class="vhs-small">
-                            @v.DozentName
+                            @namen.Dozent(v)
                             @if (betroffen.TryGetValue(v.Id, out var be))
                             {
                                 <span class="vhs-why" tabindex="0" data-why="@be.Begruendung"><StatusPille Stil="@(be.Geeignet ? "info" : "krit")">@(be.Geeignet ? "Ausnahme" : "Qualifikation fehlt")</StatusPille></span>
@@ -428,6 +428,7 @@
     private int? Neu { get; set; }
 
     private Kurs? kurs;
+    private Namen namen = Namen.Leer;
     private Ortsverzeichnis? verzeichnis;
     private IReadOnlyList<Ort> buchbareOrte = [];
     private IReadOnlyList<Konflikt> konflikte = [];
@@ -502,6 +503,7 @@
         {
             var p = d.GetRequiredService<IProgrammSpeicher>();
             kurs = await p.KursLadenAsync(Id);
+            namen = kurs is null ? Namen.Leer : await p.FuerKurseAsync([kurs]);
             verzeichnis = await p.OrtsverzeichnisAsync();
             teilnehmende = await d.GetRequiredService<VibeVHS.Application.Anmeldung.AnmeldungDienst>().TeilnehmendeAsync(Id);
             lage = VibeVHS.Application.Anmeldung.Einbuchungslage.Berechnen(teilnehmende.Select(t => t.Belegung));

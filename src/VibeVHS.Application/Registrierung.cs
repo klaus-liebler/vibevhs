@@ -15,7 +15,6 @@ public static class Registrierung
         dienste.AddScoped<Zustellung>();
         dienste.AddScoped<PersonenDienst>();
         dienste.AddScoped<AnspracheDienst>();
-        dienste.AddScoped<Zwischenstaende>();
         dienste.AddScoped<Personen.PersonenrollenDienst>();
         dienste.AddScoped<Personen.Stammdatenaenderung>();
         dienste.AddScoped<Rundschreiben>();

@@ -57,8 +57,8 @@ public class BriefanredeTests
         p.AngabeAendern(MerkmalArt.Titel, "Dr.", new DateOnly(2026, 12, 1), VibeVHS.Domain.Gemeinsam.Erfassung.Aenderung(jetzt, "Promotion"), korrektur: false);
         p.StandAm(new DateOnly(2026, 11, 30), jetzt).Titel.ShouldBeNull();
         p.StandAm(new DateOnly(2026, 12, 1), jetzt).Titel.ShouldBe("Dr.");
-        p.Titel.ShouldBeNull(); // Cache: heute noch ohne Titel, ab 01.12. schreibt der Fortschreib-Job ihn nach
-        p.ZwischenstandFortschreiben(jetzt.AddDays(20)).ShouldBeTrue();
+        p.Titel.ShouldBeNull(); // heute noch ohne Titel …
+        p.StichzeitSetzen(jetzt.AddDays(20)); // … ab 01.12. berechnet (keine Kopie, kein Nachziehen nötig)
         (p.Titel, p.Anzeigename).ShouldBe(("Dr.", "Dr. Eva Muster"));
         Should.Throw<InvalidOperationException>(() => p.TitelSetzen("Prof."));
     }

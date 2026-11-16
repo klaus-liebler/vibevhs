@@ -4,6 +4,7 @@ using VibeVHS.Domain.Gemeinsam;
 using VibeVHS.Domain.Personen;
 using VibeVHS.Domain.Programm;
 using VibeVHS.Infrastructure.Datenbank;
+using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Web.Entwicklung;
 
@@ -233,11 +234,15 @@ internal static class ProgrammDemodaten
         ];
 
         // Dozierende aus den Testdaten, passend zum Fachbereich
-        var dozierende = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
-            .Where(p => (p.Rollen & Personenrolle.Dozierende) == Personenrolle.Dozierende && p.Status != Personenstatus.Zusammengefuehrt)
-            .OrderBy(p => p.Sortierschluessel)
-            .Select(p => new { p.Id, p.Anzeigename, p.Fachbereiche })
+        var heuteTag = DateOnly.FromDateTime(uhr.GetLocalNow().Date);
+        var dozRolle = db.MitRolle(Personenrolle.Dozierende, heuteTag);
+        var dozRoh = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
+            .Where(p => dozRolle.Contains(p.Id) && p.Status != Personenstatus.Zusammengefuehrt)
+            .NachNameSortiert(db, heuteTag)
+            .Select(p => new { p.Id, p.Fachbereiche })
             .ToListAsync();
+        var dozNamen = await db.AnzeigenamenAsync(dozRoh.Select(d => d.Id).ToList(), heuteTag);
+        var dozierende = dozRoh.Select(d => new { d.Id, Anzeigename = dozNamen.GetValueOrDefault(d.Id, ""), d.Fachbereiche }).ToList();
         var stadtwerke = await db.Organisationen.Where(o => o.Name.StartsWith("Stadtwerke")).OrderBy(o => o.Name).ThenBy(o => o.Id).FirstOrDefaultAsync();
         var horizont = DateOnly.FromDateTime(jetzt.Date).AddDays(12 * 7);
         var zaehler = 0;
@@ -250,12 +255,12 @@ internal static class ProgrammDemodaten
             if (auswahl.Count > 0)
             {
                 var d = auswahl[zaehler++ % auswahl.Count];
-                kurs.MitTeam([new KursDozent(d.Id, d.Anzeigename, true)]);
+                kurs.MitTeam([new KursDozent(d.Id, true)]);
             }
 
             if (p.Art == "Firma" && stadtwerke is not null)
             {
-                kurs.MitSichtbarkeit(Sichtbarkeit.Geschlossen, stadtwerke.Id, stadtwerke.Name);
+                kurs.MitSichtbarkeit(Sichtbarkeit.Geschlossen, stadtwerke.Id);
             }
 
             kurs.EntgeltSetzenAb(Geld.Euro(p.Euro), p.Euro > 0 ? Geld.Euro(p.Euro * 3 / 4) : null, semester.Beginn, e);
@@ -274,7 +279,7 @@ internal static class ProgrammDemodaten
                 DauerMinuten = p.Minuten,
                 OrtIds = ortIds,
                 FerienAuslassen = arten[p.Art].FerienAuslassen,
-            }, kalender, id => orte.First(o => o.Id == id).Anzeige, horizont);
+            }, kalender, horizont);
             kurs.StatusSetzen(p.Status);
             if (p.Titel.Contains("Alphabetisierung", StringComparison.Ordinal))
             {

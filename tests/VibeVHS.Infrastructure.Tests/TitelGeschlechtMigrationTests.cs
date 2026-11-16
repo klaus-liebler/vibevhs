@@ -34,7 +34,7 @@ public sealed class TitelGeschlechtMigrationTests
         await migrator.MigrateAsync(cancellationToken: ct);
 
         await using var neu = new VibeVhsDbContext(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite(verbindung).Options);
-        var personen = await neu.Personen.AsNoTracking().OrderBy(p => p.Sortierschluessel).ToListAsync(ct);
+        var personen = await neu.Personen.AsNoTracking().OrderBy(p => p.Id).ToListAsync(ct);
         var eva = personen.Single(p => p.Id == a.Id);
         var stand = eva.StandAm(new DateOnly(2026, 11, 16), jetzt);
         (stand.Titel, stand.Geschlecht).ShouldBe(("Dr.", "weiblich"));

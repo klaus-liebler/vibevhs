@@ -1,0 +1,94 @@
+using Microsoft.EntityFrameworkCore;
+using VibeVHS.Domain.Personen;
+using VibeVHS.Infrastructure.Datenbank;
+
+namespace VibeVHS.Infrastructure.Personen;
+
+/// <summary>
+/// Abfragebausteine „Stand zum Stichtag“ direkt auf den Versionstabellen (keine Kopien in der Personentabelle). Immer der aktuelle
+/// Wissensstand (<c>ErsetztAm IS NULL</c>) und die am Stichtag gültige Version (<c>GueltigVon ≤ tag &lt; GueltigBis</c>).
+/// Alle Bausteine sind komponierbare <see cref="IQueryable{T}"/> (eine SQL-Abfrage, kein N+1).
+/// </summary>
+public static class Personensicht
+{
+    public static IQueryable<PersonName> NamenAm(this VibeVhsDbContext db, DateOnly tag)
+        => db.Set<PersonName>().Where(n => n.ErsetztAm == null && n.GueltigVon <= tag && (n.GueltigBis == null || n.GueltigBis > tag));
+
+    public static IQueryable<PersonMerkmal> MerkmaleAm(this VibeVhsDbContext db, MerkmalArt art, DateOnly tag)
+        => db.Set<PersonMerkmal>().Where(m => m.Art == art && m.ErsetztAm == null && m.GueltigVon <= tag && (m.GueltigBis == null || m.GueltigBis > tag));
+
+    /// <summary>Personen, die am Stichtag die Rolle(n) haben (Bitmaske im Merkmal Rollen).</summary>
+    public static IQueryable<Guid> MitRolle(this VibeVhsDbContext db, Personenrolle rolle, DateOnly tag)
+        => db.MerkmaleAm(MerkmalArt.Rollen, tag)
+            .Where(m => (SqlFunktionen.Ganzzahl(m.Inhalt) & (long)rolle) == (long)rolle)
+            .Select(m => EF.Property<Guid>(m, "PersonId"));
+
+    /// <summary>Personen mit diesem Geburtsdatum (aktueller Wissensstand).</summary>
+    public static IQueryable<Guid> MitGeburtsdatum(this VibeVhsDbContext db, DateOnly geburtsdatum)
+    {
+        var text = PersonMerkmal.DatumText(geburtsdatum);
+        return db.Set<PersonMerkmal>().Where(m => m.Art == MerkmalArt.Geburtsdatum && m.ErsetztAm == null && m.Inhalt == text)
+            .Select(m => EF.Property<Guid>(m, "PersonId"));
+    }
+
+    /// <summary>Personen, die am Stichtag diese E-Mail-Adresse haben (Groß-/Kleinschreibung egal).</summary>
+    public static IQueryable<Guid> MitEMail(this VibeVhsDbContext db, string eMail, DateOnly tag)
+    {
+        var mail = eMail.Trim().ToLowerInvariant();
+        return db.Set<EMailAdresse>()
+            .Where(e => e.ErsetztAm == null && e.GueltigVon <= tag && (e.GueltigBis == null || e.GueltigBis > tag) && e.Adresse.ToLower() == mail)
+            .Select(e => EF.Property<Guid>(e, "PersonId"));
+    }
+
+    /// <summary>Sortierung nach Name (DIN 5007-2) mit eindeutigem Seitenschlüssel „sortierform|ID“ – wie <see cref="Person.Sortierschluessel"/>.</summary>
+    public static IQueryable<PersonMitSchluessel> MitSortierschluessel(this VibeVhsDbContext db, IQueryable<Person> personen, DateOnly tag)
+        => from p in personen
+           join n in db.NamenAm(tag) on p.Id equals EF.Property<Guid>(n, "PersonId")
+           select new PersonMitSchluessel { Id = p.Id, Schluessel = n.Sortierschluessel + "|" + p.Id.ToString().ToUpper() };
+
+    /// <summary>Personen sortiert nach Name zum Stichtag (DIN 5007-2), eindeutig über die Id.</summary>
+    public static IQueryable<Person> NachNameSortiert(this IQueryable<Person> personen, VibeVhsDbContext db, DateOnly tag)
+        => from p in personen
+           join n in db.NamenAm(tag) on p.Id equals EF.Property<Guid>(n, "PersonId")
+           orderby n.Sortierschluessel, p.Id
+           select p;
+
+    /// <summary>Personen mit diesem Namen am Stichtag (exakt, z. B. für Demodaten).</summary>
+    public static IQueryable<Guid> MitNamen(this VibeVhsDbContext db, string vorname, string nachname, DateOnly tag)
+        => db.NamenAm(tag).Where(n => n.Vorname == vorname && n.Nachname == nachname).Select(n => EF.Property<Guid>(n, "PersonId"));
+
+    /// <summary>Anzeigenamen (Titel + Name) zum Stichtag für viele Personen in zwei Abfragen.</summary>
+    public static async Task<Dictionary<Guid, string>> AnzeigenamenAsync(this VibeVhsDbContext db, IReadOnlyCollection<Guid> ids, DateOnly tag,
+        CancellationToken abbruch = default)
+    {
+        var namen = await db.NamenAm(tag).Where(n => ids.Contains(EF.Property<Guid>(n, "PersonId")))
+            .Select(n => new { PersonId = EF.Property<Guid>(n, "PersonId"), Name = n }).ToListAsync(abbruch);
+        var titel = await db.MerkmaleAm(MerkmalArt.Titel, tag).Where(m => ids.Contains(EF.Property<Guid>(m, "PersonId")))
+            .Select(m => new { PersonId = EF.Property<Guid>(m, "PersonId"), m.Inhalt }).ToDictionaryAsync(m => m.PersonId, m => m.Inhalt, abbruch);
+        var anonymisiert = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
+            .Where(p => ids.Contains(p.Id) && p.Datenschutz == Domain.Datenschutz.Datenschutzstatus.Anonymisiert).Select(p => p.Id).ToListAsync(abbruch);
+        var ergebnis = namen.ToDictionary(n => n.PersonId,
+            n => titel.GetValueOrDefault(n.PersonId) is { Length: > 0 } t ? $"{t} {n.Name.Anzeige}" : n.Name.Anzeige);
+        foreach (var id in anonymisiert)
+        {
+            ergebnis[id] = $"Gelöschte Person {Domain.Datenschutz.Pseudonym.Kurz(id)}";
+        }
+
+        return ergebnis;
+    }
+}
+
+/// <summary>Person-Id mit Seitenschlüssel (Klasse mit init-Eigenschaften, damit EF danach noch sortieren und filtern kann).</summary>
+public sealed class PersonMitSchluessel
+{
+    public required Guid Id { get; init; }
+
+    public required string Schluessel { get; init; }
+}
+
+/// <summary>SQL-Funktionen für Abfragen auf Textspalten (in <see cref="VibeVhsDbContext"/> registriert).</summary>
+public static class SqlFunktionen
+{
+    /// <summary>CAST(text AS INTEGER) – z. B. die Rollen-Bitmaske im Merkmal Rollen.</summary>
+    public static long Ganzzahl(string text) => throw new InvalidOperationException("Nur in Datenbankabfragen verwendbar.");
+}

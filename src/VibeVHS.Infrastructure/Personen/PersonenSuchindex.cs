@@ -15,9 +15,12 @@ public sealed class Suchindexeintrag
 }
 
 /// <summary>
-/// Pflege und Abfrage des Volltextindex (SQLite FTS5). Indexiert werden normalisierte Texte
-/// (siehe <see cref="Suchtext"/>), gesucht wird mit Präfix je Wort ("yil" findet "Yılmaz").
+/// Pflege und Abfrage des Volltextindex (SQLite FTS5). Der Index enthält ALLE Versionen (frühere und künftige Namen, Titel, E-Mails,
+/// Wohnorte, Geburtsdatum) – sein Inhalt hängt also nicht vom Tagesdatum ab und kann nicht veralten. Er wird im selben Speichervorgang
+/// wie die Person geschrieben (<c>SaveChangesAsync</c>); ein SQL-Trigger ist nicht möglich, weil die Normalisierung (Umlaute, ı/ł/ß …)
+/// in C# erfolgt. Damit ist er ein Index, keine Kopie.
 /// </summary>
+/// <remarks>Indexiert werden normalisierte Texte (siehe <see cref="Suchtext"/>), gesucht wird mit Präfix je Wort („yil“ findet „Yılmaz“).</remarks>
 public static class PersonenSuchindex
 {
     public const string TabelleAnlegen =
@@ -50,20 +53,6 @@ public static class PersonenSuchindex
     /// <summary>Baut den Index neu auf, wenn er nicht zur Personentabelle passt (z. B. nach einer Migration).</summary>
     public static async Task AufbauenFallsNoetigAsync(VibeVhsDbContext db, ILogger log, CancellationToken abbruch = default)
     {
-        // Nach einer Migration fehlen Zwischenstände (Anzeigename, Sortierschlüssel) für vorhandene Personen.
-        var ohneZwischenstand = await db.Personen.Where(p => p.Anzeigename == "").Select(p => p.Id).ToListAsync(abbruch);
-        if (ohneZwischenstand.Count > 0)
-        {
-            log.LogInformation("Zwischenstand für {Anzahl} Personen wird nachgeführt", ohneZwischenstand.Count);
-            foreach (var block in ohneZwischenstand.Chunk(200))
-            {
-                var geladen = await db.Personen.Where(p => block.Contains(p.Id)).ToListAsync(abbruch);
-                geladen.ForEach(p => p.ZwischenstandNachfuehren(DateTimeOffset.Now));
-                await db.SaveChangesAsync(abbruch);
-                db.ChangeTracker.Clear();
-            }
-        }
-
         var imIndex = await db.Database.SqlQuery<int>($"SELECT COUNT(*) AS Value FROM PersonSuche").SingleAsync(abbruch);
         var personen = await db.Personen.CountAsync(abbruch);
         if (imIndex == personen)

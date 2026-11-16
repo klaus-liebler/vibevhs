@@ -355,7 +355,7 @@ public sealed class AltdatenImportDienst(
                 {
                     Start = beginn, Anzahl = Zahl(F(Kursfeld.Termine), 1) ?? 1, Wochentage = [beginn.DayOfWeek], Beginn = start, DauerMinuten = dauer,
                     OrtIds = ort is null ? [] : [ort.Id], FerienAuslassen = kursart.FerienAuslassen,
-                }, kalender, id => verzeichnis.Finden(id)?.Anzeige ?? "?", sem.Ende);
+                }, kalender, sem.Ende);
                 kurs.StatusSetzen(F(Kursfeld.Status).ToLowerInvariant() switch
                 {
                     "entwurf" or "geplant" => Kursstatus.Entwurf,

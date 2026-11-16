@@ -28,20 +28,24 @@ public sealed class Person
 
     public Guid Id { get; private set; }
 
-    public DateOnly? Geburtsdatum { get; private set; }
+    /// <summary>Geburtsdatum nach heutigem Stand (aus dem Merkmal; keine Spalte).</summary>
+    public DateOnly? Geburtsdatum => IstAnonymisiert ? null : Heute.Geburtsdatum;
 
     /// <summary>Bevorzugte E-Mail-Adresse (Zwischenstand).</summary>
-    public string? EMail { get; private set; }
+    /// <summary>Bevorzugte E-Mail-Adresse nach heutigem Stand (aus den Versionen; keine Spalte).</summary>
+    public string? EMail => IstAnonymisiert ? null
+        : (Heute.EMails.Where(e => e.Adresse != "–").FirstOrDefault(e => e.Bevorzugt) ?? Heute.EMails.FirstOrDefault(e => e.Adresse != "–"))?.Adresse;
 
     /// <summary>Bevorzugte Sprache für Korrespondenz (ISO 639-1, z. B. "de", "tr", "uk").</summary>
-    public string Sprache { get; private set; } = "de";
+    public string Sprache => IstAnonymisiert ? string.Empty : Heute.Sprache ?? "de";
 
     public DateTimeOffset AngelegtAm { get; private set; }
 
-    /// <summary>Lese-Cache des versionierten Merkmals <see cref="MerkmalArt.Titel"/> (Stand heute), z. B. „Dr.“ – nie direkt schreiben.</summary>
-    public string? Titel { get; private set; }
+    /// <summary>Titel nach heutigem Stand (Merkmal <see cref="MerkmalArt.Titel"/>; keine Spalte).</summary>
+    public string? Titel => IstAnonymisiert ? null : Heute.Titel;
 
-    public Personenrolle Rollen { get; private set; }
+    /// <summary>Rollen nach heutigem Stand (Merkmal <see cref="MerkmalArt.Rollen"/>; keine Spalte).</summary>
+    public Personenrolle Rollen => Heute.Rollen;
 
     public IReadOnlyCollection<PersonName> Namen => _namen;
 
@@ -68,17 +72,56 @@ public sealed class Person
     /// <summary>Fachbereiche, denen die Person zugeordnet ist (v. a. Dozierende).</summary>
     public List<int> Fachbereiche { get; private set; } = [];
 
-    /// <summary>Zwischenstand für Listen: "Titel Vorname Nachname".</summary>
-    public string Anzeigename { get; private set; } = string.Empty;
+    /// <summary>„Titel Vorname Vorsatz Nachname Zusatz“ nach heutigem Stand (keine Spalte).</summary>
+    public string Anzeigename => IstAnonymisiert
+        ? $"Gelöschte Person {Datenschutz_.Pseudonym.Kurz(Id)} · anonymisiert am {AnonymisiertAm?.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture)}"
+        : HeutigerName is { } n ? (string.IsNullOrEmpty(Titel) ? n.Anzeige : $"{Titel} {n.Anzeige}") : "(ohne Namen)";
 
-    /// <summary>Zwischenstand für die Sortierung: normalisiert "nachname vorname".</summary>
-    public string Sortiername { get; private set; } = string.Empty;
+    /// <summary>Sortierform des heutigen Namens (DIN 5007-2, normalisiert).</summary>
+    public string Sortiername => HeutigerName?.Sortierschluessel ?? string.Empty;
 
     /// <summary>Eindeutiger Sortierschlüssel (Sortiername + Id) für die Keyset-Pagination.</summary>
-    public string Sortierschluessel { get; private set; } = string.Empty;
+    public string Sortierschluessel => Seitenschluessel(Sortiername, Id);
 
-    /// <summary>Zwischenstand: Ort des üblichen Aufenthalts.</summary>
-    public string? Wohnort { get; private set; }
+    /// <summary>Gemeinsame Form des Seitenschlüssels (auch in SQL so gebildet).</summary>
+    public static string Seitenschluessel(string sortiername, Guid id) => $"{sortiername}|{id.ToString().ToUpperInvariant()}";
+
+    /// <summary>Ort des üblichen Aufenthalts nach heutigem Stand (nach der Anonymisierung: das grobe Gebiet).</summary>
+    public string? Wohnort => IstAnonymisiert ? AnonymisiertGebiet : Heute.Aufenthaltsort?.Ort;
+
+    private DateTimeOffset _stichzeit;
+    private PersonenStand? _heute;
+
+    /// <summary>
+    /// Bezugszeitpunkt der Lese-Eigenschaften (Anzeigename, Rollen, E-Mail …): beim Laden aus der Datenbank „jetzt“ der Anwendungsuhr,
+    /// nach jeder Änderung deren Zeitpunkt. Alles wird aus den Versionen berechnet – es gibt keine Kopien, die veralten könnten.
+    /// </summary>
+    public DateTimeOffset Stichzeit => _stichzeit == default ? DateTimeOffset.Now : _stichzeit;
+
+    /// <summary>Bezugszeitpunkt setzen (z. B. beim Laden oder für einen Stichtag).</summary>
+    public void StichzeitSetzen(DateTimeOffset jetzt)
+    {
+        _stichzeit = jetzt;
+        _heute = null;
+    }
+
+    private PersonenStand Heute
+    {
+        get
+        {
+            if (_heute is null)
+            {
+                // Rückdatierte Erfassungen (Datenübernahme) zählen mit: maßgeblich ist der jüngste bekannte Stand.
+                var juengste = AlleVersionen.Select(v => v.ErfasstAm).DefaultIfEmpty(Stichzeit).Max();
+                var bekannt = juengste > Stichzeit ? juengste : Stichzeit;
+                _heute = StandAm(DateOnly.FromDateTime(Stichzeit.Date), bekannt);
+            }
+
+            return _heute;
+        }
+    }
+
+    private PersonName? HeutigerName => Heute.Name ?? _namen.AktuellerVerlauf().LastOrDefault();
 
     /// <summary>Gesetzt, wenn dieser Datensatz als Dublette in einen anderen überführt wurde.</summary>
     public Guid? ZusammengefuehrtIn { get; private set; }
@@ -121,7 +164,7 @@ public sealed class Person
             gueltigAm,
             bekanntAm,
             _namen.AlsStichtag(gueltigAm, bekanntAm),
-            _merkmale.Any(m => m.Art == MerkmalArt.Titel) ? Leer(Merkmal(MerkmalArt.Titel)?.Inhalt) : Titel,
+            Leer(Merkmal(MerkmalArt.Titel)?.Inhalt),
             Merkmal(MerkmalArt.Geburtsdatum)?.AlsDatum(),
             Merkmal(MerkmalArt.Sprache)?.Inhalt,
             Merkmal(MerkmalArt.Rollen)?.AlsRollen() ?? Personenrolle.Keine,
@@ -562,7 +605,6 @@ public sealed class Person
         }
 
         ZwischenstandAktualisieren(jetzt);
-        EMail = null;
     }
 
     /// <summary>
@@ -578,7 +620,7 @@ public sealed class Person
 
         var heute = DateOnly.FromDateTime(jetzt.Date);
         var stand = StandAm(heute, jetzt);
-        AnonymisiertGeburtskohorte = (Geburtsdatum ?? stand.Geburtsdatum) is { } geb ? Datenschutz_.Statistik.Geburtskohorte(geb) : null;
+        AnonymisiertGeburtskohorte = stand.Geburtsdatum is { } geb ? Datenschutz_.Statistik.Geburtskohorte(geb) : null;
         AnonymisiertGebiet = Datenschutz_.Statistik.Gebiet(stand.Aufenthaltsort?.Postleitzahl ?? _adressen.LastOrDefault()?.Postleitzahl);
         var kurz = Datenschutz_.Pseudonym.Kurz(Id);
 
@@ -635,14 +677,6 @@ public sealed class Person
             }
         }
 
-        Titel = null;
-        Geburtsdatum = null;
-        EMail = null;
-        Sprache = string.Empty;
-        Wohnort = AnonymisiertGebiet;
-        Anzeigename = $"Gelöschte Person {kurz} · anonymisiert am {heute:dd.MM.yyyy}";
-        Sortiername = $"~ geloschte person {kurz.ToLowerInvariant()}";
-        Sortierschluessel = $"{Sortiername}|{Id:N}";
         Datenschutz = VibeVHS.Domain.Datenschutz.Datenschutzstatus.Anonymisiert;
         AnonymisiertAm = jetzt;
         GesperrtBis = null;
@@ -735,14 +769,16 @@ public sealed class Person
     /// <summary>Text für den Suchindex: alle (auch frühere) Namen, E-Mail-Adressen, Geburtsdatum, Wohnort – normalisiert.</summary>
     public string SuchtextFuerIndex()
     {
-        var teile = new List<string?> { Titel, Wohnort, Geburtsdatum?.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture) };
+        // Alle Versionen (nicht nur der Stand von heute): der Index hängt so nicht vom Datum ab.
+        var teile = new List<string?>();
         teile.AddRange(_namen.Select(n => n.Anzeige));
+        teile.AddRange(_merkmale.Where(m => m.Art == MerkmalArt.Titel).Select(m => m.Inhalt));
+        teile.AddRange(_merkmale.Where(m => m.Art == MerkmalArt.Geburtsdatum).Select(m => m.AlsDatum()?.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture)));
+        teile.AddRange(_adressen.Select(a => a.Ort));
         teile.AddRange(_emails.Select(e => e.Adresse));
         return string.Join(' ', teile.Where(t => !string.IsNullOrWhiteSpace(t)).Select(Suchtext.Normalisieren).Distinct());
     }
 
-    /// <summary>Berechnet die Zwischenstands-Spalten neu (z. B. nach einer Migration).</summary>
-    public void ZwischenstandNachfuehren(DateTimeOffset jetzt) => ZwischenstandAktualisieren(jetzt);
 
     // ---------- intern ----------
 
@@ -757,65 +793,15 @@ public sealed class Person
 
     private static string NormierteSprache(string? sprache) => string.IsNullOrWhiteSpace(sprache) ? "de" : sprache.Trim().ToLowerInvariant();
 
-    /// <summary>
-    /// Lese-Caches (Anzeigename, Sortierung, Rollen, E-Mail, Sprache, Geburtsdatum, Wohnort) auf den Stand von heute bringen.
-    /// Nötig, wenn eine früher erfasste Änderung mit Datum in der Zukunft (z. B. „Rolle endet am …“, „Umzug ab …“) heute wirksam wird.
-    /// Liefert <c>true</c>, wenn sich ein Cache geändert hat.
-    /// </summary>
-    public bool ZwischenstandFortschreiben(DateTimeOffset jetzt)
-    {
-        var vorher = (Anzeigename, Sortierschluessel, Rollen, EMail, Sprache, Geburtsdatum, Wohnort, Titel);
-        ZwischenstandAktualisieren(jetzt);
-        return vorher != (Anzeigename, Sortierschluessel, Rollen, EMail, Sprache, Geburtsdatum, Wohnort, Titel);
-    }
-
+    /// <summary>Nach einer Änderung: Bezugszeit nachziehen und den berechneten Stand verwerfen (er wird beim nächsten Lesen neu gebildet).</summary>
     private void ZwischenstandAktualisieren(DateTimeOffset jetzt)
     {
-        if (IstAnonymisiert)
+        if (jetzt > _stichzeit)
         {
-            return;
+            _stichzeit = jetzt;
         }
 
-        // Rückdatierte Erfassungen (z. B. Datenübernahme) dürfen den Zwischenstand nicht auf einen alten Stand zurücksetzen:
-        // maßgeblich ist der jüngste bekannte Stand.
-        var juengste = AlleVersionen.Select(v => v.ErfasstAm).DefaultIfEmpty(jetzt).Max();
-        var stichzeit = juengste > jetzt ? juengste : jetzt;
-        var stand = StandAm(DateOnly.FromDateTime(stichzeit.Date), stichzeit);
-
-        // Felder ohne versionierte Daten (Altbestand vor Einführung der Versionierung) bleiben, wie sie sind.
-        if (_merkmale.Any(m => m.Art == MerkmalArt.Geburtsdatum))
-        {
-            Geburtsdatum = stand.Geburtsdatum;
-        }
-
-        if (_merkmale.Any(m => m.Art == MerkmalArt.Sprache))
-        {
-            Sprache = stand.Sprache ?? "de";
-        }
-
-        if (_merkmale.Any(m => m.Art == MerkmalArt.Rollen))
-        {
-            Rollen = stand.Rollen;
-        }
-
-        if (_emails.Count > 0)
-        {
-            EMail = (stand.EMails.Where(e => e.Adresse != "–").FirstOrDefault(e => e.Bevorzugt) ?? stand.EMails.FirstOrDefault(e => e.Adresse != "–"))?.Adresse;
-        }
-        if (_merkmale.Any(m => m.Art == MerkmalArt.Titel))
-        {
-            Titel = stand.Titel;
-        }
-
-        var name = stand.Name ?? _namen.AktuellerVerlauf().LastOrDefault();
-        if (name is not null)
-        {
-            Anzeigename = string.IsNullOrEmpty(Titel) ? name.Anzeige : $"{Titel} {name.Anzeige}";
-            Sortiername = Suchtext.Normalisieren(name.Sortierform);
-            Sortierschluessel = $"{Sortiername}|{Id:N}";
-        }
-
-        Wohnort = stand.Aufenthaltsort?.Ort ?? Wohnort;
+        _heute = null;
     }
 }
 

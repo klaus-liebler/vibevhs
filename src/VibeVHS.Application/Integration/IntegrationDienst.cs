@@ -406,7 +406,8 @@ public sealed class IntegrationDienst(
             throw new InvalidOperationException(f.Begruendung);
         }
 
-        var ort = u.Kurs.Veranstaltungen.FirstOrDefault()?.Orte.FirstOrDefault()?.OrtName ?? "–";
+        var ersterOrt = u.Kurs.Veranstaltungen.FirstOrDefault()?.Orte.FirstOrDefault();
+        var ort = ersterOrt is null ? "–" : (await programm.FuerKurseAsync([u.Kurs], abbruch)).Ort(ersterOrt.OrtId);
         var vorgang = await bamf.KursbeginnMeldenAsync(new BamfKursmeldung(u.Daten.BamfKursnummer, u.Kurs.Kursnummer, IntegrationskursVorlagen.Name(u.Daten.Art),
             u.Kurs.ErsterTermin is { } b ? DateOnly.FromDateTime(b) : Heute, ort, u.Teilnehmende.Select(t => t.Berechtigung!.Aktenzeichen).ToList()), abbruch);
         var daten = (await speicher.KursdatenAsync(kursId, abbruch))!;

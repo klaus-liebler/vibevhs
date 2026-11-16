@@ -172,13 +172,14 @@ public sealed class DozentenportalDienst(
         var verzeichnis = await programm.OrtsverzeichnisAsync(abbruch);
         var termine = kurse.SelectMany(k => k.Veranstaltungen.Where(v => v.Beginn >= start && v.Beginn <= ende && Eigen(k, v, ich)).Select(v => (Kurs: k, V: v))).ToList();
         var zu = await durchfuehrung.AbgeschlosseneAsync(termine.Select(t => t.V.Id), abbruch);
+        var namen = await programm.FuerKurseAsync(kurse, abbruch);
         var liste = new List<PortalTermin>();
         foreach (var (k, v) in termine.OrderBy(t => t.V.Beginn))
         {
             var ort = v.Orte.Select(o => verzeichnis.Finden(o.OrtId)).OfType<Ort>().FirstOrDefault();
             var belegungen = await anmeldungen.BelegungenDesKursesAsync(k.Id, abbruch);
-            liste.Add(new PortalTermin(v.Id, k.Id, k.Kursnummer, k.Titel, v.Nummer, v.Beginn, v.Ende, string.Join(" + ", v.Orte.Select(o => o.OrtName)),
-                ort is null ? null : verzeichnis.Wegbeschreibung(ort), v.Ausgefallen, Aenderung(k, v), zu.Contains(v.Id), Teilnehmende(k, v, belegungen).Count));
+            liste.Add(new PortalTermin(v.Id, k.Id, k.Kursnummer, k.Titel, v.Nummer, v.Beginn, v.Ende, namen.Orte(v.Orte),
+                ort is null ? null : verzeichnis.Wegbeschreibung(ort), v.Ausgefallen, Aenderung(k, v, namen), zu.Contains(v.Id), Teilnehmende(k, v, belegungen).Count));
         }
 
         return liste;
@@ -264,16 +265,18 @@ public sealed class DozentenportalDienst(
         var von = Heute.AddDays(-30).ToDateTime(TimeOnly.MinValue);
         var bis = Heute.AddYears(1).ToDateTime(TimeOnly.MinValue);
         var name = (await stammdaten.EinrichtungAsync(abbruch))?.Name ?? "vhs";
+        var namen = await programm.FuerKurseAsync(kurse, abbruch);
         return Kalenderdatei.Erzeugen($"Meine Kurse – {name}",
-            kurse.SelectMany(k => k.Veranstaltungen.Where(v => v.Beginn >= von && v.Beginn <= bis && Eigen(k, v, t.PersonId)).Select(v => (k, v, Aenderung(k, v)))),
-            name, uhr.GetUtcNow());
+            kurse.SelectMany(k => k.Veranstaltungen.Where(v => v.Beginn >= von && v.Beginn <= bis && Eigen(k, v, t.PersonId)).Select(v => (k, v, Aenderung(k, v, namen)))),
+            name, uhr.GetUtcNow(), namen);
     }
 
     public async Task<(string Datei, string Inhalt)> TerminIcsAsync(Guid veranstaltungId, CancellationToken abbruch = default)
     {
         var (k, v) = await TerminAsync(veranstaltungId, abbruch);
         var name = (await stammdaten.EinrichtungAsync(abbruch))?.Name ?? "vhs";
-        return ($"{k.Kursnummer}-termin-{v.Nummer}.ics", Kalenderdatei.Erzeugen($"{k.Kursnummer} Termin {v.Nummer}", [(k, v, Aenderung(k, v))], name, uhr.GetUtcNow()));
+        var namen = await programm.FuerKurseAsync([k], abbruch);
+        return ($"{k.Kursnummer}-termin-{v.Nummer}.ics", Kalenderdatei.Erzeugen($"{k.Kursnummer} Termin {v.Nummer}", [(k, v, Aenderung(k, v, namen))], name, uhr.GetUtcNow(), namen));
     }
 
     // ---------- Unterlagen ----------
@@ -592,7 +595,10 @@ public sealed class DozentenportalDienst(
     public static bool Eigen(Kurs k, Veranstaltung v, Guid ich) => v.DozentId == ich || k.Team.Any(t => t.PersonId == ich);
 
     /// <summary>Hinweis auf Ausfall, Raum- oder Zeitänderung eines Termins (für Portale und Kalender).</summary>
-    public static string? Aenderung(Kurs k, Veranstaltung v)
+    /// <summary>Namen (Orte, Lehrkräfte) eines Kurses zur Laufzeit.</summary>
+    public Task<Namen> NamenAsync(Kurs k, CancellationToken abbruch = default) => programm.FuerKurseAsync([k], abbruch);
+
+    public static string? Aenderung(Kurs k, Veranstaltung v, Namen namen)
     {
         if (v.Ausgefallen)
         {
@@ -608,7 +614,7 @@ public sealed class DozentenportalDienst(
         var teile = new List<string>();
         if (regel is not null && regel.OrtIds.Count > 0 && !v.Orte.Select(o => o.OrtId).OrderBy(x => x).SequenceEqual(regel.OrtIds.OrderBy(x => x)))
         {
-            teile.Add($"Raumänderung: {string.Join(" + ", v.Orte.Select(o => o.OrtName))}");
+            teile.Add($"Raumänderung: {namen.Orte(v.Orte)}");
         }
 
         if (regel is not null && (TimeOnly.FromDateTime(v.Beginn) != regel.Beginn))

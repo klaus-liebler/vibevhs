@@ -46,7 +46,7 @@ public class AnmeldungTests
         {
             Start = new DateOnly(2026, 12, 3), Anzahl = richtlinie?.Belegung == Belegungsart.Kontingent ? 20 : 6, Wochentage = [DayOfWeek.Thursday],
             Beginn = new TimeOnly(19, 0), DauerMinuten = 90, OrtIds = [raum.Id],
-        }, Kalender.OhneFerien, _ => "B 1.01 Bewegungsraum", new DateOnly(2027, 6, 30));
+        }, Kalender.OhneFerien, new DateOnly(2027, 6, 30));
         kurs.StatusSetzen(Kursstatus.Veroeffentlicht);
 
         var liste = Enumerable.Range(1, personen).Select(i =>
@@ -257,7 +257,7 @@ public class AnmeldungTests
             {
                 Start = new DateOnly(2026, 12, 2), Anzahl = 5, Wochentage = [DayOfWeek.Wednesday], Beginn = new TimeOnly(9, 0), DauerMinuten = 60,
                 OrtIds = [kurs.Serie!.OrtIds[0]],
-            }, Kalender.OhneFerien, _ => "B 1.01", new DateOnly(2027, 6, 30));
+            }, Kalender.OhneFerien, new DateOnly(2027, 6, 30));
             zweiter.StatusSetzen(Kursstatus.Veroeffentlicht);
             db.Kurse.Add(zweiter);
             await db.SaveChangesAsync(ct);

@@ -229,7 +229,7 @@ public static class Checkinregel
 
         if (ortId is { } o && v.Orte.All(x => x.OrtId != o))
         {
-            return new(Checkincode.FalscherOrt, $"Dieser Code gehört nicht zum Ort der Veranstaltung ({string.Join(" + ", v.Orte.Select(x => x.OrtName))}).");
+            return new(Checkincode.FalscherOrt, "Dieser Code gehört nicht zum Ort dieser Veranstaltung. Bitte den QR-Code im richtigen Raum scannen.");
         }
 
         if (bereitsAnwesend)

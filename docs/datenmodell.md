@@ -8,6 +8,58 @@ als Ganzzahl gespeichert, Datumswerte als Text `JJJJ-MM-TT`, Aufzählungen als T
 „Einstufung“: F = führend, C = Lese-Cache (Kopie), A = nur nach Anonymisierung (siehe `Spalteneinstufung.cs`). Spalten mit „JSON“ enthalten eine
 serialisierte Liste bzw. Struktur (Kandidaten für eigene Tabellen).
 
+## Bitemporale Datenhaltung
+
+Alle Personenangaben (Namen, Merkmale wie Titel, Rollen, Sprache, Geburtsdatum, Anrede, Adressen, Adresskennzeichen, Rufnummern,
+E-Mail-Adressen, Organisationen, Vollmachten, Einwilligungen, Qualifikationen) und weitere Stammdaten (Entgelte, Ortsmerkmale) werden
+**bitemporal** gespeichert. Es gibt zwei Zeitachsen:
+
+| Achse | Spalten | Bedeutung |
+|---|---|---|
+| **Gültigkeitszeit** (valid time) | `GueltigVon`, `GueltigBis` | Wann galt die Angabe in der Welt? Intervall **halboffen**: `GueltigVon` einschließlich, `GueltigBis` ausschließlich (`NULL` = offen). |
+| **Erfassungszeit** (transaction/system time) | `ErfasstAm`, `ErsetztAm` | Wann wusste das System das? Ebenfalls halboffen: ab `ErfasstAm`, bis `ErsetztAm` (`NULL` = aktueller Wissensstand). |
+
+**Versionen werden nie geändert.** Jede Änderung – auch das Beenden einer Gültigkeit – erzeugt neue Zeilen und setzt `ErsetztAm` an der
+alten Zeile. Nur so bleibt beantwortbar, was das System zu einem früheren Zeitpunkt wusste (z. B. warum ein Brief an die alte Adresse ging).
+
+**Stabile Identität vs. Version:** Die Spalte `Id` ist die Zeilen-Id einer *Version*. Gegenstände, von denen eine Person mehrere haben kann,
+tragen zusätzlich eine stabile Identität, die über alle Versionen gleich bleibt: `AdressId` (eine Adresse), `NummerId` (eine Rufnummer) usw.
+Darauf verweisen andere Versionen, z. B. das Kennzeichen „üblicher Aufenthaltsort“ (`PersonAdressKennzeichen.AdressId`).
+`AdressId` ist also **kein Adresstyp** – der Typ ergibt sich aus den Kennzeichen.
+
+### Beispiel: Umzug mit nachträglicher Korrektur
+
+Frau Muster wohnt seit 2020 in der Lindenstraße. Am 15.03.2026 meldet sie den Umzug zum 01.08. in den Bergweg. Am 10.07. geht die
+Kursbestätigung raus. Am 20.09. kommt der Brief zurück, und sie sagt, sie sei schon zum 01.07. umgezogen.
+
+| Zeile | Adresse | gültig von | gültig bis (einschl.) | erfasst | ersetzt | Erfassungsart |
+|---|---|---|---|---|---|---|
+| A | Lindenstr. 5 | 2020-01-01 | offen | 2020-01-10 | 2026-03-15 | Ersterfassung |
+| B | Lindenstr. 5 | 2020-01-01 | 2026-07-31 | 2026-03-15 | 2026-09-20 | Ende wegen gemeldetem Umzug (Abgrenzung) |
+| C | Bergweg 2 | 2026-08-01 | offen | 2026-03-15 | 2026-09-20 | Umzug ab 01.08. |
+| D | Lindenstr. 5 | 2020-01-01 | 2026-06-30 | 2026-09-20 | – | Korrektur |
+| E | Bergweg 2 | 2026-07-01 | offen | 2026-09-20 | – | Korrektur |
+
+(In der Datenbank steht `GueltigBis` ausschließlich, also bei B `2026-08-01`, bei D `2026-07-01`.)
+
+- **„Wo wohnte sie am 10.07.?“** (heutiger Wissensstand) → nur nicht ersetzte Zeilen D, E → **Bergweg**.
+- **„Wohin hätten wir am 10.07. geschrieben?“** (Wissensstand 10.07.) → Zeilen, die am 10.07. bekannt und nicht ersetzt waren: B, C → **Lindenstraße**.
+
+Beide Fragen beantwortet dieselbe Abfrage mit zwei Parametern – Stichtag `:tag` und Wissensstand `:bekannt`:
+
+```sql
+SELECT a.*
+FROM PersonAdressen a
+WHERE a.PersonId = :person
+  AND a.GueltigVon <= :tag AND (a.GueltigBis IS NULL OR a.GueltigBis > :tag)          -- galt am Stichtag
+  AND a.ErfasstAm <= :bekannt AND (a.ErsetztAm IS NULL OR a.ErsetztAm > :bekannt);   -- war zu diesem Zeitpunkt bekannt
+-- „Wo wohnte sie am 10.07.?“            :tag = '2026-07-10', :bekannt = jetzt
+-- „Wohin hätten wir am 10.07. geschrieben?“ :tag = '2026-07-10', :bekannt = '2026-07-10'
+```
+
+Im Code übernimmt das `ZeitlicheHistorie.AlsStichtag(gueltigAm, bekanntAm)`; `Person.StandAm(tag, bekannt)` liefert den gesamten Stand.
+Hinweis: `ErfasstAm`/`ErsetztAm` sind als `DateTimeOffset` binär gespeichert (Ganzzahl); die Parameter werden von EF Core passend umgerechnet.
+
 ## Übersicht
 
 - [Abwesenheiten](#abwesenheiten) – Abwesenheit
@@ -269,7 +321,7 @@ Klasse: `VibeVHS.Application.Sicherheit.Benutzerkonto`
 | Funktion | TEXT(300) |  |  | F: Funktionsbezeichnung |
 | Hinweis | TEXT(500) |  |  | F: Notiz |
 | Login | TEXT(100) | ja | eindeutig | F: Anmeldename |
-| Name | TEXT(200) | ja |  | C: Anzeigename der verknüpften Person (ohne Person: führend) |
+| Name | TEXT(200) |  |  | F: Name nur bei Funktionskonten ohne Person (sonst leer, der Name kommt aus der Person) |
 | PersonId | TEXT |  |  | F: einzige Verknüpfung Konto ↔ Person |
 | Rollen | TEXT | ja |  | F: Berechtigungsrollen des Kontos; JSON |
 
@@ -570,25 +622,22 @@ Klasse: `VibeVHS.Domain.Programm.Kurs`
 | Id | TEXT | ja | PK | F: Schlüssel |
 | ArchiviertAm | INTEGER |  |  | F: Archivierung (Prozess) |
 | AuftraggeberId | TEXT |  |  | F: Verweis auf die Organisation |
-| AuftraggeberName | TEXT(300) |  |  | C: Name der Organisation |
 | BenoetigteDozierendenmerkmale | TEXT | ja |  | F: Anforderungen an Lehrkräfte (z. B. sprachfreigabe=Englisch); JSON |
 | BenoetigteMerkmale | TEXT | ja |  | F: Raumanforderungen (aus der Kursart übernommen, kursbezogen änderbar); JSON |
 | Beschreibung | TEXT |  |  | F: Planungsdatum |
 | Bildungsurlaub | TEXT(100) |  |  | F: Anerkennung |
-| ErzeugtBis | TEXT |  |  | C: wie weit die Termine einer unbefristeten Serie erzeugt sind |
+| ErzeugtBis | TEXT |  |  | F: Prozesszustand: wie weit die Termine einer unbefristeten Serie erzeugt sind |
 | Fachbereich | INTEGER | ja |  | F: Planungsdatum |
 | KursartId | TEXT | ja |  | F: Planungsdatum |
 | Kursnummer | TEXT(30) | ja | eindeutig | F: Planungsdatum |
 | MaxTeilnehmende | INTEGER | ja |  | F: Planungsdatum |
 | MinTeilnehmende | INTEGER | ja |  | F: Planungsdatum |
-| Nutzungsart | TEXT(40) | ja |  | C: aus der Kursart |
+| Nutzungsart | TEXT(40) | ja |  | F: Planungsdatum: bestimmt die Raumkapazität (Vorlage aus der Kursart, wie Richtlinie und Raumanforderungen) |
 | Richtlinie | TEXT | ja |  | F: Buchungsrichtlinie (aus der Kursart übernommen, kursbezogen änderbar); JSON |
 | SemesterId | TEXT | ja | Index | F: Planungsdatum |
 | Serie | TEXT |  |  | F: Serienregel; JSON |
 | Sichtbarkeit | TEXT(40) | ja |  | F: Planungsdatum |
 | Status | TEXT(40) | ja |  | F: Prozesszustand |
-| Suchtext | TEXT(400) | ja |  | C: Suche |
-| Team | TEXT | ja |  | C: Lehrkräfte (PersonId, Leitung führend; Name = Cache: Name zum letzten Termin bzw. heute); JSON |
 | Titel | TEXT(300) | ja |  | F: Planungsdatum |
 | Umfang | TEXT(40) | ja |  | F: Planungsdatum |
 
@@ -773,7 +822,6 @@ Klasse: `VibeVHS.Domain.Programm.Ort`
 | Postleitzahl | TEXT(10) |  |  | F: Adresse des Orts |
 | Stadt | TEXT(100) |  |  | F: Adresse des Orts |
 | Strasse | TEXT(200) |  |  | F: Adresse des Orts (nicht personenbezogen) |
-| Suchtext | TEXT(500) | ja |  | C: Suche |
 | Zugang | TEXT(500) |  |  | F: Zugangshinweis |
 
 ## PersonAdressKennzeichen
@@ -890,6 +938,7 @@ Klasse: `VibeVHS.Domain.Personen.PersonName`
 | GueltigVon | TEXT | ja | Index |  |
 | Nachname | TEXT(200) | ja | Index |  |
 | PersonId | TEXT | ja | → Personen, Index |  |
+| Sortierschluessel | TEXT(400) | ja | Index |  |
 | Vorname | TEXT(200) | ja |  |  |
 | Vorsatz | TEXT(30) | ja |  |  |
 | Zusatz | TEXT(20) | ja |  |  |
@@ -997,22 +1046,13 @@ Klasse: `VibeVHS.Domain.Personen.Person`
 | AnonymisiertAm | INTEGER |  |  | F: Anonymisierung (Prozess) |
 | AnonymisiertGebiet | TEXT(100) |  |  | A: Kreis/PLZ-Gebiet statt Adresse |
 | AnonymisiertGeburtskohorte | TEXT(20) |  |  | A: Geburtsjahr-Kohorte statt Geburtsdatum |
-| Anzeigename | TEXT(300) | ja |  | C: Titel + Name zum heutigen Tag |
 | ArchiviertAm | INTEGER |  |  | F: Archivierung (Prozess) |
 | Datenschutz | TEXT(20) | ja | Index | F: Datenschutzstatus (aktiv, gesperrt, archiviert, anonymisiert) |
-| EMail | TEXT(320) |  |  | C: bevorzugte E-Mail-Adresse (versioniert) |
 | Fachbereiche | TEXT | ja |  | F: Zuordnung zu Fachbereichen (Organisation, nicht personenbezogen); JSON |
-| Geburtsdatum | TEXT |  | Index | C: Merkmal Geburtsdatum |
 | GesperrtAm | INTEGER |  |  | F: Sperre (Prozess) |
 | GesperrtBis | TEXT |  |  | F: Sperre (Prozess) |
-| Rollen | INTEGER(40) | ja |  | C: Merkmal Rollen (Bitmaske Personenrolle) zum heutigen Tag |
-| Sortiername | TEXT(300) | ja |  | C: Name zum heutigen Tag, normalisiert |
-| Sortierschluessel | TEXT(340) | ja | eindeutig | C: Sortiername + Id (Keyset-Paging) |
 | Sperrgrund | TEXT(2000) |  |  | F: Sperre (Prozess) |
-| Sprache | TEXT(10) | ja |  | C: Merkmal Sprache |
 | Status | TEXT(30) | ja | Index | F: Prozesszustand (aktiv, ruhend, zusammengeführt …), Änderungen im Protokoll |
-| Titel | TEXT(50) |  |  | C: Merkmal Titel zum heutigen Tag |
-| Wohnort | TEXT(200) |  |  | C: Ort des üblichen Aufenthalts zum heutigen Tag (Adresse + Kennzeichen) |
 | ZusammengefuehrtIn | TEXT |  |  | F: Dublettenzusammenführung (Prozess) |
 
 ## Portalanliegen
@@ -1293,12 +1333,10 @@ Klasse: `VibeVHS.Domain.Programm.Veranstaltung`
 | Ausnahme | INTEGER | ja |  |  |
 | Beginn | TEXT | ja | Index |  |
 | Bemerkung | TEXT(500) |  |  |  |
-| DozentId | TEXT |  |  |  |
-| DozentName | TEXT(300) | ja |  |  |
+| DozentId | TEXT |  | Index |  |
 | Ende | TEXT | ja |  |  |
 | KursId | TEXT | ja | → Kurse, Index |  |
 | Nummer | INTEGER | ja |  |  |
-| Orte | TEXT | ja |  | JSON |
 
 ## Vorlagen
 

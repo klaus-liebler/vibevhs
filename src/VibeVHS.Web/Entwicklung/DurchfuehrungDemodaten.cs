@@ -9,6 +9,7 @@ using VibeVHS.Domain.Durchfuehrung;
 using VibeVHS.Domain.Gemeinsam;
 using VibeVHS.Domain.Programm;
 using VibeVHS.Infrastructure.Datenbank;
+using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Web.Entwicklung;
 
@@ -41,10 +42,11 @@ internal static class DurchfuehrungDemodaten
         var pilates = await db.Kurse.Include(k => k.Veranstaltungen).FirstOrDefaultAsync(k => k.Kursnummer == z.Nr("26H-704"));
         if (pilates?.Leitung is { } leitung && !await db.Benutzerkonten.AnyAsync(k => k.PersonId == leitung.PersonId))
         {
-            var login = Login(leitung.Name);
+            var leitungName = (await db.AnzeigenamenAsync([leitung.PersonId], DateOnly.FromDateTime(DateTime.Today))).GetValueOrDefault(leitung.PersonId, "Kursleitung");
+            var login = Login(leitungName);
             if (!await db.Benutzerkonten.AnyAsync(k => k.Login == login))
             {
-                db.Benutzerkonten.Add(new Benutzerkonto(login, leitung.Name, "Kursleitung (Demo, freiberuflich)", [Rolle.Dozierende], [7, 8], leitung.PersonId,
+                db.Benutzerkonten.Add(new Benutzerkonto(login, leitungName, "Kursleitung (Demo, freiberuflich)", [Rolle.Dozierende], [7, 8], leitung.PersonId,
                     "Demokonto: sieht und erfasst die Anwesenheit eigener Veranstaltungen"));
                 notizen.Add($"Testkonto {login} (Dozierende)");
             }
@@ -74,7 +76,7 @@ internal static class DurchfuehrungDemodaten
                 continue;
             }
 
-            var leiter = kurs.Leitung?.Name ?? "Kursleitung";
+            var leiter = kurs.Leitung is { } l ? (await db.AnzeigenamenAsync([l.PersonId], DateOnly.FromDateTime(DateTime.Today))).GetValueOrDefault(l.PersonId, "Kursleitung") : "Kursleitung";
             foreach (var v in kurs.Veranstaltungen.Where(v => !v.Ausgefallen && v.Ende < jetzt.LocalDateTime).OrderBy(v => v.Beginn))
             {
                 var dauer = (int)(v.Ende - v.Beginn).TotalMinutes;
@@ -110,8 +112,11 @@ internal static class DurchfuehrungDemodaten
         notizen.Add($"{anzahl} Anwesenheiten");
 
         // Frühjahr 2025: Anna Schmidt (heute Becker) leitet, Olena Kovalenko nimmt teil
-        var anna = await db.Personen.Where(p => p.Anzeigename == "Anna Becker").OrderBy(p => p.Sortierschluessel).FirstOrDefaultAsync();
-        var olena = await db.Personen.Where(p => p.Anzeigename == "Olena Kovalenko").OrderBy(p => p.Sortierschluessel).FirstOrDefaultAsync();
+        var heuteTag = DateOnly.FromDateTime(uhr.GetLocalNow().Date);
+        var annaIds = db.MitNamen("Anna", "Becker", heuteTag);
+        var olenaIds = db.MitNamen("Olena", "Kovalenko", heuteTag);
+        var anna = await db.Personen.Where(p => annaIds.Contains(p.Id)).OrderBy(p => p.Id).FirstOrDefaultAsync();
+        var olena = await db.Personen.Where(p => olenaIds.Contains(p.Id)).OrderBy(p => p.Id).FirstOrDefaultAsync();
         var raum = await db.Orte.FirstOrDefaultAsync(o => o.Kurzname == "A 1.12");
         var sprachkurs = await db.Kursarten.FirstOrDefaultAsync(k => k.Name == "Sprachkurs");
         Guid? olenaBelegung = null;
@@ -124,19 +129,21 @@ internal static class DurchfuehrungDemodaten
             }
 
             var e = Erfassung.Erst(z.DTO(2025, 1, 15, 10, 0), Von);
-            var kurs = new Kurs(z.Nr("25F-501"), "Englisch A1 – Einstieg", f25, 5, sprachkurs, 6, 14).MitTeam([new KursDozent(anna.Id, "Anna Schmidt", true)]);
+            var kurs = new Kurs(z.Nr("25F-501"), "Englisch A1 – Einstieg", f25, 5, sprachkurs, 6, 14).MitTeam([new KursDozent(anna.Id, true)]);
             kurs.EntgeltSetzenAb(Geld.Euro(92), Geld.Euro(69), f25.Beginn, e);
             kurs.SerieFestlegen(new Serienregel
             {
                 Start = z.D(2025, 3, 11), Anzahl = 10, Wochentage = [DayOfWeek.Tuesday], Beginn = new TimeOnly(18, 0), DauerMinuten = 90, OrtIds = [raum.Id],
-            }, new Kalender(await db.Ferien.AsNoTracking().ToListAsync()), _ => raum.Anzeige, z.D(2025, 12, 31));
+            }, new Kalender(await db.Ferien.AsNoTracking().ToListAsync()), z.D(2025, 12, 31));
             kurs.StatusSetzen(Kursstatus.Veroeffentlicht);
             db.Kurse.Add(kurs);
 
             var teilnehmende = new List<Guid> { olena.Id };
-            teilnehmende.AddRange(await db.Personen.IgnoreAutoIncludes().Where(p => (p.Rollen & Domain.Personen.Personenrolle.Teilnehmende) != 0 && p.Id != olena.Id
-                                                                             && p.AngelegtAm < z.DTO(2025, 1, 1, 0, 0))
-                .OrderBy(p => p.Sortierschluessel).Select(p => p.Id).Take(7).ToListAsync());
+            var tnRolle = db.MitRolle(Domain.Personen.Personenrolle.Teilnehmende, heuteTag);
+            var vor2025 = z.DTO(2025, 1, 1, 0, 0);
+            teilnehmende.AddRange((await db.Personen.IgnoreAutoIncludes().Where(p => tnRolle.Contains(p.Id) && p.Id != olena.Id)
+                    .NachNameSortiert(db, heuteTag).Select(p => new { p.Id, p.AngelegtAm }).ToListAsync())
+                .Where(p => p.AngelegtAm < vor2025).Select(p => p.Id).Take(7));
             var tresen = new Buchender("Katja Friesen", "katja.friesen", "Teilnehmerservice");
             foreach (var pid in teilnehmende)
             {
@@ -174,7 +181,9 @@ internal static class DurchfuehrungDemodaten
             await dokumente.BescheinigungErstellenAsync(ob, Domain.Dokumente.Dokumentart.Teilnahmebescheinigung);
         }
 
-        var mehmet = await db.Personen.AsNoTracking().Where(p => p.Anzeigename == "Mehmet Yılmaz" && p.AngelegtAm > jetzt.AddDays(-30)).OrderBy(p => p.Sortierschluessel).FirstOrDefaultAsync();
+        var mehmetIds = db.MitNamen("Mehmet", "Yılmaz", DateOnly.FromDateTime(uhr.GetLocalNow().Date));
+        var mehmet = (await db.Personen.AsNoTracking().Where(p => mehmetIds.Contains(p.Id)).OrderBy(p => p.Id).ToListAsync())
+            .FirstOrDefault(p => p.AngelegtAm > jetzt.AddDays(-30));
         var englisch = await db.Kurse.AsNoTracking().FirstOrDefaultAsync(k => k.Kursnummer == z.Nr("26H-501"));
         if (mehmet is not null && englisch is not null
             && await db.Belegungen.AsNoTracking().FirstOrDefaultAsync(b => b.PersonId == mehmet.Id && b.KursId == englisch.Id) is { } mb

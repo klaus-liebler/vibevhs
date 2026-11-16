@@ -70,6 +70,7 @@ public sealed class Schnellanmeldedienst(
         var ermaessigt = (await anmeldung.ErmaessigungHeuteAsync(personId, abbruch)) is not null && entgelt?.ErmaessigtCent is not null;
         var zahlart = await ZahlartAsync(personId, abbruch);
         var termine = kurs.Veranstaltungen.Where(v => !v.Ausgefallen).OrderBy(v => v.Beginn).ToList();
+        var namen = await anmeldung.NamenAsync(kurs, abbruch);
         var status = pruefung.Code switch
         {
             Buchungscode.Buchbar => "Es ist ein Platz frei.",
@@ -77,7 +78,7 @@ public sealed class Schnellanmeldedienst(
             _ => pruefung.Erklaerung,
         };
         return new SchnellVorschau(kurs.Kursnummer, kurs.Titel, termine.FirstOrDefault()?.Beginn, ShopText.Zeiten(termine),
-            termine.FirstOrDefault()?.Orte.FirstOrDefault()?.OrtName, termine.Count, ermaessigt ? entgelt!.ErmaessigtCent : entgelt?.Cent, ermaessigt,
+            termine.FirstOrDefault()?.Orte.FirstOrDefault() is { } ersterOrt ? namen.Ort(ersterOrt.OrtId) : null, termine.Count, ermaessigt ? entgelt!.ErmaessigtCent : entgelt?.Cent, ermaessigt,
             zahlart, zahlart == Zahlart.Lastschrift ? "SEPA-Lastschrift (Ihr bestehendes Mandat)" : "Rechnung (Überweisung)",
             pruefung.Moeglich, pruefung.Code == Buchungscode.Warteliste, status, person.AktuellerName(jetzt).Vorname,
             optionen.AgbVersion, optionen.AgbUrl, optionen.DatenschutzVersion, optionen.DatenschutzUrl);

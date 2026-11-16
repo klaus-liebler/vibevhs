@@ -7,6 +7,7 @@ using VibeVHS.Domain.Gemeinsam;
 using VibeVHS.Domain.Personen;
 using VibeVHS.Domain.Programm;
 using VibeVHS.Infrastructure.Datenbank;
+using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Infrastructure.Datenschutz;
 
@@ -85,8 +86,9 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
             .Where(p => !mitarbeitende.Contains(p.Id) && p.Status != Personenstatus.Zusammengefuehrt
                         && (p.Datenschutz == Datenschutzstatus.Aktiv || p.Datenschutz == Datenschutzstatus.Archiviert
                             || (p.Datenschutz == Datenschutzstatus.Gesperrt && p.GesperrtBis < heute)))
-            .Select(p => new { p.Id, p.Anzeigename, p.AngelegtAm, p.Datenschutz })
+            .Select(p => new { p.Id, p.AngelegtAm, p.Datenschutz })
             .ToListAsync(abbruch);
+        var anzeigenamen = await db.AnzeigenamenAsync(kandidaten.Select(k => k.Id).ToList(), heute, abbruch);
 
         var letzte = kandidaten.ToDictionary(k => k.Id, k => k.AngelegtAm);
         void Max(IEnumerable<(Guid Id, DateTimeOffset Am)> werte)
@@ -126,7 +128,7 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
 
         return kandidaten
             .Where(k => letzte[k.Id] < vor || (k.Datenschutz == Datenschutzstatus.Gesperrt))
-            .Select(k => new PersonAktivitaet(k.Id, k.Anzeigename, letzte[k.Id], k.Datenschutz))
+            .Select(k => new PersonAktivitaet(k.Id, anzeigenamen.GetValueOrDefault(k.Id, "?"), letzte[k.Id], k.Datenschutz))
             .OrderBy(k => k.LetzteAktivitaet)
             .ToList();
     }

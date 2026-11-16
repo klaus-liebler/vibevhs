@@ -24,7 +24,7 @@ internal static class Testkurse
         {
             Start = start ?? new DateOnly(2026, 12, 1), Anzahl = termine, Wochentage = [DayOfWeek.Tuesday], Beginn = new TimeOnly(18, 0), DauerMinuten = 90,
             OrtIds = [Raum],
-        }, Kalender.OhneFerien, _ => "A 1.12", new DateOnly(2027, 6, 30));
+        }, Kalender.OhneFerien, new DateOnly(2027, 6, 30));
         kurs.StatusSetzen(status);
         return kurs;
     }
@@ -37,8 +37,8 @@ internal static class Testkurse
     }
 
     public static Buchungsergebnis Pruefen(Kurs kurs, Person person, Buchungsweg weg = Buchungsweg.Tresen, Guid? bev = null, int belegt = 0, int wartend = 0,
-        Belegungsstatus? bestehend = null)
-        => Buchungspruefung.Pruefen(kurs, person, weg, bev, new Buchungslage(belegt, wartend, bestehend), Jetzt);
+        Belegungsstatus? bestehend = null, string? auftraggeber = null)
+        => Buchungspruefung.Pruefen(kurs, person, weg, bev, new Buchungslage(belegt, wartend, bestehend, auftraggeber), Jetzt);
 }
 
 public class BuchungspruefungTests
@@ -115,7 +115,7 @@ public class BuchungspruefungTests
         Testkurse.Pruefen(Testkurse.Kurs(auchOnline, Sichtbarkeit.Intern), _olena, Buchungsweg.Online).Code.ShouldBe(Buchungscode.NurOeffentlich);
 
         var org = new Organisation("Stadtwerke", Organisationsart.Firma);
-        var geschlossen = Testkurse.Kurs(auchOnline).MitSichtbarkeit(Sichtbarkeit.Geschlossen, org.Id, org.Name);
+        var geschlossen = Testkurse.Kurs(auchOnline).MitSichtbarkeit(Sichtbarkeit.Geschlossen, org.Id);
         _olena.OrganisationZuordnenAb(org, null, new DateOnly(2026, 1, 1), Erfassung.Erst(Testkurse.Jetzt));
         Testkurse.Pruefen(geschlossen, _olena, Buchungsweg.Online).Code.ShouldBe(Buchungscode.NurOeffentlich);
     }
@@ -124,8 +124,8 @@ public class BuchungspruefungTests
     public void Geschlossener_Kurs_nur_fuer_die_Zielgruppe()
     {
         var org = new Organisation("Stadtwerke Beispielstadt", Organisationsart.Firma);
-        var kurs = Testkurse.Kurs(Buchungsrichtlinie.Firmenkurs).MitSichtbarkeit(Sichtbarkeit.Geschlossen, org.Id, org.Name);
-        var e = Testkurse.Pruefen(kurs, _olena);
+        var kurs = Testkurse.Kurs(Buchungsrichtlinie.Firmenkurs).MitSichtbarkeit(Sichtbarkeit.Geschlossen, org.Id);
+        var e = Testkurse.Pruefen(kurs, _olena, auftraggeber: org.Name); // Name zur Laufzeit, keine Kopie am Kurs
         e.Code.ShouldBe(Buchungscode.GeschlossenZielgruppe);
         e.Erklaerung.ShouldContain("Stadtwerke Beispielstadt");
 

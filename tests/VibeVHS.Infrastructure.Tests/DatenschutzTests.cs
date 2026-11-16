@@ -68,12 +68,12 @@ public class DatenschutzTests
         anna.RolleHinzufuegen(Personenrolle.Dozierende, new DateOnly(kursjahr, 1, 1), Erfassung.Erst(erfasst));
         var semester = new Semester($"Frühjahr {kursjahr}", $"{kursjahr % 100}F", new DateOnly(kursjahr, 2, 1), new DateOnly(kursjahr, 7, 31));
         var art = new Kursart("Sprachkurs", Nutzungsart.Seminar, [], Buchungsrichtlinie.Oeffentlich);
-        var kurs = new Kurs($"{kursjahr % 100}F-501", "Englisch A2", semester, 5, art, 6, 14).MitTeam([new KursDozent(anna.Id, "Anna Becker", true)]);
+        var kurs = new Kurs($"{kursjahr % 100}F-501", "Englisch A2", semester, 5, art, 6, 14).MitTeam([new KursDozent(anna.Id, true)]);
         kurs.SerieFestlegen(new Serienregel
         {
             Start = new DateOnly(kursjahr, 3, 2), Anzahl = 4, Wochentage = [DayOfWeek.Tuesday], Beginn = new TimeOnly(18, 0), DauerMinuten = 90,
             OrtIds = [Guid.NewGuid()],
-        }, Kalender.OhneFerien, _ => "R 1", new DateOnly(kursjahr, 12, 31));
+        }, Kalender.OhneFerien, new DateOnly(kursjahr, 12, 31));
 
         await using var db = t.NeuerKontext();
         db.Personen.Add(anna);
@@ -109,8 +109,10 @@ public class DatenschutzTests
 
         var k = await neu.Kurse.Include(x => x.Veranstaltungen).SingleAsync(x => x.Id == kurs.Id, ct);
         k.Team.Single().PersonId.ShouldBe(anna.Id);
-        k.Team.Single().Name.ShouldStartWith("Gelöschte Person");
-        k.Veranstaltungen.ShouldAllBe(v => v.DozentId == anna.Id && v.DozentName.StartsWith("Gelöschte Person"));
+        // Keine Namenskopien mehr: der Platzhalter erscheint, weil Namen zur Laufzeit aus der (anonymisierten) Person gelesen werden.
+        var namen = await VibeVHS.Application.Programm.NamensquelleErweiterungen.FuerKurseAsync(new VibeVHS.Infrastructure.Personen.Namensquelle(neu), [k], ct);
+        namen.Team(k, k.Team.Single()).ShouldStartWith("Gelöschte Person");
+        k.Veranstaltungen.ShouldAllBe(v => v.DozentId == anna.Id && namen.Dozent(v).StartsWith("Gelöschte Person"));
 
         var mail = await neu.Postausgang.SingleAsync(n => n.PersonId == anna.Id, ct);
         mail.Inhalt.ShouldBe("[Inhalt anonymisiert]");
@@ -124,12 +126,12 @@ public class DatenschutzTests
         await using var t = await TestDatenbank.ErzeugenAsync();
         var (mehmet, ayse) = await TeilnehmendeAsync(t, new DateTimeOffset(2020, 3, 1, 9, 0, 0, TimeSpan.FromHours(1)));
         var (dienst, db, _) = await DienstAsync(t, Verwaltungsleitung);
-        var teilnehmendeVorher = await db.Personen.CountAsync(p => (p.Rollen & Personenrolle.Teilnehmende) == Personenrolle.Teilnehmende, ct);
+        var teilnehmendeVorher = (await db.Personen.AsNoTracking().ToListAsync(ct)).Count(p => (p.Rollen & Personenrolle.Teilnehmende) == Personenrolle.Teilnehmende);
 
         await dienst.LoeschenAsync(mehmet.Id, "Test", ct);
 
         await using var neu = t.NeuerKontext();
-        (await neu.Personen.CountAsync(p => (p.Rollen & Personenrolle.Teilnehmende) == Personenrolle.Teilnehmende, ct)).ShouldBe(teilnehmendeVorher);
+        (await neu.Personen.AsNoTracking().ToListAsync(ct)).Count(p => (p.Rollen & Personenrolle.Teilnehmende) == Personenrolle.Teilnehmende).ShouldBe(teilnehmendeVorher);
         var m = await neu.Personen.SingleAsync(p => p.Id == mehmet.Id, ct);
         m.AnonymisiertGeburtskohorte.ShouldBe("1985–1989"); // statt eingefrorener Altersgruppe
         VibeVHS.Domain.Datenschutz.Statistik.AltersgruppeAusKohorte(m.AnonymisiertGeburtskohorte, new DateOnly(2040, 12, 31)).ShouldBe("50–64"); // altert mit

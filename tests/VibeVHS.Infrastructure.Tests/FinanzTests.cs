@@ -79,15 +79,15 @@ public class FinanzTests
         var dozentin = Person.Anlegen("Maria", "Rossi", new DateOnly(2020, 1, 1), jetzt.AddYears(-5), null, "maria@example.org");
         dozentin.RolleHinzufuegen(Personenrolle.Dozierende, new DateOnly(2020, 1, 1), Erfassung.Erst(jetzt.AddYears(-5)));
         dozentin.BeschaeftigungAendernAb(Beschaeftigungsart.Freiberuflich, new DateOnly(2020, 1, 1), Erfassung.Erst(jetzt.AddYears(-5)));
-        var kurs = new Kurs("26H-811", "Spanisch A1", semester, 8, art, 1, 10).MitTeam([new KursDozent(dozentin.Id, "Maria Rossi", true)]);
+        var kurs = new Kurs("26H-811", "Spanisch A1", semester, 8, art, 1, 10).MitTeam([new KursDozent(dozentin.Id, true)]);
         kurs.EntgeltSetzenAb(Geld.Euro(90), null, semester.Beginn, Erfassung.Erst(jetzt.AddMonths(-3)));
         kurs.SerieFestlegen(new Serienregel
         {
             Start = new DateOnly(2026, 11, 2), Anzahl = 8, Wochentage = [DayOfWeek.Monday], Beginn = new TimeOnly(18, 0), DauerMinuten = 90, OrtIds = [raum.Id],
-        }, Kalender.OhneFerien, _ => "A 1.12 Seminarraum", new DateOnly(2027, 6, 30));
+        }, Kalender.OhneFerien, new DateOnly(2027, 6, 30));
         if (auftraggeber is { } a)
         {
-            kurs.MitSichtbarkeit(Sichtbarkeit.Intern, a, "Stadtwerke Emsdetten");
+            kurs.MitSichtbarkeit(Sichtbarkeit.Intern, a);
         }
 
         kurs.StatusSetzen(Kursstatus.Veroeffentlicht);

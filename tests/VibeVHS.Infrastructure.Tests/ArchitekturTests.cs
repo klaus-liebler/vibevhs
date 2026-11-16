@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using VibeVHS.Application.Personen;
+using VibeVHS.Application.Programm;
 using VibeVHS.Application.Sicherheit;
 using VibeVHS.Domain.Gemeinsam;
 using VibeVHS.Domain.Personen;
@@ -11,9 +12,9 @@ using VibeVHS.Infrastructure.Personen;
 namespace VibeVHS.Infrastructure.Tests;
 
 /// <summary>
-/// Architekturtests der Grundreinigung (11/2026): Stammdatentabellen bekommen keine neuen, unklassifizierten Spalten (A), Lese-Caches
-/// entsprechen nach dem Fortschreib-Job ihrer bitemporalen Quelle (B), und Statistik- bzw. Namenskopien sind nur als dokumentierte
-/// Ausnahmen erlaubt (C).
+/// Architekturtests der Normalisierung (11/2026): Stammdatentabellen bekommen keine neuen, unklassifizierten Spalten und keine Lese-Caches (A),
+/// berechnete Werte und Namen entsprechen zu jedem Datum ihrer bitemporalen Quelle (B), und Statistik- bzw. Namenskopien gibt es nur dort,
+/// wo ein Beleg den Stand zum Erfassungszeitpunkt bewusst festhält (C).
 /// </summary>
 public sealed class ArchitekturTests
 {
@@ -46,6 +47,12 @@ public sealed class ArchitekturTests
             fehler.AddRange(spalten.Keys.Except(vorhanden).Select(s => $"{tabelle}.{s}: in der Einstufung, aber nicht (mehr) im Modell"));
         }
 
+        foreach (var (tabelle, spalten) in Spalteneinstufung.Tabellen)
+        {
+            fehler.AddRange(spalten.Where(s => s.Value.Art == Spaltenart.Cache)
+                .Select(s => $"{tabelle}.{s.Key}: Lese-Cache (Kopie) – stattdessen zur Laufzeit aus der Quelle lesen (Index statt Kopie)"));
+        }
+
         fehler.ShouldBeEmpty();
     }
 
@@ -55,12 +62,8 @@ public sealed class ArchitekturTests
     public void C_Keine_Statistikspalten_und_Namenskopien_ausserhalb_der_Ausnahmen()
     {
         using var db = ModellKontext();
-        var erlaubteNamenskopien = new HashSet<string>(StringComparer.Ordinal)
-        {
-            // dokumentierte Caches (Regel „Name zum Termindatum“ bzw. heute), täglich abgeglichen
-            "Kurse.AuftraggeberName", "Benutzerkonten.Name", "Veranstaltungen.DozentName",
-            // Belege und Vollmachten frieren den Namen zum Erfassungszeitpunkt bewusst ein (GoBD, Nachweis)
-        };
+        // Benutzerkonten.Name ist nur bei Funktionskonten ohne Person gefüllt (führend), sonst leer.
+        var erlaubteNamenskopien = new HashSet<string>(StringComparer.Ordinal) { "Benutzerkonten.Name" };
         var fehler = new List<string>();
         foreach (var e in db.Model.GetEntityTypes().Where(e => e.GetTableName() is not null))
         {
@@ -92,7 +95,7 @@ public sealed class ArchitekturTests
             or "Ermaessigungen" or "Anwesenheiten" or "Listenabschluesse" or "Schnellanmeldungen" or "Honorarvertraege";
     }
 
-    // ---------- B: Caches == bitemporale Quelle nach dem Fortschreiben ----------
+    // ---------- B: berechnete Werte und Namen == bitemporale Quelle zu jedem Datum (ohne Job, ohne Kopien) ----------
 
     private sealed class Automatik : IAktuellerBenutzer
     {
@@ -100,7 +103,7 @@ public sealed class ArchitekturTests
     }
 
     [Fact]
-    public async Task B_Caches_entsprechen_der_bitemporalen_Quelle_zum_jeweiligen_Datum()
+    public async Task B_Berechnete_Werte_und_Namen_entsprechen_der_bitemporalen_Quelle_zum_jeweiligen_Datum()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var t = await TestDatenbank.ErzeugenAsync();
@@ -132,10 +135,10 @@ public sealed class ArchitekturTests
         var art = new Kursart("Sprachkurs", Nutzungsart.Seminar, [], Buchungsrichtlinie.Oeffentlich);
         var kurse = personen.Take(10).Select((p, i) =>
         {
-            var k = new Kurs($"26H-{600 + i}", $"Kurs {i}", semester, 5, art, 1, 10).MitTeam([new KursDozent(p.Id, p.Anzeigename, true)]);
+            var k = new Kurs($"26H-{600 + i}", $"Kurs {i}", semester, 5, art, 1, 10).MitTeam([new KursDozent(p.Id, true)]);
             var start = heute.AddDays(-70 + (i * 7));
             k.SerieFestlegen(new Serienregel { Start = start, Anzahl = 12, Wochentage = [start.DayOfWeek], Beginn = new TimeOnly(18, 0), DauerMinuten = 90, OrtIds = [Guid.NewGuid()], DozentId = p.Id },
-                Kalender.OhneFerien, _ => "Raum", heute.AddDays(120));
+                Kalender.OhneFerien, heute.AddDays(120));
             return k;
         }).ToList();
         await using (var db = t.NeuerKontext())
@@ -147,15 +150,10 @@ public sealed class ArchitekturTests
             await db.SaveChangesAsync(ct);
         }
 
-        // Zeit läuft: an mehreren Tagen der Job, dazwischen Lücken.
+        // Zeit läuft – ohne Job und ohne Kopien: beim Laden wird jeder Wert aus den Versionen zum jeweiligen Tag berechnet.
         foreach (var schritt in new[] { 0, 3, 10, 30, 45 })
         {
             t.Uhr.SetUtcNow(jetzt.ToUniversalTime().AddDays(schritt));
-            await using (var db = t.NeuerKontext())
-            {
-                await new Zwischenstaende(new ZwischenstandSpeicher(db, t.Uhr), new AuditProtokoll(db, new Automatik(), t.Uhr), t.Uhr).FortschreibenAsync(ct);
-            }
-
             var n = t.Uhr.GetLocalNow();
             var h = DateOnly.FromDateTime(n.Date);
             await using var pruef = t.NeuerKontext();
@@ -164,15 +162,17 @@ public sealed class ArchitekturTests
                 var s = p.StandAm(h, n);
                 (p.Anzeigename, p.Rollen, p.Wohnort, p.Sprache, p.Titel, p.EMail, p.Geburtsdatum)
                     .ShouldBe((s.NameMitTitel, s.Rollen, s.Aufenthaltsort?.Ort, s.Sprache ?? "de", s.Titel, s.EMails.FirstOrDefault()?.Adresse, s.Geburtsdatum),
-                        $"Cache von {p.Anzeigename} am {h:dd.MM.yyyy}");
+                        $"Wert von {p.Anzeigename} am {h:dd.MM.yyyy}");
             }
 
             var alle = await pruef.Personen.AsNoTracking().ToDictionaryAsync(p => p.Id, ct);
-            foreach (var k in await pruef.Kurse.AsNoTracking().Include(x => x.Veranstaltungen).ToListAsync(ct))
+            var kurseMitTerminen = await pruef.Kurse.AsNoTracking().Include(x => x.Veranstaltungen).ToListAsync(ct);
+            var namen = await new Namensquelle(pruef).FuerKurseAsync(kurseMitTerminen, ct);
+            foreach (var k in kurseMitTerminen)
             {
                 foreach (var v in k.Veranstaltungen.Where(v => v.DozentId is not null))
                 {
-                    v.DozentName.ShouldBe(alle[v.DozentId!.Value].StandAm(DateOnly.FromDateTime(v.Beginn), n).NameMitTitel, $"Termin {k.Kursnummer} am {v.Beginn:dd.MM.yyyy}");
+                    namen.Dozent(v).ShouldBe(alle[v.DozentId!.Value].StandAm(DateOnly.FromDateTime(v.Beginn), n).NameMitTitel, $"Termin {k.Kursnummer} am {v.Beginn:dd.MM.yyyy}");
                 }
             }
         }

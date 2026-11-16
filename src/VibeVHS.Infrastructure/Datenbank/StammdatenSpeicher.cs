@@ -1,3 +1,4 @@
+using VibeVHS.Infrastructure.Personen;
 using Microsoft.EntityFrameworkCore;
 using VibeVHS.Application.Sicherheit;
 using VibeVHS.Application.Stammdaten;
@@ -8,9 +9,10 @@ namespace VibeVHS.Infrastructure.Datenbank;
 internal sealed class StammdatenSpeicher(VibeVhsDbContext db) : IStammdaten, IBenutzerkonten, IEinrichtungAendern, IBenutzerkontenPflege
 {
     public async Task<IReadOnlyList<Benutzerkonto>> AlleMitInaktivenAsync(CancellationToken abbruch = default)
-        => await db.Benutzerkonten.OrderBy(k => k.Name).ThenBy(k => k.Id).ToListAsync(abbruch);
+        => await MitNamenAsync(await db.Benutzerkonten.ToListAsync(abbruch), abbruch);
 
-    public Task<Benutzerkonto?> ZumAendernAsync(Guid id, CancellationToken abbruch = default) => db.Benutzerkonten.FirstOrDefaultAsync(k => k.Id == id, abbruch);
+    public async Task<Benutzerkonto?> ZumAendernAsync(Guid id, CancellationToken abbruch = default)
+        => (await MitNamenAsync(await db.Benutzerkonten.Where(k => k.Id == id).ToListAsync(abbruch), abbruch)).FirstOrDefault();
 
     public Task<bool> LoginVergebenAsync(string login, CancellationToken abbruch = default) => db.Benutzerkonten.AnyAsync(k => k.Login == login, abbruch);
 
@@ -28,11 +30,27 @@ internal sealed class StammdatenSpeicher(VibeVhsDbContext db) : IStammdaten, IBe
         => await db.Fachbereiche.AsNoTracking().OrderBy(f => f.Nr).ToListAsync(abbruch);
 
     public async Task<IReadOnlyList<Benutzerkonto>> AlleAsync(CancellationToken abbruch = default)
-        => await db.Benutzerkonten.AsNoTracking().Where(k => k.Aktiv).OrderBy(k => k.Name).ToListAsync(abbruch);
+        => await MitNamenAsync(await db.Benutzerkonten.AsNoTracking().Where(k => k.Aktiv).ToListAsync(abbruch), abbruch);
 
-    public Task<Benutzerkonto?> FindenAsync(string login, CancellationToken abbruch = default)
+    public async Task<Benutzerkonto?> FindenAsync(string login, CancellationToken abbruch = default)
     {
         var l = login.Trim().ToLowerInvariant();
-        return db.Benutzerkonten.AsNoTracking().FirstOrDefaultAsync(k => k.Login == l && k.Aktiv, abbruch);
+        return (await MitNamenAsync(await db.Benutzerkonten.AsNoTracking().Where(k => k.Login == l && k.Aktiv).ToListAsync(abbruch), abbruch)).FirstOrDefault();
+    }
+
+    /// <summary>Konten mit Person bekommen deren heutigen Namen (aus den Versionen, keine Kopie); sortiert nach Name.</summary>
+    private async Task<IReadOnlyList<Benutzerkonto>> MitNamenAsync(List<Benutzerkonto> konten, CancellationToken abbruch)
+    {
+        var ids = konten.Where(k => k.PersonId is not null).Select(k => k.PersonId!.Value).Distinct().ToList();
+        if (ids.Count > 0)
+        {
+            var namen = await db.AnzeigenamenAsync(ids, DateOnly.FromDateTime(db.Uhr.GetLocalNow().Date), abbruch);
+            foreach (var k in konten.Where(k => k.PersonId is not null))
+            {
+                k.PersonennameSetzen(namen.GetValueOrDefault(k.PersonId!.Value));
+            }
+        }
+
+        return konten.OrderBy(k => k.Name, StringComparer.CurrentCulture).ThenBy(k => k.Id).ToList();
     }
 }

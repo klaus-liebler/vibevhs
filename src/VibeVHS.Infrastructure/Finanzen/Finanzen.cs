@@ -216,11 +216,12 @@ internal sealed class FinanzSpeicher(VibeVhsDbContext db) : IFinanzSpeicher
             .ToDictionaryAsync(x => x.Key, x => x.Anwesend, abbruch);
         var abgeschlossen = await db.Set<Listenabschluss>().AsNoTracking().Where(l => ids.Contains(l.VeranstaltungId)).Select(l => l.VeranstaltungId).ToListAsync(abbruch);
         var zu = abgeschlossen.ToHashSet();
+        var ortNamen = await db.Orte.IgnoreAutoIncludes().AsNoTracking().ToDictionaryAsync(o => o.Id, o => o.Anzeige, abbruch);
         return termine.Where(v => kurse.ContainsKey(v.KursId)).Select(v =>
         {
             var k = kurse[v.KursId];
             return new Dozententermin(v.DozentId!.Value, v.Id, v.KursId, k.Kursnummer, arten.GetValueOrDefault(k.KursartId, "?"), k.Fachbereich, v.Beginn, v.Ende,
-                v.Ausgefallen, v.AusgefallenAm, v.Bemerkung, string.Join(" + ", v.Orte.Select(o => o.OrtName)), belegungen.Count(b => b.KursId == v.KursId),
+                v.Ausgefallen, v.AusgefallenAm, v.Bemerkung, string.Join(" + ", v.Orte.Select(o => ortNamen.GetValueOrDefault(o.OrtId, "?"))), belegungen.Count(b => b.KursId == v.KursId),
                 anwesend.TryGetValue(v.Id, out var n) ? n : zu.Contains(v.Id) ? 0 : null, belegungen.Count(b => b.KursId == v.KursId && b.Ermaessigt),
                 v.Orte.FirstOrDefault()?.OrtId);
         }).ToList();

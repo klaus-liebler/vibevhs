@@ -111,7 +111,7 @@ internal sealed class ShopTestHost : IAsyncDisposable
         kurs.SerieFestlegen(new Serienregel
         {
             Start = start, Anzahl = 6, Wochentage = [start.DayOfWeek], Beginn = new TimeOnly(19, 0), DauerMinuten = 90, OrtIds = [raum.Id],
-        }, Kalender.OhneFerien, _ => "B 1.01 Bewegungsraum", heute.AddDays(300));
+        }, Kalender.OhneFerien, heute.AddDays(300));
         kurs.StatusSetzen(status);
         db.AddRange(semester, art, haus, raum, kurs);
         await db.SaveChangesAsync();

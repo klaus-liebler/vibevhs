@@ -4,6 +4,7 @@ using VibeVHS.Domain.Anmeldung;
 using VibeVHS.Domain.Personen;
 using VibeVHS.Domain.Programm;
 using VibeVHS.Infrastructure.Datenbank;
+using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Web.Entwicklung;
 
@@ -35,10 +36,14 @@ internal static class AnmeldungDemodaten
         var ikTeam = new Buchender(Name("sylvia.beckmann", "Sylvia Beckmann"), "sylvia.beckmann", "Integrationskurs-Team");
 
         var kontoPersonen = await db.Benutzerkonten.AsNoTracking().Where(k => k.PersonId != null).Select(k => k.PersonId!.Value).ToListAsync();
-        var teilnehmende = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
-            .Where(p => (p.Rollen & Personenrolle.Teilnehmende) == Personenrolle.Teilnehmende && p.Status == Personenstatus.Aktiv
+        var heuteTag = DateOnly.FromDateTime(uhr.GetLocalNow().Date);
+        var mitRolle = db.MitRolle(Personenrolle.Teilnehmende, heuteTag);
+        var tnIds = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
+            .Where(p => mitRolle.Contains(p.Id) && p.Status == Personenstatus.Aktiv
                         && p.Datenschutz == VibeVHS.Domain.Datenschutz.Datenschutzstatus.Aktiv && !kontoPersonen.Contains(p.Id))
-            .OrderBy(p => p.Sortierschluessel).Select(p => new { p.Id, p.Anzeigename }).Take(4000).ToListAsync();
+            .NachNameSortiert(db, heuteTag).Select(p => p.Id).Take(4000).ToListAsync();
+        var tnNamen = await db.AnzeigenamenAsync(tnIds, heuteTag);
+        var teilnehmende = tnIds.Select(id => new { Id = id, Anzeigename = tnNamen.GetValueOrDefault(id, "") }).ToList();
         if (teilnehmende.Count == 0)
         {
             return;

@@ -15,7 +15,7 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261116202319_Namensvorsatz";
+    public override string LastMigrationId => "20261116212554_KontonameLeeren";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -206,17 +206,17 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(100)
                     .HasColumnType("TEXT");
 
-                b.Property<string>("Name")
-                    .IsRequired()
-                    .HasMaxLength(200)
-                    .HasColumnType("TEXT");
-
                 b.Property<Guid?>("PersonId")
                     .HasColumnType("TEXT");
 
                 b.PrimitiveCollection<string>("Rollen")
                     .IsRequired()
                     .HasColumnType("TEXT");
+
+                b.Property<string>("_name")
+                    .HasMaxLength(200)
+                    .HasColumnType("TEXT")
+                    .HasColumnName("Name");
 
                 b.HasKey("Id");
 
@@ -2200,11 +2200,6 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(20)
                     .HasColumnType("TEXT");
 
-                b.Property<string>("Anzeigename")
-                    .IsRequired()
-                    .HasMaxLength(300)
-                    .HasColumnType("TEXT");
-
                 b.Property<long?>("ArchiviertAm")
                     .HasColumnType("INTEGER");
 
@@ -2213,15 +2208,8 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(20)
                     .HasColumnType("TEXT");
 
-                b.Property<string>("EMail")
-                    .HasMaxLength(320)
-                    .HasColumnType("TEXT");
-
                 b.PrimitiveCollection<string>("Fachbereiche")
                     .IsRequired()
-                    .HasColumnType("TEXT");
-
-                b.Property<DateOnly?>("Geburtsdatum")
                     .HasColumnType("TEXT");
 
                 b.Property<long?>("GesperrtAm")
@@ -2230,40 +2218,13 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.Property<DateOnly?>("GesperrtBis")
                     .HasColumnType("TEXT");
 
-                b.Property<int>("Rollen")
-                    .HasMaxLength(40)
-                    .HasColumnType("INTEGER");
-
-                b.Property<string>("Sortiername")
-                    .IsRequired()
-                    .HasMaxLength(300)
-                    .HasColumnType("TEXT");
-
-                b.Property<string>("Sortierschluessel")
-                    .IsRequired()
-                    .HasMaxLength(340)
-                    .HasColumnType("TEXT");
-
                 b.Property<string>("Sperrgrund")
                     .HasMaxLength(2000)
-                    .HasColumnType("TEXT");
-
-                b.Property<string>("Sprache")
-                    .IsRequired()
-                    .HasMaxLength(10)
                     .HasColumnType("TEXT");
 
                 b.Property<string>("Status")
                     .IsRequired()
                     .HasMaxLength(30)
-                    .HasColumnType("TEXT");
-
-                b.Property<string>("Titel")
-                    .HasMaxLength(50)
-                    .HasColumnType("TEXT");
-
-                b.Property<string>("Wohnort")
-                    .HasMaxLength(200)
                     .HasColumnType("TEXT");
 
                 b.Property<Guid?>("ZusammengefuehrtIn")
@@ -2272,11 +2233,6 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.HasKey("Id");
 
                 b.HasIndex("Datenschutz");
-
-                b.HasIndex("Geburtsdatum");
-
-                b.HasIndex("Sortierschluessel")
-                    .IsUnique();
 
                 b.HasIndex("Status");
 
@@ -2375,6 +2331,11 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.Property<Guid>("PersonId")
                     .HasColumnType("TEXT");
 
+                b.Property<string>("Sortierschluessel")
+                    .IsRequired()
+                    .HasMaxLength(400)
+                    .HasColumnType("TEXT");
+
                 b.Property<string>("Vorname")
                     .IsRequired()
                     .HasMaxLength(200)
@@ -2393,6 +2354,8 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.HasKey("Id");
 
                 b.HasIndex("Nachname");
+
+                b.HasIndex("Sortierschluessel");
 
                 b.HasIndex("PersonId", "GueltigVon");
 
@@ -2777,10 +2740,6 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.Property<Guid?>("AuftraggeberId")
                     .HasColumnType("TEXT");
 
-                b.Property<string>("AuftraggeberName")
-                    .HasMaxLength(300)
-                    .HasColumnType("TEXT");
-
                 b.PrimitiveCollection<string>("BenoetigteDozierendenmerkmale")
                     .IsRequired()
                     .HasColumnType("TEXT");
@@ -2839,15 +2798,6 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.Property<string>("Status")
                     .IsRequired()
                     .HasMaxLength(40)
-                    .HasColumnType("TEXT");
-
-                b.Property<string>("Suchtext")
-                    .IsRequired()
-                    .HasMaxLength(400)
-                    .HasColumnType("TEXT");
-
-                b.Property<string>("Team")
-                    .IsRequired()
                     .HasColumnType("TEXT");
 
                 b.Property<string>("Titel")
@@ -3077,11 +3027,6 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasMaxLength(200)
                     .HasColumnType("TEXT");
 
-                b.Property<string>("Suchtext")
-                    .IsRequired()
-                    .HasMaxLength(500)
-                    .HasColumnType("TEXT");
-
                 b.Property<string>("Zugang")
                     .HasMaxLength(500)
                     .HasColumnType("TEXT");
@@ -3238,11 +3183,6 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.Property<Guid?>("DozentId")
                     .HasColumnType("TEXT");
 
-                b.Property<string>("DozentName")
-                    .IsRequired()
-                    .HasMaxLength(300)
-                    .HasColumnType("TEXT");
-
                 b.Property<DateTime>("Ende")
                     .HasColumnType("TEXT");
 
@@ -3252,13 +3192,11 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                 b.Property<int>("Nummer")
                     .HasColumnType("INTEGER");
 
-                b.Property<string>("Orte")
-                    .IsRequired()
-                    .HasColumnType("TEXT");
-
                 b.HasKey("Id");
 
                 b.HasIndex("Beginn");
+
+                b.HasIndex("DozentId");
 
                 b.HasIndex("KursId");
 
@@ -3733,6 +3671,38 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .IsRequired();
             });
 
+        modelBuilder.Entity("VibeVHS.Domain.Programm.Kurs", b =>
+            {
+                b.OwnsMany("VibeVHS.Domain.Programm.KursDozent", "Team", b1 =>
+                    {
+                        b1.Property<Guid>("Id")
+                            .ValueGeneratedOnAdd()
+                            .HasColumnType("TEXT");
+
+                        b1.Property<Guid>("KursId")
+                            .HasColumnType("TEXT");
+
+                        b1.Property<bool>("Leitung")
+                            .HasColumnType("INTEGER");
+
+                        b1.Property<Guid>("PersonId")
+                            .HasColumnType("TEXT");
+
+                        b1.HasKey("Id");
+
+                        b1.HasIndex("KursId");
+
+                        b1.HasIndex("PersonId");
+
+                        b1.ToTable("KursTeam");
+
+                        b1.WithOwner()
+                            .HasForeignKey("KursId");
+                    });
+
+                b.Navigation("Team");
+            });
+
         modelBuilder.Entity("VibeVHS.Domain.Programm.KursEntgelt", b =>
             {
                 b.HasOne("VibeVHS.Domain.Programm.Kurs", null)
@@ -3758,6 +3728,35 @@ partial class VibeVhsDbContextModelSnapshot : ModelSnapshot
                     .HasForeignKey("KursId")
                     .OnDelete(DeleteBehavior.Cascade)
                     .IsRequired();
+
+                b.OwnsMany("VibeVHS.Domain.Programm.VeranstaltungsOrt", "Orte", b1 =>
+                    {
+                        b1.Property<Guid>("Id")
+                            .ValueGeneratedOnAdd()
+                            .HasColumnType("TEXT");
+
+                        b1.Property<int?>("Hoechstzahl")
+                            .HasColumnType("INTEGER");
+
+                        b1.Property<Guid>("OrtId")
+                            .HasColumnType("TEXT");
+
+                        b1.Property<Guid>("VeranstaltungId")
+                            .HasColumnType("TEXT");
+
+                        b1.HasKey("Id");
+
+                        b1.HasIndex("OrtId");
+
+                        b1.HasIndex("VeranstaltungId");
+
+                        b1.ToTable("VeranstaltungOrte");
+
+                        b1.WithOwner()
+                            .HasForeignKey("VeranstaltungId");
+                    });
+
+                b.Navigation("Orte");
             });
 
         modelBuilder.Entity("VibeVHS.Domain.Anmeldung.Belegung", b =>

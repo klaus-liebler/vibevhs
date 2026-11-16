@@ -4,6 +4,7 @@ using VibeVHS.Application.Sicherheit;
 using VibeVHS.Domain.Gemeinsam;
 using VibeVHS.Domain.Personen;
 using VibeVHS.Infrastructure.Datenbank;
+using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Web.Entwicklung;
 
@@ -24,7 +25,8 @@ internal static class TeilnehmendenDemodaten
             return;
         }
 
-        var olena = (await db.Personen.Where(p => p.Anzeigename == "Olena Kovalenko").ToListAsync()).FirstOrDefault();
+        var olenaIds = db.MitNamen("Olena", "Kovalenko", DateOnly.FromDateTime(bereich.ServiceProvider.GetRequiredService<TimeProvider>().GetLocalNow().Date));
+        var olena = await db.Personen.Where(p => olenaIds.Contains(p.Id)).OrderBy(p => p.Id).FirstOrDefaultAsync();
         if (olena is null)
         {
             return;

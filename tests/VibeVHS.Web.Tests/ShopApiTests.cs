@@ -77,7 +77,7 @@ public sealed class ShopApiTests
 
         await using var bereich = h.App.Services.CreateAsyncScope();
         var db = bereich.ServiceProvider.GetRequiredService<VibeVhsDbContext>();
-        var p = await db.Personen.AsNoTracking().SingleAsync(x => x.Titel != null, TestContext.Current.CancellationToken);
+        var p = (await db.Personen.AsNoTracking().ToListAsync(TestContext.Current.CancellationToken)).Single(x => x.Titel != null);
         (p.Titel, p.Anzeigename).ShouldBe(("Dr.", "Dr. Erika Muster"));
     }
 

@@ -13,8 +13,11 @@ using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Infrastructure.Datenbank;
 
-public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen) : DbContext(optionen)
+public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen, TimeProvider? uhr = null) : DbContext(optionen)
 {
+    /// <summary>Anwendungsuhr: Bezugszeitpunkt („jetzt“) geladener Personen für ihre berechneten Eigenschaften.</summary>
+    public TimeProvider Uhr { get; } = uhr ?? TimeProvider.System;
+
     public DbSet<Person> Personen => Set<Person>();
 
     public DbSet<PersonName> PersonNamen => Set<PersonName>();
@@ -68,23 +71,28 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasDbFunction(typeof(SqlFunktionen).GetMethod(nameof(SqlFunktionen.Ganzzahl))!)
+            .HasTranslation(a => new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlUnaryExpression(ExpressionType.Convert, a[0], typeof(long),
+                new Microsoft.EntityFrameworkCore.Storage.LongTypeMapping("INTEGER")));
+
         modelBuilder.Entity<Person>(b =>
         {
             b.ToTable("Personen");
             b.HasKey(p => p.Id);
             b.Property(p => p.Id).ValueGeneratedNever();
-            b.Property(p => p.EMail).HasMaxLength(320);
-            b.Property(p => p.Sprache).HasMaxLength(10);
-            b.Property(p => p.Titel).HasMaxLength(50);
-            b.Property(p => p.Rollen).HasConversion<int>();
+            // Keine Kopien: Anzeigename, Rollen, E-Mail, Sprache, Titel, Geburtsdatum, Wohnort und Sortierung werden aus den Versionen berechnet.
+            b.Ignore(p => p.EMail);
+            b.Ignore(p => p.Sprache);
+            b.Ignore(p => p.Titel);
+            b.Ignore(p => p.Rollen);
+            b.Ignore(p => p.Anzeigename);
+            b.Ignore(p => p.Sortiername);
+            b.Ignore(p => p.Sortierschluessel);
+            b.Ignore(p => p.Wohnort);
+            b.Ignore(p => p.Geburtsdatum);
+            b.Ignore(p => p.Stichzeit);
             b.Property(p => p.Status).HasMaxLength(30);
-            b.Property(p => p.Anzeigename).HasMaxLength(300);
-            b.Property(p => p.Sortiername).HasMaxLength(300);
-            b.Property(p => p.Sortierschluessel).HasMaxLength(340);
-            b.Property(p => p.Wohnort).HasMaxLength(200);
             b.PrimitiveCollection(p => p.Fachbereiche);
-            b.HasIndex(p => p.Sortierschluessel).IsUnique();
-            b.HasIndex(p => p.Geburtsdatum);
             b.HasIndex(p => p.Status);
             b.Property(p => p.Datenschutz).HasMaxLength(20);
             b.HasIndex(p => p.Datenschutz);
@@ -107,6 +115,8 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
         {
             b.Property(n => n.Vorname).HasMaxLength(200);
             b.Property(n => n.Nachname).HasMaxLength(200);
+            b.Property(n => n.Sortierschluessel).HasMaxLength(400);
+            b.HasIndex(n => n.Sortierschluessel);
             b.Property(n => n.Vorsatz).HasMaxLength(30);
             b.Property(n => n.Zusatz).HasMaxLength(20);
             b.HasIndex(n => n.Nachname);
@@ -278,7 +288,8 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(k => k.Id).ValueGeneratedNever();
             b.Property(k => k.Login).HasMaxLength(100);
             b.HasIndex(k => k.Login).IsUnique();
-            b.Property(k => k.Name).HasMaxLength(200);
+            b.Ignore(k => k.Name);
+            b.Property<string?>("_name").HasColumnName("Name").HasMaxLength(200);
             b.Property(k => k.Funktion).HasMaxLength(300);
             b.Property(k => k.Hinweis).HasMaxLength(500);
             b.PrimitiveCollection(k => k.Rollen);

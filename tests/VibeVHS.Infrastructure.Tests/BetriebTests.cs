@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -59,7 +59,7 @@ public class BetriebTests
                 var kurs = new Kurs($"26H-{fb}{kursNr++:00}", $"Kurs {fb}/{k}", semester, fb, art, fb == 8 ? 20 : 3, fb == 8 ? 25 : 10);
                 kurs.EntgeltSetzenAb(Geld.Euro(80), null, semester.Beginn, Erfassung.Erst(jetzt.AddMonths(-3)));
                 kurs.SerieFestlegen(new Serienregel { Start = new DateOnly(2026, 11, 2), Anzahl = 10, Wochentage = [DayOfWeek.Monday], Beginn = new TimeOnly(18, 0), DauerMinuten = 90, OrtIds = [Guid.NewGuid()] },
-                    Kalender.OhneFerien, _ => "Raum", new DateOnly(2027, 6, 30));
+                    Kalender.OhneFerien, new DateOnly(2027, 6, 30));
                 kurs.StatusSetzen(Kursstatus.Veroeffentlicht);
                 db.Kurse.Add(kurs);
                 foreach (var p in leute.Take(fb == 8 ? 4 : 6))
@@ -82,7 +82,7 @@ public class BetriebTests
         await using (var db = t.NeuerKontext())
         {
             // V1 (geb. 01.03.1955): Geschlecht „männlich“ zum Kursbeginn (02.11.2026), ab 01.12.2026 „weiblich“ – die Statistik 2026 zählt „männlich“.
-            var p = await db.Personen.SingleAsync(x => x.Anzeigename == "V1 N1", ct);
+            var p = (await db.Personen.ToListAsync(ct)).Single(x => x.Anzeigename == "V1 N1");
             p.AngabeAendern(MerkmalArt.Geschlecht, "männlich", new DateOnly(2025, 1, 1), Erfassung.Erst(jetzt), korrektur: false);
             p.AngabeAendern(MerkmalArt.Geschlecht, "weiblich", new DateOnly(2026, 12, 1), Erfassung.Aenderung(jetzt, "Personenstand geändert"), korrektur: false);
             await db.SaveChangesAsync(ct);
@@ -303,7 +303,7 @@ public class BetriebTests
                 var kurs = new Kurs($"26H-{i:000}", $"Kurs {i}", semester, 1 + (i % 8), art, 6, 15);
                 kurs.EntgeltSetzenAb(Geld.Euro(60 + (i % 40)), null, semester.Beginn, Erfassung.Erst(jetzt.AddMonths(-3)));
                 kurs.SerieFestlegen(new Serienregel { Start = new DateOnly(2026, 9, 1).AddDays(i % 60), Anzahl = 10, Wochentage = [(DayOfWeek)(1 + (i % 5))], Beginn = new TimeOnly(18, 0),
-                    DauerMinuten = 90, OrtIds = [Guid.NewGuid()] }, Kalender.OhneFerien, _ => "Raum", new DateOnly(2027, 6, 30));
+                    DauerMinuten = 90, OrtIds = [Guid.NewGuid()] }, Kalender.OhneFerien, new DateOnly(2027, 6, 30));
                 kurs.StatusSetzen(Kursstatus.Veroeffentlicht);
                 db.Kurse.Add(kurs);
                 for (var j = 0; j < 12; j++)

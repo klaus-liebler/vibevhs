@@ -342,12 +342,13 @@ public sealed class TeilnehmendenportalDienst(
         var ich = await IchAsync(abbruch);
         var verzeichnis = await programm.OrtsverzeichnisAsync(abbruch);
         var termine = await EigeneTermineAsync(ich, Heute.ToDateTime(TimeOnly.MinValue), Heute.AddDays(42).ToDateTime(TimeOnly.MaxValue), abbruch);
+        var namen = await programm.FuerKurseAsync(termine.Select(t => t.Kurs).DistinctBy(k => k.Id), abbruch);
         return termine.Select(t =>
         {
             var ort = t.Termin.Orte.Select(o => verzeichnis.Finden(o.OrtId)).OfType<Ort>().FirstOrDefault();
             return new PortalTermin(t.Termin.Id, t.Kurs.Id, t.Kurs.Kursnummer, t.Kurs.Titel, t.Termin.Nummer, t.Termin.Beginn, t.Termin.Ende,
-                string.Join(" + ", t.Termin.Orte.Select(o => o.OrtName)), ort is null ? null : verzeichnis.Wegbeschreibung(ort), t.Termin.Ausgefallen,
-                DozentenportalDienst.Aenderung(t.Kurs, t.Termin), false, 0);
+                namen.Orte(t.Termin.Orte), ort is null ? null : verzeichnis.Wegbeschreibung(ort), t.Termin.Ausgefallen,
+                DozentenportalDienst.Aenderung(t.Kurs, t.Termin, namen), false, 0);
         }).ToList();
     }
 
@@ -361,8 +362,9 @@ public sealed class TeilnehmendenportalDienst(
         }
 
         var name = (await stammdaten.EinrichtungAsync(abbruch))?.Name ?? "vhs";
+        var namen = await programm.FuerKurseAsync([t.Kurs], abbruch);
         return ($"{t.Kurs.Kursnummer}-termin-{t.Termin.Nummer}.ics",
-            Kalenderdatei.Erzeugen($"{t.Kurs.Kursnummer} Termin {t.Termin.Nummer}", [(t.Kurs, t.Termin, DozentenportalDienst.Aenderung(t.Kurs, t.Termin))], name, uhr.GetUtcNow()));
+            Kalenderdatei.Erzeugen($"{t.Kurs.Kursnummer} Termin {t.Termin.Nummer}", [(t.Kurs, t.Termin, DozentenportalDienst.Aenderung(t.Kurs, t.Termin, namen))], name, uhr.GetUtcNow(), namen));
     }
 
     public async Task<Uri> KalenderLinkErzeugenAsync(CancellationToken abbruch = default)
@@ -407,7 +409,8 @@ public sealed class TeilnehmendenportalDienst(
         await tokens.SpeichernAsync(abbruch);
         var name = (await stammdaten.EinrichtungAsync(abbruch))?.Name ?? "vhs";
         var termine = await EigeneTermineAsync(t.PersonId, Heute.AddDays(-30).ToDateTime(TimeOnly.MinValue), Heute.AddYears(1).ToDateTime(TimeOnly.MinValue), abbruch);
-        return Kalenderdatei.Erzeugen($"Meine Kurse – {name}", termine.Select(x => (x.Kurs, x.Termin, DozentenportalDienst.Aenderung(x.Kurs, x.Termin))), name, uhr.GetUtcNow());
+        var namen = await programm.FuerKurseAsync(termine.Select(t => t.Kurs).DistinctBy(k => k.Id), abbruch);
+        return Kalenderdatei.Erzeugen($"Meine Kurse – {name}", termine.Select(x => (x.Kurs, x.Termin, DozentenportalDienst.Aenderung(x.Kurs, x.Termin, namen))), name, uhr.GetUtcNow(), namen);
     }
 
     /// <summary>Neuer persönlicher Check-in-Link (frühere bleiben gültig, bis sie gesperrt werden).</summary>

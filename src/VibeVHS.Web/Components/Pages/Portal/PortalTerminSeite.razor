@@ -19,7 +19,7 @@ else if (kurs is not null && termin is not null)
     <div>
         <a href="portal/dozierende" class="vhs-small">← Meine Termine</a>
         <h1 style="font-size:21px;margin:4px 0">@kurs.Titel</h1>
-        <p class="vhs-small vhs-muted" style="margin:0">@kurs.Kursnummer · Termin @termin.Nummer · @termin.Beginn.ToString("dddd, dd.MM.yyyy, HH:mm")–@termin.Ende.ToString("HH:mm") · @string.Join(" + ", termin.Orte.Select(o => o.OrtName))</p>
+        <p class="vhs-small vhs-muted" style="margin:0">@kurs.Kursnummer · Termin @termin.Nummer · @termin.Beginn.ToString("dddd, dd.MM.yyyy, HH:mm")–@termin.Ende.ToString("HH:mm") · @namen.Orte(termin.Orte)</p>
     </div>
     @if (meldung is not null)
     {
@@ -84,6 +84,8 @@ else if (kurs is not null && termin is not null)
 }
 
 @code {
+    private VibeVHS.Application.Programm.Namen namen = VibeVHS.Application.Programm.Namen.Leer;
+
     [Parameter]
     public Guid Id { get; set; }
 
@@ -121,6 +123,7 @@ else if (kurs is not null && termin is not null)
         try
         {
             (kurs, termin) = await Portal.TerminAsync(Id);
+            namen = await Portal.NamenAsync(kurs);
             teilnehmende = (await Portal.TeilnehmendeAsync(Id)).Count;
             ausfallGemeldet = (await Portal.DatenAsync()).Antraege.Any(a => a.Art == VibeVHS.Domain.Portal.Antragsart.Ausfall && a.BezugId == Id
                                                                              && a.Status == VibeVHS.Domain.Portal.Antragsstatus.Offen);

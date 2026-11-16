@@ -36,15 +36,6 @@ public static class Spalteneinstufung
                 ["AnonymisiertAm"] = (Spaltenart.Fuehrend, "Anonymisierung (Prozess)"),
                 ["ZusammengefuehrtIn"] = (Spaltenart.Fuehrend, "Dublettenzusammenführung (Prozess)"),
                 ["Fachbereiche"] = (Spaltenart.Fuehrend, "Zuordnung zu Fachbereichen (Organisation, nicht personenbezogen)"),
-                ["Geburtsdatum"] = (Spaltenart.Cache, "Merkmal Geburtsdatum"),
-                ["Sprache"] = (Spaltenart.Cache, "Merkmal Sprache"),
-                ["EMail"] = (Spaltenart.Cache, "bevorzugte E-Mail-Adresse (versioniert)"),
-                ["Rollen"] = (Spaltenart.Cache, "Merkmal Rollen (Bitmaske Personenrolle) zum heutigen Tag"),
-                ["Titel"] = (Spaltenart.Cache, "Merkmal Titel zum heutigen Tag"),
-                ["Anzeigename"] = (Spaltenart.Cache, "Titel + Name zum heutigen Tag"),
-                ["Sortiername"] = (Spaltenart.Cache, "Name zum heutigen Tag, normalisiert"),
-                ["Sortierschluessel"] = (Spaltenart.Cache, "Sortiername + Id (Keyset-Paging)"),
-                ["Wohnort"] = (Spaltenart.Cache, "Ort des üblichen Aufenthalts zum heutigen Tag (Adresse + Kennzeichen)"),
                 ["AnonymisiertGeburtskohorte"] = (Spaltenart.Anonymisierungsrest, "Geburtsjahr-Kohorte statt Geburtsdatum"),
                 ["AnonymisiertGebiet"] = (Spaltenart.Anonymisierungsrest, "Kreis/PLZ-Gebiet statt Adresse"),
             },
@@ -69,11 +60,8 @@ public static class Spalteneinstufung
                 ["BenoetigteDozierendenmerkmale"] = (Spaltenart.Fuehrend, "Anforderungen an Lehrkräfte (z. B. sprachfreigabe=Englisch)"),
                 ["AuftraggeberId"] = (Spaltenart.Fuehrend, "Verweis auf die Organisation"),
                 ["ArchiviertAm"] = (Spaltenart.Fuehrend, "Archivierung (Prozess)"),
-                ["Team"] = (Spaltenart.Cache, "Lehrkräfte (PersonId, Leitung führend; Name = Cache: Name zum letzten Termin bzw. heute)"),
-                ["AuftraggeberName"] = (Spaltenart.Cache, "Name der Organisation"),
-                ["Nutzungsart"] = (Spaltenart.Cache, "aus der Kursart"),
-                ["Suchtext"] = (Spaltenart.Cache, "Suche"),
-                ["ErzeugtBis"] = (Spaltenart.Cache, "wie weit die Termine einer unbefristeten Serie erzeugt sind"),
+                ["Nutzungsart"] = (Spaltenart.Fuehrend, "Planungsdatum: bestimmt die Raumkapazität (Vorlage aus der Kursart, wie Richtlinie und Raumanforderungen)"),
+                ["ErzeugtBis"] = (Spaltenart.Fuehrend, "Prozesszustand: wie weit die Termine einer unbefristeten Serie erzeugt sind"),
             },
             ["Orte"] = new Dictionary<string, (Spaltenart, string)>
             {
@@ -91,7 +79,6 @@ public static class Spalteneinstufung
                 ["Zugang"] = (Spaltenart.Fuehrend, "Zugangshinweis"),
                 ["Kapazitaeten"] = (Spaltenart.Fuehrend, "Kapazität je Nutzungsart"),
                 ["Aktiv"] = (Spaltenart.Fuehrend, "Prozesszustand"),
-                ["Suchtext"] = (Spaltenart.Cache, "Suche"),
             },
             ["Benutzerkonten"] = new Dictionary<string, (Spaltenart, string)>
             {
@@ -103,7 +90,7 @@ public static class Spalteneinstufung
                 ["Aktiv"] = (Spaltenart.Fuehrend, "Prozesszustand"),
                 ["Hinweis"] = (Spaltenart.Fuehrend, "Notiz"),
                 ["PersonId"] = (Spaltenart.Fuehrend, "einzige Verknüpfung Konto ↔ Person"),
-                ["Name"] = (Spaltenart.Cache, "Anzeigename der verknüpften Person (ohne Person: führend)"),
+                ["Name"] = (Spaltenart.Fuehrend, "Name nur bei Funktionskonten ohne Person (sonst leer, der Name kommt aus der Person)"),
             },
             ["Organisationen"] = new Dictionary<string, (Spaltenart, string)>
             {

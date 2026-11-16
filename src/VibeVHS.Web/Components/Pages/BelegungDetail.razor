@@ -207,13 +207,13 @@
                                 {
                                     var kap = Ortsplanung.KapazitaetAmOrt(vo, kurs, verzeichnis);
                                     var belegt = lage!.Belegt(v.Id, vo.OrtId);
-                                    <div class="vhs-small">@vo.OrtName · <span class="vhs-mono">@belegt/@kap</span> @if (belegt >= kap) { <StatusPille Stil="warn">voll</StatusPille> }</div>
+                                    <div class="vhs-small">@namen.Ort(vo.OrtId) · <span class="vhs-mono">@belegt/@kap</span> @if (belegt >= kap) { <StatusPille Stil="warn">voll</StatusPille> }</div>
                                 }
                                 @if (lage!.Wartend.GetValueOrDefault(v.Id) is > 0 and var w) { <span class="vhs-small vhs-muted">@w wartend</span> }
                             </td>
                             <td>
                                 @if (abgeschlossen is not null) { <StatusPille Stil="@(abgeschlossen.Art == Kontingentereignisart.Besucht ? "gut" : "neutral")">@KontingentEreignis.ArtAnzeige(abgeschlossen.Art)</StatusPille> }
-                                else if (eingebucht) { <StatusPille Stil="gut">eingebucht@(v.Orte.Count > 1 ? $" ({v.Orte.FirstOrDefault(o => o.OrtId == ortGewaehlt)?.OrtName})" : "")</StatusPille> }
+                                else if (eingebucht) { <StatusPille Stil="gut">eingebucht@(v.Orte.Count > 1 ? $" ({namen.Ort(ortGewaehlt ?? Guid.Empty)})" : "")</StatusPille> }
                                 else if (wartet) { <StatusPille Stil="warn">Warteliste</StatusPille> }
                             </td>
                             <td>
@@ -275,6 +275,7 @@
 
     private Belegung? b;
     private Kurs? kurs;
+    private VibeVHS.Application.Programm.Namen namen = VibeVHS.Application.Programm.Namen.Leer;
     private Ortsverzeichnis? verzeichnis;
     private Einbuchungslage? lage;
     private string name = string.Empty;
@@ -363,6 +364,7 @@
 
             var p = d.GetRequiredService<IProgrammSpeicher>();
             kurs = await p.KursLadenAsync(b.KursId);
+            namen = kurs is null ? namen : await p.FuerKurseAsync([kurs]);
             verzeichnis = await p.OrtsverzeichnisAsync();
             var alle = await d.GetRequiredService<IAnmeldungSpeicher>().BelegungenDesKursesAsync(b.KursId);
             lage = Einbuchungslage.Berechnen(alle);

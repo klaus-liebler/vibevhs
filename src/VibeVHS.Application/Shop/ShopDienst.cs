@@ -189,7 +189,7 @@ public sealed class ShopDienst(
             entgelt?.Cent, entgelt?.ErmaessigtCent, orte.Count > 0 && orte.All(o => o.Barrierefrei), k.Richtlinie.Darf(Buchungsweg.Online), geaendert);
         return new KursDetail(kurz, k.Beschreibung, k.Bildungsurlaub, k.MinTeilnehmende, k.MaxTeilnehmende, k.Richtlinie.StornofristTage,
             k.Richtlinie.BearbeitungsgebuehrCent, k.Richtlinie.Warteliste,
-            termine.Select(v => new TerminInfo(v.Nummer, v.Beginn, v.Ende, v.Orte.Select(o => o.OrtName).ToList(), v.Ausgefallen)).ToList(), orte);
+            termine.Select(v => new TerminInfo(v.Nummer, v.Beginn, v.Ende, v.Orte.Select(o => verzeichnis.Finden(o.OrtId)?.Anzeige ?? "?").ToList(), v.Ausgefallen)).ToList(), orte);
     }
 
     // ---------- Verfügbarkeit ----------

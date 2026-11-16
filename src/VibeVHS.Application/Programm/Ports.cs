@@ -26,7 +26,8 @@ public sealed record KursFilter(Guid? SemesterId = null, int? Fachbereich = null
 /// <summary>Termin mit Kurs- und Ortsangaben für Raumplan und Konfliktprüfung.</summary>
 public sealed record PlanTermin(Termin Termin, string Kursnummer, IReadOnlyList<string> OrtNamen, string Dozent, int Fachbereich);
 
-public interface IProgrammSpeicher
+/// <remarks>Liefert auch Namen zur Laufzeit (<see cref="INamensquelle"/>), damit Kurse und Termine keine Namenskopien brauchen.</remarks>
+public interface IProgrammSpeicher : INamensquelle
 {
     Task<IReadOnlyList<Semester>> SemesterAsync(CancellationToken abbruch = default);
 

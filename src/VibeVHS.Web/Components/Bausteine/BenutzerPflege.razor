@@ -19,7 +19,14 @@
             <b>@(bearbeitetId is null ? "Neues Konto" : $"Konto {login} bearbeiten")</b>
             <div class="vhs-fields">
                 <RadzenFormField Text="Login *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="login" Disabled="@(bearbeitetId is not null)" Placeholder="vorname.nachname" /></RadzenFormField>
-                <RadzenFormField Text="Name *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="name" /></RadzenFormField>
+                @if (mitPerson)
+                {
+                    <span class="vhs-why" tabindex="0" data-why="Der Name kommt aus der verknüpften Person (Personenseite → Name ändern) und wird hier nicht gespeichert."><RadzenFormField Text="Name" Variant="Variant.Outlined"><RadzenTextBox Value="@name" Disabled="true" /></RadzenFormField></span>
+                }
+                else
+                {
+                    <RadzenFormField Text="Name *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="name" /></RadzenFormField>
+                }
                 <RadzenFormField Text="Funktion" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="funktion" /></RadzenFormField>
             </div>
             <fieldset class="vhs-auswahl"><legend>Rollen * <span class="vhs-small vhs-muted">(die erste ist beim Anmelden aktiv)</span></legend>
@@ -74,6 +81,7 @@
     private bool formular;
     private Guid? bearbeitetId;
     private string? login, name, funktion;
+    private bool mitPerson;
     private List<Rolle> rollen = [];
     private List<int> fbs = [];
 
@@ -100,6 +108,7 @@
         bearbeitetId = k?.Id;
         login = k?.Login;
         name = k?.Name;
+        mitPerson = k?.PersonId is not null;
         funktion = k?.Funktion;
         rollen = k?.Rollen.ToList() ?? [];
         fbs = k?.Fachbereiche.ToList() ?? [];

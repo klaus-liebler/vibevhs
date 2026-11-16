@@ -4,6 +4,7 @@ using VibeVHS.Application.Postausgang;
 using VibeVHS.Application.Protokoll;
 using VibeVHS.Application.Sicherheit;
 using VibeVHS.Domain.Personen;
+using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Infrastructure.Datenbank;
 
@@ -30,8 +31,7 @@ internal sealed class PersonenSpeicher(VibeVhsDbContext db) : IPersonenSpeicher
     public async Task<IReadOnlyDictionary<Guid, string>> AnzeigenamenAsync(IEnumerable<Guid> ids, CancellationToken abbruch = default)
     {
         var liste = ids.Distinct().ToList();
-        return await db.Personen.IgnoreAutoIncludes().AsNoTracking().Where(p => liste.Contains(p.Id))
-            .ToDictionaryAsync(p => p.Id, p => p.Anzeigename, abbruch);
+        return await db.AnzeigenamenAsync(liste, DateOnly.FromDateTime(DateTime.Today), abbruch);
     }
 
     public Task SpeichernAsync(CancellationToken abbruch = default) => db.SaveChangesAsync(abbruch);

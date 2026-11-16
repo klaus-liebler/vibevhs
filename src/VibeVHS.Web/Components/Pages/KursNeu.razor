@@ -70,7 +70,7 @@
     }
     @if (dozent is not null)
     {
-        <p class="vhs-small" style="margin:0">Gewählt: <b>@dozent.Name</b></p>
+        <p class="vhs-small" style="margin:0">Gewählt: <b>@dozentName</b></p>
     }
     @if (ausnahmeNoetig)
     {
@@ -180,13 +180,15 @@
     private Dozenteneignung? dozentEignung;
     private bool ausnahmeNoetig;
     private string? ausnahmebegruendung;
+    private string dozentName = string.Empty;
     private Rolle? rolle;
 
     private bool AusnahmeErlaubt => rolle is Rolle.Fachbereichsleitung or Rolle.Leitung;
 
     private void DozentWaehlen(DozentOption o)
     {
-        dozent = new KursDozent(o.Person.Id, o.Person.Anzeigename, true);
+        dozent = new KursDozent(o.Person.Id, true);
+        dozentName = o.Person.Anzeigename;
         dozentEignung = o.Eignung;
         ausnahmeNoetig = !o.Eignung.Geeignet;
         vorschau = null;

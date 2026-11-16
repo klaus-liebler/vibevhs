@@ -52,6 +52,12 @@ public interface IPersonenAbfrage
 
     /// <summary>Alle Treffer (für Export und Massenaktionen), in Listenreihenfolge.</summary>
     IAsyncEnumerable<PersonZeile> AlleAsync(PersonenFilter filter, CancellationToken abbruch = default);
+
+    /// <summary>Rundschreiben: Treffer, davon mit E-Mail-Adresse, davon mit Einwilligung für den Zweck – vollständig in SQL gezählt.</summary>
+    Task<RundschreibenVorschau> RundschreibenZaehlenAsync(PersonenFilter filter, Kontaktzweck zweck, CancellationToken abbruch = default);
+
+    /// <summary>Rundschreiben: nur die Empfänger (E-Mail und ggf. Einwilligung), vollständig geladen, paketweise.</summary>
+    IAsyncEnumerable<Person> RundschreibenEmpfaengerAsync(PersonenFilter filter, Kontaktzweck zweck, CancellationToken abbruch = default);
 }
 
 /// <summary>Excel-Export einer Trefferliste.</summary>

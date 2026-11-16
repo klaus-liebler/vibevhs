@@ -53,10 +53,20 @@ public static class Registrierung
     public static IServiceCollection AddVibeVhsInfrastruktur(this IServiceCollection dienste, IConfiguration konfiguration,
         string basisVerzeichnis, bool strengeAbfragepruefung = false)
     {
-        var verbindung = Datenbankverbindung(konfiguration.GetConnectionString("VibeVHS"), basisVerzeichnis);
+        // Mandanten (Vorbereitung „eine Datenbank je VHS“): Mandanten:<Kennung>:Datenbank / :Host; ohne Eintrag genau ein Mandant „standard“.
+        var mandanten = konfiguration.GetSection("Mandanten").GetChildren()
+            .Select(m => new Application.Betrieb.Mandant(m.Key, Datenbankverbindung(m["Datenbank"], basisVerzeichnis).ToString(), m["Host"]))
+            .ToList();
+        if (mandanten.Count == 0)
+        {
+            mandanten.Add(new Application.Betrieb.Mandant("standard", Datenbankverbindung(konfiguration.GetConnectionString("VibeVHS"), basisVerzeichnis).ToString()));
+        }
 
-        dienste.AddDbContext<VibeVhsDbContext>(o => o.UseSqlite(verbindung.ToString(),
-            s => s.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)).Konfigurieren(strengeAbfragepruefung));
+        dienste.AddSingleton(new Application.Betrieb.Mandanten(mandanten));
+        dienste.AddScoped<Application.Betrieb.Mandantenkontext>();
+        dienste.AddDbContext<VibeVhsDbContext>((d, o) => o.UseSqlite(d.GetRequiredService<Application.Betrieb.Mandantenkontext>().Aktuell.Verbindung,
+            s => s.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)).Konfigurieren(strengeAbfragepruefung)
+            .AddInterceptors(StichzeitBeimLaden.Instanz));
 
         dienste.AddScoped<IPersonenSpeicher, PersonenSpeicher>();
         dienste.AddScoped<INachrichtenSpeicher, NachrichtenSpeicher>();
@@ -69,6 +79,7 @@ public static class Registrierung
         dienste.AddScoped<StartdatenLader>();
         dienste.AddScoped<DublettenSuche>();
         dienste.AddScoped<IDublettenSuche>(d => d.GetRequiredService<DublettenSuche>());
+        dienste.AddScoped<Application.Programm.INamensquelle, Namensquelle>();
         dienste.AddScoped<PersonenAbfrage>();
         dienste.AddScoped<IPersonenAbfrage>(d => d.GetRequiredService<PersonenAbfrage>());
         dienste.AddScoped<IPersonenExport>(d => d.GetRequiredService<PersonenAbfrage>());
@@ -93,7 +104,6 @@ public static class Registrierung
         dienste.AddScoped<Application.Betrieb.IImportSpeicher, Betrieb.ImportSpeicher>();
         dienste.AddScoped<Application.Finanzen.IFinanzprotokoll, Finanzen.Finanzprotokoll>();
         dienste.AddScoped<Application.Portal.IPortalSpeicher, Portal.PortalSpeicher>();
-        dienste.AddScoped<Application.Personen.IZwischenstandSpeicher, Personen.ZwischenstandSpeicher>();
         dienste.AddScoped<Shop.ShopSpeicher>();
         dienste.AddScoped<Application.Shop.IShopSpeicher>(d => d.GetRequiredService<Shop.ShopSpeicher>());
         dienste.AddScoped<Application.Anmeldung.IPlatzreservierungen>(d => d.GetRequiredService<Shop.ShopSpeicher>());
@@ -112,8 +122,6 @@ public static class Registrierung
                 .WithSimpleSchedule(s => s.WithInterval(TimeSpan.FromSeconds(takt)).RepeatForever()));
 
             // Täglich nachts; einmal nach dem Start in fester Reihenfolge über den StartabgleichDienst.
-            q.AddJob<ZwischenstandJob>(j => j.WithIdentity(ZwischenstandJob.Schluessel));
-            q.AddTrigger(t => t.ForJob(ZwischenstandJob.Schluessel).WithIdentity("zwischenstaende-nacht", "automatik").WithCronSchedule("0 5 0 * * ?"));
             q.AddJob<TermineFortschreibenJob>(j => j.WithIdentity(TermineFortschreibenJob.Schluessel));
             q.AddJob<MerkmalAblaufJob>(j => j.WithIdentity(MerkmalAblaufJob.Schluessel));
             q.AddJob<LoeschlaufJob>(j => j.WithIdentity(LoeschlaufJob.Schluessel));

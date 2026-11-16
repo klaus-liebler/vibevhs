@@ -29,7 +29,7 @@ internal sealed class TestDatenbank : IAsyncDisposable
     }
 
     public VibeVhsDbContext NeuerKontext()
-        => new(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite(_verbindung, s => s.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)).Konfigurieren(streng: true).Options);
+        => new(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite(_verbindung, s => s.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)).Konfigurieren(streng: true).AddInterceptors(StichzeitBeimLaden.Instanz).Options, Uhr);
 
     public StartdatenLader Lader(VibeVhsDbContext db)
         => new(db, new AuditProtokoll(db, new Automatik(), Uhr), Uhr, NullLogger<StartdatenLader>.Instance);

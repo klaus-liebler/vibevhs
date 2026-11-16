@@ -8,23 +8,103 @@ using VibeVHS.Infrastructure.Datenbank;
 namespace VibeVHS.Infrastructure.Personen;
 
 /// <summary>
-/// Abfragen über die Zwischenstands-Spalten der Personentabelle (ohne Historie zu laden).
+/// Personenliste direkt aus den Versionen (Stand heute, keine Kopien): Filter und Sortierung in SQL über die am Stichtag gültigen
+/// Namen und Merkmale, danach werden nur die Personen der Seite vollständig geladen und ihr Stand berechnet.
 /// Blättern per Keyset (Sortierschlüssel &gt; letzter Schlüssel) statt OFFSET: gleich schnell auf jeder Seite.
 /// </summary>
-internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche dubletten) : IPersonenAbfrage, IPersonenExport
+internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche dubletten, TimeProvider? uhr = null) : IPersonenAbfrage, IPersonenExport
 {
+    private DateTimeOffset Jetzt => (uhr ?? TimeProvider.System).GetLocalNow();
+
+    private DateOnly Heute => DateOnly.FromDateTime(Jetzt.Date);
+
     public async Task<IReadOnlyList<PersonZeile>> SeiteAsync(PersonenFilter filter, Seitenschluessel? nach, int anzahl,
         CancellationToken abbruch = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(anzahl, 1);
-        var q = await BasisAsync(filter, abbruch);
+        var sortiert = db.MitSortierschluessel(await BasisAsync(filter, abbruch), Heute);
         if (nach is not null)
         {
-            q = q.Where(p => string.Compare(p.Sortierschluessel, nach.Wert) > 0);
+            sortiert = sortiert.Where(x => string.Compare(x.Schluessel, nach.Wert) > 0);
         }
 
-        var roh = await q.OrderBy(p => p.Sortierschluessel).Take(anzahl).Select(Projektion).ToListAsync(abbruch);
-        return roh.Select(Zeile).ToList();
+        var seite = await sortiert.OrderBy(x => x.Schluessel).Take(anzahl).ToListAsync(abbruch);
+        var ids = seite.Select(x => x.Id).ToList();
+        var personen = await db.Personen.AsNoTracking().AsSplitQuery().Where(p => ids.Contains(p.Id)).ToDictionaryAsync(p => p.Id, abbruch);
+        var jetzt = Jetzt;
+        return seite.Where(x => personen.ContainsKey(x.Id)).Select(x =>
+        {
+            var p = personen[x.Id];
+            p.StichzeitSetzen(jetzt);
+            return new PersonZeile(p.Id, p.Anzeigename, x.Schluessel, p.Geburtsdatum, p.Wohnort, p.EMail, p.Sprache, p.Rollen, p.Status, p.Fachbereiche);
+        }).ToList();
+    }
+
+    public async Task<RundschreibenVorschau> RundschreibenZaehlenAsync(PersonenFilter filter, Kontaktzweck zweck, CancellationToken abbruch = default)
+    {
+        var basis = await BasisAsync(filter, abbruch);
+        var treffer = await basis.CountAsync(abbruch);
+        var mitMail = MitEMail(basis);
+        var mitEMail = await mitMail.CountAsync(abbruch);
+        var empfaenger = zweck == Kontaktzweck.Kursorganisation ? mitEMail : await MitEinwilligung(mitMail, zweck).CountAsync(abbruch);
+        return new RundschreibenVorschau(treffer, mitEMail, empfaenger, mitEMail - empfaenger);
+    }
+
+    public async IAsyncEnumerable<Person> RundschreibenEmpfaengerAsync(PersonenFilter filter, Kontaktzweck zweck,
+        [EnumeratorCancellation] CancellationToken abbruch = default)
+    {
+        var mitMail = MitEMail(await BasisAsync(filter, abbruch));
+        var empfaenger = zweck == Kontaktzweck.Kursorganisation ? mitMail : MitEinwilligung(mitMail, zweck);
+        var ids = await empfaenger.Select(p => p.Id).OrderBy(id => id).ToListAsync(abbruch);
+        var jetzt = Jetzt;
+        foreach (var paket in ids.Chunk(500))
+        {
+            foreach (var p in await db.Personen.AsNoTracking().AsSplitQuery().Where(p => paket.Contains(p.Id)).OrderBy(p => p.Id).ToListAsync(abbruch))
+            {
+                p.StichzeitSetzen(jetzt);
+                yield return p;
+            }
+        }
+    }
+
+    /// <summary>Personen mit heute gültiger E-Mail-Adresse („–“ = bewusst keine).</summary>
+    private IQueryable<Person> MitEMail(IQueryable<Person> personen)
+    {
+        var tag = Heute;
+        var mitAdresse = db.Set<EMailAdresse>()
+            .Where(e => e.ErsetztAm == null && e.GueltigVon <= tag && (e.GueltigBis == null || e.GueltigBis > tag) && e.Adresse != "–" && e.Adresse != "")
+            .Select(e => EF.Property<Guid>(e, "PersonId"));
+        return personen.Where(p => mitAdresse.Contains(p.Id));
+    }
+
+    /// <summary>Personen mit heute gültiger Einwilligung für E-Mail zu diesem Zweck.</summary>
+    private IQueryable<Person> MitEinwilligung(IQueryable<Person> personen, Kontaktzweck zweck)
+    {
+        var tag = Heute;
+        var erteilt = db.Set<Einwilligung>()
+            .Where(w => w.ErsetztAm == null && w.GueltigVon <= tag && (w.GueltigBis == null || w.GueltigBis > tag)
+                        && w.Kanal == Kontaktkanal.EMail && w.Zweck == zweck && w.Erteilt)
+            .Select(w => EF.Property<Guid>(w, "PersonId"));
+        return personen.Where(p => erteilt.Contains(p.Id));
+    }
+
+    /// <summary>Für Rundschreiben und Export: alle Treffer mit vollständig geladener Person, paketweise (500).</summary>
+    public async IAsyncEnumerable<Person> PersonenAsync(PersonenFilter filter, [EnumeratorCancellation] CancellationToken abbruch = default)
+    {
+        var ids = await db.MitSortierschluessel(await BasisAsync(filter, abbruch), Heute).OrderBy(x => x.Schluessel).Select(x => x.Id).ToListAsync(abbruch);
+        var jetzt = Jetzt;
+        foreach (var paket in ids.Chunk(500))
+        {
+            var personen = await db.Personen.AsNoTracking().AsSplitQuery().Where(p => paket.Contains(p.Id)).ToDictionaryAsync(p => p.Id, abbruch);
+            foreach (var id in paket)
+            {
+                if (personen.TryGetValue(id, out var p))
+                {
+                    p.StichzeitSetzen(jetzt);
+                    yield return p;
+                }
+            }
+        }
     }
 
     public async Task<Filterzahlen> ZaehlenAsync(PersonenFilter filter, CancellationToken abbruch = default)
@@ -131,7 +211,8 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
 
         if (filter.Rolle is { } rolle)
         {
-            q = q.Where(p => (p.Rollen & rolle) == rolle);
+            var mitRolle = db.MitRolle(rolle, Heute);
+            q = q.Where(p => mitRolle.Contains(p.Id));
         }
 
         if (filter.Fachbereich is { } fb)
@@ -153,15 +234,6 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
 
         return q;
     }
-
-    private sealed record Roh(Guid Id, string Anzeigename, string Sortierschluessel, DateOnly? Geburtsdatum, string? Wohnort, string? EMail,
-        string Sprache, Personenrolle Rollen, Personenstatus Status, List<int> Fachbereiche);
-
-    private static readonly System.Linq.Expressions.Expression<Func<Person, Roh>> Projektion = p =>
-        new Roh(p.Id, p.Anzeigename, p.Sortierschluessel, p.Geburtsdatum, p.Wohnort, p.EMail, p.Sprache, p.Rollen, p.Status, p.Fachbereiche);
-
-    private static PersonZeile Zeile(Roh r)
-        => new(r.Id, r.Anzeigename, r.Sortierschluessel, r.Geburtsdatum, r.Wohnort, r.EMail, r.Sprache, r.Rollen, r.Status, r.Fachbereiche);
 }
 
 /// <summary>Dublettensuche über Geburtsdatum (Index) und normalisierte Namen.</summary>
@@ -176,10 +248,13 @@ internal sealed class DublettenSuche(VibeVhsDbContext db) : IDublettenSuche
         }
 
         var form = Dublettenregel.Normalform(vorname, nachname);
-        var gleicherTag = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
-            .Where(p => p.Geburtsdatum == geburtsdatum && p.Status != Personenstatus.Zusammengefuehrt && p.Id != ausser && p.Datenschutz == Domain.Datenschutz.Datenschutzstatus.Aktiv)
+        var mitDatum = db.MitGeburtsdatum(geburtsdatum.Value);
+        var gleicherTag = (await db.Personen.AsNoTracking().AsSplitQuery()
+                .Where(p => mitDatum.Contains(p.Id) && p.Status != Personenstatus.Zusammengefuehrt && p.Id != ausser
+                            && p.Datenschutz == Domain.Datenschutz.Datenschutzstatus.Aktiv)
+                .ToListAsync(abbruch))
             .Select(p => new { p.Id, p.Anzeigename, p.Sortiername, p.Geburtsdatum, p.Wohnort })
-            .ToListAsync(abbruch);
+            .ToList();
         var ausgeschlossen = ausser is { } a ? await AusschluesseAsync(a, abbruch) : [];
 
         return gleicherTag
@@ -192,10 +267,19 @@ internal sealed class DublettenSuche(VibeVhsDbContext db) : IDublettenSuche
 
     public async Task<IReadOnlyList<DublettenPaar>> PaareAsync(CancellationToken abbruch = default)
     {
-        var alle = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
-            .Where(p => p.Geburtsdatum != null && p.Status != Personenstatus.Zusammengefuehrt && p.Datenschutz == Domain.Datenschutz.Datenschutzstatus.Aktiv)
-            .Select(p => new { p.Id, p.Geburtsdatum, p.Sortiername })
-            .ToListAsync(abbruch);
+        // Geburtsdatum und heutiger Name direkt aus den Versionen (eine Abfrage je Tabelle).
+        var heute = DateOnly.FromDateTime(DateTime.Today);
+        var aktiv = db.Personen.IgnoreAutoIncludes().Where(p => p.Status != Personenstatus.Zusammengefuehrt && p.Datenschutz == Domain.Datenschutz.Datenschutzstatus.Aktiv)
+            .Select(p => p.Id);
+        var geburt = (await db.Set<PersonMerkmal>().AsNoTracking()
+                .Where(m => m.Art == MerkmalArt.Geburtsdatum && m.ErsetztAm == null && aktiv.Contains(EF.Property<Guid>(m, "PersonId")))
+                .Select(m => new { PersonId = EF.Property<Guid>(m, "PersonId"), m.Inhalt }).ToListAsync(abbruch))
+            .GroupBy(m => m.PersonId).ToDictionary(g => g.Key, g => g.First().Inhalt);
+        var namen = await db.NamenAm(heute).AsNoTracking().Where(n => aktiv.Contains(EF.Property<Guid>(n, "PersonId")))
+            .Select(n => new { PersonId = EF.Property<Guid>(n, "PersonId"), n.Sortierschluessel }).ToListAsync(abbruch);
+        var alle = namen.Where(n => geburt.ContainsKey(n.PersonId))
+            .Select(n => new { Id = n.PersonId, Geburtsdatum = (DateOnly?)DateOnly.ParseExact(geburt[n.PersonId], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), Sortiername = n.Sortierschluessel })
+            .ToList();
         var ausschluesse = (await db.DublettenAusschluesse.AsNoTracking().Select(d => new { d.PersonA, d.PersonB }).ToListAsync(abbruch))
             .Select(d => (d.PersonA, d.PersonB)).ToHashSet();
 

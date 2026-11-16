@@ -326,7 +326,6 @@ public sealed class Ort
     private Ort()
     {
         Name = string.Empty;
-        Suchtext = string.Empty;
     }
 
     public Ort(Ortsart art, string name, Guid? elternId = null, string? kurzname = null)
@@ -337,7 +336,6 @@ public sealed class Ort
         Name = name.Trim();
         Kurzname = string.IsNullOrWhiteSpace(kurzname) ? null : kurzname.Trim();
         ElternId = elternId;
-        Suchtext = Gemeinsam.Suchtext.Normalisieren($"{Name} {Kurzname}");
     }
 
     public Guid Id { get; private set; }
@@ -373,9 +371,6 @@ public sealed class Ort
 
     public IReadOnlyCollection<OrtMerkmal> Merkmale => _merkmale;
 
-    /// <summary>Normalisierter Text für die globale Suche.</summary>
-    public string Suchtext { get; private set; }
-
     public string Anzeige => Kurzname is null || Name.StartsWith(Kurzname, StringComparison.Ordinal) ? Name : $"{Kurzname} {Name}";
 
     /// <summary>Räume und virtuelle Räume sind exklusiv (Konflikt bei Überschneidung); Treffpunkte nicht.</summary>
@@ -390,7 +385,6 @@ public sealed class Ort
         Stadt = stadt;
         Breitengrad = breite;
         Laengengrad = laenge;
-        Suchtext = Gemeinsam.Suchtext.Normalisieren($"{Name} {Kurzname} {Strasse} {Stadt}");
         return this;
     }
 
