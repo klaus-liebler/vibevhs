@@ -23,6 +23,9 @@ public enum Importfeld
     Ort,
     EMail,
     Telefon,
+
+    /// <summary>Akademischer Grad/Titel (z. B. „Dr.“). Fehlt die Spalte, wird ein Titel aus Vor- oder Nachname abgetrennt.</summary>
+    Titel,
 }
 
 public enum Importstatus
@@ -80,6 +83,7 @@ public sealed class ImportDienst(IDublettenSuche dubletten, IPersonenSpeicher pe
         ["plz"] = Importfeld.Postleitzahl, ["postleitzahl"] = Importfeld.Postleitzahl,
         ["ort"] = Importfeld.Ort, ["wohnort"] = Importfeld.Ort,
         ["email"] = Importfeld.EMail, ["e-mail"] = Importfeld.EMail, ["mail"] = Importfeld.EMail,
+        ["titel"] = Importfeld.Titel, ["akad. grad"] = Importfeld.Titel, ["akadgrad"] = Importfeld.Titel, ["grad"] = Importfeld.Titel,
         ["telefon"] = Importfeld.Telefon, ["tel"] = Importfeld.Telefon, ["telefonprivat"] = Importfeld.Telefon, ["mobil"] = Importfeld.Telefon, ["handy"] = Importfeld.Telefon,
     };
 
@@ -215,6 +219,20 @@ public sealed class ImportDienst(IDublettenSuche dubletten, IPersonenSpeicher pe
                 .ToDictionary(z => z.Value, z => roh[z.Key].Trim());
             var nr = n + 2; // Zeile in der Datei (1 = Kopf)
             string? fehler = null;
+            string? titelHinweis = null;
+            if (werte.ContainsKey(Importfeld.Vorname) && werte.ContainsKey(Importfeld.Nachname))
+            {
+                // Titel im Namen („Dr. Kai“) abtrennen; eine eigene Titelspalte bleibt maßgeblich und wird ergänzt.
+                var (titel, vor, nach) = Titelerkennung.Abtrennen(werte[Importfeld.Vorname], werte[Importfeld.Nachname]);
+                if (titel is not null && vor.Length > 0 && nach.Length > 0)
+                {
+                    werte[Importfeld.Vorname] = vor;
+                    werte[Importfeld.Nachname] = nach;
+                    werte[Importfeld.Titel] = Titelerkennung.Zusammen(werte.GetValueOrDefault(Importfeld.Titel), titel)!;
+                    titelHinweis = $"Titel „{titel}“ aus dem Namen übernommen";
+                }
+            }
+
             DateOnly? geburt = null;
             if (!werte.ContainsKey(Importfeld.Vorname) || !werte.ContainsKey(Importfeld.Nachname))
             {
@@ -260,7 +278,7 @@ public sealed class ImportDienst(IDublettenSuche dubletten, IPersonenSpeicher pe
             var kandidaten = await dubletten.KandidatenAsync(werte[Importfeld.Vorname], werte[Importfeld.Nachname], geburt, abbruch: abbruch);
             zeilen.Add(kandidaten.FirstOrDefault() is { } k
                 ? new Importzeile(nr, werte, Importstatus.Dublette, $"vorhanden: {k.Anzeigename}{(k.Geburtsdatum is { } kg ? $", geb. {kg:dd.MM.yyyy}" : "")} – {k.Grund}", k.Id)
-                : new Importzeile(nr, werte, Importstatus.Neu, "wird angelegt", null));
+                : new Importzeile(nr, werte, Importstatus.Neu, titelHinweis is null ? "wird angelegt" : $"wird angelegt ({titelHinweis})", null));
         }
 
         return new Importpruefung(zeilen, false, 0);
@@ -285,6 +303,7 @@ public sealed class ImportDienst(IDublettenSuche dubletten, IPersonenSpeicher pe
                 DateTimeStyles.None, out var g) ? (g.Year > heute.Year ? g.AddYears(-100) : g) : null;
             var p = Person.Anlegen(z.Wert(Importfeld.Vorname), z.Wert(Importfeld.Nachname), heute, jetzt, geburt,
                 string.IsNullOrWhiteSpace(z.Wert(Importfeld.EMail)) ? null : z.Wert(Importfeld.EMail), "de", $"Import {datei.Name}");
+            p.TitelSetzen(z.Wert(Importfeld.Titel));
             p.RolleHinzufuegen(Personenrolle.Teilnehmende, heute, Erfassung.Erst(jetzt, $"Import {datei.Name}"));
             if (!string.IsNullOrWhiteSpace(z.Wert(Importfeld.Strasse)) && !string.IsNullOrWhiteSpace(z.Wert(Importfeld.Ort)))
             {

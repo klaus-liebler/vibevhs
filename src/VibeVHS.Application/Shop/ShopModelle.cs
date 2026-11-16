@@ -108,7 +108,8 @@ public sealed record WarenkorbPositionAntwort(string Kursnummer, string Titel, b
 
 public sealed record WarenkorbAntwort(Guid Id, string Status, DateTimeOffset ReserviertBis, int RestSekunden, IReadOnlyList<WarenkorbPositionAntwort> Positionen, long SummeCent);
 
-public sealed record TeilnehmerAngabe(string Vorname, string Nachname, DateOnly? Geburtsdatum, string EMail, string Strasse, string Postleitzahl, string Ort, string? Sprache);
+public sealed record TeilnehmerAngabe(string Vorname, string Nachname, DateOnly? Geburtsdatum, string EMail, string Strasse, string Postleitzahl, string Ort, string? Sprache,
+    string? Titel = null);
 
 public sealed record LastschriftAngabe(string Kontoinhaber, string Iban, string? Bic);
 

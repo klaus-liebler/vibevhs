@@ -29,11 +29,12 @@ public interface IPersonenSpeicher
 public sealed class PersonenDienst(IPersonenSpeicher speicher, IAuditProtokoll protokoll, IAktuellerBenutzer benutzer, TimeProvider uhr)
 {
     public async Task<Person> AnlegenAsync(string vorname, string nachname, DateOnly? geburtsdatum, string? eMail,
-        string sprache, CancellationToken abbruch = default)
+        string sprache, CancellationToken abbruch = default, string? titel = null)
     {
         var jetzt = uhr.GetLocalNow();
         var von = (await benutzer.ErmittelnAsync(abbruch)).Anzeige;
         var person = Person.Anlegen(vorname, nachname, DateOnly.FromDateTime(jetzt.Date), jetzt, geburtsdatum, eMail, sprache, von);
+        person.TitelSetzen(titel);
         speicher.Hinzufuegen(person);
         await protokoll.ProtokollierenAsync("Person.Angelegt", $"{Pseudonym.Person(person.Id)} angelegt",
             nameof(Person), person.Id, abbruch: abbruch);

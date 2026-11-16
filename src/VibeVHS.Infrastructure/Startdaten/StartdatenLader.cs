@@ -117,20 +117,14 @@ public sealed class StartdatenLader(VibeVhsDbContext db, IAuditProtokoll protoko
     /// <summary>"Dr. Kai Lüken" → ("Dr.", "Kai", "Lüken"). Der Nachname ist das letzte Wort.</summary>
     public static (string? Titel, string Vorname, string Nachname) NameZerlegen(string name)
     {
-        var teile = name.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-        var titel = new List<string>();
-        while (teile.Count > 2 && teile[0].EndsWith('.'))
-        {
-            titel.Add(teile[0]);
-            teile.RemoveAt(0);
-        }
-
+        var (titel, rest, _) = Titelerkennung.Abtrennen(name, null);
+        var teile = rest.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         if (teile.Count < 2)
         {
             throw new InvalidDataException($"Name „{name}“ braucht Vor- und Nachnamen.");
         }
 
-        return (titel.Count > 0 ? string.Join(' ', titel) : null, string.Join(' ', teile[..^1]), teile[^1]);
+        return (titel, string.Join(' ', teile[..^1]), teile[^1]);
     }
 }
 

@@ -40,6 +40,7 @@
     <section class="vhs-card">
         <h2>Neue Person</h2>
         <div class="vhs-fields">
+            <RadzenFormField Text="Titel" Variant="Variant.Outlined" Style="max-width:9em"><RadzenTextBox @bind-Value="titel" Placeholder="z. B. Dr." /></RadzenFormField>
             <RadzenFormField Text="Vorname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="vorname" @bind-Value:after="DublettenPruefenAsync" /></RadzenFormField>
             <RadzenFormField Text="Nachname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nachname" @bind-Value:after="DublettenPruefenAsync" /></RadzenFormField>
             <RadzenFormField Text="Geburtsdatum" Variant="Variant.Outlined">
@@ -50,6 +51,13 @@
                 <RadzenDropDown TValue="string" @bind-Value="sprache" Data="@Sprachen.Alle" TextProperty="Name" ValueProperty="Code" />
             </RadzenFormField>
         </div>
+        @if (Titelerkennung.Erkannt(vorname, nachname) is { } erkannt)
+        {
+            <div class="vhs-alert vhs-info" role="status" data-testid="titel-erkannt">
+                „@erkannt“ steht im Namen und sieht wie ein akademischer Grad aus. Titel werden getrennt gespeichert (für Anrede, Sortierung und Suche).
+                <RadzenButton Text="Als Titel übernehmen" Icon="school" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Info" Click="TitelUebernehmenAsync" />
+            </div>
+        }
         @if (kandidaten.Count > 0)
         {
             <div class="vhs-alert vhs-warn" role="alert">
@@ -252,7 +260,7 @@
     private int? Neu { get; set; }
 
     private bool formularOffen, speichert, dublettenGeprueft;
-    private string? vorname, nachname, eMail, fehler;
+    private string? titel, vorname, nachname, eMail, fehler;
     private string sprache = "de";
     private DateOnly? geburtsdatum;
     private IReadOnlyList<DublettenKandidat> kandidaten = [];
@@ -402,6 +410,20 @@
         _ => "info",
     };
 
+    private async Task TitelUebernehmenAsync()
+    {
+        var (erkannt, v, n) = Titelerkennung.Abtrennen(vorname, nachname);
+        if (erkannt is null || v.Length == 0 || n.Length == 0)
+        {
+            return;
+        }
+
+        titel = Titelerkennung.Zusammen(titel, erkannt);
+        vorname = v;
+        nachname = n;
+        await DublettenPruefenAsync();
+    }
+
     private async Task DublettenPruefenAsync()
     {
         dublettenGeprueft = false;
@@ -417,8 +439,8 @@
         try
         {
             var person = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<PersonenDienst>()
-                .AnlegenAsync(vorname!, nachname!, geburtsdatum, eMail, sprache));
-            var name = $"{vorname} {nachname}";
+                .AnlegenAsync(vorname!, nachname!, geburtsdatum, eMail, sprache, titel: titel));
+            var name = person.Anzeigename;
             Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", $"{name} wurde angelegt und protokolliert.");
             folgeTitel = $"{name} wurde angelegt. Wie geht es weiter?";
             folgeschritte =
@@ -427,7 +449,7 @@
                 new("Zu einem Kurs anmelden", $"anmeldung?person={person.Id}", "Tresen-Assistent mit dieser Person starten"),
                 new("Weitere Person anlegen", "personen?neu=1"),
             ];
-            vorname = nachname = eMail = null;
+            titel = vorname = nachname = eMail = null;
             geburtsdatum = null;
             sprache = "de";
             kandidaten = [];

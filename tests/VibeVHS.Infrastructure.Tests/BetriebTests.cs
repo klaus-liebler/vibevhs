@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -202,6 +202,32 @@ public class BetriebTests
         var hildegard = await db.Personen.Include(p => p.Adressen).SingleAsync(p => p.Id == lauf.Zuordnungen[2].PersonId, ct);
         hildegard.Adressen.Single().Strasse.ShouldBe("Kirchweg 5; Hinterhaus");
         await Should.ThrowAsync<InvalidOperationException>(() => dienst.ImportierenAsync(datei, zuordnung, ct)); // gleiche Datei
+    }
+
+    [Fact]
+    public async Task Import_trennt_Titel_aus_dem_Namen_ab_und_uebernimmt_eine_Titelspalte()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var t = await TestDatenbank.ErzeugenAsync();
+        await using var db = t.NeuerKontext();
+        var b = new TestBenutzer(System);
+        var dienst = new ImportDienst(new DublettenSuche(db), new PersonenSpeicher(db), new ImportSpeicher(db), new AuditProtokoll(db, b, t.Uhr), b, t.Uhr);
+
+        var ohneSpalte = ImportDienst.Lesen("a.csv", Encoding.UTF8.GetBytes("Nr;Name;Vorname\n1;Lüken;Dr. Kai\n2;Dr. Berg;Anna\n3;Ahlers;Jens\n"));
+        var probe = await dienst.ProbelaufAsync(ohneSpalte, ImportDienst.ZuordnungVorschlagen(ohneSpalte.Spalten), ct);
+        probe.Zeilen[0].Hinweis.ShouldContain("Titel „Dr.“");
+        await dienst.ImportierenAsync(ohneSpalte, ImportDienst.ZuordnungVorschlagen(ohneSpalte.Spalten), ct);
+
+        var mitSpalte = ImportDienst.Lesen("b.csv", Encoding.UTF8.GetBytes("Nr;Titel;Name;Vorname\n4;Prof.;Kranz;Dr. Eva\n"));
+        var zuordnung = ImportDienst.ZuordnungVorschlagen(mitSpalte.Spalten);
+        zuordnung.Values.ShouldContain(Importfeld.Titel);
+        await dienst.ImportierenAsync(mitSpalte, zuordnung, ct);
+
+        var personen = await db.Personen.Include(p => p.Namen).AsNoTracking().ToListAsync(ct);
+        var jetzt = t.Uhr.GetLocalNow();
+        string Name(Person p) => $"{p.Titel}|{p.AktuellerName(jetzt).Vorname}|{p.AktuellerName(jetzt).Nachname}";
+        personen.Select(Name).Order().ShouldBe(["|Jens|Ahlers", "Dr.|Anna|Berg", "Dr.|Kai|Lüken", "Prof. Dr.|Eva|Kranz"]);
+        personen.Single(p => p.Titel == "Dr." && p.Anzeigename.Contains("Kai")).Anzeigename.ShouldBe("Dr. Kai Lüken");
     }
 
     [Fact]

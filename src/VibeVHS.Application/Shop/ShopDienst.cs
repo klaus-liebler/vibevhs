@@ -577,7 +577,10 @@ public sealed class ShopDienst(
         // Gäste werden neu angelegt; mögliche Dubletten findet die Dublettenprüfung der Verwaltung.
         var jetzt = uhr.GetLocalNow();
         var erfassung = Erfassung.Erst(jetzt, Von);
-        var person = Person.Anlegen(t.Vorname.Trim(), t.Nachname.Trim(), Heute, jetzt, t.Geburtsdatum, t.EMail.Trim(), Sprache(t.Sprache), Von);
+        // Titel im Namen („Dr. Kai“) wird abgetrennt; ein eigens angegebener Titel bleibt erhalten.
+        var (titel, vorname, nachname) = Titelerkennung.Abtrennen(t.Vorname, t.Nachname);
+        var person = Person.Anlegen(vorname.Length > 0 ? vorname : t.Vorname.Trim(), nachname, Heute, jetzt, t.Geburtsdatum, t.EMail.Trim(), Sprache(t.Sprache), Von);
+        person.TitelSetzen(Titelerkennung.Zusammen(t.Titel, vorname.Length > 0 ? titel : null));
         person.RolleHinzufuegen(Personenrolle.Teilnehmende, Heute, erfassung);
         person.AdresseHinzufuegen(null, t.Strasse.Trim(), t.Postleitzahl.Trim(), t.Ort.Trim(), Heute, erfassung);
         personen.Hinzufuegen(person);
@@ -652,7 +655,9 @@ public sealed class ShopDienst(
         }
 
         var lokal = uhr.GetLocalNow();
-        var person = Person.Anlegen(konto.Vorname, konto.Nachname, Heute, lokal, konto.Geburtsdatum, konto.EMail, konto.Sprache, Von);
+        var (titel, vorname, nachname) = Titelerkennung.Abtrennen(konto.Vorname, konto.Nachname);
+        var person = Person.Anlegen(vorname.Length > 0 ? vorname : konto.Vorname, nachname, Heute, lokal, konto.Geburtsdatum, konto.EMail, konto.Sprache, Von);
+        person.TitelSetzen(vorname.Length > 0 ? titel : null);
         person.RolleHinzufuegen(Personenrolle.Teilnehmende, Heute, Erfassung.Erst(lokal, Von));
         personen.Hinzufuegen(person);
         konto.Bestaetigen(person.Id, jetzt);

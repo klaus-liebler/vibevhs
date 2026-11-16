@@ -67,6 +67,21 @@ public sealed class ShopApiTests
     }
 
     [Fact]
+    public async Task Gastbuchung_trennt_einen_Titel_im_Vornamen_ab()
+    {
+        await using var h = await StartenAsync();
+        await h.KursAsync("26H-907", max: 5);
+        var korb = (await JsonAsync(await KorbAsync(h, "26H-907"))).GetProperty("id").GetGuid();
+        (await h.SendenAsync(HttpMethod.Post, $"warenkorb/{korb}/buchen", Anfrage(vorname: "Dr. Erika"), nachweis: true, idempotenz: Guid.NewGuid().ToString()))
+            .StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        await using var bereich = h.App.Services.CreateAsyncScope();
+        var db = bereich.ServiceProvider.GetRequiredService<VibeVhsDbContext>();
+        var p = await db.Personen.AsNoTracking().SingleAsync(x => x.Titel != null, TestContext.Current.CancellationToken);
+        (p.Titel, p.Anzeigename).ShouldBe(("Dr.", "Dr. Erika Muster"));
+    }
+
+    [Fact]
     public async Task Buchen_ist_idempotent_und_lehnt_abweichende_Wiederholung_ab()
     {
         await using var h = await StartenAsync();
