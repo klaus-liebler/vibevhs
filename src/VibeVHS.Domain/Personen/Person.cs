@@ -481,9 +481,11 @@ public sealed class Person
     public DateTimeOffset? AnonymisiertAm { get; private set; }
 
     /// <summary>Statistikmerkmale, die nach der Anonymisierung bleiben.</summary>
-    public string? StatistikAltersgruppe { get; private set; }
+    /// <summary>Nur nach der Anonymisierung: Geburtsjahr-Kohorte („1985–1989“) für die Altersstatistik zu jedem Stichtag.</summary>
+    public string? AnonymisiertGeburtskohorte { get; private set; }
 
-    public string? StatistikGebiet { get; private set; }
+    /// <summary>Nur nach der Anonymisierung: grobes Gebiet (Kreis bzw. PLZ-Gebiet) statt der Adresse.</summary>
+    public string? AnonymisiertGebiet { get; private set; }
 
     public bool IstAnonymisiert => Datenschutz == VibeVHS.Domain.Datenschutz.Datenschutzstatus.Anonymisiert;
 
@@ -563,7 +565,7 @@ public sealed class Person
 
     /// <summary>
     /// Anonymisierung an Ort und Stelle: Die Zeile bleibt (andere Daten zeigen auf sie), alle Versionen werden überschrieben.
-    /// Übrig bleiben ein eigener Platzhalter, Rollen und Statistikmerkmale (Altersgruppe, Gebiet, Geschlecht).
+    /// Übrig bleiben ein eigener Platzhalter, Rollen und Statistikmerkmale (Geburtsjahr-Kohorte, Gebiet, letztes Geschlecht).
     /// </summary>
     public string Anonymisieren(DateTimeOffset jetzt)
     {
@@ -574,8 +576,8 @@ public sealed class Person
 
         var heute = DateOnly.FromDateTime(jetzt.Date);
         var stand = StandAm(heute, jetzt);
-        StatistikAltersgruppe = Datenschutz_.Statistik.Altersgruppe(Geburtsdatum ?? stand.Geburtsdatum, heute);
-        StatistikGebiet = Datenschutz_.Statistik.Gebiet(stand.Aufenthaltsort?.Postleitzahl ?? _adressen.LastOrDefault()?.Postleitzahl);
+        AnonymisiertGeburtskohorte = (Geburtsdatum ?? stand.Geburtsdatum) is { } geb ? Datenschutz_.Statistik.Geburtskohorte(geb) : null;
+        AnonymisiertGebiet = Datenschutz_.Statistik.Gebiet(stand.Aufenthaltsort?.Postleitzahl ?? _adressen.LastOrDefault()?.Postleitzahl);
         var kurz = Datenschutz_.Pseudonym.Kurz(Id);
 
         foreach (var n in _namen)
@@ -635,7 +637,7 @@ public sealed class Person
         Geburtsdatum = null;
         EMail = null;
         Sprache = string.Empty;
-        Wohnort = StatistikGebiet;
+        Wohnort = AnonymisiertGebiet;
         Anzeigename = $"Gelöschte Person {kurz} · anonymisiert am {heute:dd.MM.yyyy}";
         Sortiername = $"~ geloschte person {kurz.ToLowerInvariant()}";
         Sortierschluessel = $"{Sortiername}|{Id:N}";

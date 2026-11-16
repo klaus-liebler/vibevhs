@@ -96,7 +96,7 @@ internal sealed class Auswertungsquelle(VibeVhsDbContext db, TimeProvider uhr) :
         var ids = kurse.Keys.ToList();
         var faelle = await db.Belegungen.IgnoreAutoIncludes().AsNoTracking()
             .Where(b => ids.Contains(b.KursId) && b.Status == Belegungsstatus.Angemeldet)
-            .Join(db.Personen.AsNoTracking(), b => b.PersonId, p => p.Id, (b, p) => new { b.KursId, b.PersonId, p.Geburtsdatum, p.StatistikAltersgruppe })
+            .Join(db.Personen.AsNoTracking(), b => b.PersonId, p => p.Id, (b, p) => new { b.KursId, b.PersonId, p.Geburtsdatum, p.AnonymisiertGeburtskohorte })
             .ToListAsync(abbruch);
 
         // Geschlecht zum Kursdatum aus dem versionierten Merkmal (nicht der heutige Stand); Alter zum Stichtag des Berichtsjahrs (31.12.).
@@ -117,7 +117,7 @@ internal sealed class Auswertungsquelle(VibeVhsDbContext db, TimeProvider uhr) :
             var geschlecht = geschlechter[f.PersonId].AlsStichtag(kursdatum, jetzt)?.Inhalt is { Length: > 0 } g ? g : "nicht erfasst";
             var altersgruppe = f.Geburtsdatum is { } geb
                 ? Domain.Datenschutz.Statistik.Altersgruppe(geb, stichtag)
-                : f.StatistikAltersgruppe ?? Domain.Datenschutz.Statistik.Altersgruppe(null, stichtag);
+                : Domain.Datenschutz.Statistik.AltersgruppeAusKohorte(f.AnonymisiertGeburtskohorte, stichtag);
             return new Statistikfall(k.Fachbereich, arten.GetValueOrDefault(k.KursartId, ""), ue, geschlecht, altersgruppe, k.Nutzungsart == Nutzungsart.Integrationskurs);
         }).ToList();
     }

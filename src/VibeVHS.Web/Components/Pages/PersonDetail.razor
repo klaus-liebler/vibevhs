@@ -41,7 +41,7 @@
 
 @if (person.IstAnonymisiert)
 {
-    <div class="vhs-alert vhs-info">Dieser Datensatz wurde am @person.AnonymisiertAm?.ToLocalTime().ToString("dd.MM.yyyy") anonymisiert. Erhalten sind nur Rollen und Statistikmerkmale (Altersgruppe @person.StatistikAltersgruppe, @person.StatistikGebiet), damit alte Kurse und Statistiken stimmen.</div>
+    <div class="vhs-alert vhs-info">Dieser Datensatz wurde am @person.AnonymisiertAm?.ToLocalTime().ToString("dd.MM.yyyy") anonymisiert. Erhalten sind nur Rollen und Statistikmerkmale (Geburtsjahre @(person.AnonymisiertGeburtskohorte ?? "unbekannt"), @person.AnonymisiertGebiet), damit alte Kurse und Statistiken stimmen.</div>
 }
 else if (person.Datenschutz == Datenschutzstatus.Gesperrt)
 {

@@ -131,8 +131,9 @@ public class DatenschutzTests
         await using var neu = t.NeuerKontext();
         (await neu.Personen.CountAsync(p => (p.Rollen & Personenrolle.Teilnehmende) == Personenrolle.Teilnehmende, ct)).ShouldBe(teilnehmendeVorher);
         var m = await neu.Personen.SingleAsync(p => p.Id == mehmet.Id, ct);
-        m.StatistikAltersgruppe.ShouldBe("35–49");
-        m.StatistikGebiet.ShouldBe("Kreis Steinfurt");
+        m.AnonymisiertGeburtskohorte.ShouldBe("1985–1989"); // statt eingefrorener Altersgruppe
+        VibeVHS.Domain.Datenschutz.Statistik.AltersgruppeAusKohorte(m.AnonymisiertGeburtskohorte, new DateOnly(2040, 12, 31)).ShouldBe("50–64"); // altert mit
+        m.AnonymisiertGebiet.ShouldBe("Kreis Steinfurt");
         m.Adressen.ShouldAllBe(a => a.Strasse == "–" && a.Postleitzahl == string.Empty);
         m.Rufnummern.ShouldAllBe(r => r.Nummer == "–");
 

@@ -52,6 +52,22 @@ public static class Statistik
         };
     }
 
+    /// <summary>Geburtsjahr-Kohorte in 5-Jahres-Schritten („1985–1989“) – bleibt nach der Anonymisierung statt des Geburtsdatums.</summary>
+    public static string Geburtskohorte(DateOnly geburtsdatum)
+    {
+        var von = geburtsdatum.Year - (geburtsdatum.Year % 5);
+        return $"{von}–{von + 4}";
+    }
+
+    /// <summary>
+    /// Altersgruppe zum Stichtag aus einer Geburtsjahr-Kohorte (Mitte der Kohorte, 1. Juli). An Gruppengrenzen ist das ungenau
+    /// (± 2 Jahre) – für anonymisierte Datensätze ist das die bewusst gewählte Unschärfe.
+    /// </summary>
+    public static string AltersgruppeAusKohorte(string? kohorte, DateOnly stichtag)
+        => kohorte is { Length: >= 4 } k && int.TryParse(k[..4], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var von)
+            ? Altersgruppe(new DateOnly(von + 2, 7, 1), stichtag)
+            : "unbekannt";
+
     private static readonly Dictionary<string, string> Kreise = new(StringComparer.Ordinal)
     {
         ["48282"] = "Kreis Steinfurt",
