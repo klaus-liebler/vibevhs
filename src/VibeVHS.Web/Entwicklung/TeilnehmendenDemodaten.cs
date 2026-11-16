@@ -32,6 +32,7 @@ internal static class TeilnehmendenDemodaten
 
         var uhr = bereich.ServiceProvider.GetRequiredService<TimeProvider>();
         var jetzt = uhr.GetLocalNow();
+        var z = await Demozeit.LadenAsync(db, uhr);
         var heute = DateOnly.FromDateTime(jetzt.Date);
         var e = Erfassung.Erst(jetzt, Von);
         if (!await db.Benutzerkonten.AnyAsync(k => k.Login == "olena.kovalenko"))
@@ -40,7 +41,7 @@ internal static class TeilnehmendenDemodaten
                 "Demokonto Teilnehmendenportal: eigene Buchungen, Termine, Unterlagen; darf für ihren Sohn buchen"));
         }
 
-        var taras = Person.Anlegen("Taras", "Kovalenko", heute, jetzt, new DateOnly(2014, 6, 3), null, "uk", Von);
+        var taras = Person.Anlegen("Taras", "Kovalenko", heute, jetzt, z.D(2014, 6, 3), null, "uk", Von);
         taras.RolleHinzufuegen(Personenrolle.Teilnehmende, heute, e);
         taras.VollmachtErteilen(Bevollmaechtigtenart.Person, olena.Id, olena.Anzeigename, "Geburtsurkunde vorgelegt (Mutter, sorgeberechtigt)", heute.AddDays(-30), null, e);
         db.Personen.Add(taras);

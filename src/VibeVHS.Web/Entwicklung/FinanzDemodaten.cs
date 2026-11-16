@@ -29,6 +29,7 @@ internal static class FinanzDemodaten
 
         var uhr = d.GetRequiredService<TimeProvider>();
         var jetzt = uhr.GetLocalNow();
+        var z = await Demozeit.LadenAsync(db, uhr);
         var heute = DateOnly.FromDateTime(jetzt.Date);
         var finanzen = d.GetRequiredService<FinanzDienst>();
         var notizen = new List<string>();
@@ -73,18 +74,18 @@ internal static class FinanzDemodaten
 
             if (vertraege % 3 == 2)
             {
-                await honorare.VertragSpeichernAsync(dozentId, null, "Rahmenvertrag 2026", "basis-ue-tn", new Dictionary<string, string?>
+                await honorare.VertragSpeichernAsync(dozentId, null, $"Rahmenvertrag {z.D(2026, 1, 1).Year}", "basis-ue-tn", new Dictionary<string, string?>
                 {
                     ["basisJeTermin"] = "15", ["satzJeUe"] = "22", ["satzJeTeilnehmer"] = "1.50", ["mindestJeTermin"] = "45", ["hoechstJeTermin"] = "120",
                     ["fahrtkosten"] = "km", ["kmJeTermin"] = "18",
-                }, new DateOnly(2026, 1, 1), null);
+                }, z.D(2026, 1, 1), null);
             }
             else
             {
-                await honorare.VertragSpeichernAsync(dozentId, null, "Rahmenvertrag 2026", "pro-ue", new Dictionary<string, string?>
+                await honorare.VertragSpeichernAsync(dozentId, null, $"Rahmenvertrag {z.D(2026, 1, 1).Year}", "pro-ue", new Dictionary<string, string?>
                 {
                     ["satzJeUe"] = vertraege % 2 == 0 ? "30" : "32.50", ["ausfallProzent"] = "50", ["fahrtkosten"] = vertraege % 2 == 0 ? "pauschal" : "keine", ["fahrtPauschale"] = "6",
-                }, new DateOnly(2026, 1, 1), null);
+                }, z.D(2026, 1, 1), null);
             }
 
             if (vertraege % 4 != 3)
@@ -109,9 +110,9 @@ internal static class FinanzDemodaten
             }
 
             var empf = FinanzDienst.Personenempfaenger(p, jetzt);
-            var r = new Beleg(Belegart.Rechnung, new DateOnly(2026, 9, 15), p.Id, null, empf.Name, string.Join('\n', empf.Anschrift),
+            var r = new Beleg(Belegart.Rechnung, z.D(2026, 9, 15), p.Id, null, empf.Name, string.Join('\n', empf.Anschrift),
                 [new Belegposition($"Kursentgelt {kurs.Kursnummer} {kurs.Titel}", b.EntgeltCent, belegungId: b.Id, kursId: kurs.Id, art: Positionsart.Kursentgelt)],
-                jetzt, "Demodaten", new DateOnly(2026, 9, 29));
+                jetzt, "Demodaten", z.D(2026, 9, 29));
             db.Add(r);
             await finanzen.FestschreibenAsync(r, empf, false);
         }
@@ -136,7 +137,7 @@ internal static class FinanzDemodaten
         notizen.Add($"Kontoauszug: {auszug.Umsaetze} Umsätze, {gebucht} sicher gebucht");
 
         // Honorarentwürfe für Oktober
-        var honorarlauf = await honorare.AbrechnungenErstellenAsync(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31));
+        var honorarlauf = await honorare.AbrechnungenErstellenAsync(z.D(2026, 10, 1), z.D(2026, 10, 31));
         notizen.Add($"{honorarlauf.Entwuerfe} Honorarentwürfe Oktober");
         await routinen.AufgabenAbgleichenAsync();
 

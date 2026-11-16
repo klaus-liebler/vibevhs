@@ -3,6 +3,8 @@
 **Teilnehmende:** 2–3 Verwaltungsmitarbeitende der vhs EGS (z. B. Teilnehmerservice, Fachbereichsleitung, Buchhaltung/Integrationskurs-Team)
 **Dauer:** 60–90 Minuten · **Adresse:** die lokale Testinstanz (z. B. `http://localhost:5189`) · **Daten:** ausschließlich fiktive Demodaten
 
+> **Datumsangaben:** Die Demodaten sind auf den 16.11.2026 zugeschnitten und werden beim Anlegen einer neuen Datenbank um ganze Wochen auf das aktuelle Datum verschoben (Kurse, Termine, Fristen, Rechnungen, Aufgaben …). Kursnummern und Semester heißen dann ggf. anders als unten (z. B. `27F-501` statt `26H-501`) – die Endziffern bleiben gleich.
+
 ## Ablauf
 
 1. **Begrüßung (5 min):** Ziel erklären: Wir testen die Software, nicht Sie. Fehler sind wertvolle Hinweise.

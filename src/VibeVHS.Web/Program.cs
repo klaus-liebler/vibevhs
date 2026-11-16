@@ -156,31 +156,7 @@ await using (var bereich = app.Services.CreateAsyncScope())
 
 if (app.Configuration.GetValue("Demodaten:Anlegen", false))
 {
-    await Demodaten.AnlegenAsync(app.Services);
-    await Demodaten.MassendatenAnlegenAsync(app.Services, app.Configuration.GetValue("Demodaten:Massendaten", 0));
-    await ProgrammDemodaten.AnlegenAsync(app.Services);
-    // Nachgereichte Demodaten dürfen den Start einer bestehenden Instanz nie verhindern.
-    foreach (var (name, anlegen) in new (string, Func<IServiceProvider, Task>)[]
-             {
-                 ("Anmeldungen", AnmeldungDemodaten.AnlegenAsync),
-                 ("Qualifikationen", QualifikationsDemodaten.AnlegenAsync),
-                 ("Sprachfreigaben", QualifikationsDemodaten.SprachfreigabenAnlegenAsync),
-                 ("Merkmal-Typen", MerkmalDemodaten.AnlegenAsync),
-                 ("Teilnehmendenportal", TeilnehmendenDemodaten.AnlegenAsync),
-                 ("Durchführung", DurchfuehrungDemodaten.AnlegenAsync),
-                 ("Integration", IntegrationDemodaten.AnlegenAsync),
-                 ("Finanzen", FinanzDemodaten.AnlegenAsync),
-             })
-    {
-        try
-        {
-            await anlegen(app.Services);
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or Microsoft.EntityFrameworkCore.DbUpdateException)
-        {
-            app.Logger.LogWarning(ex, "Demodaten {Name} konnten nicht angelegt werden", name);
-        }
-    }
+    await Demodaten.AllesAnlegenAsync(app.Services, app.Configuration.GetValue("Demodaten:Massendaten", 0), app.Logger);
 }
 
 if (hinterProxy)

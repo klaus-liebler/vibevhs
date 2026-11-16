@@ -15,6 +15,38 @@ internal static class Demodaten
 {
     private const string Von = "Demodaten";
 
+    /// <summary>
+    /// Alle Demodaten in fester Reihenfolge, relativ zum Tagesdatum (<see cref="Demozeit"/>). Nachgereichte Demodaten dürfen den Start
+    /// einer bestehenden Instanz nie verhindern; ihre Fehler werden nur protokolliert.
+    /// </summary>
+    public static async Task AllesAnlegenAsync(IServiceProvider dienste, int massendaten, ILogger log)
+    {
+        await AnlegenAsync(dienste);
+        await MassendatenAnlegenAsync(dienste, massendaten);
+        await ProgrammDemodaten.AnlegenAsync(dienste);
+        foreach (var (name, anlegen) in new (string, Func<IServiceProvider, Task>)[]
+                 {
+                     ("Anmeldungen", AnmeldungDemodaten.AnlegenAsync),
+                     ("Qualifikationen", QualifikationsDemodaten.AnlegenAsync),
+                     ("Sprachfreigaben", QualifikationsDemodaten.SprachfreigabenAnlegenAsync),
+                     ("Merkmal-Typen", MerkmalDemodaten.AnlegenAsync),
+                     ("Teilnehmendenportal", TeilnehmendenDemodaten.AnlegenAsync),
+                     ("Durchführung", DurchfuehrungDemodaten.AnlegenAsync),
+                     ("Integration", IntegrationDemodaten.AnlegenAsync),
+                     ("Finanzen", FinanzDemodaten.AnlegenAsync),
+                 })
+        {
+            try
+            {
+                await anlegen(dienste);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or DbUpdateException)
+            {
+                log.LogWarning(ex, "Demodaten {Name} konnten nicht angelegt werden", name);
+            }
+        }
+    }
+
     /// <summary>Große Testdatenmenge (fester Startwert), einmalig, wenn <c>Demodaten:Massendaten</c> &gt; 0.</summary>
     public static async Task MassendatenAnlegenAsync(IServiceProvider dienste, int anzahl)
     {
@@ -46,48 +78,47 @@ internal static class Demodaten
             return;
         }
 
-        var mez = TimeSpan.FromHours(1);
-        var mesz = TimeSpan.FromHours(2);
         var uhr = bereich.ServiceProvider.GetRequiredService<TimeProvider>();
         var jetzt = uhr.GetLocalNow();
         var heute = DateOnly.FromDateTime(jetzt.Date);
+        var z = await Demozeit.LadenAsync(db, uhr);
 
         // Namensänderung durch Heirat (mit vorheriger Tippfehler-Korrektur).
-        var anna = Person.Anlegen("Anna", "Schmitt", new DateOnly(2019, 3, 1), new DateTimeOffset(2019, 3, 1, 9, 0, 0, mez),
-            new DateOnly(1986, 8, 12), "anna.becker@example.org", von: Von);
-        anna.NameKorrigieren("Anna", "Schmidt", new DateOnly(2019, 3, 1), "Tippfehler bei Ersterfassung",
-            new DateTimeOffset(2019, 3, 4, 10, 0, 0, mez), Von);
-        anna.NameAendernAb("Anna", "Becker", new DateOnly(2025, 6, 14), "Heirat, Nachweis: Heiratsurkunde",
-            new DateTimeOffset(2025, 7, 2, 14, 30, 0, mesz), Von);
-        anna.RolleHinzufuegen(Personenrolle.Dozierende, new DateOnly(2019, 3, 1), Erfassung.Erst(new DateTimeOffset(2019, 3, 1, 9, 0, 0, mez), Von));
+        var anna = Person.Anlegen("Anna", "Schmitt", z.D(2019, 3, 1), z.DTO(2019, 3, 1, 9, 0),
+            z.D(1986, 8, 12), "anna.becker@example.org", von: Von);
+        anna.NameKorrigieren("Anna", "Schmidt", z.D(2019, 3, 1), "Tippfehler bei Ersterfassung",
+            z.DTO(2019, 3, 4, 10, 0), Von);
+        anna.NameAendernAb("Anna", "Becker", z.D(2025, 6, 14), "Heirat, Nachweis: Heiratsurkunde",
+            z.DTO(2025, 7, 2, 14, 30), Von);
+        anna.RolleHinzufuegen(Personenrolle.Dozierende, z.D(2019, 3, 1), Erfassung.Erst(z.DTO(2019, 3, 1, 9, 0), Von));
 
         // Umzug und abweichende Korrespondenzadresse (c/o).
-        var start = new DateTimeOffset(2025, 3, 1, 10, 0, 0, mez);
-        var olena = Person.Anlegen("Olena", "Kovalenko", new DateOnly(2025, 3, 1), start, new DateOnly(1991, 1, 21),
+        var start = z.DTO(2025, 3, 1, 10, 0);
+        var olena = Person.Anlegen("Olena", "Kovalenko", z.D(2025, 3, 1), start, z.D(1991, 1, 21),
             "olena.kovalenko@example.org", "uk", Von);
-        olena.RolleHinzufuegen(Personenrolle.Teilnehmende, new DateOnly(2025, 3, 1), Erfassung.Erst(start, Von));
-        var wohnung1 = olena.AdresseHinzufuegen(null, "Lindenstraße 14", "48282", "Emsdetten", new DateOnly(2025, 3, 1), Erfassung.Erst(start, Von));
-        olena.AdressKennzeichnenAb(AdressKennzeichenArt.UeblicherAufenthaltsort, wohnung1, new DateOnly(2025, 3, 1), Erfassung.Erst(start, Von));
+        olena.RolleHinzufuegen(Personenrolle.Teilnehmende, z.D(2025, 3, 1), Erfassung.Erst(start, Von));
+        var wohnung1 = olena.AdresseHinzufuegen(null, "Lindenstraße 14", "48282", "Emsdetten", z.D(2025, 3, 1), Erfassung.Erst(start, Von));
+        olena.AdressKennzeichnenAb(AdressKennzeichenArt.UeblicherAufenthaltsort, wohnung1, z.D(2025, 3, 1), Erfassung.Erst(start, Von));
         var handy = olena.RufnummerHinzufuegen(RufnummerArt.Mobil, "+49 151 00000001", Messagingdienst.Anruf | Messagingdienst.Sms | Messagingdienst.WhatsApp,
-            true, true, new DateOnly(2025, 3, 1), Erfassung.Erst(start, Von, "Einwilligung schriftlich bei Anmeldung"));
+            true, true, z.D(2025, 3, 1), Erfassung.Erst(start, Von, "Einwilligung schriftlich bei Anmeldung"));
 
-        var coErfasst = new DateTimeOffset(2026, 6, 3, 11, 15, 0, mesz);
-        var co = olena.AdresseHinzufuegen("c/o Flüchtlingsberatung", "Kirchplatz 2", "48268", "Greven", new DateOnly(2026, 6, 1),
+        var coErfasst = z.DTO(2026, 6, 3, 11, 15);
+        var co = olena.AdresseHinzufuegen("c/o Flüchtlingsberatung", "Kirchplatz 2", "48268", "Greven", z.D(2026, 6, 1),
             Erfassung.Aenderung(coErfasst, "Post soll über die Beratungsstelle laufen (Wunsch der Teilnehmerin)", Von));
-        olena.AdressKennzeichnenAb(AdressKennzeichenArt.Korrespondenzadresse, co, new DateOnly(2026, 6, 1),
+        olena.AdressKennzeichnenAb(AdressKennzeichenArt.Korrespondenzadresse, co, z.D(2026, 6, 1),
             Erfassung.Aenderung(coErfasst, "Post soll über die Beratungsstelle laufen (Wunsch der Teilnehmerin)", Von));
 
-        olena.UmzugAb(wohnung1, null, "Grevener Damm 120", "48282", "Emsdetten", new DateOnly(2026, 8, 1),
-            Erfassung.Aenderung(new DateTimeOffset(2026, 8, 10, 9, 30, 0, mesz), "Umzug, Nachweis: Meldebescheinigung", Von));
+        olena.UmzugAb(wohnung1, null, "Grevener Damm 120", "48282", "Emsdetten", z.D(2026, 8, 1),
+            Erfassung.Aenderung(z.DTO(2026, 8, 10, 9, 30), "Umzug, Nachweis: Meldebescheinigung", Von));
         olena.RufnummerAendernAb(handy, RufnummerArt.Mobil, "+49 151 00000001",
-            Messagingdienst.Anruf | Messagingdienst.Sms | Messagingdienst.WhatsApp | Messagingdienst.Signal, true, true, new DateOnly(2026, 9, 1),
-            Erfassung.Aenderung(new DateTimeOffset(2026, 9, 1, 14, 0, 0, mesz), "Einwilligung für Signal erteilt", Von));
+            Messagingdienst.Anruf | Messagingdienst.Sms | Messagingdienst.WhatsApp | Messagingdienst.Signal, true, true, z.D(2026, 9, 1),
+            Erfassung.Aenderung(z.DTO(2026, 9, 1, 14, 0), "Einwilligung für Signal erteilt", Von));
 
-        var mehmet = Person.Anlegen("Mehmet", "Yılmaz", heute, jetzt, new DateOnly(1988, 5, 3), "mehmet.yilmaz@example.org", "tr", Von);
+        var mehmet = Person.Anlegen("Mehmet", "Yılmaz", heute, jetzt, z.D(1988, 5, 3), "mehmet.yilmaz@example.org", "tr", Von);
         mehmet.RolleHinzufuegen(Personenrolle.Teilnehmende, heute, Erfassung.Erst(jetzt, Von));
-        var weber = Person.Anlegen("Sabine", "Weber", heute, jetzt, new DateOnly(1972, 11, 14), "sabine.weber@example.org", von: Von);
+        var weber = Person.Anlegen("Sabine", "Weber", heute, jetzt, z.D(1972, 11, 14), "sabine.weber@example.org", von: Von);
         weber.RolleHinzufuegen(Personenrolle.Teilnehmende, heute, Erfassung.Erst(jetzt, Von));
-        var nadia = Person.Anlegen("Nadia", "Haddad", heute, jetzt, new DateOnly(1993, 10, 9), null, "ar", Von);
+        var nadia = Person.Anlegen("Nadia", "Haddad", heute, jetzt, z.D(1993, 10, 9), null, "ar", Von);
         nadia.RolleHinzufuegen(Personenrolle.Teilnehmende, heute, Erfassung.Erst(jetzt, Von));
 
         db.Personen.AddRange(anna, olena, mehmet, weber, nadia);

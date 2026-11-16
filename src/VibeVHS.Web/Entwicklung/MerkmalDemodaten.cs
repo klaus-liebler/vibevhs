@@ -23,7 +23,9 @@ public static class MerkmalDemodaten
             return; // ohne Programm-Demodaten oder schon angelegt
         }
 
-        var jetzt = bereich.ServiceProvider.GetRequiredService<TimeProvider>().GetLocalNow();
+        var uhr = bereich.ServiceProvider.GetRequiredService<TimeProvider>();
+        var jetzt = uhr.GetLocalNow();
+        var z = await Demozeit.LadenAsync(db, uhr);
         var e = Erfassung.Erst(jetzt, "Demodaten Merkmal-Typen");
 
         // PC-Arbeitsplätze waren Ja/Nein mit Zahl als Bemerkung → Ganzzahl (Demodaten: alle Werte sind Zahlen)
@@ -51,7 +53,7 @@ public static class MerkmalDemodaten
         {
             if (o is not null && !o.Merkmale.Any(x => x.Schluessel == schluessel))
             {
-                o.MerkmalSetzenAb(katalog[schluessel], wert, null, new DateOnly(2024, 1, 1), null, e);
+                o.MerkmalSetzenAb(katalog[schluessel], wert, null, z.D(2024, 1, 1), null, e);
             }
         }
 
