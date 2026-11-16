@@ -8,9 +8,14 @@ Runbook für den Umzug von „Apache auf 443 + Node-RED auf 1880“ zu **nginx a
 |---|---|
 | Server | Ubuntu 26.04.1 LTS, x86_64 · Benutzer `srvadmin` (sudo mit Passwort) |
 | Adressen | 131.173.241.60 · 2001:638:513:f10::83ad:f13c (IPv6 – nginx und ufw gelten für beide) |
-| Heute | Apache 2.4.66 auf 80/443 (Zertifikat GEANT/HARICA bis 07.02.2027), Node-RED auf 1880, OpenSSH 10.2 |
-| Ziel | 443 nginx (+80 nur für Let's Encrypt und Umleitung) · 22 nur aus dem VPN · 1880 zu |
-| CAA | keine Einträge – Let's Encrypt darf ausstellen |
+| Heute | Apache 2.4.66 auf 80/443 (statisch `/var/www/html`: `index.html`, `rgb/`, `simplesorter/`), Node-RED auf 1880 (HTTPS), OpenSSH 10.2 |
+| Zertifikat | certbot (snap) mit webroot `/var/www/html`, `snap.certbot.renew.timer` aktiv; ausgeliefert wird aber GEANT (bis 07.02.2027) aus dem LE-Pfad |
+| Weitere Dienste | mosquitto (8883 TLS), influxdb3 (8181), nagios-nrpe (5666), Docker als snap (9443, 8000) – bleiben unverändert |
+| Firewall | ufw schon **aktiv** (Standard DROP) – Schritt 07 ergänzt nur, nichts wird zurückgesetzt |
+| Ziel | 443 nginx (+80 für Let's Encrypt und Umleitung) · 22 nur aus dem VPN · 1880 zu |
+| CAA | keine Einträge – Let's Encrypt darf ausstellen; Port 80 ist von außen offen |
+
+Bestandsaufnahme (nur lesend, alle Befehle wörtlich): [`protokoll/2026-11-16-erkundung.md`](protokoll/2026-11-16-erkundung.md).
 
 SSH-Host-Schlüssel des Servers (bei der ersten Verbindung vergleichen):
 
@@ -20,7 +25,7 @@ ECDSA   SHA256:Es80ZFNAUByLJLQ3McI9vbLR6loVR9aaMWktcjoPEvQ
 RSA     SHA256:EkK0c7hZFTd/bvy/LcZgrAJkIDSQnMzTGvuGS1rVHCo
 ```
 
-**Reihenfolge:** A → 01 → 02 → 03 → 04 → 05 → 06 → Ausrollen → 07. Bei jedem Schritt eine **zweite SSH-Sitzung offen
+**Reihenfolge:** A → 01 → 02 → 03 → 04 → 05 → 06 → Ausrollen → 07. **Jeden Schritt startet Klaus selbst** (bzw. gibt ihn frei). Bei jedem Schritt eine **zweite SSH-Sitzung offen
 lassen** (Rettungsanker). Alle Kommandos stammen aus Windows-PowerShell auf dem Entwicklungsrechner, im VPN.
 
 ---
@@ -106,9 +111,9 @@ keine verlässliche Microsoft-Paketquelle).
 **Prüfen:** `https://liebler.iui.hs-osnabrueck.de/` zeigt die Übersicht; `http://…` leitet auf HTTPS um.
 **Rückweg:** `sudo bash /tmp/vibevhs-kit/schritte/03-zurueck.sh` (nginx aus, Apache an).
 
-**Bisherige Inhalte:** Statische Seiten aus `/var/www/html` lassen sich in nginx mit `root /var/www/html;` übernehmen,
-PHP über `php-fpm`, weitere Anwendungen als eigene `location`. Das trägt Klaus nach Bedarf in
-`/etc/nginx/sites-available/liebler.conf` ein (`location = /` ersetzt dann die Übersicht).
+**Bisherige Inhalte:** Apache liefert nur statische Seiten aus `/var/www/html` (`index.html`, `rgb/`, `simplesorter/`, kein PHP,
+keine Proxys). nginx liefert dasselbe Verzeichnis unverändert aus (`root /var/www/html`); das Skript prüft `/rgb/` und `/simplesorter/`.
+Schritt 03 legt außerdem den certbot-Hook „nginx neu laden“ an (neben dem vorhandenen `nodered-cert-copy.sh`).
 
 ---
 
@@ -116,11 +121,15 @@ PHP über `php-fpm`, weitere Anwendungen als eigene `location`. Das trägt Klaus
 
 `ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/04-nodered-lokal.sh"`
 
-Setzt in `settings.js` (mit Sicherung) `uiHost: "127.0.0.1"`, `httpAdminRoot` und `httpNodeRoot` = `"/nodered"`, prüft die
-Syntax und startet Node-RED neu. Danach ist 1880 nur noch lokal; nginx reicht `/nodered/` inkl. WebSockets durch.
+Node-RED läuft als `nodered.service` (Benutzer `nodered`, v4.1.0, `/home/nodered/.node-red/settings.js`) mit eigenem HTTPS
+(`requireHttps`, Zertifikat kopiert der certbot-Hook) und `adminAuth`. Das Skript setzt (mit Sicherung) `uiHost: "127.0.0.1"`,
+`httpAdminRoot` und `httpNodeRoot` = `"/nodered"`, prüft die Syntax und startet Node-RED neu. HTTPS und Anmeldung bleiben;
+nginx verbindet sich per `https://127.0.0.1:1880`. Danach ist 1880 nur noch lokal.
+
+**Achtung:** HTTP-Endpunkte der Flows heißen danach `https://liebler…/nodered/<pfad>` statt `…:1880/<pfad>` – Geräte oder
+Skripte, die Node-RED direkt auf 1880 ansprechen, vorher umstellen. MQTT (mosquitto) ist nicht betroffen.
 
 - **Prüfen:** `https://liebler.iui.hs-osnabrueck.de/nodered/` öffnet den Editor. HTTP-Endpunkte der Flows heißen jetzt `/nodered/<pfad>`.
-- **Dringend:** `adminAuth` für den Editor setzen (Vorlage `nodered/settings-ausschnitt.js`, Hash mit `node-red admin hash-pw`).
 - Findet das Skript `settings.js` nicht: `ssh -t liebler "sudo NODERED_SETTINGS=/pfad/settings.js bash /tmp/vibevhs-kit/schritte/04-nodered-lokal.sh"`.
 - **Rückweg:** `sudo bash /tmp/vibevhs-kit/schritte/04-zurueck.sh`.
 
@@ -130,9 +139,11 @@ Syntax und startet Node-RED neu. Danach ist 1880 nur noch lokal; nginx reicht `/
 
 `ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/05-zertifikat.sh"`
 
-HTTP-01 über Port 80: erst ein Probelauf (`--dry-run`), dann das echte Zertifikat. certbot fragt nach einer E-Mail
-(Ablaufwarnungen) und nach Zustimmung zu den Nutzungsbedingungen. Danach nutzt nginx `/etc/letsencrypt/live/…`;
-`certbot.timer` erneuert automatisch, ein deploy-hook lädt nginx neu. **Prüfen:** Ausgabe zeigt Aussteller „Let's Encrypt“,
+certbot ist schon eingerichtet (snap, webroot `/var/www/html`, `snap.certbot.renew.timer` zweimal täglich). Der Dienst, der das
+Zertifikat erneuert, heißt also **certbot** – „Let's Encrypt“ ist die Zertifizierungsstelle, die es ausstellt. Im Let's-Encrypt-Pfad
+liegt derzeit aber das GEANT-Zertifikat. Das Skript zeigt `certbot certificates`, macht einen Probelauf und holt nach Rückfrage
+ein echtes Let's-Encrypt-Zertifikat (`certbot renew --force-renewal`). Danach erneuert der Timer automatisch; die Hooks laden
+nginx neu und kopieren das Zertifikat für Node-RED. **Prüfen:** Ausgabe zeigt Aussteller „Let's Encrypt“,
 Ablaufdatum und „Erneuerung (Probelauf) klappt“. **Rückweg:** `05-zurueck.sh` (wieder das Hochschul-Zertifikat).
 
 **Voraussetzung: Port 80 von außen erreichbar.** Aus dem VPN ist 80 offen; ob auch von außen, bitte ohne VPN prüfen
@@ -191,13 +202,18 @@ dazu vor jedem Update `vor-update-*.db`. **Optional Litestream** (fortlaufende R
 ## 07 · Firewall
 
 ```powershell
-ssh -t liebler "sudo VPN_NETZ=<a.b.c.d/nn> VPN_NETZ6=<präfix/nn> bash /tmp/vibevhs-kit/schritte/07-firewall.sh"
+ssh -t liebler "sudo VPN_NETZ=172.22.192.0/21 VPN_NETZ6=2001:638:513:fe02::/64 bash /tmp/vibevhs-kit/schritte/07-firewall.sh"
 ```
 
-ufw: eingehend alles zu außer 443 und 80, SSH nur aus dem VPN-Netz (IPv4 und – falls angegeben – IPv6), 1880 zu. Prüft vorher,
-ob die eigene Sitzung im VPN-Netz liegt. **Rettungsanker:** ufw schaltet sich nach 10 Minuten selbst ab, bis der Auftrag
-mit `sudo atrm $(atq | awk '{print $1}')` entfernt wird. **Prüfen** (neues Fenster, im VPN): `ssh liebler`, `https://…/`.
-**Rückweg:** `07-zurueck.sh` (ufw aus).
+Die Netze stammen aus Klaus' eduVPN-Verbindung (Adapter `172.22.193.94/21`, `2001:638:513:fe02::15e/64`; der Server sah die
+IPv6-Adresse). eduVPN kann weitere Adresspools haben – passt eine spätere Verbindung nicht, das Netz ergänzen oder großzügiger
+das Hochschulnetz `2001:638:513::/48` nehmen.
+
+ufw ist schon **aktiv** mit eigenen Regeln (z. B. MQTT 8883). Das Skript zeigt die bisherigen Regeln, **ergänzt** 443, 80 und SSH
+aus dem VPN und fragt bei Regeln, die 22 oder 1880 für alle öffnen, einzeln nach, ob sie gelöscht werden sollen. Nichts wird
+zurückgesetzt. **Rettungsanker:** nach 10 Minuten kommt der vorige Stand automatisch zurück, bis der Auftrag mit
+`sudo atrm $(atq | awk '{print $1}')` entfernt wird. **Prüfen** (neues Fenster, im VPN): `ssh liebler`, `https://…/`.
+**Rückweg:** `07-zurueck.sh` (vorige Regeln). Hinweis: Docker (snap) veröffentlicht Ports an ufw vorbei.
 
 Die Hochschul-Firewall davor filtert zusätzlich: **Port 1880 dort schließen lassen**, 80 öffnen (falls Schritt 05 per HTTP-01).
 
@@ -210,10 +226,8 @@ Die Hochschul-Firewall davor filtert zusätzlich: **Port 1880 dort schließen la
 - Zertifikatsablauf beobachten: `sudo certbot certificates`; Erneuerungs-Timer: `systemctl list-timers certbot.timer`.
 - Logs: `journalctl -u vibevhs -f`, `/var/log/vibevhs/`, `/var/log/nginx/`.
 
-## Offene Fragen (nur Klaus kann sie beantworten)
+## Offene Punkte
 
-1. Was liefert Apache heute außer der Standardseite aus? (Schritt 03 zeigt es; entscheidet, was nginx übernehmen muss.)
-2. VPN-Netzbereich der Hochschule (IPv4 und IPv6) für Schritt 07 – oder ist 22 schon heute nur aus dem VPN erreichbar?
-3. Ist Port 80 von außen offen bzw. freigebbar (Let's Encrypt per HTTP-01)?
-4. Let's Encrypt statt des vorhandenen GEANT-Zertifikats – wirklich gewünscht?
-5. Unter welchem Benutzer und wie (systemd, pm2) läuft Node-RED, und gibt es schon `adminAuth`?
+1. Wer spricht Node-RED heute direkt auf Port 1880 an (Geräte, Skripte)? Diese Adressen ändern sich auf `/nodered/…`.
+2. Sollen 8181 (influxdb3), 9443/8000 (Docker) und 5666 (nagios) von außen erreichbar bleiben? (Heute filtert die Hochschul-Firewall.)
+3. Wie kam das GEANT-Zertifikat in den Let's-Encrypt-Pfad? Schritt 05 ersetzt es nach Rückfrage.

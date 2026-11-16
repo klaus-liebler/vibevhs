@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Schritt 07: Firewall (ufw) – von außen nur 443 (und 80 für Let's Encrypt), SSH nur aus dem VPN-Netz, 1880 zu.
-# Start (VPN-Netz der Hochschule eintragen!):
-#   ssh -t srvadmin@liebler.iui.hs-osnabrueck.de "sudo VPN_NETZ=<a.b.c.d/nn> VPN_NETZ6=<präfix/nn> bash /tmp/vibevhs-kit/schritte/07-firewall.sh"
-# Rettungsanker: ufw schaltet sich nach 10 Minuten von selbst wieder ab, wenn die Bestätigung ausbleibt.
+# Schritt 07: Firewall (ufw) – 443 und 80 frei, SSH nur aus dem VPN, 1880 zu. ufw ist auf diesem Server SCHON AKTIV
+# (Standard DROP, eigene Regeln z. B. für MQTT 8883): Es wird nichts zurückgesetzt, nur ergänzt; Löschen nur nach Rückfrage.
+# Start (eduVPN der Hochschule, aus Klaus' Verbindung ermittelt):
+#   ssh -t liebler "sudo VPN_NETZ=172.22.192.0/21 VPN_NETZ6=2001:638:513:fe02::/64 bash /tmp/vibevhs-kit/schritte/07-firewall.sh"
+# Rettungsanker: nach 10 Minuten kommt der vorige Firewall-Stand automatisch zurück, wenn der at-Auftrag nicht entfernt wird.
 # Rückweg: sudo bash /tmp/vibevhs-kit/schritte/07-zurueck.sh
 source "$(dirname "$0")/gemeinsam.sh"
 als_root
@@ -20,22 +21,35 @@ sys.exit(0 if q and any(ipaddress.ip_address(q) in ipaddress.ip_network(n, stric
 PY
 
 sichern /etc/ufw
-ufw --force reset >/dev/null
-ufw default deny incoming
-ufw default allow outgoing
+info "Bisherige Regeln:"
+ufw status numbered | sed 's/^/   /'
+
+# Rettungsanker VOR jeder Änderung: der gesicherte Stand wird in 10 Minuten automatisch wiederhergestellt
+command -v at >/dev/null || fehler "at fehlt – erst Schritt 02."
+echo "cp -a $SICHERUNG/etc/ufw/. /etc/ufw/ && ufw reload" | at now + 10 minutes 2>/dev/null \
+    && warn "Rettungsanker: in 10 Minuten wird der vorige Firewall-Stand wiederhergestellt (atq zeigt den Auftrag)."
+
+# Ergänzen (ufw überspringt vorhandene gleiche Regeln)
 ufw allow 443/tcp comment 'HTTPS nginx'
 ufw allow 80/tcp comment 'HTTP: Lets Encrypt und Umleitung'
 ufw allow from "$VPN_NETZ" to any port 22 proto tcp comment 'SSH nur aus dem VPN'
 [[ -n "${VPN_NETZ6:-}" ]] && ufw allow from "$VPN_NETZ6" to any port 22 proto tcp comment 'SSH nur aus dem VPN (IPv6)'
-# 1880 (Node-RED) und alles andere: zu
 
-echo "ufw disable" | at now + 10 minutes 2>/dev/null && warn "Rettungsanker: ufw schaltet sich in 10 Minuten wieder ab (atq zeigt den Auftrag)."
-ufw --force enable
+# Regeln, die SSH von überall bzw. Node-RED 1880 öffnen: einzeln nachfragen und löschen (von hinten, damit die Nummern stimmen)
+mapfile -t weg < <(ufw status numbered | grep -E '^\[ *[0-9]+\]' | grep -E '(^|\s)(22|22/tcp|OpenSSH|1880|1880/tcp)(\s|\(v6\))' | grep -E 'Anywhere\s*(\(v6\))?\s*$|Anywhere \(v6\)\s*$' || true)
+for ((i=${#weg[@]}-1; i>=0; i--)); do
+    nr=$(sed -E 's/^\[ *([0-9]+)\].*/\1/' <<<"${weg[$i]}")
+    if frage "Regel löschen? ${weg[$i]}"; then ufw --force delete "$nr"; fi
+done
+
+ufw reload
 ufw status verbose | sed 's/^/   /'
 cat <<HINWEIS
 
 JETZT in einem NEUEN Fenster (aus dem VPN) prüfen:  ssh srvadmin@$HOST   und  https://$HOST/
 Klappt alles, den Rettungsanker entfernen:  sudo atrm \$(atq | awk '{print \$1}')
-Klappt es nicht: einfach 10 Minuten warten (ufw geht aus) oder  sudo bash $(dirname "$0")/07-zurueck.sh
-Hinweis: Die Hochschul-Firewall davor filtert zusätzlich – Port 1880 dort ebenfalls schließen lassen.
+Klappt es nicht: 10 Minuten warten (voriger Stand kommt zurück) oder  sudo bash $(dirname "$0")/07-zurueck.sh
+Hinweise:
+- Die Hochschul-Firewall davor filtert zusätzlich – Port 1880 dort schließen lassen.
+- Docker (snap) veröffentlicht Ports an ufw vorbei (z. B. 9443/8000); ufw schützt diese NICHT.
 HINWEIS

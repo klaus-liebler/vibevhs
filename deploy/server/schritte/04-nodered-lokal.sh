@@ -36,10 +36,14 @@ node -e "require('$datei')" || { warn "settings.js fehlerhaft – spiele Sicheru
 grep -nE '^\s*(uiHost|httpAdminRoot|httpNodeRoot)\s*:' "$datei" | sed 's/^/   /'
 
 [[ -n "$dienst" ]] && systemctl restart "$dienst" && sleep 3
-if curl -fsS -o /dev/null "http://127.0.0.1:1880/nodered/"; then ok "Node-RED antwortet lokal unter /nodered/"; else warn "Node-RED antwortet (noch) nicht unter http://127.0.0.1:1880/nodered/"; fi
+# Node-RED spricht selbst HTTPS (requireHttps); nginx verbindet sich per https://127.0.0.1:1880
+if curl -fsSk -o /dev/null "https://127.0.0.1:1880/nodered/"; then ok "Node-RED antwortet lokal unter https://127.0.0.1:1880/nodered/"; else warn "Node-RED antwortet (noch) nicht unter https://127.0.0.1:1880/nodered/"; fi
+curl -fsS -o /dev/null --resolve "$HOST:443:127.0.0.1" "https://$HOST/nodered/" && ok "über nginx erreichbar: https://$HOST/nodered/" || warn "über nginx noch nicht erreichbar"
 if ss -ltn | grep -qE '(0\.0\.0\.0|\[::\]|\*):1880 '; then warn "Port 1880 lauscht noch auf allen Schnittstellen"; else ok "Port 1880 nur noch lokal"; fi
 cat <<HINWEIS
 
-Prüfen im Browser: https://$HOST/nodered/  (Editor) – Flows mit HTTP-Endpunkten sind jetzt unter /nodered/<pfad> erreichbar.
-Empfehlung: adminAuth für den Editor setzen (siehe $KIT/nodered/settings-ausschnitt.js).
+Prüfen im Browser: https://$HOST/nodered/  (Editor, Anmeldung wie bisher über adminAuth).
+ACHTUNG: HTTP-Endpunkte der Flows heißen jetzt https://$HOST/nodered/<pfad> statt https://$HOST:1880/<pfad>.
+Geräte/Skripte, die Node-RED direkt auf Port 1880 ansprechen, müssen auf die neue Adresse umgestellt werden.
+MQTT (mosquitto 8883) ist davon nicht betroffen.
 HINWEIS
