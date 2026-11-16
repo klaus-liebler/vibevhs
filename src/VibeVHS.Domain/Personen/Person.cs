@@ -145,6 +145,10 @@ public sealed class Person
         static string? Leer(string? s) => string.IsNullOrWhiteSpace(s) ? null : s;
     }
 
+    /// <summary>Briefanrede nach heutigem Stand (Anrede, Titel, Name), z. B. „Sehr geehrte Frau Dr. Muster“.</summary>
+    public string Briefanrede(DateTimeOffset jetzt, Anredestil stil = Anredestil.Foermlich)
+        => StandAm(DateOnly.FromDateTime(jetzt.Date), jetzt).Briefanrede(stil);
+
     // ---------- Dozierende: Beschäftigungsart und Qualifikationen ----------
 
     /// <summary>Beschäftigungsart ab einem Datum (z. B. Wechsel von freiberuflich zu festangestellt). Ältere Einsätze behalten die damalige Art.</summary>
@@ -817,6 +821,10 @@ public sealed record PersonenStand(
         => Einwilligungen.FirstOrDefault(e => e.Kanal == kanal && e.Zweck == zweck)?.Erteilt ?? false;
 
     public string NameMitTitel => Name is null ? "(unbekannt)" : string.IsNullOrEmpty(Titel) ? Name.Anzeige : $"{Titel} {Name.Anzeige}";
+
+    /// <summary>Briefanrede ohne Komma, z. B. „Sehr geehrte Frau Dr. Muster“.</summary>
+    public string Briefanrede(Anredestil stil = Anredestil.Foermlich)
+        => Name is null ? "Guten Tag" : Personen.Briefanrede.Bilden(Anrede, Titel, Name.Vorname, Name.Nachname, stil);
 
     public Postadresse? Aufenthaltsort => Adressen.FirstOrDefault(a => a.AdressId == AufenthaltsortId);
 

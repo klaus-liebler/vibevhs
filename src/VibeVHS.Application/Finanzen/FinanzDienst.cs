@@ -19,7 +19,7 @@ namespace VibeVHS.Application.Finanzen;
 
 /// <summary>Empfänger eines Belegs: Person oder Organisation, mit Anschrift zum Belegzeitpunkt.</summary>
 public sealed record Belegempfaenger(Guid? PersonId, Guid? OrganisationId, string Name, IReadOnlyList<string> Anschrift, string? EMail, string Sprache,
-    string? LeitwegId = null)
+    string? LeitwegId = null, string? Briefanrede = null)
 {
     public Guid ParteiId => PersonId ?? OrganisationId ?? Guid.Empty;
 }
@@ -409,14 +409,15 @@ public sealed class FinanzDienst(
         var anschrift = (stand.BriefAn ?? stand.Adressen.FirstOrDefault()) is { } a
             ? new[] { a.Zusatz, a.Strasse, $"{a.Postleitzahl} {a.Ort}" }.Where(z => !string.IsNullOrWhiteSpace(z)).Select(z => z!).ToList()
             : [];
-        return new Belegempfaenger(person.Id, null, stand.NameMitTitel, [stand.NameMitTitel, .. anschrift], person.EMail, person.Sprache);
+        return new Belegempfaenger(person.Id, null, stand.NameMitTitel, [stand.NameMitTitel, .. anschrift], person.EMail, person.Sprache,
+            Briefanrede: stand.Briefanrede());
     }
 
     public static Belegempfaenger Firmenempfaenger(Organisation org)
     {
         ArgumentNullException.ThrowIfNull(org);
         var zeilen = (org.Rechnungsanschrift ?? org.Ort ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return new Belegempfaenger(null, org.Id, org.Name, [org.Name, .. zeilen], org.RechnungsEMail, "de", org.LeitwegId);
+        return new Belegempfaenger(null, org.Id, org.Name, [org.Name, .. zeilen], org.RechnungsEMail, "de", org.LeitwegId, "Sehr geehrte Damen und Herren");
     }
 
     public async Task<Belegempfaenger?> EmpfaengerZuAsync(Beleg b, CancellationToken abbruch = default)

@@ -688,6 +688,7 @@ public sealed class AnmeldungDienst(
         var vorschlag = Textvorlagen.Vorschlaege.First(v => v.Schluessel == vorlageSchluessel);
         vorlage ??= new Textvorlage(vorschlag.Schluessel, vorschlag.Bezeichnung, vorschlag.Betreff, vorschlag.Text, uhr.GetUtcNow(), "Vorschlag");
         werte["Einrichtung"] = await EinrichtungAsync(abbruch);
+        werte["Anrede"] = person.Briefanrede(uhr.GetLocalNow(), vorlage.Anredestil);
         var (betreff, text) = vorlage.Fuellen(werte);
         if (werte.TryGetValue("Checkinlink", out var checkin) && !text.Contains(checkin, StringComparison.Ordinal))
         {

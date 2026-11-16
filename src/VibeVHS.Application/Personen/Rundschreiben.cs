@@ -60,7 +60,7 @@ public sealed class Rundschreiben(
             }
 
             await postausgang.KundenmailEinreihenAsync(zeile.EMail, zeile.Anzeigename, betreff,
-                $"Guten Tag {zeile.Anzeigename},\n\n{text.Trim()}", person.Sprache, person.Id, abbruch);
+                $"{person.Briefanrede(uhr.GetLocalNow())},\n\n{text.Trim()}", person.Sprache, person.Id, abbruch);
             eingereiht++;
         }
 

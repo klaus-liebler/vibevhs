@@ -117,9 +117,8 @@ public sealed class Schnellanmeldedienst(
             var kostenpflichtig = e.Belegung.EntgeltCent > 0 && e.Belegung.Status != Belegungsstatus.Warteliste;
             if (kostenpflichtig && person.EMail is { Length: > 0 } mail && mail != "–" && !person.IstAnonymisiert)
             {
-                var name = person.AktuellerName(uhr.GetLocalNow());
                 await post.KundenmailEinreihenAsync(mail, person.Anzeigename, $"Ihre Schnellanmeldung: {kurs.Titel}",
-                    $"Guten Tag {name.Vorname} {name.Nachname},\n\nSie haben sich soeben über Ihren persönlichen Link für „{kurs.Titel}“ ({kurs.Kursnummer}) angemeldet "
+                    $"{person.Briefanrede(uhr.GetLocalNow())},\n\nSie haben sich soeben über Ihren persönlichen Link für „{kurs.Titel}“ ({kurs.Kursnummer}) angemeldet "
                     + $"(Entgelt {e.Belegung.Entgelt}).\n\nWaren Sie das nicht, oder möchten Sie es sich anders überlegen? Bis {(jetzt + KostenfreieFrist).ToLocalTime():dd.MM.yyyy HH:mm} Uhr "
                     + $"können Sie sich hier kostenlos wieder abmelden, danach gelten die Abmeldefristen der AGB:\n{stornoLink(token)}\n\n"
                     + "Ihr persönlicher Link ist nur für Sie bestimmt. Bitte geben Sie ihn nicht weiter; bei Verlust sperrt der Teilnehmerservice ihn sofort.",

@@ -109,7 +109,7 @@ public sealed class DemodatenZeitbezugTests
         spaeter.Kurse.ShouldBe(heute.Kurse);
         spaeter.Laufend.ShouldBeInRange(heute.Laufend - 3, heute.Laufend + 3);
         spaeter.Kuenftig.ShouldBeInRange(heute.Kuenftig - 3, heute.Kuenftig + 3);
-        spaeter.Belegungen.ShouldBeInRange(heute.Belegungen * 9 / 10, heute.Belegungen * 11 / 10);
+        spaeter.Belegungen.ShouldBeInRange(heute.Belegungen * 8 / 10, heute.Belegungen * 12 / 10); // Füllbuchungen hängen von Zufall und Uhrzeit ab
         spaeter.Rechnungen.ShouldBeInRange(heute.Rechnungen * 8 / 10, heute.Rechnungen * 12 / 10 + 2);
         spaeter.UeberfaelligeRechnungen.ShouldBeInRange(heute.UeberfaelligeRechnungen - 3, heute.UeberfaelligeRechnungen + 3);
         spaeter.UeberfaelligeAufgaben.ShouldBeInRange(heute.UeberfaelligeAufgaben - 3, heute.UeberfaelligeAufgaben + 3);

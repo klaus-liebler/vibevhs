@@ -28,7 +28,8 @@ public sealed class VorlagenDienst(IVorlagenSpeicher speicher, IAuditProtokoll p
 
     public Task<IReadOnlyList<Textvorlage>> AlleAsync(CancellationToken abbruch = default) => speicher.VorlagenAsync(abbruch);
 
-    public async Task AendernAsync(string schluessel, string betreff, string text, CancellationToken abbruch = default)
+    public async Task AendernAsync(string schluessel, string betreff, string text, CancellationToken abbruch = default,
+        VibeVHS.Domain.Personen.Anredestil? anredestil = null)
     {
         var wer = await benutzer.ErmittelnAsync(abbruch);
         if (wer.Rolle is not { } r || !PflegeRollen.Contains(r))
@@ -38,11 +39,24 @@ public sealed class VorlagenDienst(IVorlagenSpeicher speicher, IAuditProtokoll p
 
         var vorlage = await speicher.VorlageAsync(schluessel, abbruch) ?? throw new InvalidOperationException("Vorlage nicht gefunden.");
         vorlage.Aendern(betreff, text, uhr.GetUtcNow(), wer.Anzeige);
-        await protokoll.ProtokollierenAsync("Vorlage.Geaendert", $"Vorlage „{vorlage.Bezeichnung}“ geändert", "Textvorlage", null, abbruch: abbruch);
+        if (anredestil is { } stil && stil != vorlage.Anredestil)
+        {
+            vorlage.AnredestilSetzen(stil, uhr.GetUtcNow(), wer.Anzeige);
+        }
+
+        await protokoll.ProtokollierenAsync("Vorlage.Geaendert", $"Vorlage „{vorlage.Bezeichnung}“ geändert (Anrede {vorlage.Anredestil})", "Textvorlage", null,
+            abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
     }
 
     /// <summary>Vorschau mit Beispielwerten (ohne zu speichern).</summary>
-    public static (string Betreff, string Text) Vorschau(string betreff, string text)
-        => new Textvorlage("vorschau", "Vorschau", betreff, text, DateTimeOffset.MinValue, "").Fuellen(Textvorlagen.Beispielwerte);
+    public static (string Betreff, string Text) Vorschau(string betreff, string text,
+        VibeVHS.Domain.Personen.Anredestil stil = VibeVHS.Domain.Personen.Anredestil.Foermlich)
+    {
+        var werte = new Dictionary<string, string>(Textvorlagen.Beispielwerte)
+        {
+            ["Anrede"] = VibeVHS.Domain.Personen.Briefanrede.Bilden("Frau", "Dr.", "Olena", "Kovalenko", stil),
+        };
+        return new Textvorlage("vorschau", "Vorschau", betreff, text, DateTimeOffset.MinValue, "").Fuellen(werte);
+    }
 }

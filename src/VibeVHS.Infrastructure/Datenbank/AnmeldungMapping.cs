@@ -61,6 +61,7 @@ internal static class AnmeldungMapping
             b.Property(x => x.Betreff).HasMaxLength(300);
             b.Property(x => x.Text).HasMaxLength(8000);
             b.Property(x => x.GeaendertVon).HasMaxLength(200);
+            b.Property(x => x.Anredestil).HasMaxLength(20);
         });
     }
 }

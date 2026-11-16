@@ -99,9 +99,8 @@ public sealed class DozentenportalDienst(
         var person = treffer[0];
         var (token, geheimnis) = Zugangstoken.Erzeugen(person.Id, Tokenart.PortalLink, uhr.GetUtcNow());
         tokens.Hinzufuegen(token);
-        var name = person.AktuellerName(uhr.GetLocalNow());
         await post.KundenmailEinreihenAsync(mail, person.Anzeigename, "Ihr Anmeldelink zum Dozierendenportal",
-            $"Guten Tag {name.Vorname} {name.Nachname},\n\nmit diesem Link melden Sie sich im Dozierendenportal an (gültig {PortalLinkGueltig.TotalMinutes:0} Minuten, nur einmal):\n"
+            $"{person.Briefanrede(uhr.GetLocalNow())},\n\nmit diesem Link melden Sie sich im Dozierendenportal an (gültig {PortalLinkGueltig.TotalMinutes:0} Minuten, nur einmal):\n"
             + $"{adresse.Link($"portal/dozierende/link/{geheimnis}")}\n\nWenn Sie den Link nicht angefordert haben, ignorieren Sie diese Mail.", person.Sprache, person.Id, abbruch);
         await protokoll.ProtokollierenAsync("Portal.LinkAngefordert", $"Anmeldelink Dozierendenportal an {Pseudonym.Person(person.Id)} verschickt", nameof(Person), person.Id,
             abbruch: abbruch);
@@ -636,8 +635,7 @@ public sealed class DozentenportalDienst(
             return false;
         }
 
-        var name = p.AktuellerName(uhr.GetLocalNow());
-        await post.KundenmailEinreihenAsync(mail, p.Anzeigename, betreff, $"Guten Tag {name.Vorname} {name.Nachname},\n\n{text}", p.Sprache, p.Id, abbruch);
+        await post.KundenmailEinreihenAsync(mail, p.Anzeigename, betreff, $"{p.Briefanrede(uhr.GetLocalNow())},\n\n{text}", p.Sprache, p.Id, abbruch);
         return true;
     }
 

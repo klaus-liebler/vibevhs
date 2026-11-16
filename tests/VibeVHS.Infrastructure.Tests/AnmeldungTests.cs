@@ -143,6 +143,7 @@ public class AnmeldungTests
         mail.AnhangInhalt!.ShouldContain("BEGIN:VCALENDAR");
         mail.AnhangInhalt!.Split("BEGIN:VEVENT").Length.ShouldBe(7);
         mail.Inhalt.ShouldContain("84,00 €");
+        mail.Inhalt.ShouldContain("Guten Tag Vorname1 Nachname1,"); // ohne gepflegte Anrede: voller Name
     }
 
     [Fact]

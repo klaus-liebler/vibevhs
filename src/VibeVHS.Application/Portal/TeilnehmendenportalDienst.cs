@@ -151,9 +151,8 @@ public sealed class TeilnehmendenportalDienst(
 
         var (token, geheimnis) = Zugangstoken.Erzeugen(person.Id, Tokenart.PortalLinkTeilnehmende, uhr.GetUtcNow());
         tokens.Hinzufuegen(token);
-        var name = person.AktuellerName(uhr.GetLocalNow());
         await post.KundenmailEinreihenAsync(mail, person.Anzeigename, "Ihr Link zu „Meine vhs“",
-            $"Guten Tag {name.Vorname} {name.Nachname},\n\nmit diesem Link kommen Sie zu Ihren Kursen, Terminen und Unterlagen (gilt 15 Minuten, nur einmal):\n"
+            $"{person.Briefanrede(uhr.GetLocalNow())},\n\nmit diesem Link kommen Sie zu Ihren Kursen, Terminen und Unterlagen (gilt 15 Minuten, nur einmal):\n"
             + $"{adresse.Link($"portal/teilnehmende/link/{geheimnis}")}\n\nSie haben den Link nicht angefordert? Dann löschen Sie diese Mail einfach.", person.Sprache, person.Id, abbruch);
         await protokoll.ProtokollierenAsync("Portal.LinkAngefordert", $"Anmeldelink Teilnehmendenportal an {Pseudonym.Person(person.Id)} verschickt", nameof(Person), person.Id,
             abbruch: abbruch);
