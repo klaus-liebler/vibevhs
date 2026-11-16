@@ -64,8 +64,11 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
 
     protected override void ConfigureConventions(ModelConfigurationBuilder konfiguration)
     {
-        // SQLite kennt keinen Zeitstempel mit Offset; als sortierbare Zahl (UTC-Ticks) speichern.
-        konfiguration.Properties<DateTimeOffset>().HaveConversion<DateTimeOffsetToBinaryConverter>();
+        // Speicherformate (siehe Speicherformate.cs): Ids 16 Byte (Big Endian, UUIDv7), Tage JJJJMMTT, Zeitpunkte und Termine UTC-Millisekunden.
+        konfiguration.Properties<Guid>().HaveConversion<IdAlsBytes>();
+        konfiguration.Properties<DateOnly>().HaveConversion<TagAlsZahl>();
+        konfiguration.Properties<DateTimeOffset>().HaveConversion<ZeitpunktAlsMillisekunden>();
+        konfiguration.Properties<DateTime>().HaveConversion<TerminAlsUtcMillisekunden>();
         konfiguration.Properties<Enum>().HaveConversion<string>().HaveMaxLength(40);
     }
 
@@ -74,6 +77,9 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
         modelBuilder.HasDbFunction(typeof(SqlFunktionen).GetMethod(nameof(SqlFunktionen.Ganzzahl))!)
             .HasTranslation(a => new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlUnaryExpression(ExpressionType.Convert, a[0], typeof(long),
                 new Microsoft.EntityFrameworkCore.Storage.LongTypeMapping("INTEGER")));
+        modelBuilder.HasDbFunction(typeof(SqlFunktionen).GetMethod(nameof(SqlFunktionen.Hex))!)
+            .HasTranslation(a => new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFunctionExpression("hex", a, nullable: true,
+                argumentsPropagateNullability: [true], typeof(string), new Microsoft.EntityFrameworkCore.Storage.StringTypeMapping("TEXT", System.Data.DbType.String)));
 
         modelBuilder.Entity<Person>(b =>
         {

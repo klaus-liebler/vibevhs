@@ -140,9 +140,9 @@ Klasse: `VibeVHS.Domain.Aufgaben.Abwesenheit`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | BeendetAm | INTEGER |  |  |  |
-| Bis | TEXT | ja |  |  |
+| Bis | INTEGER | ja |  |  |
 | ErfasstAm | INTEGER | ja |  |  |
 | ErfasstVon | TEXT | ja |  |  |
 | Grund | TEXT |  |  |  |
@@ -150,7 +150,7 @@ Klasse: `VibeVHS.Domain.Aufgaben.Abwesenheit`
 | Name | TEXT | ja |  |  |
 | VertretungLogin | TEXT |  |  |  |
 | VertretungName | TEXT |  |  |  |
-| Von | TEXT | ja |  |  |
+| Von | INTEGER | ja |  |  |
 
 ## Anwesenheiten
 
@@ -158,19 +158,19 @@ Klasse: `VibeVHS.Domain.Durchfuehrung.Anwesenheit`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
-| BelegungId | TEXT | ja | eindeutig |  |
+| Id | BLOB | ja | PK |  |
+| BelegungId | BLOB | ja | eindeutig |  |
 | Bemerkung | TEXT(500) |  |  |  |
-| Datum | TEXT | ja |  |  |
+| Datum | INTEGER | ja |  |  |
 | ErfasstAm | INTEGER | ja |  |  |
 | ErfasstVon | TEXT(200) | ja |  |  |
 | ErstErfasstAm | INTEGER | ja |  |  |
-| KursId | TEXT | ja | Index |  |
+| KursId | BLOB | ja | Index |  |
 | Minuten | INTEGER | ja |  |  |
-| OrtId | TEXT |  |  |  |
-| PersonId | TEXT | ja | Index |  |
+| OrtId | BLOB |  |  |  |
+| PersonId | BLOB | ja | Index |  |
 | Status | TEXT(40) | ja |  |  |
-| VeranstaltungId | TEXT | ja | eindeutig |  |
+| VeranstaltungId | BLOB | ja | eindeutig |  |
 | Vorlaeufig | INTEGER | ja |  |  |
 | VorlaeufigGrund | TEXT |  |  |  |
 | Weg | TEXT(40) | ja |  |  |
@@ -194,7 +194,7 @@ Klasse: `VibeVHS.Domain.Aufgaben.Aufgabe`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | AngelegtAm | INTEGER | ja |  |  |
 | BearbeiterKennung | TEXT(100) |  |  |  |
 | BearbeiterName | TEXT(200) |  |  |  |
@@ -204,7 +204,7 @@ Klasse: `VibeVHS.Domain.Aufgaben.Aufgabe`
 | ErledigtVon | TEXT(200) |  |  |  |
 | EskaliertAm | INTEGER |  |  |  |
 | Fachbereich | INTEGER |  |  |  |
-| Faellig | TEXT | ja |  |  |
+| Faellig | INTEGER | ja |  |  |
 | Gruppe | TEXT(60) | ja | Index |  |
 | Schluessel | TEXT(200) | ja | eindeutig |  |
 | Status | TEXT(40) | ja | Index |  |
@@ -236,7 +236,7 @@ Klasse: `VibeVHS.Domain.Finanzen.Bankverbindung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| PersonId | TEXT | ja | PK |  |
+| PersonId | BLOB | ja | PK |  |
 | Bic | TEXT(11) |  |  |  |
 | Iban | TEXT(34) | ja |  |  |
 | Kontoinhaber | TEXT(200) | ja |  |  |
@@ -247,30 +247,30 @@ Klasse: `VibeVHS.Domain.Finanzen.Beleg`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | AnonymisiertAm | INTEGER |  |  |  |
 | Art | TEXT(40) | ja |  |  |
-| Belegdatum | TEXT | ja |  |  |
+| Belegdatum | INTEGER | ja |  |  |
 | BetragCent | INTEGER | ja |  |  |
-| BezugBelegId | TEXT |  | Index |  |
-| DokumentId | TEXT |  |  |  |
+| BezugBelegId | BLOB |  | Index |  |
+| DokumentId | BLOB |  |  |  |
 | EmpfaengerAnschrift | TEXT(1000) |  |  |  |
 | EmpfaengerName | TEXT(300) | ja |  |  |
 | ErfasstAm | INTEGER | ja |  |  |
 | ErfasstVon | TEXT(200) | ja |  |  |
-| Faellig | TEXT |  |  |  |
+| Faellig | INTEGER |  |  |  |
 | FestgeschriebenAm | INTEGER |  |  |  |
 | FestgeschriebenVon | TEXT(200) |  |  |  |
 | Grundlage | TEXT |  |  |  |
 | Jahr | INTEGER |  |  |  |
 | Laufnummer | INTEGER |  |  |  |
 | Nummer | TEXT(30) |  | eindeutig |  |
-| OrganisationId | TEXT |  | Index |  |
-| PersonId | TEXT |  | Index |  |
+| OrganisationId | BLOB |  | Index |  |
+| PersonId | BLOB |  | Index |  |
 | Sha256 | TEXT(64) |  |  |  |
-| StorniertDurchId | TEXT |  |  |  |
+| StorniertDurchId | BLOB |  |  |  |
 | Text | TEXT(2000) |  |  |  |
-| UebergabeId | TEXT |  |  |  |
+| UebergabeId | BLOB |  |  |  |
 | Xml | TEXT |  |  |  |
 
 ## Belegungen
@@ -279,10 +279,10 @@ Klasse: `VibeVHS.Domain.Anmeldung.Belegung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | AngebotBis | INTEGER |  | Index |  |
 | Belegungsart | TEXT(40) | ja |  |  |
-| BevollmaechtigterId | TEXT |  | Index |  |
+| BevollmaechtigterId | BLOB |  | Index |  |
 | BevollmaechtigterName | TEXT(300) |  |  |  |
 | EntgeltCent | INTEGER | ja |  |  |
 | ErinnertAm | INTEGER |  |  |  |
@@ -294,17 +294,17 @@ Klasse: `VibeVHS.Domain.Anmeldung.Belegung`
 | GebuchtVonKennung | TEXT(100) |  |  |  |
 | GebuehrCent | INTEGER |  |  |  |
 | KontingentAnzahl | INTEGER |  |  |  |
-| KontingentGueltigBis | TEXT |  |  |  |
-| KursId | TEXT | ja | Index |  |
+| KontingentGueltigBis | INTEGER |  |  |  |
+| KursId | BLOB | ja | Index |  |
 | Kursnummer | TEXT(30) | ja |  |  |
-| PersonId | TEXT | ja | Index |  |
+| PersonId | BLOB | ja | Index |  |
 | Status | TEXT(40) | ja | Index |  |
 | StorniertAm | INTEGER |  |  |  |
 | StorniertVon | TEXT(200) |  |  |  |
 | StornoGrund | TEXT(500) |  |  |  |
-| UmgebuchtNachId | TEXT |  |  |  |
-| UmgebuchtVonId | TEXT |  |  |  |
-| VollmachtId | TEXT |  |  |  |
+| UmgebuchtNachId | BLOB |  |  |  |
+| UmgebuchtVonId | BLOB |  |  |  |
+| VollmachtId | BLOB |  |  |  |
 | WartelisteSeit | INTEGER |  |  |  |
 | Weg | TEXT(40) | ja |  |  |
 | Zahlart | TEXT(40) | ja |  |  |
@@ -315,14 +315,14 @@ Klasse: `VibeVHS.Application.Sicherheit.Benutzerkonto`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK | F: Schlüssel |
+| Id | BLOB | ja | PK | F: Schlüssel |
 | Aktiv | INTEGER | ja |  | F: Prozesszustand |
 | Fachbereiche | TEXT | ja |  | F: Zuständigkeit; JSON |
 | Funktion | TEXT(300) |  |  | F: Funktionsbezeichnung |
 | Hinweis | TEXT(500) |  |  | F: Notiz |
 | Login | TEXT(100) | ja | eindeutig | F: Anmeldename |
 | Name | TEXT(200) |  |  | F: Name nur bei Funktionskonten ohne Person (sonst leer, der Name kommt aus der Person) |
-| PersonId | TEXT |  |  | F: einzige Verknüpfung Konto ↔ Person |
+| PersonId | BLOB |  |  | F: einzige Verknüpfung Konto ↔ Person |
 | Rollen | TEXT | ja |  | F: Berechtigungsrollen des Kontos; JSON |
 
 ## Dateien
@@ -331,7 +331,7 @@ Klasse: `VibeVHS.Domain.Portal.Datei`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | ErstelltAm | INTEGER | ja |  |  |
 | Groesse | INTEGER | ja |  |  |
 | Inhalt | BLOB | ja |  |  |
@@ -345,20 +345,20 @@ Klasse: `VibeVHS.Domain.Dokumente.Dokument`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | AnonymisiertAm | INTEGER |  |  |  |
 | Art | TEXT(40) | ja |  |  |
-| BelegungId | TEXT |  | Index |  |
+| BelegungId | BLOB |  | Index |  |
 | DatenJson | TEXT | ja |  |  |
-| ErsetztDurch | TEXT |  |  |  |
+| ErsetztDurch | BLOB |  |  |  |
 | ErstelltAm | INTEGER | ja |  |  |
 | ErstelltVon | TEXT(200) | ja |  |  |
 | Klartext | TEXT | ja |  |  |
-| KursId | TEXT |  | Index |  |
+| KursId | BLOB |  | Index |  |
 | NeuausstellungGrund | TEXT(500) |  |  |  |
-| NeuausstellungVon | TEXT |  |  |  |
+| NeuausstellungVon | BLOB |  |  |  |
 | Pdf | BLOB | ja |  |  |
-| PersonId | TEXT | ja | Index |  |
+| PersonId | BLOB | ja | Index |  |
 | Sha256 | TEXT(64) | ja |  |  |
 | Titel | TEXT(300) | ja |  |  |
 | UebersetzbarBis | INTEGER | ja |  |  |
@@ -370,8 +370,8 @@ Klasse: `VibeVHS.Application.Personen.DublettenAusschluss`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| PersonA | TEXT | ja | PK |  |
-| PersonB | TEXT | ja | PK |  |
+| PersonA | BLOB | ja | PK |  |
+| PersonB | BLOB | ja | PK |  |
 | Am | INTEGER | ja |  |  |
 | Von | TEXT(200) | ja |  |  |
 
@@ -395,14 +395,14 @@ Klasse: `VibeVHS.Domain.Anmeldung.Ermaessigung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Art | TEXT(100) | ja |  |  |
 | ErfasstAm | INTEGER | ja |  |  |
 | ErfasstVon | TEXT(200) | ja |  |  |
-| GueltigBis | TEXT | ja |  |  |
-| GueltigVon | TEXT | ja |  |  |
+| GueltigBis | INTEGER | ja |  |  |
+| GueltigVon | INTEGER | ja |  |  |
 | Nachweis | TEXT(500) | ja |  |  |
-| PersonId | TEXT | ja | Index |  |
+| PersonId | BLOB | ja | Index |  |
 
 ## Fachbereiche
 
@@ -419,12 +419,12 @@ Klasse: `VibeVHS.Domain.Programm.Ferienzeitraum`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
-| Bis | TEXT | ja |  |  |
+| Id | BLOB | ja | PK |  |
+| Bis | INTEGER | ja |  |  |
 | Bundesland | TEXT(10) | ja |  |  |
 | Name | TEXT(100) | ja |  |  |
 | Quelle | TEXT |  |  |  |
-| Von | TEXT | ja |  |  |
+| Von | INTEGER | ja |  |  |
 
 ## Finanzeinstellungen
 
@@ -457,7 +457,7 @@ Klasse: `VibeVHS.Domain.Finanzen.Finanzprotokolleintrag`
 | BenutzerKennung | TEXT(100) | ja |  |  |
 | Hash | TEXT(64) | ja |  |  |
 | Nachher | TEXT |  |  |  |
-| ObjektId | TEXT |  |  |  |
+| ObjektId | BLOB |  |  |  |
 | ObjektTyp | TEXT(60) | ja |  |  |
 | Vorher | TEXT |  |  |  |
 | VorigerHash | TEXT(64) | ja |  |  |
@@ -469,16 +469,16 @@ Klasse: `VibeVHS.Domain.Finanzen.Honorarvertrag`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Bezeichnung | TEXT | ja |  |  |
 | ErfasstAm | INTEGER | ja |  |  |
 | ErfasstVon | TEXT |  |  |  |
-| GueltigAb | TEXT | ja |  |  |
-| GueltigBis | TEXT |  |  |  |
-| KursId | TEXT |  |  |  |
+| GueltigAb | INTEGER | ja |  |  |
+| GueltigBis | INTEGER |  |  |  |
+| KursId | BLOB |  |  |  |
 | Modell | TEXT(60) | ja |  |  |
 | Parameter | TEXT | ja |  | JSON |
-| PersonId | TEXT | ja | Index |  |
+| PersonId | BLOB | ja | Index |  |
 
 ## Identitaetspruefungen
 
@@ -486,12 +486,12 @@ Klasse: `VibeVHS.Domain.Integration.Identitaetspruefung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Bemerkung | TEXT(500) |  |  |  |
 | Dokument | TEXT(40) | ja |  |  |
 | GeprueftAm | INTEGER | ja |  |  |
 | GeprueftVon | TEXT | ja |  |  |
-| PersonId | TEXT | ja | Index |  |
+| PersonId | BLOB | ja | Index |  |
 | StimmtUeberein | INTEGER | ja |  |  |
 
 ## IkFahrtkosten
@@ -500,16 +500,16 @@ Klasse: `VibeVHS.Domain.Integration.IkFahrtkosten`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | BeantragtAm | INTEGER | ja |  |  |
 | Begruendung | TEXT | ja |  |  |
 | BetragCent | INTEGER | ja |  |  |
 | EntfernungKm | TEXT | ja |  |  |
-| GutschriftId | TEXT |  |  |  |
+| GutschriftId | BLOB |  |  |  |
 | Jahr | INTEGER | ja |  |  |
-| KursId | TEXT | ja | Index |  |
+| KursId | BLOB | ja | Index |  |
 | Monat | INTEGER | ja |  |  |
-| PersonId | TEXT | ja |  |  |
+| PersonId | BLOB | ja |  |  |
 | Status | TEXT(40) | ja |  |  |
 
 ## Importlaeufe
@@ -518,7 +518,7 @@ Klasse: `VibeVHS.Domain.Personen.Importlauf`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Am | INTEGER | ja |  |  |
 | Angelegt | INTEGER | ja |  |  |
 | Art | TEXT | ja |  |  |
@@ -536,7 +536,7 @@ Klasse: `VibeVHS.Domain.Integration.Integrationskursdaten`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| KursId | TEXT | ja | PK |  |
+| KursId | BLOB | ja | PK |  |
 | Abrechnungen | TEXT | ja |  | JSON |
 | Abschnitte | TEXT | ja |  | JSON |
 | Art | TEXT(40) | ja |  |  |
@@ -552,14 +552,14 @@ Klasse: `VibeVHS.Domain.Anmeldung.KontingentEreignis`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Anzahl | INTEGER | ja |  |  |
 | Art | TEXT(40) | ja |  |  |
-| BelegungId | TEXT | ja | → Belegungen, eindeutig |  |
+| BelegungId | BLOB | ja | → Belegungen, eindeutig |  |
 | Bemerkung | TEXT(300) |  |  |  |
 | Laufnummer | INTEGER | ja | eindeutig |  |
-| OrtId | TEXT |  |  |  |
-| VeranstaltungId | TEXT |  | Index |  |
+| OrtId | BLOB |  |  |  |
+| VeranstaltungId | BLOB |  | Index |  |
 | Von | TEXT(200) | ja |  |  |
 | Zeitpunkt | INTEGER | ja |  |  |
 
@@ -569,16 +569,16 @@ Klasse: `VibeVHS.Domain.Finanzen.Kontoauszug`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | AuszugId | TEXT | ja | Index |  |
-| Bis | TEXT |  |  |  |
+| Bis | INTEGER |  |  |  |
 | Datei | TEXT | ja |  |  |
 | EingelesenAm | INTEGER | ja |  |  |
 | EingelesenVon | TEXT | ja |  |  |
 | EndsaldoCent | INTEGER |  |  |  |
 | Iban | TEXT |  |  |  |
 | Sha256 | TEXT | ja | eindeutig |  |
-| Von | TEXT |  |  |  |
+| Von | INTEGER |  |  |  |
 
 ## KursEntgelte
 
@@ -586,7 +586,7 @@ Klasse: `VibeVHS.Domain.Programm.KursEntgelt`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Cent | INTEGER | ja |  |  |
 | ErfasstAm | INTEGER | ja |  |  |
 | ErfasstVon | TEXT(200) | ja |  |  |
@@ -594,9 +594,9 @@ Klasse: `VibeVHS.Domain.Programm.KursEntgelt`
 | ErmaessigtCent | INTEGER |  |  |  |
 | ErsetztAm | INTEGER |  |  |  |
 | Grund | TEXT(500) | ja |  |  |
-| GueltigBis | TEXT |  |  |  |
-| GueltigVon | TEXT | ja | Index |  |
-| KursId | TEXT | ja | → Kurse, Index |  |
+| GueltigBis | INTEGER |  |  |  |
+| GueltigVon | INTEGER | ja | Index |  |
+| KursId | BLOB | ja | → Kurse, Index |  |
 
 ## Kursarten
 
@@ -604,7 +604,7 @@ Klasse: `VibeVHS.Domain.Programm.Kursart`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | BenoetigteDozierendenmerkmale | TEXT | ja |  | JSON |
 | BenoetigteMerkmale | TEXT | ja |  | JSON |
 | FerienAuslassen | INTEGER | ja |  |  |
@@ -619,22 +619,22 @@ Klasse: `VibeVHS.Domain.Programm.Kurs`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK | F: Schlüssel |
+| Id | BLOB | ja | PK | F: Schlüssel |
 | ArchiviertAm | INTEGER |  |  | F: Archivierung (Prozess) |
-| AuftraggeberId | TEXT |  |  | F: Verweis auf die Organisation |
+| AuftraggeberId | BLOB |  |  | F: Verweis auf die Organisation |
 | BenoetigteDozierendenmerkmale | TEXT | ja |  | F: Anforderungen an Lehrkräfte (z. B. sprachfreigabe=Englisch); JSON |
 | BenoetigteMerkmale | TEXT | ja |  | F: Raumanforderungen (aus der Kursart übernommen, kursbezogen änderbar); JSON |
 | Beschreibung | TEXT |  |  | F: Planungsdatum |
 | Bildungsurlaub | TEXT(100) |  |  | F: Anerkennung |
-| ErzeugtBis | TEXT |  |  | F: Prozesszustand: wie weit die Termine einer unbefristeten Serie erzeugt sind |
+| ErzeugtBis | INTEGER |  |  | F: Prozesszustand: wie weit die Termine einer unbefristeten Serie erzeugt sind |
 | Fachbereich | INTEGER | ja |  | F: Planungsdatum |
-| KursartId | TEXT | ja |  | F: Planungsdatum |
+| KursartId | BLOB | ja |  | F: Planungsdatum |
 | Kursnummer | TEXT(30) | ja | eindeutig | F: Planungsdatum |
 | MaxTeilnehmende | INTEGER | ja |  | F: Planungsdatum |
 | MinTeilnehmende | INTEGER | ja |  | F: Planungsdatum |
 | Nutzungsart | TEXT(40) | ja |  | F: Planungsdatum: bestimmt die Raumkapazität (Vorlage aus der Kursart, wie Richtlinie und Raumanforderungen) |
 | Richtlinie | TEXT | ja |  | F: Buchungsrichtlinie (aus der Kursart übernommen, kursbezogen änderbar); JSON |
-| SemesterId | TEXT | ja | Index | F: Planungsdatum |
+| SemesterId | BLOB | ja | Index | F: Planungsdatum |
 | Serie | TEXT |  |  | F: Serienregel; JSON |
 | Sichtbarkeit | TEXT(40) | ja |  | F: Planungsdatum |
 | Status | TEXT(40) | ja |  | F: Prozesszustand |
@@ -647,7 +647,7 @@ Klasse: `VibeVHS.Domain.Shop.Kursstand`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| KursId | TEXT | ja | PK |  |
+| KursId | BLOB | ja | PK |  |
 | Entfernt | INTEGER | ja |  |  |
 | GeaendertAm | INTEGER | ja |  |  |
 | Hash | TEXT | ja |  |  |
@@ -659,13 +659,13 @@ Klasse: `VibeVHS.Domain.Portal.Kursunterlage`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Abrufe | INTEGER | ja |  |  |
-| DateiId | TEXT | ja |  |  |
+| DateiId | BLOB | ja |  |  |
 | GueltigBis | INTEGER | ja |  |  |
 | HochgeladenAm | INTEGER | ja |  |  |
-| HochgeladenVon | TEXT | ja |  |  |
-| KursId | TEXT | ja | Index |  |
+| HochgeladenVon | BLOB | ja |  |  |
+| KursId | BLOB | ja | Index |  |
 | Titel | TEXT | ja |  |  |
 | TokenHash | TEXT | ja | eindeutig |  |
 | ZurueckgezogenAm | INTEGER |  |  |  |
@@ -676,14 +676,14 @@ Klasse: `VibeVHS.Domain.Integration.Lichtbild`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | AufgenommenAm | INTEGER | ja |  |  |
 | AufgenommenVon | TEXT | ja |  |  |
 | GeloeschtAm | INTEGER |  |  |  |
 | Inhalt | BLOB | ja |  |  |
-| KursId | TEXT | ja | Index |  |
-| LoeschenAb | TEXT | ja |  |  |
-| PersonId | TEXT | ja | Index |  |
+| KursId | BLOB | ja | Index |  |
+| LoeschenAb | INTEGER | ja |  |  |
+| PersonId | BLOB | ja | Index |  |
 | Typ | TEXT | ja |  |  |
 
 ## Listenabschluesse
@@ -692,9 +692,9 @@ Klasse: `VibeVHS.Domain.Durchfuehrung.Listenabschluss`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| VeranstaltungId | TEXT | ja | PK |  |
+| VeranstaltungId | BLOB | ja | PK |  |
 | Am | INTEGER | ja |  |  |
-| KursId | TEXT | ja |  |  |
+| KursId | BLOB | ja |  |  |
 | Von | TEXT(200) | ja |  |  |
 
 ## Loeschlaeufe
@@ -703,7 +703,7 @@ Klasse: `VibeVHS.Domain.Datenschutz.Loeschlauf`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Anonymisiert | INTEGER | ja |  |  |
 | AusgefuehrtAm | INTEGER |  |  |  |
 | ErstelltAm | INTEGER | ja |  |  |
@@ -728,7 +728,7 @@ Klasse: `VibeVHS.Domain.Finanzen.Mahnlauf`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | ErstelltAm | INTEGER | ja |  |  |
 | ErstelltVon | TEXT | ja |  |  |
 | FreigegebenAm | INTEGER |  |  |  |
@@ -768,7 +768,7 @@ Klasse: `VibeVHS.Domain.Finanzen.Nummernkreis`
 | Art | TEXT(40) | ja | PK |  |
 | Jahr | INTEGER | ja | PK |  |
 | Letzte | INTEGER | ja |  |  |
-| Version | TEXT | ja |  |  |
+| Version | BLOB | ja |  |  |
 
 ## Organisationen
 
@@ -776,7 +776,7 @@ Klasse: `VibeVHS.Domain.Personen.Organisation`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK | F: Schlüssel |
+| Id | BLOB | ja | PK | F: Schlüssel |
 | Art | TEXT(40) | ja |  | F: Stammdatum Organisation |
 | LeitwegId | TEXT |  |  | F: XRechnung |
 | Name | TEXT(300) | ja |  | F: Stammdatum Organisation |
@@ -790,16 +790,16 @@ Klasse: `VibeVHS.Domain.Programm.OrtMerkmal`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | ErfasstAm | INTEGER | ja |  |  |
 | ErfasstVon | TEXT(200) | ja |  |  |
 | Erfassungsart | TEXT(40) | ja |  |  |
 | ErsetztAm | INTEGER |  |  |  |
 | Grund | TEXT(500) | ja |  |  |
-| GueltigBis | TEXT |  |  |  |
-| GueltigVon | TEXT | ja | Index |  |
+| GueltigBis | INTEGER |  |  |  |
+| GueltigVon | INTEGER | ja | Index |  |
 | Nachweis | TEXT |  |  |  |
-| OrtId | TEXT | ja | → Orte, Index |  |
+| OrtId | BLOB | ja | → Orte, Index |  |
 | Schluessel | TEXT(40) | ja |  |  |
 | WertText | TEXT |  |  |  |
 
@@ -809,11 +809,11 @@ Klasse: `VibeVHS.Domain.Programm.Ort`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK | F: Schlüssel |
+| Id | BLOB | ja | PK | F: Schlüssel |
 | Aktiv | INTEGER | ja |  | F: Prozesszustand |
 | Art | TEXT(40) | ja |  | F: Stammdatum Ort |
 | Breitengrad | REAL |  |  | F: Geo |
-| ElternId | TEXT |  | Index | F: Hierarchie |
+| ElternId | BLOB |  | Index | F: Hierarchie |
 | Kapazitaeten | TEXT | ja |  | F: Kapazität je Nutzungsart; JSON |
 | Kurzname | TEXT(40) |  |  | F: Stammdatum Ort |
 | Laengengrad | REAL |  |  | F: Geo |
@@ -830,18 +830,18 @@ Klasse: `VibeVHS.Domain.Personen.AdressKennzeichen`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | AdressAnzeige | TEXT(500) | ja |  |  |
-| AdressId | TEXT | ja |  |  |
+| AdressId | BLOB | ja |  |  |
 | Art | TEXT(40) | ja |  |  |
 | ErfasstAm | INTEGER | ja |  |  |
 | ErfasstVon | TEXT(200) | ja |  |  |
 | Erfassungsart | TEXT(40) | ja |  |  |
 | ErsetztAm | INTEGER |  |  |  |
 | Grund | TEXT(500) | ja |  |  |
-| GueltigBis | TEXT |  |  |  |
-| GueltigVon | TEXT | ja | Index |  |
-| PersonId | TEXT | ja | → Personen, Index |  |
+| GueltigBis | INTEGER |  |  |  |
+| GueltigVon | INTEGER | ja | Index |  |
+| PersonId | BLOB | ja | → Personen, Index |  |
 
 ## PersonAdressen
 
@@ -849,18 +849,18 @@ Klasse: `VibeVHS.Domain.Personen.Postadresse`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
-| AdressId | TEXT | ja | Index |  |
+| Id | BLOB | ja | PK |  |
+| AdressId | BLOB | ja | Index |  |
 | ErfasstAm | INTEGER | ja |  |  |
 | ErfasstVon | TEXT(200) | ja |  |  |
 | Erfassungsart | TEXT(40) | ja |  |  |
 | ErsetztAm | INTEGER |  |  |  |
 | Grund | TEXT(500) | ja |  |  |
-| GueltigBis | TEXT |  |  |  |
-| GueltigVon | TEXT | ja | Index |  |
+| GueltigBis | INTEGER |  |  |  |
+| GueltigVon | INTEGER | ja | Index |  |
 | Land | TEXT(2) | ja |  |  |
 | Ort | TEXT(200) | ja |  |  |
-| PersonId | TEXT | ja | → Personen, Index |  |
+| PersonId | BLOB | ja | → Personen, Index |  |
 | Postleitzahl | TEXT(20) | ja |  |  |
 | Strasse | TEXT(200) | ja |  |  |
 | Zusatz | TEXT(200) |  |  |  |
@@ -871,8 +871,8 @@ Klasse: `VibeVHS.Domain.Personen.EMailAdresse`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
-| AdressId | TEXT | ja | Index |  |
+| Id | BLOB | ja | PK |  |
+| AdressId | BLOB | ja | Index |  |
 | Adresse | TEXT(320) | ja |  |  |
 | Art | TEXT(40) | ja |  |  |
 | Bevorzugt | INTEGER | ja |  |  |
@@ -881,9 +881,9 @@ Klasse: `VibeVHS.Domain.Personen.EMailAdresse`
 | Erfassungsart | TEXT(40) | ja |  |  |
 | ErsetztAm | INTEGER |  |  |  |
 | Grund | TEXT(500) | ja |  |  |
-| GueltigBis | TEXT |  |  |  |
-| GueltigVon | TEXT | ja | Index |  |
-| PersonId | TEXT | ja | → Personen, Index |  |
+| GueltigBis | INTEGER |  |  |  |
+| GueltigVon | INTEGER | ja | Index |  |
+| PersonId | BLOB | ja | → Personen, Index |  |
 
 ## PersonEinwilligungen
 
@@ -891,17 +891,17 @@ Klasse: `VibeVHS.Domain.Personen.Einwilligung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | ErfasstAm | INTEGER | ja |  |  |
 | ErfasstVon | TEXT(200) | ja |  |  |
 | Erfassungsart | TEXT(40) | ja |  |  |
 | ErsetztAm | INTEGER |  |  |  |
 | Erteilt | INTEGER | ja |  |  |
 | Grund | TEXT(500) | ja |  |  |
-| GueltigBis | TEXT |  |  |  |
-| GueltigVon | TEXT | ja | Index |  |
+| GueltigBis | INTEGER |  |  |  |
+| GueltigVon | INTEGER | ja | Index |  |
 | Kanal | TEXT(40) | ja |  |  |
-| PersonId | TEXT | ja | → Personen, Index |  |
+| PersonId | BLOB | ja | → Personen, Index |  |
 | Zweck | TEXT(40) | ja |  |  |
 
 ## PersonMerkmale
@@ -910,17 +910,17 @@ Klasse: `VibeVHS.Domain.Personen.PersonMerkmal`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Art | TEXT(40) | ja |  |  |
 | ErfasstAm | INTEGER | ja |  |  |
 | ErfasstVon | TEXT(200) | ja |  |  |
 | Erfassungsart | TEXT(40) | ja |  |  |
 | ErsetztAm | INTEGER |  |  |  |
 | Grund | TEXT(500) | ja |  |  |
-| GueltigBis | TEXT |  |  |  |
-| GueltigVon | TEXT | ja | Index |  |
+| GueltigBis | INTEGER |  |  |  |
+| GueltigVon | INTEGER | ja | Index |  |
 | Inhalt | TEXT(200) | ja |  |  |
-| PersonId | TEXT | ja | → Personen, Index |  |
+| PersonId | BLOB | ja | → Personen, Index |  |
 
 ## PersonNamen
 
@@ -928,16 +928,16 @@ Klasse: `VibeVHS.Domain.Personen.PersonName`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | ErfasstAm | INTEGER | ja |  |  |
 | ErfasstVon | TEXT(200) | ja |  |  |
 | Erfassungsart | TEXT(40) | ja |  |  |
 | ErsetztAm | INTEGER |  |  |  |
 | Grund | TEXT(500) | ja |  |  |
-| GueltigBis | TEXT |  |  |  |
-| GueltigVon | TEXT | ja | Index |  |
+| GueltigBis | INTEGER |  |  |  |
+| GueltigVon | INTEGER | ja | Index |  |
 | Nachname | TEXT(200) | ja | Index |  |
-| PersonId | TEXT | ja | → Personen, Index |  |
+| PersonId | BLOB | ja | → Personen, Index |  |
 | Sortierschluessel | TEXT(400) | ja | Index |  |
 | Vorname | TEXT(200) | ja |  |  |
 | Vorsatz | TEXT(30) | ja |  |  |
@@ -949,18 +949,18 @@ Klasse: `VibeVHS.Domain.Personen.Organisationszugehoerigkeit`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | ErfasstAm | INTEGER | ja |  |  |
 | ErfasstVon | TEXT(200) | ja |  |  |
 | Erfassungsart | TEXT(40) | ja |  |  |
 | ErsetztAm | INTEGER |  |  |  |
 | Funktion | TEXT(200) |  |  |  |
 | Grund | TEXT(500) | ja |  |  |
-| GueltigBis | TEXT |  |  |  |
-| GueltigVon | TEXT | ja | Index |  |
-| OrganisationId | TEXT | ja | Index |  |
+| GueltigBis | INTEGER |  |  |  |
+| GueltigVon | INTEGER | ja | Index |  |
+| OrganisationId | BLOB | ja | Index |  |
 | OrganisationName | TEXT(300) | ja |  |  |
-| PersonId | TEXT | ja | → Personen, Index |  |
+| PersonId | BLOB | ja | → Personen, Index |  |
 
 ## PersonQualifikationen
 
@@ -968,7 +968,7 @@ Klasse: `VibeVHS.Domain.Personen.PersonQualifikation`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | AusstellendeStelle | TEXT(200) |  |  |  |
 | Bezeichnung | TEXT(200) | ja |  |  |
 | ErfasstAm | INTEGER | ja |  |  |
@@ -976,10 +976,10 @@ Klasse: `VibeVHS.Domain.Personen.PersonQualifikation`
 | Erfassungsart | TEXT(40) | ja |  |  |
 | ErsetztAm | INTEGER |  |  |  |
 | Grund | TEXT(500) | ja |  |  |
-| GueltigBis | TEXT |  |  |  |
-| GueltigVon | TEXT | ja | Index |  |
+| GueltigBis | INTEGER |  |  |  |
+| GueltigVon | INTEGER | ja | Index |  |
 | Nachweis | TEXT(500) |  |  |  |
-| PersonId | TEXT | ja | → Personen, Index |  |
+| PersonId | BLOB | ja | → Personen, Index |  |
 | Schluessel | TEXT(40) | ja |  |  |
 | WertText | TEXT(200) |  |  |  |
 
@@ -989,7 +989,7 @@ Klasse: `VibeVHS.Domain.Personen.Rufnummer`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Art | TEXT(40) | ja |  |  |
 | Bevorzugt | INTEGER | ja |  |  |
 | Dienste | INTEGER(40) | ja |  |  |
@@ -999,11 +999,11 @@ Klasse: `VibeVHS.Domain.Personen.Rufnummer`
 | Erfassungsart | TEXT(40) | ja |  |  |
 | ErsetztAm | INTEGER |  |  |  |
 | Grund | TEXT(500) | ja |  |  |
-| GueltigBis | TEXT |  |  |  |
-| GueltigVon | TEXT | ja | Index |  |
+| GueltigBis | INTEGER |  |  |  |
+| GueltigVon | INTEGER | ja | Index |  |
 | Nummer | TEXT(50) | ja |  |  |
-| NummerId | TEXT | ja | Index |  |
-| PersonId | TEXT | ja | → Personen, Index |  |
+| NummerId | BLOB | ja | Index |  |
+| PersonId | BLOB | ja | → Personen, Index |  |
 
 ## PersonSuche
 
@@ -1011,7 +1011,7 @@ Klasse: `VibeVHS.Infrastructure.Personen.Suchindexeintrag`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| PersonId | TEXT | ja | PK |  |
+| PersonId | BLOB | ja | PK |  |
 | Text | TEXT | ja |  |  |
 
 ## PersonVollmachten
@@ -1020,20 +1020,20 @@ Klasse: `VibeVHS.Domain.Personen.Buchungsvollmacht`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Art | TEXT(40) | ja |  |  |
-| BevollmaechtigterId | TEXT | ja | Index |  |
+| BevollmaechtigterId | BLOB | ja | Index |  |
 | BevollmaechtigterName | TEXT(300) | ja |  |  |
 | ErfasstAm | INTEGER | ja |  |  |
 | ErfasstVon | TEXT(200) | ja |  |  |
 | Erfassungsart | TEXT(40) | ja |  |  |
 | ErsetztAm | INTEGER |  |  |  |
 | Grund | TEXT(500) | ja |  |  |
-| GueltigBis | TEXT |  |  |  |
-| GueltigVon | TEXT | ja | Index |  |
+| GueltigBis | INTEGER |  |  |  |
+| GueltigVon | INTEGER | ja | Index |  |
 | Nachweis | TEXT(500) | ja |  |  |
-| PersonId | TEXT | ja | → Personen, Index |  |
-| VollmachtId | TEXT | ja |  |  |
+| PersonId | BLOB | ja | → Personen, Index |  |
+| VollmachtId | BLOB | ja |  |  |
 
 ## Personen
 
@@ -1041,7 +1041,7 @@ Klasse: `VibeVHS.Domain.Personen.Person`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK | F: Schlüssel |
+| Id | BLOB | ja | PK | F: Schlüssel |
 | AngelegtAm | INTEGER | ja |  | F: Zeitpunkt der Ersterfassung |
 | AnonymisiertAm | INTEGER |  |  | F: Anonymisierung (Prozess) |
 | AnonymisiertGebiet | TEXT(100) |  |  | A: Kreis/PLZ-Gebiet statt Adresse |
@@ -1050,10 +1050,10 @@ Klasse: `VibeVHS.Domain.Personen.Person`
 | Datenschutz | TEXT(20) | ja | Index | F: Datenschutzstatus (aktiv, gesperrt, archiviert, anonymisiert) |
 | Fachbereiche | TEXT | ja |  | F: Zuordnung zu Fachbereichen (Organisation, nicht personenbezogen); JSON |
 | GesperrtAm | INTEGER |  |  | F: Sperre (Prozess) |
-| GesperrtBis | TEXT |  |  | F: Sperre (Prozess) |
+| GesperrtBis | INTEGER |  |  | F: Sperre (Prozess) |
 | Sperrgrund | TEXT(2000) |  |  | F: Sperre (Prozess) |
 | Status | TEXT(30) | ja | Index | F: Prozesszustand (aktiv, ruhend, zusammengeführt …), Änderungen im Protokoll |
-| ZusammengefuehrtIn | TEXT |  |  | F: Dublettenzusammenführung (Prozess) |
+| ZusammengefuehrtIn | BLOB |  |  | F: Dublettenzusammenführung (Prozess) |
 
 ## Portalanliegen
 
@@ -1061,16 +1061,16 @@ Klasse: `VibeVHS.Domain.Portal.Portalantrag`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Art | TEXT(40) | ja |  |  |
-| BezugId | TEXT |  |  |  |
-| DateiId | TEXT |  |  |  |
+| BezugId | BLOB |  |  |  |
+| DateiId | BLOB |  |  |  |
 | Daten | TEXT | ja |  | JSON |
 | EingereichtAm | INTEGER | ja |  |  |
 | EntschiedenAm | INTEGER |  |  |  |
 | EntschiedenVon | TEXT |  |  |  |
 | Fachbereich | INTEGER |  |  |  |
-| PersonId | TEXT | ja | Index |  |
+| PersonId | BLOB | ja | Index |  |
 | Status | TEXT(40) | ja | Index |  |
 | Text | TEXT | ja |  |  |
 | Titel | TEXT | ja |  |  |
@@ -1082,7 +1082,7 @@ Klasse: `VibeVHS.Application.Postausgang.AusgehendeNachricht`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | AnhangInhalt | TEXT |  |  |  |
 | AnhangName | TEXT(200) |  |  |  |
 | AnhangTyp | TEXT(100) |  |  |  |
@@ -1094,7 +1094,7 @@ Klasse: `VibeVHS.Application.Postausgang.AusgehendeNachricht`
 | Fehler | TEXT |  |  |  |
 | Inhalt | TEXT | ja |  |  |
 | Kanal | TEXT(40) | ja |  |  |
-| PersonId | TEXT |  | Index |  |
+| PersonId | BLOB |  | Index |  |
 | Rueckmeldung | TEXT |  |  |  |
 | Sprache | TEXT(10) | ja |  |  |
 | Status | TEXT(40) | ja | Index |  |
@@ -1109,13 +1109,13 @@ Klasse: `VibeVHS.Application.Protokoll.AuditEintrag`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Aktion | TEXT(100) | ja |  |  |
 | Benutzer | TEXT(200) | ja |  |  |
 | BenutzerKennung | TEXT(100) | ja |  |  |
 | Beschreibung | TEXT | ja |  |  |
 | Erfolgreich | INTEGER | ja |  |  |
-| ObjektId | TEXT |  | Index |  |
+| ObjektId | BLOB |  | Index |  |
 | ObjektTyp | TEXT(100) |  | Index |  |
 | Rolle | TEXT(50) |  |  |  |
 | Zeitpunkt | INTEGER | ja | Index |  |
@@ -1126,11 +1126,11 @@ Klasse: `VibeVHS.Domain.Integration.Pruefungsanmeldung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | AngemeldetAm | INTEGER | ja |  |  |
 | Ergebnis | TEXT(40) | ja |  |  |
-| PersonId | TEXT | ja | Index |  |
-| PruefungId | TEXT | ja | Index |  |
+| PersonId | BLOB | ja | Index |  |
+| PruefungId | BLOB | ja | Index |  |
 | Punkte | INTEGER |  |  |  |
 
 ## Pruefungstermine
@@ -1139,11 +1139,11 @@ Klasse: `VibeVHS.Domain.Integration.Pruefungstermin`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Art | TEXT(40) | ja |  |  |
-| Beginn | TEXT | ja |  |  |
+| Beginn | INTEGER | ja |  |  |
 | GemeldetAm | INTEGER |  |  |  |
-| KursId | TEXT |  |  |  |
+| KursId | BLOB |  |  |  |
 | Ort | TEXT | ja |  |  |
 
 ## Qualifikationsausnahmen
@@ -1152,12 +1152,12 @@ Klasse: `VibeVHS.Domain.Programm.Qualifikationsausnahme`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Begruendung | TEXT(1000) | ja |  |  |
 | ErteiltAm | INTEGER | ja |  |  |
 | ErteiltVon | TEXT(200) | ja |  |  |
-| KursId | TEXT | ja | Index |  |
-| PersonId | TEXT | ja |  |  |
+| KursId | BLOB | ja | Index |  |
+| PersonId | BLOB | ja |  |  |
 | Schluessel | TEXT(40) | ja |  |  |
 
 ## Schnellanmeldungen
@@ -1166,12 +1166,12 @@ Klasse: `VibeVHS.Domain.Shop.Schnellanmeldung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
-| BelegungId | TEXT | ja |  |  |
+| Id | BLOB | ja | PK |  |
+| BelegungId | BLOB | ja |  |  |
 | Einwilligungen | TEXT | ja |  | JSON |
 | KostenfreiBis | INTEGER | ja |  |  |
 | Kursnummer | TEXT | ja |  |  |
-| PersonId | TEXT | ja | Index |  |
+| PersonId | BLOB | ja | Index |  |
 | StorniertAm | INTEGER |  |  |  |
 | StornoHash | TEXT | ja | eindeutig |  |
 | Weg | TEXT | ja |  |  |
@@ -1183,10 +1183,10 @@ Klasse: `VibeVHS.Domain.Programm.Semester`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | ArchiviertAm | INTEGER |  |  |  |
-| Beginn | TEXT | ja |  |  |
-| Ende | TEXT | ja |  |  |
+| Beginn | INTEGER | ja |  |  |
+| Ende | INTEGER | ja |  |  |
 | Kuerzel | TEXT(10) | ja |  |  |
 | Name | TEXT(100) | ja |  |  |
 
@@ -1196,18 +1196,18 @@ Klasse: `VibeVHS.Domain.Finanzen.SepaMandat`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Bic | TEXT(11) |  |  |  |
 | ErfasstAm | INTEGER | ja |  |  |
-| ErsteNutzungAm | TEXT |  |  |  |
+| ErsteNutzungAm | INTEGER |  |  |  |
 | Iban | TEXT(34) | ja |  |  |
 | Kontoinhaber | TEXT(200) | ja |  |  |
-| LetzteNutzungAm | TEXT |  |  |  |
-| PersonId | TEXT | ja | Index |  |
+| LetzteNutzungAm | INTEGER |  |  |  |
+| PersonId | BLOB | ja | Index |  |
 | Referenz | TEXT(35) | ja | eindeutig |  |
 | Status | TEXT(40) | ja |  |  |
-| UnterschriebenAm | TEXT | ja |  |  |
-| WiderrufenAm | TEXT |  |  |  |
+| UnterschriebenAm | INTEGER | ja |  |  |
+| WiderrufenAm | INTEGER |  |  |  |
 
 ## Shopbuchungen
 
@@ -1215,15 +1215,15 @@ Klasse: `VibeVHS.Domain.Shop.Shopbuchung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | AnfrageHash | TEXT | ja |  |  |
 | Einwilligungen | TEXT | ja |  | JSON |
 | Idempotenzschluessel | TEXT | ja | eindeutig |  |
-| KontoId | TEXT |  |  |  |
-| MandatId | TEXT |  |  |  |
-| PersonId | TEXT | ja |  |  |
+| KontoId | BLOB |  |  |  |
+| MandatId | BLOB |  |  |  |
+| PersonId | BLOB | ja |  |  |
 | Positionen | TEXT | ja |  | JSON |
-| WarenkorbId | TEXT | ja | Index |  |
+| WarenkorbId | BLOB | ja | Index |  |
 | Zahlart | TEXT | ja |  |  |
 | Zeitpunkt | INTEGER | ja |  |  |
 
@@ -1233,13 +1233,13 @@ Klasse: `VibeVHS.Domain.Shop.Shopkonto`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | BestaetigtAm | INTEGER |  |  |  |
 | EMail | TEXT | ja | eindeutig |  |
 | ErstelltAm | INTEGER | ja |  |  |
-| Geburtsdatum | TEXT |  |  |  |
+| Geburtsdatum | INTEGER |  |  |  |
 | Nachname | TEXT | ja |  |  |
-| PersonId | TEXT |  |  |  |
+| PersonId | BLOB |  |  |  |
 | Sprache | TEXT | ja |  |  |
 | Status | TEXT(40) | ja |  |  |
 | TokenGueltigBis | INTEGER | ja |  |  |
@@ -1252,17 +1252,17 @@ Klasse: `VibeVHS.Domain.Integration.Teilnahmeberechtigung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Aktenzeichen | TEXT(60) | ja |  |  |
 | Art | TEXT(40) | ja |  |  |
-| Ausgestellt | TEXT | ja |  |  |
+| Ausgestellt | INTEGER | ja |  |  |
 | Befreiungsgrund | TEXT |  |  |  |
 | ErfasstAm | INTEGER | ja |  |  |
 | ErfasstVon | TEXT | ja |  |  |
 | Fahrtkosten | INTEGER | ja |  |  |
-| GueltigBis | TEXT |  |  |  |
+| GueltigBis | INTEGER |  |  |  |
 | Kostenbefreit | INTEGER | ja |  |  |
-| PersonId | TEXT | ja | Index |  |
+| PersonId | BLOB | ja | Index |  |
 | Stelle | TEXT(200) | ja |  |  |
 | UeUmfang | INTEGER | ja |  |  |
 
@@ -1276,8 +1276,8 @@ Klasse: `VibeVHS.Domain.Durchfuehrung.Termincode`
 | ErstelltAm | INTEGER | ja |  |  |
 | GueltigBis | INTEGER | ja |  |  |
 | GueltigVon | INTEGER | ja |  |  |
-| OrtId | TEXT | ja | Index |  |
-| VeranstaltungId | TEXT | ja | Index |  |
+| OrtId | BLOB | ja | Index |  |
+| VeranstaltungId | BLOB | ja | Index |  |
 
 ## Uebergaben
 
@@ -1285,7 +1285,7 @@ Klasse: `VibeVHS.Domain.Finanzen.Uebergabe`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Am | INTEGER | ja |  |  |
 | Anzahl | INTEGER | ja |  |  |
 | Datei | TEXT | ja |  |  |
@@ -1300,24 +1300,24 @@ Klasse: `VibeVHS.Domain.Finanzen.Umsatz`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | BetragCent | INTEGER | ja |  |  |
-| Buchungstag | TEXT | ja |  |  |
+| Buchungstag | INTEGER | ja |  |  |
 | EndToEndId | TEXT |  | Index |  |
-| ErzeugterBelegId | TEXT |  |  |  |
+| ErzeugterBelegId | BLOB |  |  |  |
 | GegenIban | TEXT |  |  |  |
 | GegenName | TEXT |  |  |  |
-| KontoauszugId | TEXT | ja | Index |  |
+| KontoauszugId | BLOB | ja | Index |  |
 | Nr | INTEGER | ja |  |  |
 | Rueckgabegrund | TEXT |  |  |  |
 | Sicherheit | TEXT(40) | ja |  |  |
 | Status | TEXT(40) | ja |  |  |
-| Valuta | TEXT |  |  |  |
+| Valuta | INTEGER |  |  |  |
 | Verwendungszweck | TEXT(500) | ja |  |  |
-| VorschlagBelegId | TEXT |  |  |  |
+| VorschlagBelegId | BLOB |  |  |  |
 | VorschlagText | TEXT |  |  |  |
 | ZugeordnetAm | INTEGER |  |  |  |
-| ZugeordnetBelegId | TEXT |  |  |  |
+| ZugeordnetBelegId | BLOB |  |  |  |
 | ZugeordnetVon | TEXT |  |  |  |
 
 ## Veranstaltungen
@@ -1326,16 +1326,16 @@ Klasse: `VibeVHS.Domain.Programm.Veranstaltung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | AusSerie | INTEGER | ja |  |  |
 | Ausgefallen | INTEGER | ja |  |  |
 | AusgefallenAm | INTEGER |  |  |  |
 | Ausnahme | INTEGER | ja |  |  |
-| Beginn | TEXT | ja | Index |  |
+| Beginn | INTEGER | ja | Index |  |
 | Bemerkung | TEXT(500) |  |  |  |
-| DozentId | TEXT |  | Index |  |
-| Ende | TEXT | ja |  |  |
-| KursId | TEXT | ja | → Kurse, Index |  |
+| DozentId | BLOB |  | Index |  |
+| Ende | INTEGER | ja |  |  |
+| KursId | BLOB | ja | → Kurse, Index |  |
 | Nummer | INTEGER | ja |  |  |
 
 ## Vorlagen
@@ -1358,10 +1358,10 @@ Klasse: `VibeVHS.Domain.Shop.Warenkorb`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | AbgeschlossenAm | INTEGER |  |  |  |
 | ErstelltAm | INTEGER | ja |  |  |
-| KontoId | TEXT |  |  |  |
+| KontoId | BLOB |  |  |  |
 | Positionen | TEXT | ja |  | JSON |
 | ReserviertBis | INTEGER | ja |  |  |
 | Status | TEXT(40) | ja | Index |  |
@@ -1372,9 +1372,9 @@ Klasse: `VibeVHS.Domain.Finanzen.Zahlungslauf`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Art | TEXT(40) | ja |  |  |
-| Ausfuehrung | TEXT | ja |  |  |
+| Ausfuehrung | INTEGER | ja |  |  |
 | ErstelltAm | INTEGER | ja |  |  |
 | ErstelltVon | TEXT | ja |  |  |
 | ExportiertAm | INTEGER |  |  |  |
@@ -1391,12 +1391,12 @@ Klasse: `VibeVHS.Domain.Durchfuehrung.Zugangstoken`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | TEXT | ja | PK |  |
+| Id | BLOB | ja | PK |  |
 | Art | TEXT(40) | ja |  |  |
 | ErstelltAm | INTEGER | ja |  |  |
 | Hash | TEXT(64) | ja | eindeutig |  |
-| PersonId | TEXT | ja | Index |  |
-| Ursprung | TEXT |  |  |  |
+| PersonId | BLOB | ja | Index |  |
+| Ursprung | BLOB |  |  |  |
 | WiderrufGrund | TEXT(300) |  |  |  |
 | WiderrufenAm | INTEGER |  |  |  |
 | ZuletztGenutzt | INTEGER |  |  |  |

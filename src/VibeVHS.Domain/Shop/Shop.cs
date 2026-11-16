@@ -248,7 +248,7 @@ public sealed class Kursstand
         KursId = kursId;
         Kursnummer = kursnummer;
         Hash = hash;
-        GeaendertAm = jetzt;
+        GeaendertAm = AufMillisekunden(jetzt);
     }
 
     public Guid KursId { get; private set; }
@@ -258,6 +258,9 @@ public sealed class Kursstand
     public string Hash { get; private set; }
 
     public DateTimeOffset GeaendertAm { get; private set; }
+
+    /// <summary>Wie gespeichert und wieder gelesen (UTC-Millisekunden, Anzeigezeitzone): so liefert der erste Abruf denselben Stand und ETag wie spätere aus der Datenbank.</summary>
+    private static DateTimeOffset AufMillisekunden(DateTimeOffset z) => Gemeinsam.Zeitzone.Ortszeit(DateTimeOffset.FromUnixTimeMilliseconds(z.ToUnixTimeMilliseconds()));
 
     public bool Entfernt { get; private set; }
 
@@ -271,7 +274,7 @@ public sealed class Kursstand
 
         Hash = hash;
         Entfernt = false;
-        GeaendertAm = jetzt;
+        GeaendertAm = AufMillisekunden(jetzt);
         return true;
     }
 
@@ -284,7 +287,7 @@ public sealed class Kursstand
 
         Entfernt = true;
         Hash = string.Empty;
-        GeaendertAm = jetzt;
+        GeaendertAm = AufMillisekunden(jetzt);
         return true;
     }
 }

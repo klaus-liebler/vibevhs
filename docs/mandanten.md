@@ -33,5 +33,7 @@ dass weitere ohne Umbau des Datenmodells hinzukommen können.
 4. Startdaten, Migrationen und Sicherung je Mandant (beim Start alle Datenbanken migrieren; Sicherungsordner je Mandant).
 5. Anmeldung: Benutzerkonten sind je Mandant; ein Konto gilt nur in „seiner“ VHS (Cookie-Name bzw. -Pfad je Mandant).
 6. Speicherorte (Dokumente, Logs) je Mandant trennen.
+7. Zeitzone je Mandant: heute eine Einstellung „Zeitzone“ für die ganze Anwendung (`Domain.Gemeinsam.Zeitzone`, statisch); beim Einschalten
+   aus der Mandantenkonfiguration lesen und die Speicher-Konverter (Termine/Zeitpunkte) über den Mandantenkontext umrechnen lassen.
 
-Grober Aufwand für 1–6: 3–4 Arbeitstage plus Tests (insbesondere „kein Zugriff über Mandantengrenzen“).
+Grober Aufwand für 1–7: 3–4 Arbeitstage plus Tests (insbesondere „kein Zugriff über Mandantengrenzen“).

@@ -72,6 +72,6 @@ public static class PersonenSuchindex
         }
     }
 
-    /// <summary>Gleiches Textformat wie EF Core für Guid-Spalten in SQLite.</summary>
-    internal static string Schluessel(Guid id) => id.ToString().ToUpperInvariant();
+    /// <summary>Gleiches Format wie die Id-Spalten (16 Byte, Big Endian, siehe Speicherformate).</summary>
+    internal static byte[] Schluessel(Guid id) => Datenbank.Speicherformate.IdBytes(id);
 }

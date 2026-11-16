@@ -53,6 +53,9 @@ public static class Registrierung
     public static IServiceCollection AddVibeVhsInfrastruktur(this IServiceCollection dienste, IConfiguration konfiguration,
         string basisVerzeichnis, bool strengeAbfragepruefung = false)
     {
+        // Anzeige- und Eingabezeitzone (Einstellung „Zeitzone“, z. B. Europe/Berlin); ohne Einstellung die Systemzeitzone des Servers.
+        Domain.Gemeinsam.Zeitzone.Festlegen(konfiguration["Zeitzone"]);
+
         // Mandanten (Vorbereitung „eine Datenbank je VHS“): Mandanten:<Kennung>:Datenbank / :Host; ohne Eintrag genau ein Mandant „standard“.
         var mandanten = konfiguration.GetSection("Mandanten").GetChildren()
             .Select(m => new Application.Betrieb.Mandant(m.Key, Datenbankverbindung(m["Datenbank"], basisVerzeichnis).ToString(), m["Host"]))

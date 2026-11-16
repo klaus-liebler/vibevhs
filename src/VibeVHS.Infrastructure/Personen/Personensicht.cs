@@ -44,7 +44,7 @@ public static class Personensicht
     public static IQueryable<PersonMitSchluessel> MitSortierschluessel(this VibeVhsDbContext db, IQueryable<Person> personen, DateOnly tag)
         => from p in personen
            join n in db.NamenAm(tag) on p.Id equals EF.Property<Guid>(n, "PersonId")
-           select new PersonMitSchluessel { Id = p.Id, Schluessel = n.Sortierschluessel + "|" + p.Id.ToString().ToUpper() };
+           select new PersonMitSchluessel { Id = p.Id, Schluessel = n.Sortierschluessel + "|" + SqlFunktionen.Hex(p.Id) };
 
     /// <summary>Personen sortiert nach Name zum Stichtag (DIN 5007-2), eindeutig über die Id.</summary>
     public static IQueryable<Person> NachNameSortiert(this IQueryable<Person> personen, VibeVhsDbContext db, DateOnly tag)
@@ -91,4 +91,7 @@ public static class SqlFunktionen
 {
     /// <summary>CAST(text AS INTEGER) – z. B. die Rollen-Bitmaske im Merkmal Rollen.</summary>
     public static long Ganzzahl(string text) => throw new InvalidOperationException("Nur in Datenbankabfragen verwendbar.");
+
+    /// <summary>hex(id) – die 16 Bytes der Id als Großbuchstaben-Hex (Speicherreihenfolge), z. B. für Seitenschlüssel.</summary>
+    public static string Hex(Guid id) => throw new InvalidOperationException("Nur in Datenbankabfragen verwendbar.");
 }

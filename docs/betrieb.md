@@ -43,3 +43,19 @@ Test `BetriebTests.Lastmessung_3000_Personen_500_Kurse` (SQLite im Arbeitsspeich
 | Excel-Export Kursliste | 595 ms |
 
 Grenze im Test: jede Abfrage unter 5 s. Ältere Messung der Personenliste: `docs/personenliste-ladezeiten.md`.
+
+## Zeitzone
+
+In der Datenbank stehen alle Zeitpunkte und Termine in UTC (Millisekunden seit 1970). Angezeigt und eingegeben wird in der Zeitzone aus der
+Einstellung `Zeitzone` (z. B. `Zeitzone=Europe/Berlin` als Umgebungsvariable bzw. in appsettings). Fehlt sie, gilt die Systemzeitzone des
+Servers – auf einem Linux-Server steht diese oft auf UTC, dann zeigt die Anwendung UTC-Uhrzeiten. Deshalb auf dem Zielsystem entweder
+`Zeitzone=Europe/Berlin` setzen oder die Systemzeitzone prüfen und setzen:
+
+```bash
+timedatectl
+sudo timedatectl set-timezone Europe/Berlin
+```
+
+Serientermine werden je Termin aus der Ortszeit („dienstags 18:00“) nach UTC umgerechnet und bleiben so nach der Zeitumstellung um 18:00
+Ortszeit. Die Umstellung der Bestandsdaten (Migration „SpeicherformateUmwandeln“) setzt voraus, dass bisher in Europe/Berlin gearbeitet wurde.
+
