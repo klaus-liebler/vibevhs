@@ -299,7 +299,7 @@
     ul.className = 'vhs-tourenliste';
     ul.innerHTML = liste.map((t) => `<li><div><b>${esc(t.titel)}</b><br><span class="vhs-small vhs-muted">${esc(t.konto)} · ${t.schritte.length} Schritte · Richtzeit ${esc(t.richtzeit || '–')}</span>
         <br><span class="vhs-small">${esc(t.beschreibung || '')}</span></div>
-        <button type="button" class="rz-button rz-button-sm rz-variant-outlined rz-primary" data-tour-start="${esc(t.id)}">Tour starten</button></li>`).join('');
+        <button type="button" class="vhs-btn" data-tour-start="${esc(t.id)}">Tour starten</button></li>`).join('');
     box.append(ul);
   };
 

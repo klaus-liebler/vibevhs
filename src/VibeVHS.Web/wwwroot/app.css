@@ -367,7 +367,7 @@ a.vhs-chip { text-decoration: none; display: inline-flex; align-items: center; }
 #vhs-tour-blase button:disabled { opacity: 0.4; cursor: default; }
 #vhs-tour-blase button:focus-visible { outline: 2px solid #ffd166; outline-offset: 2px; }
 .vhs-tourenliste { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
-.vhs-tourenliste li > div { display: inline-block; vertical-align: top; width: calc(100% - 140px); min-width: 220px; }
-.vhs-tourenliste li { padding: 6px 0; border-bottom: 1px solid var(--vhs-line); }
-.vhs-tourenliste li button { float: right; }
+.vhs-tourenliste li { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--vhs-line); }
+.vhs-tourenliste li > div { flex: 1 1 320px; min-width: 0; }
+.vhs-tourenliste li button { flex: 0 0 auto; }
 @media (prefers-reduced-motion: reduce) { #vhs-tour-ring { transition: none; } }
