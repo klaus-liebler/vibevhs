@@ -4,6 +4,9 @@ Webbasierte Verwaltungssoftware für Volkshochschulen: einfach zu bedienen für 
 Teilnehmende, eingebunden in die kommunale Infrastruktur, DSGVO-konform, mit Schnittstellen zu Abrechnungsstellen
 (z. B. BAMF-Integrationskurse) und automatisierten, immer protokollierten Routineabläufen.
 
+Alle geplanten Schnittstellen nach außen (Mail, Messaging, VHS-Systeme, Stadtverwaltung, Finanzen, BAMF) mit Stand:
+[schnittstellen.md](schnittstellen.md).
+
 ## Konzepte
 
 | Dokument | Link |

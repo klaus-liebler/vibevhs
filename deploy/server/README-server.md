@@ -178,6 +178,18 @@ Baut self-contained linux-x64, lädt Kit und Archiv hoch, sichert die Datenbank,
 bleibt als `/opt/vibevhs.vorher`) und prüft `http://127.0.0.1:5080/vibevhs/gesund`. Antwortet die neue Version nicht, kommt die
 vorige automatisch zurück. Von Hand zurück: `ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/ausrollen.sh --zurueck"`.
 
+**Schemaänderung (solange es keine EF-Migrationen gibt):** Passt die vorhandene Datenbank nicht zum Modell, bricht der
+Start mit „Datenbankschema veraltet“ ab, die vorige Version kommt zurück, und das Skript nennt den Ausweg:
+
+```powershell
+.\deploy\server\deploy.ps1 -DbNeu            # mit Rückfrage; -OhneRueckfrage für Skripte
+```
+
+`-DbNeu` verschiebt `vibevhs.db` samt `-wal`/`-shm` nach `/var/lib/vibevhs/beiseite/<datei>.<zeitstempel>` (Ordner 0700,
+Dienstbenutzer; nichts wird gelöscht), die Anwendung baut die Datenbank aus Start- und Demodaten neu auf (Erststart
+~1,5 min, das Skript wartet bis 5 min). Scheitert der Start, kommen vorige Version **und** vorige Datenbank zurück.
+Alte Dateien in `beiseite/` gelegentlich von Hand löschen. (Vorfall dazu: `protokoll/2026-11-17-diagnose-502.md`.)
+
 **Prüfen:** `https://liebler.iui.hs-osnabrueck.de/vibevhs/` fragt nach dem Zugangspasswort (Benutzer `vhs-test`), danach
 die Testanmeldung mit dem Banner „Testsystem“.
 

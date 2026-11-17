@@ -5,6 +5,9 @@
 .EXAMPLE
     .\deploy\server\deploy.ps1                # bauen + hochladen + einspielen (fragt nach sudo-Passwort)
 .EXAMPLE
+    .\deploy\server\deploy.ps1 -DbNeu        # wie oben, Datenbank aber beiseitelegen und neu aus Start-/Demodaten aufbauen
+                                              # (nötig bei Schemaänderung, solange es keine EF-Migrationen gibt)
+.EXAMPLE
     .\deploy\server\deploy.ps1 -NurKit        # nur das Kit nach /tmp/vibevhs-kit hochladen (für die Schritt-Skripte)
 .EXAMPLE
     .\deploy\server\deploy.ps1 -NurBauen      # nur bauen (deploy\ausgabe\vibevhs.tar.gz)
@@ -13,7 +16,12 @@ param(
     [string] $Ziel = "srvadmin@liebler.iui.hs-osnabrueck.de",
     [string] $Schluessel = "$env:USERPROFILE\.ssh\id_ed25519_liebler_iui_hs_osnabrueck",
     [switch] $NurKit,
-    [switch] $NurBauen
+    [switch] $NurBauen,
+    # Datenbank auf dem Server vor dem Start nach /var/lib/vibevhs/beiseite/ verschieben (nicht löschen); die Anwendung
+    # legt sie neu an. Scheitert der Start, kommen vorige Version und vorige Datenbank automatisch zurück.
+    [switch] $DbNeu,
+    # Rückfrage bei -DbNeu überspringen
+    [switch] $OhneRueckfrage
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,6 +38,13 @@ function Kit-Hochladen {
     tar -czf $kit -C (Join-Path $wurzel "deploy\server") .
     scp @sshArgs $kit "${Ziel}:/tmp/vibevhs-kit.tar.gz"
     ssh @sshArgs $Ziel "rm -rf /tmp/vibevhs-kit && mkdir -p /tmp/vibevhs-kit && tar -xzf /tmp/vibevhs-kit.tar.gz -C /tmp/vibevhs-kit && rm /tmp/vibevhs-kit.tar.gz && chmod +x /tmp/vibevhs-kit/schritte/*.sh /tmp/vibevhs-kit/werkzeuge/*.sh"
+}
+
+if ($DbNeu -and ($NurKit -or $NurBauen)) { throw "-DbNeu wirkt nur beim Einspielen, nicht zusammen mit -NurKit oder -NurBauen." }
+if ($DbNeu -and -not $OhneRueckfrage) {
+    Write-Host "! -DbNeu: Die Datenbank auf dem Testsystem wird beiseitegelegt und neu aus Start- und Demodaten aufgebaut." -ForegroundColor Yellow
+    Write-Host "  Alle dort erfassten Daten sind danach nicht mehr in der Anwendung (Datei bleibt unter /var/lib/vibevhs/beiseite/)." -ForegroundColor Yellow
+    if ((Read-Host "  Fortfahren? (j/N)") -notmatch '^(j|ja|y|yes)$') { Write-Host "Abgebrochen – nichts geändert."; return }
 }
 
 if ($NurKit) { Kit-Hochladen; return }
@@ -49,6 +64,7 @@ Kit-Hochladen
 Write-Host "» Archiv hochladen" -ForegroundColor Cyan
 scp @sshArgs $archiv "${Ziel}:/tmp/vibevhs.tar.gz"
 Write-Host "» einspielen (sudo fragt nach dem Passwort von srvadmin)" -ForegroundColor Cyan
-ssh @sshArgs -t $Ziel "sudo bash /tmp/vibevhs-kit/schritte/ausrollen.sh /tmp/vibevhs.tar.gz"
+$dbNeuArg = if ($DbNeu) { "--db-neu " } else { "" }
+ssh @sshArgs -t $Ziel "sudo bash /tmp/vibevhs-kit/schritte/ausrollen.sh $dbNeuArg/tmp/vibevhs.tar.gz"
 if ($LASTEXITCODE -ne 0) { throw "Einspielen fehlgeschlagen – Meldung oben (eine vorhandene Version läuft unverändert weiter)." }
 Write-Host "✓ ausgerollt: https://liebler.iui.hs-osnabrueck.de/vibevhs/" -ForegroundColor Green
