@@ -3,6 +3,7 @@
 # Start: ssh -t srvadmin@liebler.iui.hs-osnabrueck.de "sudo bash /tmp/vibevhs-kit/schritte/03-nginx-statt-apache.sh"
 # Rückweg: sudo bash /tmp/vibevhs-kit/schritte/03-zurueck.sh  (nginx aus, Apache wieder an)
 source "$(dirname "$0")/gemeinsam.sh"
+source "$(dirname "$0")/liebler-nginx.sh"
 als_root
 command -v nginx >/dev/null || fehler "nginx fehlt – erst Schritt 02."
 
@@ -71,10 +72,13 @@ einspielen systemd/zertifikat-ablauf.timer /etc/systemd/system/zertifikat-ablauf
 systemctl enable --now zertifikat-ablauf.timer >/dev/null 2>&1 && ok "Ablaufwarnung aktiv: $(/usr/local/sbin/zertifikat-ablauf --kurz)"
 
 # ---------- 3. nginx-Konfiguration ----------
-einspielen nginx/liebler.conf /etc/nginx/sites-available/liebler.conf || true
+# Grundgerüst liebler.conf + eigene Dateien in /etc/nginx/liebler.d/ (gemeinsames Schema, schritte/liebler-nginx.sh).
+# Andere Apps (FraktionPerfekt, Podium …) pflegen ihre eigenen Dateien dort – sie bleiben unberührt; ältere include-Zeilen
+# in liebler.conf werden nach liebler.d/ umgezogen. Erst die Snippets, die vibevhs.conf einbindet (nginx -t braucht sie).
 einspielen nginx/vibevhs-proxy.conf /etc/nginx/snippets/vibevhs-proxy.conf || true
 # Die Ausnahmen pflegt Klaus ggf. selbst: nur anlegen, nie überschreiben
 [[ -f /etc/nginx/snippets/vibevhs-ohne-passwort.conf ]] || einspielen nginx/vibevhs-ohne-passwort.conf /etc/nginx/snippets/vibevhs-ohne-passwort.conf || true
+liebler_grundgeruest "$KIT/nginx/liebler.conf" vibevhs="$KIT/nginx/liebler.d/vibevhs.conf" nodered="$KIT/nginx/liebler.d/nodered.conf"
 ln -sf /etc/nginx/sites-available/liebler.conf /etc/nginx/sites-enabled/liebler.conf
 rm -f /etc/nginx/sites-enabled/default
 

@@ -106,7 +106,11 @@ keine verlässliche Microsoft-Paketquelle).
    nicht abgelaufen, **Schlüssel passt** per Vergleich der öffentlichen Schlüssel, Kette vorhanden) und legt es zentral ab:
    `/etc/ssl/liebler/fullchain.pem` und `privkey.pem` (root:ssl-cert, Schlüssel 0640). nginx nutzt nur noch diesen Ort;
    `/etc/letsencrypt` bleibt bis Schritt 08 unangetastet. Dazu die **Ablaufwarnung** (`zertifikat-ablauf.timer`, siehe unten).
-3. **Konfiguration:** `nginx/liebler.conf` (+ Snippets) nach `/etc/nginx`, Standard-Site aus, `nginx -t`.
+3. **Konfiguration:** Grundgerüst `nginx/liebler.conf` (TLS, :80→:443, `/var/www/html`, `include /etc/nginx/liebler.d/*.conf;`)
+   und die eigenen Dateien `nginx/liebler.d/vibevhs.conf` und `nodered.conf` nach `/etc/nginx/liebler.d/`, Standard-Site aus.
+   **Gemeinsames Schema** (`schritte/liebler-nginx.sh`, gleich in den Kits von FraktionPerfekt und Podium): jede App pflegt nur
+   ihre Datei in `liebler.d/` – ein erneuter Schritt 03 überschreibt die anderen Apps nicht mehr. Ältere include-Zeilen in
+   `liebler.conf` zieht das Skript nach `liebler.d/` um. Jede Änderung: Sicherung → `nginx -t` → reload, sonst zurück.
 4. **Zugangspasswort** für `/vibevhs` (Benutzer `vhs-test`, Passwort fragt `htpasswd`).
 5. **Umschalten:** Apache stoppen und deaktivieren (nicht deinstallieren), nginx starten – startet nginx nicht, kommt Apache sofort zurück.
 
