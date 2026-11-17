@@ -15,7 +15,10 @@ Alle geplanten Schnittstellen nach außen (Mail, Messaging, VHS-Systeme, Stadtve
 | Architektur und Datenmodell | https://claude.ai/artifact/XVL9kYS5XcAYwGsoDQ4CN3 |
 | Umsetzungsfahrplan | https://claude.ai/artifact/FFRgE1BfKbphyCYxcVz4S9 |
 | Klick-Prototyp (online) | https://claude.ai/artifact/KR88btCTssLuRhCTYFGnbx |
-| Klick-Prototyp (lokal) | [`prototyp/prototyp-verwaltung.html`](../prototyp/prototyp-verwaltung.html) |
+| Buchungs-Shop-Plugin | https://claude.ai/artifact/VsQFogXRz3dzQYZajLgoMm |
+| Klick-Prototyp (lokal) | [`spezifikation/prototyp-verwaltung.html`](spezifikation/prototyp-verwaltung.html) |
+
+Schnappschuss aller Konzepte vom 17.11.2026 im Repo: [`spezifikation/`](spezifikation/README.md). Bei Abweichung gilt die lebende Fassung (Links oben).
 
 ## Voraussetzungen
 

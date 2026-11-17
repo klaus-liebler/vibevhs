@@ -10,6 +10,8 @@ Kursleitungen und Teilnehmende; Routinen automatisiert, aber immer protokolliert
 - Fahrplan: https://claude.ai/artifact/FFRgE1BfKbphyCYxcVz4S9
 - Shop-Konzept: https://claude.ai/artifact/VsQFogXRz3dzQYZajLgoMm
 - Prototyp: https://claude.ai/artifact/KR88btCTssLuRhCTYFGnbx
+- Schnappschuss (17.11.2026) im Repo: `docs/spezifikation/` (Anforderungen, Architektur, Fahrplan, Shop-Konzept als Markdown,
+  Prototyp als HTML); bei Abweichung gilt die lebende Fassung oben
 - Im Repo: `docs/README.md` (Gesamtüberblick je Iteration), `docs/schnittstellen.md`, `docs/betrieb.md`, `docs/sicherheit.md`, `docs/webshop.md`,
   `docs/dozierendenportal.md`, `docs/abnahme-a.md` (Abnahme-Drehbuch), `deploy/server/README-server.md` (Bereitstellung)
 
