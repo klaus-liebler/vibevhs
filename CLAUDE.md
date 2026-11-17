@@ -5,13 +5,11 @@ Kursleitungen und Teilnehmende; Routinen automatisiert, aber immer protokolliert
 
 ## Konzeptdokumente
 
-- Anforderungen: https://claude.ai/artifact/5zHT9KccZeiUj1xS1BmKNG
-- Architektur: https://claude.ai/artifact/XVL9kYS5XcAYwGsoDQ4CN3
-- Fahrplan: https://claude.ai/artifact/FFRgE1BfKbphyCYxcVz4S9
-- Shop-Konzept: https://claude.ai/artifact/VsQFogXRz3dzQYZajLgoMm
-- Prototyp: https://claude.ai/artifact/KR88btCTssLuRhCTYFGnbx
-- Schnappschuss (17.11.2026) im Repo: `docs/spezifikation/` (Anforderungen, Architektur, Fahrplan, Shop-Konzept als Markdown,
-  Prototyp als HTML); bei Abweichung gilt die lebende Fassung oben
+**Das Repo ist die führende Quelle** (seit 17.11.2026): `docs/spezifikation/` mit `anforderungen.md`, `architektur.md`, `fahrplan.md`,
+`buchungs-shop-plugin.md` und `prototyp-verwaltung.html`. Änderungen an Anforderungen und Konzepten dort vornehmen und mitcommitten.
+Die Claude Docs/Artifacts (Anforderungen 5zHT9KccZeiUj1xS1BmKNG, Architektur XVL9kYS5XcAYwGsoDQ4CN3, Fahrplan FFRgE1BfKbphyCYxcVz4S9,
+Shop VsQFogXRz3dzQYZajLgoMm, Prototyp KR88btCTssLuRhCTYFGnbx unter https://claude.ai/artifact/…) sind nur noch Ausgangsstand und werden nicht weiter gepflegt.
+
 - Im Repo: `docs/README.md` (Gesamtüberblick je Iteration), `docs/schnittstellen.md`, `docs/betrieb.md`, `docs/sicherheit.md`, `docs/webshop.md`,
   `docs/dozierendenportal.md`, `docs/abnahme-a.md` (Abnahme-Drehbuch), `deploy/server/README-server.md` (Bereitstellung)
 

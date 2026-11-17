@@ -9,16 +9,15 @@ Alle geplanten Schnittstellen nach außen (Mail, Messaging, VHS-Systeme, Stadtve
 
 ## Konzepte
 
-| Dokument | Link |
-|---|---|
-| Anforderungen | https://claude.ai/artifact/5zHT9KccZeiUj1xS1BmKNG |
-| Architektur und Datenmodell | https://claude.ai/artifact/XVL9kYS5XcAYwGsoDQ4CN3 |
-| Umsetzungsfahrplan | https://claude.ai/artifact/FFRgE1BfKbphyCYxcVz4S9 |
-| Klick-Prototyp (online) | https://claude.ai/artifact/KR88btCTssLuRhCTYFGnbx |
-| Buchungs-Shop-Plugin | https://claude.ai/artifact/VsQFogXRz3dzQYZajLgoMm |
-| Klick-Prototyp (lokal) | [`spezifikation/prototyp-verwaltung.html`](spezifikation/prototyp-verwaltung.html) |
+**Führende Quelle ist das Repo:** [`spezifikation/`](spezifikation/README.md). Die früheren Claude Docs/Artifacts sind nur noch Ausgangsstand.
 
-Schnappschuss aller Konzepte vom 17.11.2026 im Repo: [`spezifikation/`](spezifikation/README.md). Bei Abweichung gilt die lebende Fassung (Links oben).
+| Dokument | Im Repo (führend) | Ausgangsstand (nicht mehr gepflegt) |
+|---|---|---|
+| Anforderungen | [spezifikation/anforderungen.md](spezifikation/anforderungen.md) | https://claude.ai/artifact/5zHT9KccZeiUj1xS1BmKNG |
+| Architektur und Datenmodell | [spezifikation/architektur.md](spezifikation/architektur.md) | https://claude.ai/artifact/XVL9kYS5XcAYwGsoDQ4CN3 |
+| Umsetzungsfahrplan | [spezifikation/fahrplan.md](spezifikation/fahrplan.md) | https://claude.ai/artifact/FFRgE1BfKbphyCYxcVz4S9 |
+| Buchungs-Shop-Plugin | [spezifikation/buchungs-shop-plugin.md](spezifikation/buchungs-shop-plugin.md) | https://claude.ai/artifact/VsQFogXRz3dzQYZajLgoMm |
+| Klick-Prototyp | [spezifikation/prototyp-verwaltung.html](spezifikation/prototyp-verwaltung.html) | https://claude.ai/artifact/KR88btCTssLuRhCTYFGnbx |
 
 ## Voraussetzungen
 
