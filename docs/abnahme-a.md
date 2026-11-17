@@ -54,11 +54,13 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
 ## 2. Kurs per Schnellweg anlegen
 
 - **Testkonto:** Varvara Schatz · **Startpunkt:** **Kurse** → **Kurs anlegen**
-- **Aufgabe:** Legen Sie für Fachbereich 7 den Kurs „Rückenfit am Abend“ an: mittwochs 18:00–19:30, 10 Termine,
-  Ort *A 1.12*, 98 €, mindestens 6, höchstens 14 Personen. Prüfen Sie die Vorschau und veröffentlichen Sie den Kurs.
+- **Aufgabe:** Legen Sie für Fachbereich 7 den Kurs „Rückenfit am Abend“ (Kursart *Bewegungskurs*) an: mittwochs
+  18:00–19:30, 10 Termine, Ort *B 1.01 Bewegungsraum*, 98 €, mindestens 6, höchstens 14 Personen, mit einer geeigneten
+  Kursleitung. Prüfen Sie die Vorschau und veröffentlichen Sie den Kurs.
 - **Erwartung:**
   - Die Vorschau zeigt ausgelassene Ferien und Feiertage mit Grund sowie Raumkonflikte.
-  - Ungeeignete Orte und Kursleitungen sind gesperrt, mit Begründung (Tooltip).
+  - Ungeeignete Orte und Kursleitungen sind gesperrt, mit Begründung (Tooltip) – z. B. *A 1.12 Kursraum*: „Für die
+    Nutzungsart ‚Bewegung' ist hier keine Kapazität hinterlegt.“
   - Nach dem Veröffentlichen ist der Kurs am Tresen buchbar; der Raumplan zeigt ihn.
 - **Zeit:** ____ min · **Beobachtungen:**
 

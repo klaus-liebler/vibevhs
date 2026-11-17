@@ -320,6 +320,13 @@ Die Identität wird einmal am Originaldokument geprüft und im Kurs per Sichtver
 | FA-137 | Bei „Zweifel“ entsteht eine Aufgabe „Ausweiskontrolle“ für die Verwaltung; die Anwesenheit bleibt bis zur Klärung vorläufig und zählt nicht für die BAMF-Abrechnung. | Muss |
 | FA-138 | Ausbaustufe: Vor-Ort-Auslesen des Personalausweises oder elektronischen Aufenthaltstitels per NFC (§ 18a PAuswG) mit Berechtigungszertifikat; ergänzt FA-134, ersetzt sie nicht (Duldung, Gestattung, Papierdokumente). | Kann |
 
+### Hilfe, Dokumentation und Rechtliches
+
+| ID | Anforderung | Prio |
+| --- | --- | --- |
+| FA-159 | Impressum (Anbieterkennzeichnung, § 5 DDG) ist ohne Anmeldung erreichbar und in allen Fußzeilen verlinkt; Leitung und Systemverwaltung pflegen den Text in den Einstellungen. Solange er fehlt, zeigt die Seite einen deutlich markierten Platzhalter. | Muss |
+| FA-160 | Leitung, Verwaltungsleitung und Systemverwaltung lesen Spezifikation und technische Doku in der Anwendung und kommentieren sie je Abschnitt: Antworten, Status offen/erledigt, Übersicht aller Kommentare und Export als Markdown zum Einarbeiten. Andere Rollen sehen den Menüpunkt gesperrt mit Begründung; die Rechte prüft der Dienst. | Muss |
+
 ## Querschnittsanforderungen
 
 Diese Regeln gelten für jede Maske und jeden Ablauf. Sie entscheiden, ob das System die Verwaltungsmitarbeitenden überzeugt.
@@ -349,6 +356,8 @@ Das ist ein bekanntes Muster (Temporal Data, bitemporale Datenhaltung, in Data-W
 | QA-13 | Aufgabenliste je Person: Wiedervorlagen, automatisch erkannte Probleme (Unterbelegung, fehlende Nachweise, offene Posten). Details unter „Aufgabensteuerung“. | Muss |
 | QA-14 | Barrierefreiheit nach BITV 2.0 / WCAG 2.1 AA. | Muss |
 | QA-15 | Responsive Oberfläche; Dozierenden- und Teilnehmerfunktionen auf dem Smartphone. | Muss |
+| QA-56 | Hilfe in der Anwendung für alle Verwaltungsrollen: Grundprinzipien und die häufigsten Abläufe Schritt für Schritt, abgeleitet aus Spezifikation und Abnahme-Drehbuch, mit Inhaltsverzeichnis. | Muss |
+| QA-57 | Abnahme- und Schulungsmodus: Geführte Touren zeigen mit Sprechblasen direkt an der Oberfläche, was anzuklicken oder einzutragen ist, und gehen weiter, sobald es getan ist (Zurück, Überspringen, Beenden, Zeitmessung). Die Touren folgen dem Abnahme-Drehbuch, sind im Test- und Schulungsbetrieb einschaltbar und werden automatisch auf Lauffähigkeit geprüft. | Soll |
 
 ### Kommunikation, Übersetzung und QR-Codes
 
@@ -428,6 +437,10 @@ Die Verwaltung sucht meist gezielt. Listen starten deshalb mit Suche und Filtern
 | S-22 | DMS / E-Akte der Kommune | Archivierung von Verträgen, Bescheinigungen | aus | CMIS, Hersteller-API | konzeptionell |
 | S-23 | Kalender | Termine für Dozierende, Teilnehmende, Raumbuchung | aus | iCalendar (ICS), Exchange | konzeptionell |
 | S-24 | Gebäudetechnik und Raumanzeige | Raumanzeige, Schließsystem, Heizung nach Belegung | aus | REST, Webseite | konzeptionell |
+| S-25 | Messenger (Signal, WhatsApp) | Kurzfristige Hinweise an Teilnehmende ohne Mailroutine (z. B. Integrationskurse) | aus | Business-API des Dienstes; Auftragsverarbeitung vorher klären | konzeptionell |
+| S-26 | Virenscanner der Kommune | Prüfung hochgeladener Dateien (Unterlagen, Nachweise) | aus | z. B. ClamAV (clamd) | Mock |
+| S-27 | Geokodierung | Entfernung Wohnort–Kursort (BAMF-Fahrtkosten), Wegbeschreibung | aus | Geodienst (Anbieter offen) | Mock |
+| S-28 | Externe Datensicherung | Fortlaufende Kopie der Datenbank außerhalb des Servers | aus | Litestream → S3-Speicher des Rechenzentrums | konzeptionell |
 
 Eine eigene dokumentierte REST-API (OpenAPI) bildet die Grundlage für alle Portale und Partneranbindungen.
 
@@ -472,6 +485,8 @@ Das System läuft als ein Docker-Image im kommunalen Rechenzentrum und hält all
 | NFA-23 | Ids sind GUIDs, gespeichert als 16-Byte-Binärwert und zeitlich sortiert erzeugt (UUIDv7). | Muss |
 | NFA-24 | Namen werden nach DIN 5007-2 sortiert (ä = ae, ß = ss, Namensvorsatz zählt nicht), über eine Sortierregel der Datenbank statt einer gespeicherten Hilfsspalte. | Muss |
 | NFA-25 | Je Mandant (vhs) gibt es eine eigene Datenbank. | Muss |
+| NFA-26 | Kommentare zur Spezifikation liegen in einer eigenen Datenbankdatei mit eigener Schemaversion; sie überstehen den Neuaufbau der Hauptdatenbank und werden mit ihr gesichert. | Muss |
+| NFA-27 | Solange es keine Migrationen gibt (Entwicklungsphase), legt das Ausrollen bei einer Schemaänderung die alte Datenbank beiseite, statt sie zu löschen; scheitert der Start, kommen vorige Version und vorige Datenbank automatisch zurück. Vor dem ersten Produktivbetrieb werden Migrationen eingeführt. | Muss |
 
 ## Entscheidungen
 

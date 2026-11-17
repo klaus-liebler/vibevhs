@@ -386,7 +386,7 @@ Die referentielle Integrität bleibt erhalten, weil **nie eine Zeile gelöscht w
 
 ## Integrationskonzept
 
-Jede der 24 Schnittstellen aus der Anforderungsanalyse ist ein Port mit austauschbarer Implementierung. Ausgehende Nachrichten laufen über eine Outbox, sodass kein Versand verloren geht und jeder Versand am Vorgang sichtbar ist. In Stufe 1 schreiben die Mocks realistische Dateien in einen „Postausgang“, den die Verwaltung im System ansehen kann.
+Jede der 28 Schnittstellen aus der Anforderungsanalyse (S-01 bis S-28) ist ein Port mit austauschbarer Implementierung. Ausgehende Nachrichten laufen über eine Outbox, sodass kein Versand verloren geht und jeder Versand am Vorgang sichtbar ist. In Stufe 1 schreiben die Mocks realistische Dateien in einen „Postausgang“, den die Verwaltung im System ansehen kann.
 
 ### Bausteine
 
@@ -414,6 +414,22 @@ Jede der 24 Schnittstellen aus der Anforderungsanalyse ist ein Port mit austausc
 ### Übersetzungslinks und QR-Codes
 
 Jede Mail und jeder Brief erhält beim Erzeugen ein Token. Der Link `/t/{token}` zeigt den Text in der bevorzugten Sprache der Person, wählbar sind weitere Sprachen. Der QR-Code „Translate this letter in your language“ auf Briefen führt zur selben Seite. Übersetzt wird beim ersten Aufruf und zwischengespeichert.
+
+## Hilfe, Dokumentation und Abnahmemodus
+
+Hilfe (`docs/hilfe.md`), Spezifikation und technische Doku werden beim Bauen aus `docs/` in die Anwendung kopiert und dort als
+Markdown dargestellt (Markdig, HTML im Text abgeschaltet, Links nur http(s), mailto, Anker und Seiten der Anwendung). Jedes
+Dokument ist an den Überschriften in Abschnitte zerlegt; daran hängen Inhaltsverzeichnis und Kommentare (FA-160).
+
+- **Kommentare** liegen in einer eigenen SQLite-Datei `kommentare.db` neben der Hauptdatenbank, mit eigener Schemaversion
+  (`PRAGMA user_version`) statt Neuaufbau: Die Hauptdatenbank darf in der Entwicklungsphase beim Ausrollen neu entstehen
+  (NFA-27), die Kommentare nicht (NFA-26). Verfasser und Abschnittstitel stehen als Text darin, weil sich Benutzer-Ids und
+  Überschriften ändern können. Die tägliche Sicherung und das Ausrollen sichern die Datei mit.
+- **Impressum** ist ein Feld der Einrichtung (Markdown), öffentlich unter `/impressum` (FA-159).
+- **Geführte Touren** (QA-57) sind Daten (`wwwroot/touren/abnahme.json`), keine Codeänderung an den Seiten: Ein Skript
+  (`tour.js`, CSP-konform) findet das Ziel über sichtbaren Text oder Feldbeschriftung, zeigt die Sprechblase und schaltet
+  weiter, sobald geklickt oder eingetragen wurde; der Stand überdauert Seitenwechsel (sessionStorage). Ein Tourprüfer
+  (`tests/Touren/tourpruefung.mjs`) spielt alle Touren im Headless-Browser durch und meldet Schritte, deren Ziel fehlt.
 
 ## Testkonzept
 
@@ -465,6 +481,7 @@ Alle vorgeschlagenen Bibliotheken sind frei für eine Kommune nutzbar (MIT, Apac
 | xUnit, Shouldly, Verify, Bogus | Tests, Snapshot-Tests, Testdaten | Apache 2.0 / BSD / MIT / MIT |
 | Playwright für .NET, axe-core | End-to-End- und Barrierefreiheitstests | Apache 2.0 / MPL 2.0 |
 | Mailpit | Mail-Postfach für Entwicklung und Mocks | MIT |
+| Markdig | Hilfe, Spezifikation und Impressum als Markdown darstellen | BSD-2 |
 
 **Bewusst nicht verwendet:**
 

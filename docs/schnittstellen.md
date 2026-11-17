@@ -1,8 +1,8 @@
 # Schnittstellen nach außen – geplant und Stand
 
-Übersicht aller Verbindungen von VibeVHS zu anderen Systemen. Nummern **S-01 … S-24** wie in der
-[Anforderungsanalyse](https://claude.ai/artifact/5zHT9KccZeiUj1xS1BmKNG) (Abschnitt Schnittstellen); Einträge ohne Nummer
-sind später dazugekommen. Stand: 17.11.2026.
+Übersicht aller Verbindungen von VibeVHS zu anderen Systemen. Nummern **S-01 … S-28** wie in der
+[Anforderungsanalyse](spezifikation/anforderungen.md#schnittstellen) (Abschnitt Schnittstellen); Einträge ohne Nummer sind
+Datei-Übergaben ohne eigene Schnittstelle. Stand: 17.11.2026.
 
 **Stand-Begriffe**
 
@@ -25,7 +25,7 @@ Protokoll enthalten keine Personendaten (Pseudonyme). Zugangsdaten nur als Umgeb
 |---|---|---|---|---|---|
 | S-19 | **E-Mail** | Bestätigungen, Erinnerungen, Absagen, Rechnungen/Mahnungen (PDF), Konto-Bestätigung (Double-Opt-in) | aus | SMTP über das Mail-Relay der Kommune; ICS- und PDF-Anhänge, Übersetzungslink in jeder Mail | **Mock** (`IZustellKanal`, Kanal `EMail`; Mails nur im Postausgang) |
 | S-19 | **SMS** | kurzfristige Ausfälle, Raumänderungen | aus | SMS-Gateway (Anbieter offen) | **vorbereitet** – Nummern mit Dienst „SMS“ und Einwilligung je Kanal/Zweck vorhanden, kein Kanal-Adapter |
-| – | **Messenger** (Signal, WhatsApp) | wie SMS, für Teilnehmende ohne Mailroutine (z. B. Integrationskurse) | aus | Business-API des Dienstes; Datenschutz/Auftragsverarbeitung **vorher klären** | **vorbereitet** – Nummern mit Dienst (Signal/WhatsApp) und Einwilligung „Messenger“ vorhanden |
+| S-25 | **Messenger** (Signal, WhatsApp) | wie SMS, für Teilnehmende ohne Mailroutine (z. B. Integrationskurse) | aus | Business-API des Dienstes; Datenschutz/Auftragsverarbeitung **vorher klären** | **vorbereitet** – Nummern mit Dienst (Signal/WhatsApp) und Einwilligung „Messenger“ vorhanden |
 | S-20 | **Übersetzungsdienst** | „Diese Nachricht in Ihrer Sprache lesen“ (Mail), QR-Code „Translate this letter“ (Brief), Hilfe im Portal | aus | DeepL API oder LibreTranslate (selbst betrieben) | **Mock** (`IUebersetzer`, `IUebersetzungslinks`; Zielseite zeigt Platzhalter) |
 | S-21 | **Druck und Hybridpost** | Briefe in großer Menge (Bescheinigungen, Mahnungen, Programmversand) | aus | PDF-Stapel an Druckstraße der Kommune oder Hybridpost-Dienstleister | **konzeptionell** – Einzelbriefe als PDF mit QR-Code umgesetzt |
 | S-23 | **Kalender** | Termine für Dozierende und Teilnehmende | aus | iCalendar (ICS): Abo-Adresse mit widerrufbarem Token, Einzeltermin, Mail-Anhang | **umgesetzt** (ICS); Exchange/Raumbuchung **konzeptionell** |
@@ -52,8 +52,8 @@ Protokoll enthalten keine Personendaten (Pseudonyme). Zugangsdaten nur als Umgeb
 | S-03 | **Finanzsoftware der Kämmerei** (SAP, Infoma, H+H u. a.) | Buchungen, Personenkonten; Zahlungseingänge zurück | aus / ein | CSV, XML oder Hersteller-API | **Mock** – Buchungsstapel als CSV im Postausgang; **Sachkonten mit der Kämmerei klären** |
 | S-22 | **DMS / E-Akte** | Archivierung von Verträgen, Bescheinigungen, Briefen | aus | CMIS oder Hersteller-API | **konzeptionell** – internes Dokumentarchiv mit SHA-256 umgesetzt |
 | S-24 | **Gebäudetechnik und Raumanzeige** | Raumanzeige, Schließsystem, Heizung nach Belegung | aus | REST, Webseite | **konzeptionell** |
-| – | **Virenscanner** | Prüfung hochgeladener Dateien (Dozierenden-Unterlagen, Nachweise) | aus | z. B. ClamAV (clamd) der Kommune | **Mock** (`IVirenpruefung`, erkennt EICAR) |
-| – | **Datensicherung extern** | fortlaufende Kopie der Datenbank außerhalb des Servers | aus | Litestream → S3-kompatibler Speicher des Rechenzentrums | **vorbereitet** – Vorlage `deploy/server/litestream`; tägliche lokale Sicherung umgesetzt |
+| S-26 | **Virenscanner** | Prüfung hochgeladener Dateien (Dozierenden-Unterlagen, Nachweise) | aus | z. B. ClamAV (clamd) der Kommune | **Mock** (`IVirenpruefung`, erkennt EICAR) |
+| S-28 | **Datensicherung extern** | fortlaufende Kopie der Datenbank außerhalb des Servers | aus | Litestream → S3-kompatibler Speicher des Rechenzentrums | **vorbereitet** – Vorlage `deploy/server/litestream`; tägliche lokale Sicherung umgesetzt |
 
 ## 4. Finanzen und Bank
 
@@ -78,7 +78,7 @@ Protokoll enthalten keine Personendaten (Pseudonyme). Zugangsdaten nur als Umgeb
 
 | Nr. | Schnittstelle | Zweck | Richtung | Format / Technik | Stand |
 |---|---|---|---|---|---|
-| – | **Geokodierung** | Entfernung Wohnort ↔ Kursort (BAMF-Fahrtkosten ab 3 km), Wegbeschreibung | aus | Geodienst (Anbieter offen) | **Mock** (`IGeokodierer`) |
+| S-27 | **Geokodierung** | Entfernung Wohnort ↔ Kursort (BAMF-Fahrtkosten ab 3 km), Wegbeschreibung | aus | Geodienst (Anbieter offen) | **Mock** (`IGeokodierer`) |
 
 ## Offen und abzuklären
 

@@ -108,7 +108,7 @@ internal static class DatenmodellBeschreibung
         ["Benutzerkonten"] = ("System", "Anmeldekonten; Name nur bei Funktionskonten, sonst aus der Person."),
         ["BenutzerkontoRollen"] = ("System", "Rollen eines Kontos (die erste ist beim Anmelden aktiv)."),
         ["BenutzerkontoFachbereiche"] = ("System", "Zuständige Fachbereiche eines Kontos."),
-        ["Einrichtung"] = ("System", "Briefkopf der Einrichtung (Name, Logo, Website)."),
+        ["Einrichtung"] = ("System", "Briefkopf der Einrichtung (Name, Logo, Website) und Impressum."),
         ["EinrichtungOrte"] = ("System", "Orte im Briefkopf."),
         ["Fachbereiche"] = ("System", "Fachbereiche der VHS."),
         ["Vorlagen"] = ("System", "Text- und Mailvorlagen (Anredestil)."),

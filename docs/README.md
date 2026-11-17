@@ -418,6 +418,20 @@ Fachbereichsleitung und Prüfung lesen).
   eigene Daten (E-Mail mit Bestätigung, Einwilligungen, SEPA-Mandat), Auskunft/Löschung als Vorgang, Hilfe in einfacher Sprache.
 - Details: `docs/dozierendenportal.md`.
 
+## Hilfe, Dokumentation und Abnahmemodus (I10, FA-159, FA-160, QA-56, QA-57)
+
+- **Hilfe** `/hilfe` für alle Verwaltungsrollen (`docs/hilfe.md`): Aufbau, Grundprinzipien, Abläufe Schritt für Schritt,
+  mit Inhaltsverzeichnis; Link oben rechts und in der Navigation.
+- **Impressum** `/impressum` ohne Anmeldung, verlinkt in allen Fußzeilen; Text unter Einstellungen → Einrichtung (Markdown),
+  bis dahin ein deutlich markierter Platzhalter.
+- **Dokumentation** `/dokumentation` (Leitung, Verwaltungsleitung, Systemverwaltung): Spezifikation und technische Doku aus
+  `docs/` mit **Kommentaren je Abschnitt** (Antworten, offen/erledigt, Übersicht „Alle Kommentare“, Export
+  `/dokumentation/kommentare.md`). Kommentare liegen in `kommentare.db` und überstehen den Neuaufbau der Testdatenbank.
+- **Abnahme- und Schulungsmodus** (`Abnahmemodus:Aktiv`, in Entwicklung und Testsystem an): zwölf geführte Touren nach dem
+  Abnahme-Drehbuch auf der Hilfeseite; Sprechblasen zeigen Klicks und Eingaben direkt an der Oberfläche, Kontowechsel
+  inklusive. `node tests/Touren/tourpruefung.mjs http://localhost:5199` spielt alle Touren durch.
+- **Ausrollen** mit `deploy.ps1 -DbNeu`, wenn sich das Schema geändert hat (siehe `deploy/server/README-server.md`).
+
 ## Testbenutzer der Pilot-VHS
 
 Die Startdaten liegen in [`tools/Testdaten/testbenutzer-vhs-egs.json`](../tools/Testdaten/testbenutzer-vhs-egs.json)

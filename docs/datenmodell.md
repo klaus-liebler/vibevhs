@@ -653,7 +653,7 @@ erDiagram
 - [BenutzerkontoFachbereiche](#benutzerkontofachbereiche) – Zuständige Fachbereiche eines Kontos.
 - [BenutzerkontoRollen](#benutzerkontorollen) – Rollen eines Kontos (die erste ist beim Anmelden aktiv).
 - [Dateien](#dateien) – Gespeicherte Dateien (Inhalt, Virenprüfung).
-- [Einrichtung](#einrichtung) – Briefkopf der Einrichtung (Name, Logo, Website).
+- [Einrichtung](#einrichtung) – Briefkopf der Einrichtung (Name, Logo, Website) und Impressum.
 - [EinrichtungOrte](#einrichtungorte) – Orte im Briefkopf.
 - [Fachbereiche](#fachbereiche) – Fachbereiche der VHS.
 - [Loeschlaeufe](#loeschlaeufe) – Löschläufe mit Vier-Augen-Freigabe.
@@ -2542,7 +2542,7 @@ Klasse: `VibeVHS.Domain.Portal.Datei`
 
 ## Einrichtung
 
-Briefkopf der Einrichtung (Name, Logo, Website). (Bereich: System)
+Briefkopf der Einrichtung (Name, Logo, Website) und Impressum. (Bereich: System)
 
 Klasse: `VibeVHS.Domain.Stammdaten.Einrichtung`
 
@@ -2550,6 +2550,7 @@ Klasse: `VibeVHS.Domain.Stammdaten.Einrichtung`
 |---|---|---|---|---|
 | Id | INTEGER | ja | PK |  |
 | Bundesland | TEXT(50) | ja |  |  |
+| Impressum | TEXT(8000) |  |  |  |
 | Kurzname | TEXT(50) | ja |  |  |
 | Logo | BLOB |  |  |  |
 | Name | TEXT(200) | ja |  |  |

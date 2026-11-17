@@ -33,5 +33,7 @@ public static class DatenbankInitialisierung
 
         var modus = await db.Database.SqlQueryRaw<string>("PRAGMA journal_mode=WAL").ToListAsync(abbruch);
         log.LogInformation("Datenbank {Datei} bereit, Journal-Modus {Modus}", datei, modus.FirstOrDefault());
+
+        await Dokumentation.KommentarDbContext.InitialisierenAsync(dienste, abbruch);
     }
 }

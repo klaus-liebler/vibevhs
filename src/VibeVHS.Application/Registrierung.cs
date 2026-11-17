@@ -26,6 +26,7 @@ public static class Registrierung
         dienste.AddScoped<Datenschutz.DatenschutzDienst>();
         dienste.AddSingleton<Stammdaten.Briefkopf>();
         dienste.AddScoped<Stammdaten.EinrichtungDienst>();
+        dienste.AddScoped<Dokumentation.KommentarDienst>();
         dienste.AddScoped<Sicherheit.Benutzerverwaltung>();
         dienste.AddScoped<Anmeldung.AnmeldungDienst>();
         dienste.AddScoped<Durchfuehrung.Termincodes>();

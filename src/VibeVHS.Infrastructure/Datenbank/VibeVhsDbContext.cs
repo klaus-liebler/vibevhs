@@ -289,6 +289,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(e => e.Kurzname).HasMaxLength(50);
             b.Property(e => e.Bundesland).HasMaxLength(50);
             b.Property(e => e.Website).HasMaxLength(200);
+            b.Property(e => e.Impressum).HasMaxLength(VibeVHS.Domain.Stammdaten.Einrichtung.ImpressumMaxZeichen);
             b.FeldAlsTabelle<VibeVHS.Domain.Stammdaten.Einrichtung, Listenwert<string>>("_orte", nameof(VibeVHS.Domain.Stammdaten.Einrichtung.Orte), "EinrichtungOrte", "EinrichtungId", 100);
         });
 

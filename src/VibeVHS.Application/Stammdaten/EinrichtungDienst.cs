@@ -55,12 +55,22 @@ public sealed class EinrichtungDienst(IEinrichtungAendern speicher, Briefkopf br
         briefkopf.Uebernehmen(e);
     }
 
+    /// <summary>Impressum (Markdown) für die öffentliche Seite /impressum; leer = Platzhalter.</summary>
+    public async Task ImpressumSetzenAsync(string? text, CancellationToken abbruch = default)
+    {
+        var e = await LadenAsync(abbruch);
+        e.ImpressumSetzen(text);
+        await protokoll.ProtokollierenAsync("Einrichtung.Impressum",
+            e.Impressum is null ? "Impressum geleert (Platzhalter)" : $"Impressum gespeichert ({e.Impressum.Length} Zeichen)", abbruch: abbruch);
+        await speicher.SpeichernAsync(abbruch);
+    }
+
     private async Task<Einrichtung> LadenAsync(CancellationToken abbruch)
     {
         var wer = await benutzer.ErmittelnAsync(abbruch);
         if (wer.Rolle is not { } r || !Rollen.Contains(r))
         {
-            throw new InvalidOperationException("Logo und Website pflegen Systemverwaltung und Leitung.");
+            throw new InvalidOperationException("Logo, Website und Impressum pflegen Systemverwaltung und Leitung.");
         }
 
         return await speicher.EinrichtungZumAendernAsync(abbruch) ?? throw new InvalidOperationException("Es ist noch keine Einrichtung angelegt.");

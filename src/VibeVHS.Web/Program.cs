@@ -71,6 +71,8 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<BenutzerKontext>();
 builder.Services.AddScoped<IAktuellerBenutzer, AktuellerBenutzer>();
 builder.Services.AddScoped<Vorgang>();
+// Hilfe, Spezifikation und Doku (docs/**/*.md, beim Bauen nach Dokumentation/ kopiert).
+builder.Services.AddSingleton<VibeVHS.Web.Dokumentation.Dokumentkatalog>(_ => new());
 
 // Handy-Test im lokalen Netz (Profil "lan"): HTTPS auf allen Schnittstellen, öffentliche Adresse = LAN-IP.
 VibeVHS.Web.LanBetrieb.Einrichten(builder);
@@ -131,6 +133,12 @@ try
 catch (DatenbankschemaVeraltetException fehler)
 {
     // Entwicklungsphase ohne Migrationen: klare Meldung statt Absturz mit unverständlichen SQL-Fehlern.
+    app.Logger.LogCritical("{Meldung}", fehler.Message);
+    Console.Error.WriteLine(fehler.Message);
+    return 2;
+}
+catch (VibeVHS.Infrastructure.Dokumentation.KommentarSchemaException fehler)
+{
     app.Logger.LogCritical("{Meldung}", fehler.Message);
     Console.Error.WriteLine(fehler.Message);
     return 2;
@@ -343,6 +351,19 @@ app.MapGet("/postausgang/{id:guid}/anhang", async (Guid id, VibeVHS.Application.
     await speicher.LadenAsync(id) is { AnhangName: { } name, AnhangInhalt: { } inhalt } n
         ? Results.File(System.Text.Encoding.UTF8.GetBytes(inhalt), n.AnhangTyp ?? "application/octet-stream", name)
         : Results.NotFound()).RequireAuthorization();
+
+// Kommentare zu Spezifikation und Doku als Markdown (zum Einarbeiten); Rechte prüft der Dienst.
+app.MapGet("/dokumentation/kommentare.md", async (VibeVHS.Application.Dokumentation.KommentarDienst kommentare) =>
+{
+    try
+    {
+        return Results.File(System.Text.Encoding.UTF8.GetBytes(await kommentare.AlsMarkdownAsync()), "text/markdown; charset=utf-8", "kommentare-vibevhs.md");
+    }
+    catch (InvalidOperationException)
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+}).RequireAuthorization();
 
 // Excel-Export der Personenliste mit den aktuellen Filtern. Jeder Export wird protokolliert (DSGVO).
 app.MapGet("/personen/export", async (string? suche, string? rolle, string? status, int? fb, bool? dubletten,

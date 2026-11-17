@@ -1,0 +1,62 @@
+@page "/hilfe"
+@using VibeVHS.Application.Dokumentation
+@using VibeVHS.Web.Dokumentation
+@inject Vorgang Vorgang
+@inject Dokumentkatalog Katalog
+@inject IConfiguration Konfiguration
+
+@* Hilfe zur Bedienung (docs/hilfe.md) für alle Verwaltungsrollen; im Test- und Schulungsbetrieb mit geführten Touren. *@
+
+<PageTitle>Hilfe · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Hilfe</h1>
+        <p class="vhs-sub">Wie VibeVHS funktioniert – Grundprinzipien und die wichtigsten Abläufe Schritt für Schritt.</p>
+    </div>
+    @if (dokuRecht.Erlaubt)
+    {
+        <div class="vhs-row"><a class="vhs-small" href="dokumentation">Spezifikation und Doku →</a></div>
+    }
+</div>
+
+@if (Konfiguration.GetValue("Abnahmemodus:Aktiv", false))
+{
+    <section class="vhs-card" id="touren">
+        <div class="vhs-head">
+            <div>
+                <h2>Abnahme- und Schulungsmodus</h2>
+                <p class="vhs-sub">Geführte Touren nach dem Abnahme-Drehbuch: Sprechblasen zeigen direkt an der Oberfläche, was als Nächstes
+                    anzuklicken oder einzutragen ist, und gehen weiter, sobald Sie es getan haben. Jederzeit „Zurück“, „Weiter“ oder „Beenden“.</p>
+            </div>
+        </div>
+        <div class="vhs-touren" data-touren-liste>
+            <noscript><div class="vhs-alert vhs-warn">Die Touren brauchen JavaScript.</div></noscript>
+            <p class="vhs-small vhs-muted" data-touren-laden>Touren werden geladen …</p>
+        </div>
+        <p class="vhs-small vhs-muted">Die Touren arbeiten mit den Demodaten des Testsystems. Moderation: Zeiten und Beobachtungen
+            notieren wie im <a href="@(dokuRecht.Erlaubt ? "dokumentation/doku/abnahme-a" : "hilfe#abnahme")">Abnahme-Drehbuch</a>.</p>
+    </section>
+}
+
+@if (abschnitte is null)
+{
+    <div class="vhs-alert vhs-warn">Die Hilfedatei fehlt in dieser Auslieferung (docs/hilfe.md).</div>
+}
+else
+{
+    <DokumentAnsicht Dokument="@hilfe" Abschnitte="@abschnitte" Kommentieren="@dokuRecht.Erlaubt" />
+}
+
+@code {
+    private readonly Dokument hilfe = Dokumentkatalog.Finden(Dokumentkatalog.Hilfe)!;
+    private IReadOnlyList<Abschnitt>? abschnitte;
+    private Freigabe dokuRecht = Freigabe.Ja;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        dokuRecht = Freigabe.NurFuer(rolle, KommentarDienst.Rollen);
+        abschnitte = Katalog.Laden(hilfe, rolle);
+    }
+}

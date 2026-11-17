@@ -45,6 +45,11 @@ if [[ -f "$DB" ]]; then
     ziel="/var/backups/vibevhs/vor-update-$(date +%Y%m%d-%H%M%S).db"
     sqlite3 "$DB" ".backup '$ziel'" && chown vibevhs:vibevhs "$ziel" && ok "Datenbank gesichert: $ziel"
 fi
+# Kommentare zu Spezifikation/Doku (eigene Datei, wird von --db-neu nie angefasst) ebenfalls sichern
+if [[ -f /var/lib/vibevhs/kommentare.db ]]; then
+    ziel="/var/backups/vibevhs/vor-update-$(date +%Y%m%d-%H%M%S)-kommentare.db"
+    sqlite3 /var/lib/vibevhs/kommentare.db ".backup '$ziel'" && chown vibevhs:vibevhs "$ziel" && ok "Kommentare gesichert: $ziel"
+fi
 
 systemctl stop vibevhs 2>/dev/null || true
 

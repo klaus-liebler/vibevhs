@@ -48,6 +48,22 @@ public static class Registrierung
         return verbindung;
     }
 
+    /// <summary>
+    /// Verbindung der Kommentar-Datenbank: ConnectionStrings:Kommentare, sonst „kommentare.db“ im Verzeichnis der (ersten)
+    /// Hauptdatenbank; liegt diese im Arbeitsspeicher, unter data/ im Basisverzeichnis.
+    /// </summary>
+    public static string KommentarVerbindung(IConfiguration konfiguration, string hauptverbindung, string basisVerzeichnis)
+    {
+        if (konfiguration.GetConnectionString("Kommentare") is { Length: > 0 } eigene)
+        {
+            return Datenbankverbindung(eigene, basisVerzeichnis).ToString();
+        }
+
+        var haupt = new SqliteConnectionStringBuilder(hauptverbindung).DataSource;
+        var verzeichnis = haupt == ":memory:" ? Path.Combine(basisVerzeichnis, "data") : Path.GetDirectoryName(Path.GetFullPath(haupt))!;
+        return new SqliteConnectionStringBuilder { DataSource = Path.Combine(verzeichnis, "kommentare.db") }.ToString();
+    }
+
     /// <param name="strengeAbfragepruefung">Abfragen ohne eindeutige Sortierung brechen ab (Entwicklung, Tests) statt nur protokolliert zu werden.</param>
     /// <param name="basisVerzeichnis">Relative Datenbankpfade werden hierzu aufgelöst (Inhaltsverzeichnis der Anwendung).</param>
     public static IServiceCollection AddVibeVhsInfrastruktur(this IServiceCollection dienste, IConfiguration konfiguration,
@@ -70,6 +86,12 @@ public static class Registrierung
         dienste.AddDbContext<VibeVhsDbContext>((d, o) => o.UseSqlite(d.GetRequiredService<Application.Betrieb.Mandantenkontext>().Aktuell.Verbindung,
             s => s.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)).Konfigurieren(strengeAbfragepruefung)
             .AddInterceptors(StichzeitBeimLaden.Instanz));
+
+        // Kommentare zu Spezifikation/Doku: eigene Datei (Standard: kommentare.db neben der Hauptdatenbank), übersteht deren Neuanlage.
+        var kommentarOrt = new Dokumentation.KommentarDatenbankOrt(KommentarVerbindung(konfiguration, mandanten[0].Verbindung, basisVerzeichnis));
+        dienste.AddSingleton(kommentarOrt);
+        dienste.AddDbContext<Dokumentation.KommentarDbContext>(o => o.UseSqlite(kommentarOrt.Verbindung).Konfigurieren(strengeAbfragepruefung));
+        dienste.AddScoped<Application.Dokumentation.IKommentarSpeicher, Dokumentation.KommentarSpeicher>();
 
         dienste.AddScoped<IPersonenSpeicher, PersonenSpeicher>();
         dienste.AddScoped<INachrichtenSpeicher, NachrichtenSpeicher>();

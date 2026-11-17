@@ -37,6 +37,7 @@ deploy/server               Bereitstellungs-Kit (nur Branch deploy-vorbereitung)
 dotnet build VibeVHS.slnx                                    # TreatWarningsAsErrors
 dotnet test --project tests/VibeVHS.Web.Tests [--filter-class "*Name*"]
 node tests/Shop.Komponente/komponententest.mjs http://localhost:5199
+node tests/Touren/tourpruefung.mjs http://localhost:5199 [tour-id …]   # geführte Touren durchspielen (Hinweise = Schritte mit Vorarbeit)
 ```
 
 Läuft Klaus' Instanz (sperrt `src/VibeVHS.Web/bin`), mit eigenem Ausgabeordner bauen/testen: `--artifacts-path <temp>`.
@@ -52,6 +53,13 @@ Eigene Testinstanz: Port **5199**, eigene Datenbank (`ConnectionStrings__VibeVHS
 - Server liebler.iui.hs-osnabrueck.de: **Änderungen nur nach Klaus' Go je Schritt**; jeden ssh-Befehl vorher in
   `deploy/server/protokoll/<datum>-*.md` eintragen (Befehl wörtlich, gekürzte Ausgabe, Geheimnisse geschwärzt).
 - Berichte und Oberfläche auf Deutsch.
+- **Spezifikation und Umsetzung synchron halten:** Was in einer Sitzung entschieden oder gebaut wird (neue Funktionen,
+  geänderte Abläufe, Betriebsregeln, auch Erkenntnisse aus dem Chat), fließt im selben Commit in `docs/spezifikation/`
+  ein (siehe unten). Kommentare aus der App (Verwaltung → Dokumentation → Alle Kommentare, Export
+  `/dokumentation/kommentare.md`) einarbeiten und dort als erledigt markieren.
+- **Auf fraktionperfekt übertragen:** Was hier entsteht (Funktionen, Betriebs-/Deploy-Werkzeuge, Regeln), inhaltlich
+  angepasst auch in `C:\repos\fraktionperfekt` umsetzen (dort gelten dessen eigene Regeln, z. B. EF-Migrationen statt
+  Neuaufbau der Datenbank). Je Übertragung kurz festhalten, was übernommen und was bewusst weggelassen wurde.
 - Spezifikation liegt in `docs/spezifikation/` und ist führend; bei fachlichen Änderungen die betroffene Spezifikationsdatei im selben Commit mitpflegen (FA-/NFA-Nummern nie neu vergeben).
 
 ## Konventionen
@@ -88,7 +96,10 @@ Anmeldung, Durchführung (Anwesenheit, Check-in per QR, Bescheinigungen, Briefe)
 Finanzen/GoBD (Rechnungen, SEPA, Mahnwesen, Honorare, XRechnung), Integrationskurse (BAMF), Betrieb (Sicherung, Import, Auswertungen),
 Webshop (API, Web-Komponente, TYPO3), Kurs-QR/Schnellanmeldung, Dozierenden- und Teilnehmendenportal.
 
-Zuletzt (Funde aus Klaus' Test):
+Zuletzt (17.11.2026): Hilfe, Impressum, Dokumentation mit Kommentaren (`kommentare.db`), Abnahme-/Schulungsmodus mit Touren
+(`wwwroot/touren/abnahme.json`, `tour.js`), `deploy.ps1 -DbNeu`, Schnittstellenübersicht `docs/schnittstellen.md`.
+
+Davor (Funde aus Klaus' Test):
 - Startseite: Zähler-Badges, geordneter Startabgleich, „Heute automatisch erledigt“ gruppiert
 - „Zurück zur gefilterten Liste“, Kurs-QR-Bogen mit Logo, Logo und Website als Einstellung
 - Benutzerverwaltung (Einstellungen → Benutzer)

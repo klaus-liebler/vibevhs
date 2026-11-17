@@ -1,0 +1,50 @@
+@page "/impressum"
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@layout LeeresLayout
+@using VibeVHS.Application.Stammdaten
+@using VibeVHS.Domain.Stammdaten
+@using VibeVHS.Web.Dokumentation
+@inject IServiceScopeFactory Bereiche
+
+@* Öffentliches Impressum (ohne Anmeldung). Inhalt: Einstellungen → Einrichtung → Impressum (Markdown). *@
+
+<PageTitle>Impressum · @(einrichtung?.Name ?? "Volkshochschule")</PageTitle>
+
+<div class="vhs-login vhs-impressum">
+    <div class="vhs-brand"><b>Impressum</b><span>@einrichtung?.Name</span></div>
+    @if (html is null)
+    {
+        <div class="vhs-alert vhs-warn" role="note">
+            <b>Platzhalter – Impressum noch nicht gepflegt.</b><br />
+            Die Angaben nach § 5 DDG (Anbieter, Anschrift, Vertretungsberechtigte, Kontakt, ggf. Aufsichtsbehörde und
+            Umsatzsteuer-Identifikationsnummer, inhaltlich Verantwortliche) trägt die Leitung oder Systemverwaltung unter
+            <b>Einstellungen → Einrichtung → Impressum</b> ein.
+        </div>
+        @if (einrichtung is not null)
+        {
+            <p>@einrichtung.Name<br />@einrichtung.OrteAnzeige</p>
+            @if (einrichtung.Website is { } web)
+            {
+                <p><a href="@(web.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? web : "https://" + web)" rel="noopener">@web</a></p>
+            }
+        }
+    }
+    else
+    {
+        <div class="vhs-doku-text">@((MarkupString)html)</div>
+    }
+    <p class="vhs-small vhs-muted"><a href="">Zur Anwendung</a></p>
+</div>
+
+@code {
+    private Einrichtung? einrichtung;
+    private string? html;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var bereich = Bereiche.CreateAsyncScope();
+        einrichtung = await bereich.ServiceProvider.GetRequiredService<IStammdaten>().EinrichtungAsync();
+        html = einrichtung?.Impressum is { Length: > 0 } text ? MarkdownDarstellung.AlsHtml(text) : null;
+    }
+}

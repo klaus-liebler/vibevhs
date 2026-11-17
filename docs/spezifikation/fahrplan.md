@@ -59,7 +59,7 @@ flowchart LR
 ```
 
 *Richtwert etwa zwei Wochen je Iteration, Neuschätzung nach Iteration 1. Später ergänzt: I2a Datenschutz (vorgezogen, nach I2) und
-I9 Webshop (nach I8), siehe Arbeitspakete.*
+I9 Webshop (nach I8) und I10 Hilfe, Dokumentation und Abnahmemodus (vor Abnahme A auf dem Testsystem), siehe Arbeitspakete.*
 
 Nach Abnahme C folgt der Pilotbetrieb. Danach werden die Portale (Stufen 2 und 3) und die echten Schnittstellen (Stufe 4) geplant.
 
@@ -80,6 +80,7 @@ Jede Iteration endet mit etwas, das die Verwaltung anklicken kann. Die Dauer ist
 | I7 Integrationskurse | Module, Berechtigungen, Kostenbefreiung, UE-Anwesenheit, Abrechnung, Fahrtkosten, Prüfungen, BAMF-Mock, Identitätsprüfung (Ausweisprüfung ohne Kopie, Lichtbild für Sichtvergleich beim Check-in, Aufgabe bei Zweifel) | Abrechnung eines Integrationskurses | FA-40 bis FA-44, FA-134 bis FA-137 |
 | I8 Betrieb und Daten | Dashboard, Auswertungen mit Export, Statistik-Mock, Litestream-Sicherung, Last- und Sicherheitstest, Import von Altdaten aus KuferSQL-Exporten | Pilotsystem mit übernommenen Daten | FA-50 bis FA-52, NFA-02 bis NFA-09 |
 | I9 Webshop | Öffentliche Buchungs-API (/api/v1/shop), TYPO3-Extension vibevhs\_shop mit Delta-Abgleich, Web-Komponente \<vhs-kurse>, Gastbuchung und Konto über OIDC; siehe Konzept „Buchungs-Shop-Plugin“ | Kurs auf einer TYPO3-Testseite finden und buchen, Bestätigung im Postausgang | Portal-Anforderungen (Endausbau), Buchungsrechte |
+| I10 Hilfe, Doku, Abnahmemodus | Hilfe zur Bedienung, Impressum (pflegbar), Spezifikation und Doku in der Anwendung mit Kommentaren je Abschnitt (eigene Datei), geführte Touren nach dem Abnahme-Drehbuch mit automatischer Tourprüfung; Ausrollen mit Neuaufbau der Testdatenbank (`deploy.ps1 -DbNeu`) | Abnahme-Aufgabe als Tour durchklicken, Kommentar zur Spezifikation schreiben und exportieren | FA-159, FA-160, QA-56, QA-57, NFA-26, NFA-27 |
 
 ## Projektstruktur und Arbeitsweise
 

@@ -132,6 +132,55 @@ public class BetriebTests
     }
 
     [Fact]
+    public async Task Sicherung_nimmt_die_Kommentar_Datenbank_mit_und_raeumt_sie_mit_auf()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var ordner = Path.Combine(Path.GetTempPath(), $"vibevhs-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(ordner);
+        var uhr = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 11, 15, 1, 30, 0, TimeSpan.FromHours(1)));
+        try
+        {
+            var cs = new SqliteConnectionStringBuilder { DataSource = Path.Combine(ordner, "vibevhs.db"), Pooling = false }.ToString();
+            await using var db = new VibeVhsDbContext(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite(cs).Konfigurieren(streng: true).Options);
+            await Schema.AnlegenOderPruefenAsync(db, cs, ct);
+            var kommentarDatei = Path.Combine(ordner, "kommentare.db");
+            await using (var k = new VibeVHS.Infrastructure.Dokumentation.KommentarDbContext(new DbContextOptionsBuilder<VibeVHS.Infrastructure.Dokumentation.KommentarDbContext>()
+                             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = kommentarDatei, Pooling = false }.ToString()).Options))
+            {
+                await k.Database.EnsureCreatedAsync(ct);
+                k.Kommentare.Add(new VibeVHS.Domain.Dokumentation.Kommentar("hilfe", "", "", "gesichert?", "x", "X", null, uhr.GetUtcNow()));
+                await k.SaveChangesAsync(ct);
+            }
+
+            var konfig = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Sicherung:Behalten"] = "1" }).Build();
+            var b = new TestBenutzer(System);
+            var sicherung = new SqliteSicherung(db, konfig, new AuditProtokoll(db, b, uhr), b, uhr,
+                new VibeVHS.Infrastructure.Dokumentation.KommentarDatenbankOrt($"Data Source={kommentarDatei}"));
+
+            var erste = await sicherung.SichernAsync(ct);
+            var kopie = Path.Combine(ordner, "sicherung", SqliteSicherung.KommentarDatei(erste.Datei));
+            File.Exists(kopie).ShouldBeTrue();
+            await using (var pruef = new SqliteConnection($"Data Source={kopie};Pooling=False"))
+            {
+                await pruef.OpenAsync(ct);
+                await using var cmd = pruef.CreateCommand();
+                cmd.CommandText = "SELECT Text FROM Kommentare";
+                (await cmd.ExecuteScalarAsync(ct)).ShouldBe("gesichert?");
+            }
+
+            uhr.Advance(TimeSpan.FromDays(1));
+            var zweite = await sicherung.SichernAsync(ct);
+            File.Exists(kopie).ShouldBeFalse(); // mit der alten Hauptsicherung aufgeräumt (Behalten = 1)
+            File.Exists(Path.Combine(ordner, "sicherung", SqliteSicherung.KommentarDatei(zweite.Datei))).ShouldBeTrue();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            try { Directory.Delete(ordner, true); } catch (IOException) { /* Temp räumt auf */ }
+        }
+    }
+
+    [Fact]
     public async Task Sicherung_mit_Pruefsumme_Wiederherstellungstest_und_Aufbewahrung()
     {
         var ct = TestContext.Current.CancellationToken;

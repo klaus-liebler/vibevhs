@@ -17,7 +17,7 @@
                 <div class="vhs-grp">@gruppe.Key</div>
                 @foreach (var punkt in gruppe)
                 {
-                    @if (punkt.Gesperrt is { } grund)
+                    @if ((punkt.Gesperrt ?? GesperrtFuerRolle(punkt)) is { } grund)
                     {
                         <span class="vhs-why vhs-nav-off" tabindex="0" data-why="@grund" aria-disabled="true">@punkt.Titel</span>
                     }
@@ -28,7 +28,7 @@
                 }
             }
         </nav>
-        <div class="vhs-foot">Phase B · bis Iteration 9<br />Entwicklungsstand, Mock-Anbindungen</div>
+        <div class="vhs-foot">Phase B · bis Iteration 9<br />Entwicklungsstand, Mock-Anbindungen<br /><a href="impressum">Impressum</a></div>
     </aside>
     <div class="vhs-main">
         <header class="vhs-top">
@@ -60,6 +60,7 @@
                         {
                             <span class="vhs-why" tabindex="0" data-why="Ihrem Konto ist nur diese eine Rolle zugeordnet.">Rolle <b>@benutzer?.Rolle?.Anzeigename()</b></span>
                         }
+                        <a href="hilfe" class="vhs-link" title="Bedienung, Abläufe Schritt für Schritt, geführte Touren">Hilfe</a>
                         <a href="meine-einstellungen" class="vhs-link" title="Wie Sie angesprochen werden (Du/Sie, förmlich/freundlich)">Meine Einstellungen</a>
                         <a href="anmelden" class="vhs-link" title="Mit einem anderen Testkonto anmelden">Konto wechseln</a>
                         <form method="post" action="abmelden" class="vhs-inline">
@@ -92,6 +93,7 @@
         new("Übersicht", "Start", ""),
         new("Übersicht", "Aufgaben", "aufgaben"),
         new("Übersicht", "Dashboard", "dashboard"),
+        new("Übersicht", "Hilfe", "hilfe"),
         new("Programm", "Kurse", "kurse"),
         new("Programm", "Raumplan", "raumplan"),
         new("Programm", "Orte", "orte"),
@@ -111,12 +113,21 @@
         new("Verwaltung", "Import", "import"),
         new("Verwaltung", "Betrieb", "betrieb"),
         new("Verwaltung", "Einstellungen", "einstellungen"),
+        new("Verwaltung", "Dokumentation", "dokumentation"),
     ];
 
     private Einrichtung? einrichtung;
+    private Freigabe dokuRecht = Freigabe.Ja;
+
+    // Spezifikation und Kommentare nur für Leitung, Verwaltungsleitung, Systemverwaltung (Dienst prüft erneut).
+    private string? GesperrtFuerRolle(Navigationspunkt punkt)
+        => punkt.Ziel == "dokumentation" && !dokuRecht.Erlaubt ? dokuRecht.Begruendung : null;
 
     private string AktuellerPfad => Navigation.ToBaseRelativePath(Navigation.Uri);
 
     protected override async Task OnInitializedAsync()
-        => einrichtung = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IStammdaten>().EinrichtungAsync());
+    {
+        einrichtung = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IStammdaten>().EinrichtungAsync());
+        dokuRecht = Freigabe.NurFuer((await Vorgang.BenutzerAsync()).Rolle, VibeVHS.Application.Dokumentation.KommentarDienst.Rollen);
+    }
 }

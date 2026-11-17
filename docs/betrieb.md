@@ -10,6 +10,9 @@
   „wiederherstellen“, öffnen, `PRAGMA integrity_check` (mit registrierter Collation), Schemaversion mit der laufenden Datenbank vergleichen,
   Zeilen der Kerntabellen zählen. Das Ergebnis steht im Protokoll und auf der Seite **Betrieb**.
 - Es bleiben die letzten `Sicherung:Behalten` (Standard 14) Sicherungen. `Sicherung:Aktiv=false` schaltet den Job ab.
+- Die **Kommentar-Datenbank** `kommentare.db` (Kommentare zu Spezifikation und Doku, eigene Datei neben der Hauptdatenbank,
+  `ConnectionStrings:Kommentare`) wird bei jeder Sicherung als `kommentare-JJJJMMTT-HHMMSS.db` mitgesichert und mit der
+  Hauptsicherung aufgeräumt.
 - **Wichtig:** Der Sicherungsordner liegt standardmäßig auf demselben Datenträger. Für echten Schutz den Ordner auf
   ein anderes Laufwerk oder Netzlaufwerk legen bzw. ihn von der Dateisicherung des Rechenzentrums erfassen lassen.
 
@@ -69,7 +72,13 @@ Zeit mit Migrationen), bricht der Start mit einer klaren Meldung ab:
 > Datenbankschema veraltet (…: Version …, erwartet …). Bitte die Datenbankdatei löschen oder beiseitelegen und die Anwendung neu starten –
 > sie wird dann neu aus Start- und Demodaten aufgebaut.
 
-Dann die Datei `data/vibevhs.db` (mit `-wal` und `-shm`) löschen oder umbenennen und neu starten.
+Dann die Datei `data/vibevhs.db` (mit `-wal` und `-shm`) löschen oder umbenennen und neu starten. Auf dem Testsystem erledigt das
+`deploy\server\deploy.ps1 -DbNeu` (Datei nach `/var/lib/vibevhs/beiseite/`, bei Fehlstart automatisch zurück; siehe
+`deploy/server/README-server.md`).
+
+**Ausnahme `kommentare.db`:** Diese Datei wird nie gelöscht oder beiseitegelegt (Kommentare von Leitung und Systemverwaltung).
+Sie hat eine eigene Schemaversion (`PRAGMA user_version`, `KommentarDbContext.Schemaversion`); passt sie nicht, bricht der Start
+mit dem Hinweis ab, die Datei per Skript anzupassen.
 
 **Vor dem ersten Produktivbetrieb werden wieder EF-Migrationen eingeführt** (Anfangsmigration aus dem dann aktuellen Modell, Sichten und
 Collation-Index per SQL in der Migration), damit Daten bei Updates erhalten bleiben.

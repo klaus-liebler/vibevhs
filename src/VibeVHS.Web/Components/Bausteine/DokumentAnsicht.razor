@@ -1,0 +1,193 @@
+@using VibeVHS.Application.Dokumentation
+@using VibeVHS.Domain.Dokumentation
+@using VibeVHS.Domain.Gemeinsam
+@using VibeVHS.Web.Dokumentation
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+
+@* Dokument mit Inhaltsverzeichnis; für Leitung/Verwaltungsleitung/Systemverwaltung Kommentare je Abschnitt (eigene Datei kommentare.db). *@
+
+<div class="vhs-doku">
+    <nav class="vhs-doku-toc" aria-label="Inhalt">
+        <div class="vhs-grp">Inhalt</div>
+        @foreach (var a in Abschnitte.Where(InInhaltsverzeichnis))
+        {
+            var (gesamt, offenAnzahl) = Zaehlen(a.Id);
+            <a class="vhs-doku-e@(a.Ebene)" href="@($"{Dokument.Adresse}#{a.Id}")">
+                @a.Titel
+                @if (gesamt > 0)
+                {
+                    <span class="vhs-pill @(offenAnzahl > 0 ? "vhs-p-warn" : "vhs-p-neutral")" title="@($"{gesamt} Kommentar(e), {offenAnzahl} offen")">@gesamt</span>
+                }
+            </a>
+        }
+    </nav>
+
+    <article class="vhs-doku-text">
+        @foreach (var a in Abschnitte)
+        {
+            @if (a.Ebene > 0)
+            {
+                <div class="vhs-doku-kopf">
+                    @((MarkupString)$"<h{a.Ebene + 1} id=\"{System.Net.WebUtility.HtmlEncode(a.Id)}\">{a.TitelHtml}</h{a.Ebene + 1}>")
+                    @if (kommentieren)
+                    {
+                        var (gesamt, offenAnzahl) = Zaehlen(a.Id);
+                        <button type="button" class="vhs-doku-knopf @(gesamt > 0 ? "hat" : "")" aria-expanded="@(offen == a.Id)"
+                                title="Kommentare zu „@a.Titel“ (@gesamt, davon @offenAnzahl offen)" @onclick="() => Umschalten(a.Id)">
+                            <RadzenIcon Icon="chat_bubble_outline" />
+                            @(gesamt == 0 ? "Kommentieren" : offenAnzahl > 0 ? $"{gesamt} · {offenAnzahl} offen" : $"{gesamt} · erledigt")
+                        </button>
+                    }
+                </div>
+            }
+
+            @if (kommentieren && offen == a.Id)
+            {
+                <section class="vhs-kommentare" aria-label="Kommentare zu @a.Titel">
+                    @foreach (var f in Faeden(a.Id))
+                    {
+                        <div class="vhs-kommentar @(f.Start.Erledigt ? "erledigt" : "")">
+                            <div class="vhs-kommentar-kopf">
+                                <b>@f.Start.VerfasstVonName</b>
+                                <span class="vhs-muted vhs-small">@f.Start.VerfasstVonRolle · @Zeitzone.Ortszeit(f.Start.Am).ToString("dd.MM.yyyy HH:mm")</span>
+                                @if (f.Start.Erledigt)
+                                {
+                                    <StatusPille Stil="gut">erledigt</StatusPille>
+                                    <span class="vhs-small vhs-muted">von @f.Start.ErledigtVonName</span>
+                                }
+                                <span class="vhs-grow"></span>
+                                <button type="button" class="vhs-linkbutton" @onclick="() => ErledigtAsync(f.Start, !f.Start.Erledigt)">
+                                    @(f.Start.Erledigt ? "wieder öffnen" : "als erledigt markieren")
+                                </button>
+                            </div>
+                            <p class="vhs-kommentar-text">@f.Start.Text</p>
+                            @foreach (var antwort in f.Antworten)
+                            {
+                                <div class="vhs-kommentar-antwort">
+                                    <div class="vhs-kommentar-kopf"><b>@antwort.VerfasstVonName</b>
+                                        <span class="vhs-muted vhs-small">@antwort.VerfasstVonRolle · @Zeitzone.Ortszeit(antwort.Am).ToString("dd.MM.yyyy HH:mm")</span></div>
+                                    <p class="vhs-kommentar-text">@antwort.Text</p>
+                                </div>
+                            }
+                            <div class="vhs-row">
+                                @{ var fadenId = f.Start.Id; }
+                                <textarea class="vhs-textarea" rows="2" maxlength="@Kommentar.TextMaxZeichen" placeholder="Antworten …" aria-label="Antwort"
+                                          value="@antworten.GetValueOrDefault(fadenId)" @oninput="e => antworten[fadenId] = e.Value?.ToString()"></textarea>
+                                <RadzenButton Text="Antworten" Size="ButtonSize.Small" Variant="Variant.Outlined" IsBusy="@speichert"
+                                              Disabled="@string.IsNullOrWhiteSpace(antworten.GetValueOrDefault(f.Start.Id))"
+                                              Click="@(() => SchreibenAsync(a, antworten.GetValueOrDefault(f.Start.Id), f.Start.Id))" />
+                            </div>
+                        </div>
+                    }
+                    <div class="vhs-kommentar-neu">
+                        <label for="@($"neu-{a.Id}")" class="vhs-small vhs-muted">Neuer Kommentar zu „@a.Titel“</label>
+                        <textarea id="@($"neu-{a.Id}")" class="vhs-textarea" rows="3" maxlength="@Kommentar.TextMaxZeichen"
+                                  placeholder="Was fehlt, ist falsch oder unklar? Was soll anders werden?" @bind="neuerText" @bind:event="oninput"></textarea>
+                        <div class="vhs-row">
+                            <RadzenButton Text="Kommentar speichern" Icon="send" Size="ButtonSize.Small" IsBusy="@speichert"
+                                          Disabled="@string.IsNullOrWhiteSpace(neuerText)" Click="@(() => SchreibenAsync(a, neuerText, null))" />
+                            <button type="button" class="vhs-linkbutton" @onclick="() => offen = null">schließen</button>
+                        </div>
+                    </div>
+                </section>
+            }
+
+            @((MarkupString)a.InhaltHtml)
+        }
+    </article>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public Dokument Dokument { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<Abschnitt> Abschnitte { get; set; } = [];
+
+    /// <summary>Kommentarfunktion zeigen (nur für die Rollen aus <see cref="KommentarDienst.Rollen"/>; der Dienst prüft erneut).</summary>
+    [Parameter]
+    public bool Kommentieren { get; set; }
+
+    private bool kommentieren;
+    private IReadOnlyDictionary<string, IReadOnlyList<Kommentarfaden>> faeden = new Dictionary<string, IReadOnlyList<Kommentarfaden>>();
+    private string? offen;
+    private string? neuerText;
+    private readonly Dictionary<Guid, string?> antworten = [];
+    private bool speichert;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        kommentieren = Kommentieren;
+        if (kommentieren)
+        {
+            await LadenAsync();
+        }
+    }
+
+    private bool InInhaltsverzeichnis(Abschnitt a)
+        => a.Ebene is 2 or 3 || (a.Ebene == 1 && Abschnitte.Count(x => x.Ebene == 1) > 1);
+
+    private IReadOnlyList<Kommentarfaden> Faeden(string abschnitt) => faeden.GetValueOrDefault(abschnitt) ?? [];
+
+    private (int Gesamt, int Offen) Zaehlen(string abschnitt)
+    {
+        var liste = Faeden(abschnitt);
+        return (liste.Count, liste.Count(f => !f.Start.Erledigt));
+    }
+
+    private void Umschalten(string abschnitt)
+    {
+        offen = offen == abschnitt ? null : abschnitt;
+        neuerText = null;
+    }
+
+    private async Task LadenAsync()
+        => faeden = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<KommentarDienst>().ZuDokumentAsync(Dokument.Schluessel));
+
+    private async Task SchreibenAsync(Abschnitt a, string? text, Guid? antwortAuf)
+    {
+        if (string.IsNullOrWhiteSpace(text) || speichert)
+        {
+            return;
+        }
+
+        speichert = true;
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<KommentarDienst>().SchreibenAsync(Dokument.Schluessel, a.Id, a.Titel, text, antwortAuf));
+            if (antwortAuf is { } id)
+            {
+                antworten.Remove(id);
+            }
+            else
+            {
+                neuerText = null;
+            }
+
+            await LadenAsync();
+            Hinweise.Notify(NotificationSeverity.Success, "Kommentar", antwortAuf is null ? "Kommentar gespeichert." : "Antwort gespeichert.");
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Kommentar", ex.Message);
+        }
+        finally
+        {
+            speichert = false;
+        }
+    }
+
+    private async Task ErledigtAsync(Kommentar k, bool erledigt)
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<KommentarDienst>().ErledigtSetzenAsync(k.Id, erledigt));
+            await LadenAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Kommentar", ex.Message);
+        }
+    }
+}
