@@ -31,7 +31,7 @@
             <a class="vhs-btn vhs-btn-light" href="@($"kurse/qr/{Uri.EscapeDataString(kurs.Kursnummer)}.svg")" download title="Vektorgrafik für den Druck">SVG</a>
         }
         <BegruendeterButton Text="Veröffentlichen" Icon="public" Freigabe="@VeroeffentlichenFreigabe" Click="@(() => StatusAsync(Kursstatus.Veroeffentlicht))" />
-        <BegruendeterButton Text="Absagen" Icon="cancel" ButtonStyle="ButtonStyle.Light" Freigabe="@AbsagenFreigabe" Click="@(() => StatusAsync(Kursstatus.Abgesagt))" />
+        <BegruendeterButton Text="Absagen …" Icon="cancel" ButtonStyle="ButtonStyle.Light" Freigabe="@AbsagenFreigabe" Click="@(() => { absageOffen = true; absageGrund = null; })" />
     </div>
 </div>
 
@@ -43,6 +43,29 @@
 }
 
 <NaechsteSchritte Titel="Wie geht es weiter?" Schritte="@folgeschritte" />
+
+@if (absageOffen && kurs.Status != Kursstatus.Abgesagt)
+{
+    @* Absage mit Bestätigung und Grund; derselbe Dienst wie bei der Aufgabe „absagen oder durchführen?“ *@
+    var offeneBelegungen = teilnehmende.Count(t => t.Belegung.Offen);
+    var kuenftigeTermine = kurs.Veranstaltungen.Count(v => !v.Ausgefallen && v.Beginn >= Uhr.GetLocalNow().DateTime);
+    <section class="vhs-card vhs-einschub" id="kurs-absagen" aria-labelledby="h-absagen">
+        <div class="vhs-head"><h2 id="h-absagen">Kurs absagen</h2></div>
+        <div class="vhs-alert vhs-warn" role="note">
+            <b>@offeneBelegungen</b> offene Belegung(en) (Angemeldete, Warteliste, Nachrückangebote) werden ohne Gebühr aufgehoben;
+            die Personen bekommen eine Absage per Mail mit Übersetzungslink. <b>@kuenftigeTermine</b> künftige Termin(e) fallen aus.
+            Bereits gestellte Rechnungen werden im nächsten Rechnungslauf storniert. Die Absage lässt sich nicht zurücknehmen.
+        </div>
+        <label for="absage-grund" class="vhs-small"><b>Grund für die Teilnehmenden *</b> (steht in der Absage)</label>
+        <textarea id="absage-grund" class="vhs-textarea" rows="2" maxlength="300" @bind="absageGrund" @bind:event="oninput"
+                  placeholder="z. B. Mindestteilnehmerzahl nicht erreicht · Kursleitung erkrankt"></textarea>
+        <div class="vhs-row">
+            <BegruendeterButton Text="Absagen und Teilnehmende benachrichtigen" Icon="cancel" ButtonStyle="ButtonStyle.Danger" IsBusy="@absageLaeuft"
+                                Freigabe="@AbsageBestaetigenFreigabe" Click="AbsagenAsync" />
+            <RadzenButton Text="Abbrechen" ButtonStyle="ButtonStyle.Light" Click="@(() => absageOffen = false)" />
+        </div>
+    </section>
+}
 
 @if (nachrichtTermin is { } nt)
 {
@@ -470,6 +493,35 @@
 
     private Freigabe AbsagenFreigabe => Planen.Und(() => kurs!.Status == Kursstatus.Abgesagt ? Freigabe.Nein("Der Kurs ist bereits abgesagt.") : Freigabe.Ja);
 
+    private bool absageOffen;
+    private string? absageGrund;
+    private bool absageLaeuft;
+
+    private Freigabe AbsageBestaetigenFreigabe => AbsagenFreigabe.Und(() => string.IsNullOrWhiteSpace(absageGrund)
+        ? Freigabe.Nein("Bitte zuerst einen Grund eingeben – er steht in der Absage an die Teilnehmenden.")
+        : Freigabe.Ja);
+
+    private async Task AbsagenAsync()
+    {
+        absageLaeuft = true;
+        try
+        {
+            var n = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Anmeldung.AnmeldungDienst>().KursAbsagenAsync(Id, absageGrund!.Trim()));
+            absageOffen = false;
+            await LadenAsync();
+            Hinweise.Notify(NotificationSeverity.Success, "Kurs abgesagt", n == 0 ? "Es gab keine offenen Belegungen." : $"{n} Absage(n) liegen im Postausgang.");
+            folgeschritte = [new("Postausgang ansehen", "postausgang", "Absagen mit Übersetzungslink", Hauptschritt: n > 0), new("Raumplan ansehen", "raumplan"), new("Protokoll ansehen", "protokoll")];
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht abgesagt", ex.Message);
+        }
+        finally
+        {
+            absageLaeuft = false;
+        }
+    }
+
     private Freigabe AendernFreigabe => Planen.Und(() =>
         !TimeOnly.TryParse(aBeginn, out _) ? Freigabe.Nein("Beginn bitte als hh:mm eingeben.")
         : modus != "zusatz" && gewaehlt is null ? Freigabe.Nein("Bitte unten den Termin anklicken, der geändert werden soll.")
@@ -616,8 +668,6 @@
     {
         await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().StatusSetzenAsync(Id, status));
         await LadenAsync();
-        folgeschritte = status == Kursstatus.Abgesagt
-            ? [new("Teilnehmende umbuchen oder abmelden", $"kurse/{Id}", "Je Belegung: Umbuchungsvorschläge oder kostenlose Abmeldung (Kurs abgesagt)", Hauptschritt: true)]
-            : [new("Person anmelden", $"anmeldung?kurs={Id}", Hauptschritt: true), new("Zur Kursliste", "kurse")];
+        folgeschritte = [new("Person anmelden", $"anmeldung?kurs={Id}", Hauptschritt: true), new("Zur Kursliste", "kurse")];
     }
 }

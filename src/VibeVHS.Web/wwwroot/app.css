@@ -304,7 +304,8 @@ a.vhs-chip { text-decoration: none; display: inline-flex; align-items: center; }
 .vhs-foot a { color: var(--vhs-muted); }
 
 /* Mehrzeilige Eingabe (Kommentare, Impressum) */
-.vhs-textarea { font: inherit; width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid var(--vhs-line); border-radius: 8px; background: var(--vhs-surface); color: var(--vhs-fg); resize: vertical; flex: 1 1 260px; }
+.vhs-textarea { font: inherit; width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid var(--vhs-line); border-radius: 8px; background: var(--vhs-surface); color: var(--vhs-fg); resize: vertical; }
+.vhs-row > .vhs-textarea { flex: 1 1 260px; }
 .vhs-textarea:focus { outline: 2px solid var(--vhs-accent); outline-offset: 1px; }
 .vhs-textarea.vhs-mono { font-family: var(--vhs-mono); }
 

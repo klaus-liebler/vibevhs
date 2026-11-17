@@ -596,12 +596,12 @@
       "kontoName": "Varvara Schatz",
       "richtzeit": "5 min",
       "beschreibung": "Unterbelegten Kurs absagen; Absagen an alle, Termine fallen aus.",
-      "abschluss": "Der Kurs ist abgesagt. Bei einer Absage über die Aufgabe benachrichtigt VibeVHS alle Teilnehmenden automatisch (mit Übersetzungslink).",
+      "abschluss": "Der Kurs ist abgesagt, alle Teilnehmenden haben eine Absage mit Grund und Übersetzungslink, künftige Termine fallen aus.",
       "start": "kurse",
       "schritte": [
         {
           "seite": "kurse",
-          "text": "Der übliche Weg: Auf der Startseite liegt die Aufgabe **„26H-703 Gesund kochen mit wenig Geld: … absagen oder durchführen?“** – nach **Übernehmen** führt ihr Titel zur Entscheidung, und bei Absage gehen die Nachrichten an alle Teilnehmenden automatisch raus. Gibt es die Aufgabe gerade nicht, gehen wir über die Kursliste: Suchen Sie **26H-703**.",
+          "text": "Der übliche Weg: Auf der Startseite liegt die Aufgabe **„26H-703 Gesund kochen mit wenig Geld: … absagen oder durchführen?“** – nach **Übernehmen** führt ihr Titel zur Entscheidung. Gibt es die Aufgabe gerade nicht, geht es über die Kursseite: Suchen Sie **26H-703**.",
           "ziel": {
             "css": "input[aria-label='Kurse suchen']"
           },
@@ -619,24 +619,37 @@
         },
         {
           "seite": "kurse/",
-          "text": "Zu wenige Anmeldungen: Klicken Sie auf **Absagen**. Achtung: Auf der Kursseite wirkt das **sofort** (ohne Rückfrage).",
+          "text": "Zu wenige Anmeldungen: Klicken Sie auf **Absagen …**.",
           "ziel": {
             "text": "Absagen",
-            "in": "main",
-            "genau": true
+            "in": "main .vhs-head"
           },
           "weiter": "klick",
           "bedingt": "Kurs noch nicht abgesagt (frische Testdaten)"
         },
         {
           "seite": "kurse/",
-          "text": "Als nächster Schritt erscheint **Teilnehmende umbuchen oder abmelden**: je Belegung ein Umbuchungsvorschlag oder die kostenlose Abmeldung. Künftige Termine fallen aus. Danach „Weiter“.",
-          "weiter": "knopf"
+          "text": "Die Bestätigung nennt, wie viele Personen und Termine betroffen sind. Tragen Sie den **Grund** ein, z. B. **Mindestteilnehmerzahl nicht erreicht** – er steht in der Absage.",
+          "ziel": {
+            "feld": "Grund für die Teilnehmenden"
+          },
+          "weiter": "eingabe",
+          "wert": "Mindestteilnehmerzahl nicht erreicht",
+          "bedingt": "Kurs noch nicht abgesagt (frische Testdaten)"
         },
         {
-          "text": "Der Statuswechsel steht im **Protokoll**.",
+          "seite": "kurse/",
+          "text": "Jetzt **Absagen und Teilnehmende benachrichtigen**. (Ohne Grund ist der Knopf gesperrt – der Hinweis sagt warum.)",
           "ziel": {
-            "text": "Protokoll",
+            "text": "Absagen und Teilnehmende benachrichtigen"
+          },
+          "weiter": "klick",
+          "bedingt": "Kurs noch nicht abgesagt (frische Testdaten)"
+        },
+        {
+          "text": "Prüfen Sie den **Postausgang**: die Absagen an alle Teilnehmenden, mit Grund und Übersetzungslink.",
+          "ziel": {
+            "text": "Postausgang",
             "in": ".vhs-nav"
           },
           "weiter": "klick"

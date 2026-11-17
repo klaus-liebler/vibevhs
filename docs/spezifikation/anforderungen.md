@@ -142,6 +142,7 @@ Der Katalog umfasst 58 Anforderungen. Muss-Anforderungen bilden das MVP, Soll fo
 | FA-05 | Planungsansicht (Tag/Woche/Semester) mit Drag and Drop | Soll | KuferSQL |
 | FA-06 | Kursstatus-Workflow: Entwurf, freigegeben, veröffentlicht, läuft, abgeschlossen, abgesagt | Muss | Praxis |
 | FA-07 | Mindestteilnehmerzahl-Prüfung X Tage vor Beginn mit Vorschlag „absagen oder durchführen“ | Muss | Praxis |
+| FA-161 | Einen Kurs absagen geht nur mit Bestätigung und Grund – über die Aufgabe „absagen oder durchführen?“ oder auf der Kursseite. Dabei fallen künftige Termine aus, offene Belegungen (auch Warteliste und Nachrückangebote) werden ohne Gebühr aufgehoben und alle Betroffenen per Mail mit Übersetzungslink benachrichtigt; die Bestätigung nennt vorher, wie viele Personen und Termine betroffen sind. Einen Statuswechsel auf „abgesagt“ ohne diese Schritte gibt es nicht. | Muss | Abnahme-Vorbereitung |
 | FA-08 | Export für Programmheft und Website aus einer Datenquelle | Soll | KuferSQL |
 | FA-10 | Personenverwaltung ohne Dubletten: Abgleich nach Name, Geburtsdatum, E-Mail, Telefon, mit Zusammenführung | Muss | KuferSQL |
 | FA-11 | Anmeldung am Tresen in max. 3 Schritten (Person suchen/anlegen, Kurs wählen, Zahlart) | Muss | Vorgabe |

@@ -249,8 +249,15 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
         await speicher.SpeichernAsync(abbruch);
     }
 
+    /// <remarks>Absagen geht nur über <see cref="Anmeldung.AnmeldungDienst.KursAbsagenAsync"/> (Grund, Belegungen aufheben,
+    /// Teilnehmende benachrichtigen) – ein stiller Statuswechsel ließe Angemeldete ohne Nachricht zurück.</remarks>
     public async Task StatusSetzenAsync(Guid kursId, Kursstatus status, CancellationToken abbruch = default)
     {
+        if (status == Kursstatus.Abgesagt)
+        {
+            throw new InvalidOperationException("Einen Kurs bitte über „Absagen“ mit Grund absagen – dabei werden alle Teilnehmenden benachrichtigt.");
+        }
+
         var kurs = await KursAsync(kursId, abbruch);
         kurs.StatusSetzen(status);
         await protokoll.ProtokollierenAsync("Kurs.Status", $"{kurs.Kursnummer}: Status {KursAnzeige.Status(status)}", nameof(Kurs), kursId, abbruch: abbruch);

@@ -138,6 +138,8 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
   - Absagen ist erst nach „Übernehmen“ möglich (Tooltip).
   - Alle Teilnehmenden bekommen eine Absage mit Übersetzungslink; künftige Termine fallen aus; die Aufgabe ist erledigt.
   - Im Rechnungslauf werden bereits gestellte Rechnungen storniert.
+  - Gibt es die Aufgabe nicht: auf der Kursseite **Absagen …** – die Bestätigung nennt betroffene Personen und Termine
+    und verlangt einen Grund; ohne Grund ist „Absagen und Teilnehmende benachrichtigen“ gesperrt (Tooltip).
 - **Zeit:** ____ min · **Beobachtungen:**
 
   &nbsp;

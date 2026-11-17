@@ -141,8 +141,9 @@ der Name geändert, stellt **Neu ausstellen** eine neue Fassung aus.
 **Absagen** oder **Trotz Unterbelegung durchführen**. Bei Absage bekommen alle Teilnehmenden eine Nachricht mit
 Übersetzungslink, künftige Termine fallen aus, bereits gestellte Rechnungen werden im nächsten Rechnungslauf storniert.
 
-Der Knopf **Absagen** auf der Kursseite wirkt dagegen sofort und setzt nur den Status; danach bietet VibeVHS
-**Teilnehmende umbuchen oder abmelden** an. Für Absagen wegen Unterbelegung daher den Weg über die Aufgabe nehmen.
+Ohne Aufgabe (z. B. bei Krankheit der Kursleitung) geht es auf der Kursseite über **Absagen …**: VibeVHS zeigt, wie viele
+Personen und Termine betroffen sind, und fragt nach dem **Grund** – er steht in der Absage an die Teilnehmenden. Erst mit
+Grund lässt sich **Absagen und Teilnehmende benachrichtigen** klicken; die Wirkung ist dieselbe wie über die Aufgabe.
 
 ### Rechnung stornieren
 
