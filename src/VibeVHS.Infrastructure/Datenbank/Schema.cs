@@ -82,7 +82,7 @@ public static class Schema
         return typ == typeof(Guid)
             ? $"lower(substr(hex({s}),1,8)||'-'||substr(hex({s}),9,4)||'-'||substr(hex({s}),13,4)||'-'||substr(hex({s}),17,4)||'-'||substr(hex({s}),21,12))"
             : typ == typeof(DateOnly)
-                ? $"CASE WHEN {s} IS NULL THEN NULL ELSE printf('%04d-%02d-%02d', {s} / 10000, {s} / 100 % 100, {s} % 100) END"
+                ? $"CASE WHEN {s} IS NULL THEN NULL WHEN {s} = {Speicherformate.Offen} THEN 'offen' ELSE printf('%04d-%02d-%02d', {s} / 10000, {s} / 100 % 100, {s} % 100) END"
                 : typ == typeof(DateTimeOffset) || typ == typeof(DateTime)
                     ? Zeitpunkt(s)
                     : s;

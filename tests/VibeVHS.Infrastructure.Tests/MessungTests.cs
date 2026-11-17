@@ -136,6 +136,14 @@ public sealed class MessungTests
         await Messen("davon: alle Termine ohne Orte (Projektion)", async db => _ = await db.Veranstaltungen.AsNoTracking().Select(v => new { v.Id, v.KursId, v.Beginn, v.Ende, v.DozentId }).ToListAsync(ct));
         await Messen("Kursliste der Oberfläche (alle Kurse des Semesters, Kennzahlen)", async db =>
             _ = await new ProgrammSpeicher(db).KurseAsync(new VibeVHS.Application.Programm.KursFilter(), ct));
+        await Messen("Kursliste der Oberfläche: erster Block (50, Keyset) + Zähler der Filter-Chips", async db =>
+        {
+            var sp = new ProgrammSpeicher(db);
+            _ = await sp.KurszahlenAsync(new VibeVHS.Application.Programm.KursFilter(), ct);
+            _ = await sp.KurseAsync(new VibeVHS.Application.Programm.KursFilter(Anzahl: 50), ct);
+        });
+        await Messen("Kursliste: Folgeblock (Keyset)", async db =>
+            _ = await new ProgrammSpeicher(db).KurseAsync(new VibeVHS.Application.Programm.KursFilter(NachKursnummer: "26H-0500", Anzahl: 50), ct));
         await Messen("Raumplan einer Woche", async db => _ = await new ProgrammSpeicher(db).TermineAsync(jetzt.Date, jetzt.Date.AddDays(7), ct));
         await Messen("Rundschreiben-Empfänger (alle Teilnehmenden)", async db =>
         {
@@ -179,7 +187,7 @@ public sealed class MessungTests
         }
 
         ergebnisse.Add(($"Dateigröße (MB, nach Checkpoint)", new FileInfo(datei).Length / 1024.0 / 1024.0));
-        var zeilen = string.Join("\n", ergebnisse.Select(e => $"| {e.Name} | {e.Median:0} ms |"));
+        var zeilen = string.Join("\n", ergebnisse.Select(e => $"| {e.Name} | {e.Median:0} {(e.Name.StartsWith("Dateigröße", StringComparison.Ordinal) ? "MB" : "ms")} |"));
         var bericht = $"MESSUNG {anzahl} Personen, {kurse} Kurse (Aufbau {aufbau.Elapsed.TotalSeconds:0} s)\n{zeilen}\nPLAN\n{string.Join("\n", plaene)}";
         File.WriteAllText(Path.Combine(Path.GetTempPath(), $"vibevhs-messung-{anzahl}.txt"), bericht);
         TestContext.Current.SendDiagnosticMessage(bericht);

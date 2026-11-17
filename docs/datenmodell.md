@@ -849,7 +849,7 @@ Klasse: `VibeVHS.Domain.Personen.AdressKennzeichen`
 | GueltigVon | INTEGER | ja | Index |  |
 | PersonId | BLOB | ja | → Personen, Index |  |
 
-Indizes: `IX_PersonAdressKennzeichen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonAdressKennzeichen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonAdressKennzeichen_PersonId_GueltigVon` (PersonId, GueltigVon)
+Indizes: `IX_PersonAdressKennzeichen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonAdressKennzeichen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonAdressKennzeichen_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
 
 ## PersonAdressen
 
@@ -873,7 +873,7 @@ Klasse: `VibeVHS.Domain.Personen.Postadresse`
 | Strasse | TEXT(200) | ja |  |  |
 | Zusatz | TEXT(200) |  |  |  |
 
-Indizes: `IX_PersonAdressen_AdressId` (AdressId); `IX_PersonAdressen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonAdressen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonAdressen_PersonId_GueltigVon` (PersonId, GueltigVon)
+Indizes: `IX_PersonAdressen_AdressId` (AdressId); `IX_PersonAdressen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonAdressen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonAdressen_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
 
 ## PersonEMails
 
@@ -895,7 +895,7 @@ Klasse: `VibeVHS.Domain.Personen.EMailAdresse`
 | GueltigVon | INTEGER | ja | Index |  |
 | PersonId | BLOB | ja | → Personen, Index |  |
 
-Indizes: `IX_PersonEMails_AdressId` (AdressId); `IX_PersonEMails_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonEMails_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonEMails_PersonId_GueltigVon` (PersonId, GueltigVon)
+Indizes: `IX_PersonEMails_AdressId` (AdressId); `IX_PersonEMails_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonEMails_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonEMails_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
 
 ## PersonEinwilligungen
 
@@ -916,7 +916,7 @@ Klasse: `VibeVHS.Domain.Personen.Einwilligung`
 | PersonId | BLOB | ja | → Personen, Index |  |
 | Zweck | TEXT(40) | ja |  |  |
 
-Indizes: `IX_PersonEinwilligungen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonEinwilligungen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonEinwilligungen_PersonId_GueltigVon` (PersonId, GueltigVon)
+Indizes: `IX_PersonEinwilligungen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonEinwilligungen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonEinwilligungen_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
 
 ## PersonFachbereiche
 
@@ -950,7 +950,7 @@ Klasse: `VibeVHS.Domain.Personen.PersonMerkmal`
 | Inhalt | TEXT(200) | ja |  |  |
 | PersonId | BLOB | ja | → Personen, Index |  |
 
-Indizes: `IX_PersonMerkmale_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonMerkmale_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonMerkmale_PersonId_GueltigVon` (PersonId, GueltigVon)
+Indizes: `IX_PersonMerkmale_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonMerkmale_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonMerkmale_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
 
 ## PersonNamen
 
@@ -972,7 +972,7 @@ Klasse: `VibeVHS.Domain.Personen.PersonName`
 | Vorsatz | TEXT(30) | ja |  |  |
 | Zusatz | TEXT(20) | ja |  |  |
 
-Indizes: `IX_PersonNamen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonNamen_PersonId_GueltigVon` (PersonId, GueltigVon); `IX_PersonNamen_Sortierung` (ErsetztDurchVorgangId, Nachname COLLATE DIN5007_2, Vorname COLLATE DIN5007_2)
+Indizes: `IX_PersonNamen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonNamen_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon); `IX_PersonNamen_Sortierung` (ErsetztDurchVorgangId, Nachname COLLATE DIN5007_2, Vorname COLLATE DIN5007_2)
 
 ## PersonOrganisationen
 
@@ -992,7 +992,7 @@ Klasse: `VibeVHS.Domain.Personen.Organisationszugehoerigkeit`
 | OrganisationId | BLOB | ja | → Organisationen, Index |  |
 | PersonId | BLOB | ja | → Personen, Index |  |
 
-Indizes: `IX_PersonOrganisationen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonOrganisationen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonOrganisationen_OrganisationId` (OrganisationId); `IX_PersonOrganisationen_PersonId_GueltigVon` (PersonId, GueltigVon)
+Indizes: `IX_PersonOrganisationen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonOrganisationen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonOrganisationen_OrganisationId` (OrganisationId); `IX_PersonOrganisationen_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
 
 ## PersonQualifikationen
 
@@ -1015,7 +1015,7 @@ Klasse: `VibeVHS.Domain.Personen.PersonQualifikation`
 | Schluessel | TEXT(40) | ja |  |  |
 | WertText | TEXT(200) |  |  |  |
 
-Indizes: `IX_PersonQualifikationen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonQualifikationen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonQualifikationen_PersonId_GueltigVon` (PersonId, GueltigVon)
+Indizes: `IX_PersonQualifikationen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonQualifikationen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonQualifikationen_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
 
 ## PersonRufnummern
 
@@ -1039,7 +1039,7 @@ Klasse: `VibeVHS.Domain.Personen.Rufnummer`
 | NummerId | BLOB | ja | Index |  |
 | PersonId | BLOB | ja | → Personen, Index |  |
 
-Indizes: `IX_PersonRufnummern_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonRufnummern_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonRufnummern_NummerId` (NummerId); `IX_PersonRufnummern_PersonId_GueltigVon` (PersonId, GueltigVon)
+Indizes: `IX_PersonRufnummern_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonRufnummern_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonRufnummern_NummerId` (NummerId); `IX_PersonRufnummern_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
 
 ## PersonVollmachten
 
@@ -1052,7 +1052,6 @@ Klasse: `VibeVHS.Domain.Personen.Buchungsvollmacht`
 | Id | BLOB | ja | PK |  |
 | Art | TEXT(40) | ja |  |  |
 | BevollmaechtigterId | BLOB | ja | Index |  |
-| BevollmaechtigterName | TEXT(300) | ja |  |  |
 | ErfasstDurchVorgangId | BLOB | ja | → Aenderungsvorgaenge, Index |  |
 | Erfassungsart | TEXT(40) | ja |  |  |
 | ErsetztDurchVorgangId | BLOB |  | → Aenderungsvorgaenge, Index |  |
@@ -1062,7 +1061,7 @@ Klasse: `VibeVHS.Domain.Personen.Buchungsvollmacht`
 | PersonId | BLOB | ja | → Personen, Index |  |
 | VollmachtId | BLOB | ja |  |  |
 
-Indizes: `IX_PersonVollmachten_BevollmaechtigterId` (BevollmaechtigterId); `IX_PersonVollmachten_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonVollmachten_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonVollmachten_PersonId_GueltigVon` (PersonId, GueltigVon)
+Indizes: `IX_PersonVollmachten_BevollmaechtigterId` (BevollmaechtigterId); `IX_PersonVollmachten_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonVollmachten_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonVollmachten_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
 
 ## Personen
 
@@ -1136,7 +1135,7 @@ Klasse: `VibeVHS.Domain.Programm.KursEntgelt`
 | GueltigVon | INTEGER | ja | Index |  |
 | KursId | BLOB | ja | → Kurse, Index |  |
 
-Indizes: `IX_KursEntgelte_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_KursEntgelte_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_KursEntgelte_KursId_GueltigVon` (KursId, GueltigVon)
+Indizes: `IX_KursEntgelte_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_KursEntgelte_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_KursEntgelte_KursId_Stand` (KursId, ErsetztDurchVorgangId, GueltigVon)
 
 ## KursLehranforderungen
 
@@ -1436,7 +1435,7 @@ Klasse: `VibeVHS.Domain.Programm.OrtMerkmal`
 | Schluessel | TEXT(40) | ja |  |  |
 | WertText | TEXT |  |  |  |
 
-Indizes: `IX_OrtMerkmale_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_OrtMerkmale_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_OrtMerkmale_OrtId_GueltigVon` (OrtId, GueltigVon)
+Indizes: `IX_OrtMerkmale_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_OrtMerkmale_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_OrtMerkmale_OrtId_Stand` (OrtId, ErsetztDurchVorgangId, GueltigVon)
 
 ## Orte
 
@@ -1571,7 +1570,6 @@ Klasse: `VibeVHS.Domain.Anmeldung.Belegung`
 | AngebotBis | INTEGER |  | Index |  |
 | Belegungsart | TEXT(40) | ja |  |  |
 | BevollmaechtigterId | BLOB |  | Index |  |
-| BevollmaechtigterName | TEXT(300) |  |  |  |
 | EntgeltCent | INTEGER | ja |  |  |
 | ErinnertAm | INTEGER |  |  |  |
 | Ermaessigt | INTEGER | ja |  |  |

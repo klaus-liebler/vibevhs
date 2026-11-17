@@ -12,13 +12,23 @@ internal sealed class PersonenSpeicher(VibeVhsDbContext db) : IPersonenSpeicher
 {
     public void Hinzufuegen(Person person) => db.Personen.Add(person);
 
-    public Task<Person?> LadenAsync(Guid id, CancellationToken abbruch = default)
-        => db.Personen.FirstOrDefaultAsync(p => p.Id == id, abbruch);
+    public async Task<Person?> LadenAsync(Guid id, CancellationToken abbruch = default)
+    {
+        var p = await db.Personen.FirstOrDefaultAsync(p => p.Id == id, abbruch);
+        if (p is not null)
+        {
+            await Bevollmaechtigtennamen.ErgaenzenAsync(db, [p], abbruch);
+        }
+
+        return p;
+    }
 
     public async Task<IReadOnlyList<Person>> LadenAsync(IEnumerable<Guid> ids, CancellationToken abbruch = default)
     {
         var liste = ids.ToList();
-        return await db.Personen.Where(p => liste.Contains(p.Id)).ToListAsync(abbruch);
+        var personen = await db.Personen.Where(p => liste.Contains(p.Id)).ToListAsync(abbruch);
+        await Bevollmaechtigtennamen.ErgaenzenAsync(db, personen, abbruch);
+        return personen;
     }
 
     public void AusschlussHinzufuegen(DublettenAusschluss ausschluss) => db.DublettenAusschluesse.Add(ausschluss);

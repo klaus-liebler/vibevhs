@@ -15,8 +15,13 @@ public sealed record HistorienEintrag(
     string ErfasstVon,
     Erfassungsart Art,
     string Grund,
-    DateTimeOffset? ErsetztAm)
+    DateTimeOffset? ErsetztAm,
+    Stammdatenaenderung.Datumskorrektur? Korrektur = null,
+    string? KorrekturBezug = null)
 {
+    /// <summary>Gültigkeitsbeginn/-ende dieses Eintrags kann korrigiert werden (aktueller Stand, Name/Angabe/Adresse/Kennzeichen).</summary>
+    public bool DatumKorrigierbar => Korrektur is not null && !Ersetzt && Art != Erfassungsart.Beendet;
+
     /// <summary>Durch eine spätere Erfassung ersetzt (z. B. Korrektur); wird blass angezeigt.</summary>
     public bool Ersetzt => ErsetztAm is not null;
 
@@ -45,8 +50,16 @@ public static class Datenhistorie
             .Select(x =>
             {
                 var ende = Fortsetzung(x.v, alle);
+                var (korrektur, bezug) = x.v switch
+                {
+                    PersonName => ((Stammdatenaenderung.Datumskorrektur?)Stammdatenaenderung.Datumskorrektur.Name, (string?)null),
+                    PersonMerkmal m => (Stammdatenaenderung.Datumskorrektur.Angabe, m.Art.ToString()),
+                    Postadresse a => (Stammdatenaenderung.Datumskorrektur.Umzug, a.AdressId.ToString()),
+                    AdressKennzeichen k => (Stammdatenaenderung.Datumskorrektur.Kennzeichen, k.Art.ToString()),
+                    _ => (null, null),
+                };
                 return new HistorienEintrag(x.v.Datenart, x.v.Feld, AlterWert(x.v, alle), x.v.Wert, x.v.GueltigVon, ende.GueltigBis,
-                    x.v.ErfasstAm, x.v.ErfasstVon, x.v.Erfassungsart, x.v.Grund, ende.ErsetztAm);
+                    x.v.ErfasstAm, x.v.ErfasstVon, x.v.Erfassungsart, x.v.Grund, ende.ErsetztAm, korrektur, bezug);
             })
             .ToList();
     }

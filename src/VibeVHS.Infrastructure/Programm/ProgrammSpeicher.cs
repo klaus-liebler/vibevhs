@@ -19,7 +19,7 @@ internal sealed class ProgrammSpeicher(VibeVhsDbContext db) : IProgrammSpeicher
     public async Task<IReadOnlyList<Kursart>> KursartenAsync(CancellationToken abbruch = default)
         => await db.Kursarten.AsNoTracking().OrderBy(k => k.Name).ToListAsync(abbruch);
 
-    public async Task<IReadOnlyList<KursZeile>> KurseAsync(KursFilter filter, CancellationToken abbruch = default)
+    private async Task<IQueryable<Kurs>> BasisAsync(KursFilter filter, CancellationToken abbruch)
     {
         var q = db.Kurse.AsNoTracking().IgnoreAutoIncludes().Where(k => (k.ArchiviertAm != null) == filter.Archivierte);
         if (filter.SemesterId is { } s)
@@ -43,8 +43,30 @@ internal sealed class ProgrammSpeicher(VibeVhsDbContext db) : IProgrammSpeicher
             q = q.Where(k => treffer.Contains(k.Id));
         }
 
+        return q;
+    }
+
+    public async Task<Kurszahlen> KurszahlenAsync(KursFilter filter, CancellationToken abbruch = default)
+    {
+        var gesamt = await (await BasisAsync(filter, abbruch)).CountAsync(abbruch);
+        var fb = await (await BasisAsync(filter with { Fachbereich = null }, abbruch)).GroupBy(k => k.Fachbereich)
+            .Select(g => new { g.Key, N = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.N, abbruch);
+        var st = await (await BasisAsync(filter with { Status = null }, abbruch)).GroupBy(k => k.Status)
+            .Select(g => new { g.Key, N = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.N, abbruch);
+        return new Kurszahlen(gesamt, fb, st);
+    }
+
+    public async Task<IReadOnlyList<KursZeile>> KurseAsync(KursFilter filter, CancellationToken abbruch = default)
+    {
+        var q = await BasisAsync(filter, abbruch);
+        if (filter.NachKursnummer is { } nach)
+        {
+            q = q.Where(k => string.Compare(k.Kursnummer, nach) > 0); // Keyset: Kursnummer ist eindeutig
+        }
+
         // Projektion: nur die Spalten der Liste (keine vollständigen Kurse mit Richtlinie, Serie, Team …).
-        var kurse = await q.OrderBy(k => k.Kursnummer).ThenBy(k => k.Id)
+        var sortiert = q.OrderBy(k => k.Kursnummer).ThenBy(k => k.Id);
+        var kurse = await (filter.Anzahl is { } anzahl ? sortiert.Take(anzahl) : sortiert)
             .Select(k => new
             {
                 k.Id, k.Kursnummer, k.Titel, k.Fachbereich, k.Status, k.Sichtbarkeit, k.Umfang, k.SemesterId, k.MaxTeilnehmende, k.ArchiviertAm,
@@ -52,7 +74,8 @@ internal sealed class ProgrammSpeicher(VibeVhsDbContext db) : IProgrammSpeicher
             })
             .ToListAsync(abbruch);
         // Termine und Orte über die Kursabfrage selbst eingeschränkt (Unterabfrage/Join statt langer Id-Listen), nur schmale Spalten.
-        var kursIds = q.Select(k => k.Id);
+        var idListe = kurse.Select(k => k.Id).ToList();
+        var kursIds = filter.Anzahl is null ? q.Select(k => k.Id) : db.Kurse.Where(k => idListe.Contains(k.Id)).Select(k => k.Id);
         var termine = await db.Veranstaltungen.AsNoTracking()
             .Where(v => kursIds.Contains(v.KursId) && !v.Ausgefallen)
             .GroupBy(v => v.KursId)

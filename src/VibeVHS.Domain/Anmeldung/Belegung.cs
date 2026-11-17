@@ -147,7 +147,11 @@ public sealed class Belegung
     /// <summary>Bei Buchung im Auftrag: die bevollmächtigte Person oder Organisation.</summary>
     public Guid? BevollmaechtigterId { get; private set; }
 
+    /// <summary>Heutiger Name der bevollmächtigten Person bzw. Organisation (beim Laden gesetzt, nicht gespeichert).</summary>
     public string? BevollmaechtigterName { get; private set; }
+
+    /// <summary>Namen ergänzen (gebündelt aus Personen bzw. Organisationen gelesen).</summary>
+    public void NameSetzen(string? name) => BevollmaechtigterName = BevollmaechtigterId is null ? null : name;
 
     /// <summary>Die Vollmacht, auf deren Grundlage gebucht wurde.</summary>
     public Guid? VollmachtId { get; private set; }

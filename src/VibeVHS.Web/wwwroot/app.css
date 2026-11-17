@@ -150,6 +150,7 @@ pre.vhs-code { background: var(--vhs-surface-2); border: 1px solid var(--vhs-lin
 .vhs-vliste-kopf, .vhs-vzeile { display: grid; grid-template-columns: minmax(0, 2.4fr) 110px minmax(0, 1fr) minmax(0, 1.3fr) 150px; gap: 12px; align-items: center; padding: 0 10px; }
 .vhs-vliste-kopf { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--vhs-muted); font-weight: 600; padding-bottom: 6px; border-bottom: 1px solid var(--vhs-line); }
 .vhs-vliste { height: min(62vh, 640px); overflow-y: auto; border-bottom: 1px solid var(--vhs-line); }
+.vhs-vliste-kopf.vhs-kursliste, .vhs-vzeile.vhs-kursliste { grid-template-columns: 90px minmax(0, 2.4fr) 40px 130px minmax(0, 1.2fr) minmax(0, 1fr) 56px 120px; }
 .vhs-vzeile { height: 46px; border-bottom: 1px solid var(--vhs-line); color: var(--vhs-fg); text-decoration: none; }
 a.vhs-vzeile:hover, a.vhs-vzeile:focus-visible { background: var(--vhs-surface-2); }
 .vhs-vname { display: flex; gap: 8px; align-items: center; min-width: 0; overflow: hidden; white-space: nowrap; }
@@ -163,6 +164,9 @@ ul.vhs-kompakt { margin: 6px 0; padding-left: 20px; }
     .vhs-vliste-kopf { display: none; }
     .vhs-vzeile { grid-template-columns: minmax(0, 1fr) auto; height: 46px; }
     .vhs-vzeile > span:nth-child(2), .vhs-vzeile > span:nth-child(3), .vhs-vzeile > span:nth-child(4) { display: none; }
+    .vhs-vzeile.vhs-kursliste { grid-template-columns: 80px minmax(0, 1fr) auto; }
+    .vhs-vzeile.vhs-kursliste > span:nth-child(2) { display: block; }
+    .vhs-vzeile.vhs-kursliste > span:nth-child(5), .vhs-vzeile.vhs-kursliste > span:nth-child(6), .vhs-vzeile.vhs-kursliste > span:nth-child(7) { display: none; }
 }
 /* Kompakte Stammdaten: Feld | Wert | Uhr */
 .vhs-kv { display: grid; grid-template-columns: minmax(120px, 180px) minmax(0, 1fr) 28px; gap: 6px 12px; margin: 0; align-items: start; }

@@ -1,3 +1,4 @@
+using VibeVHS.Domain.Gemeinsam;
 using System.Runtime.CompilerServices;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
@@ -29,15 +30,75 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
         }
 
         var seite = await sortiert.Sortiert().Take(anzahl).ToListAsync(abbruch);
+        return await ZeilenAsync(seite, abbruch);
+    }
+
+    /// <summary>
+    /// Listenzeilen als schmale Projektion: nur die angezeigten Werte zum heutigen Tag aus den Versionen (je Art eine kleine Abfrage für die
+    /// Personen der Seite), ohne die Personen samt aller Versionen zu laden.
+    /// </summary>
+    private async Task<IReadOnlyList<PersonZeile>> ZeilenAsync(IReadOnlyList<PersonMitSchluessel> seite, CancellationToken abbruch)
+    {
+        var tag = Heute;
+        // Die (höchstens 50) Ids als Konstanten: so nutzt SQLite die Indizes auf PersonId (eine JSON-Parameterliste mit binären Ids nicht).
         var ids = seite.Select(x => x.Id).ToList();
-        var personen = await db.Personen.AsNoTracking().AsSplitQuery().Where(p => ids.Contains(p.Id)).ToDictionaryAsync(p => p.Id, abbruch);
-        var jetzt = Jetzt;
-        return seite.Where(x => personen.ContainsKey(x.Id)).Select(x =>
+        var kopf = await db.Personen.IgnoreAutoIncludes().AsNoTracking().Where(p => EF.Constant(ids).Contains(p.Id))
+            .Select(p => new
+            {
+                p.Id, p.Status, p.Datenschutz, p.AnonymisiertAm, p.AnonymisiertGebiet,
+                Fachbereiche = EF.Property<List<Listenwert<int>>>(p, "_fachbereiche").Select(f => f.Wert).ToList(),
+            })
+            .ToDictionaryAsync(p => p.Id, abbruch);
+        var arten = new[] { MerkmalArt.Titel, MerkmalArt.Geburtsdatum, MerkmalArt.Sprache, MerkmalArt.Rollen };
+        var merkmale = (await db.Set<PersonMerkmal>().AsNoTracking()
+                .Where(m => EF.Constant(arten).Contains(m.Art) && EF.Property<Guid?>(m, "ErsetztDurchVorgangId") == null && m.GueltigVon <= tag && m.GueltigBis > tag
+                            && m.Erfassungsart != Erfassungsart.Beendet && EF.Constant(ids).Contains(EF.Property<Guid>(m, "PersonId")))
+                .Select(m => new { PersonId = EF.Property<Guid>(m, "PersonId"), m.Art, m.Inhalt }).ToListAsync(abbruch))
+            .ToLookup(m => (m.PersonId, m.Art), m => m.Inhalt);
+        var mails = (await db.Set<EMailAdresse>().AsNoTracking()
+                .Where(e => EF.Property<Guid?>(e, "ErsetztDurchVorgangId") == null && e.GueltigVon <= tag && e.GueltigBis > tag
+                            && e.Erfassungsart != Erfassungsart.Beendet && e.Adresse != "–" && EF.Constant(ids).Contains(EF.Property<Guid>(e, "PersonId")))
+                .Select(e => new { PersonId = EF.Property<Guid>(e, "PersonId"), e.Adresse, e.Bevorzugt }).ToListAsync(abbruch))
+            .ToLookup(e => e.PersonId);
+        var wohnorte = (await (from k in db.Set<AdressKennzeichen>().AsNoTracking()
+                               where k.Art == AdressKennzeichenArt.UeblicherAufenthaltsort && EF.Property<Guid?>(k, "ErsetztDurchVorgangId") == null
+                                     && k.GueltigVon <= tag && k.GueltigBis > tag && k.Erfassungsart != Erfassungsart.Beendet
+                                     && EF.Constant(ids).Contains(EF.Property<Guid>(k, "PersonId"))
+                               join a in db.Set<Postadresse>().AsNoTracking() on k.AdressId equals a.AdressId
+                               where EF.Property<Guid?>(a, "ErsetztDurchVorgangId") == null && a.GueltigVon <= tag && a.GueltigBis > tag
+                                     && a.Erfassungsart != Erfassungsart.Beendet
+                               select new { PersonId = EF.Property<Guid>(k, "PersonId"), a.Ort }).ToListAsync(abbruch))
+            .GroupBy(w => w.PersonId).ToDictionary(g => g.Key, g => g.First().Ort);
+
+        var zeilen = new List<PersonZeile>(seite.Count);
+        foreach (var x in seite)
         {
-            var p = personen[x.Id];
-            p.StichzeitSetzen(jetzt);
-            return new PersonZeile(p.Id, p.Anzeigename, new Seitenschluessel(x.Nachname, x.Vorname, x.IdHex), p.Geburtsdatum, p.Wohnort, p.EMail, p.Sprache, p.Rollen, p.Status, p.Fachbereiche);
-        }).ToList();
+            if (!kopf.TryGetValue(x.Id, out var p))
+            {
+                continue;
+            }
+
+            var schluessel = new Seitenschluessel(x.Nachname, x.Vorname, x.IdHex);
+            var rollen = merkmale[(x.Id, MerkmalArt.Rollen)].FirstOrDefault() is { } r && int.TryParse(r, out var rz) ? (Personenrolle)rz : Personenrolle.Keine;
+            if (p.Datenschutz == Domain.Datenschutz.Datenschutzstatus.Anonymisiert)
+            {
+                var name = $"Gelöschte Person {Domain.Datenschutz.Pseudonym.Kurz(x.Id)} · anonymisiert am {p.AnonymisiertAm?.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture)}";
+                zeilen.Add(new PersonZeile(x.Id, name, schluessel, null, p.AnonymisiertGebiet, null, string.Empty, rollen, p.Status, p.Fachbereiche));
+                continue;
+            }
+
+            var titel = merkmale[(x.Id, MerkmalArt.Titel)].FirstOrDefault();
+            var anzeige = string.Join(' ', new[] { x.Vorname, x.Vorsatz, x.Nachname, x.Zusatz }.Where(t => t.Length > 0));
+            var geburt = merkmale[(x.Id, MerkmalArt.Geburtsdatum)].FirstOrDefault() is { } g
+                         && DateOnly.TryParseExact(g, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var gd)
+                ? gd : (DateOnly?)null;
+            var mail = (mails[x.Id].FirstOrDefault(e => e.Bevorzugt) ?? mails[x.Id].FirstOrDefault())?.Adresse;
+            var sprache = merkmale[(x.Id, MerkmalArt.Sprache)].FirstOrDefault() is { Length: > 0 } sp ? sp : "de";
+            zeilen.Add(new PersonZeile(x.Id, string.IsNullOrEmpty(titel) ? anzeige : $"{titel} {anzeige}", schluessel, geburt, wohnorte.GetValueOrDefault(x.Id),
+                mail, sprache, rollen, p.Status, p.Fachbereiche));
+        }
+
+        return zeilen;
     }
 
     public async Task<RundschreibenVorschau> RundschreibenZaehlenAsync(PersonenFilter filter, Kontaktzweck zweck, CancellationToken abbruch = default)
@@ -72,7 +133,7 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
     {
         var tag = Heute;
         var mitAdresse = db.Set<EMailAdresse>()
-            .Where(e => EF.Property<Guid?>(e, "ErsetztDurchVorgangId") == null && e.GueltigVon <= tag && (e.GueltigBis == null || e.GueltigBis > tag) && e.Adresse != "–" && e.Adresse != "")
+            .Where(e => EF.Property<Guid?>(e, "ErsetztDurchVorgangId") == null && e.GueltigVon <= tag && e.GueltigBis > tag && e.Adresse != "–" && e.Adresse != "")
             .Select(e => EF.Property<Guid>(e, "PersonId"));
         return personen.Where(p => mitAdresse.Contains(p.Id));
     }
@@ -82,7 +143,7 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
     {
         var tag = Heute;
         var erteilt = db.Set<Einwilligung>()
-            .Where(w => EF.Property<Guid?>(w, "ErsetztDurchVorgangId") == null && w.GueltigVon <= tag && (w.GueltigBis == null || w.GueltigBis > tag)
+            .Where(w => EF.Property<Guid?>(w, "ErsetztDurchVorgangId") == null && w.GueltigVon <= tag && w.GueltigBis > tag
                         && w.Kanal == Kontaktkanal.EMail && w.Zweck == zweck && w.Erteilt)
             .Select(w => EF.Property<Guid>(w, "PersonId"));
         return personen.Where(p => erteilt.Contains(p.Id));

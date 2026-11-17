@@ -172,7 +172,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
         });
         Version<Buchungsvollmacht>(modelBuilder, "PersonVollmachten", b =>
         {
-            b.Property(v => v.BevollmaechtigterName).HasMaxLength(300);
+            b.Ignore(v => v.BevollmaechtigterName); // Name zur Laufzeit (Bevollmaechtigtennamen), keine Kopie
             b.Property(v => v.Nachweis).HasMaxLength(500);
             b.HasIndex(v => v.BevollmaechtigterId);
         });
@@ -332,6 +332,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.ToTable(tabelle);
             b.HasKey(v => v.Id);
             b.Property(v => v.Id).ValueGeneratedNever();
+            b.Property(v => v.GueltigBis).HasConversion(new OffenesEnde()); // offenes Ende = 99991231 statt NULL (NFA-15)
             // Zeitpunkt, Person und Grund stehen im Änderungsvorgang (Tabelle Aenderungsvorgaenge), nicht in jeder Zeile.
             b.HasOne(v => v.ErfasstDurch).WithMany().HasForeignKey("ErfasstDurchVorgangId").IsRequired().OnDelete(DeleteBehavior.Restrict);
             b.HasOne(v => v.ErsetztDurch).WithMany().HasForeignKey("ErsetztDurchVorgangId").OnDelete(DeleteBehavior.Restrict);
@@ -341,7 +342,10 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Ignore(v => v.ErfasstVon);
             b.Ignore(v => v.ErsetztAm);
             b.Ignore(v => v.Grund);
-            b.HasIndex(fremdschluessel, nameof(BitemporaleVersion<T>.GueltigVon));
+            // „Stand der Person(en) heute“: Person + nicht ersetzt + Gültigkeit in einem Index. Ohne ErsetztDurchVorgangId darin wählt SQLite
+            // den Index auf ErsetztDurchVorgangId (fast alle Zeilen NULL) und liest die ganze Tabelle (Personenliste 30.000: 16 ms statt 0,2 ms).
+            b.HasIndex(fremdschluessel, "ErsetztDurchVorgangId", nameof(BitemporaleVersion<T>.GueltigVon))
+                .HasDatabaseName($"IX_{tabelle}_{fremdschluessel}_Stand");
             weiter(b);
         });
     }

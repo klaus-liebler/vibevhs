@@ -139,7 +139,8 @@ public class DatenschutzTests
         m.Adressen.ShouldAllBe(a => a.Strasse == "–" && a.Postleitzahl == string.Empty);
         m.Rufnummern.ShouldAllBe(r => r.Nummer == "–");
 
-        var a = await neu.Personen.SingleAsync(p => p.Id == ayse.Id, ct);
+        // Der Name des Bevollmächtigten wird beim Laden über den Speicher aus der (anonymisierten) Person gelesen – keine Kopie.
+        var a = (await new PersonenSpeicher(neu).LadenAsync(ayse.Id, ct))!;
         a.Vollmachten.Single().BevollmaechtigterId.ShouldBe(mehmet.Id);
         a.Vollmachten.Single().BevollmaechtigterName.ShouldStartWith("Gelöschte Person");
     }

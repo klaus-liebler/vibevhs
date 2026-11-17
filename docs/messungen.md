@@ -55,3 +55,31 @@ Einordnung:
   gefiltert (typisch einige hundert Kurse); weiterer Schritt bei Bedarf: Seitenweise laden.
 - **Alle Kurse vollständig laden** (Messpunkt aus der Ausgangsmessung) ist langsamer, weil Richtlinie, Serie, Team, Anforderungen und Orte
   jetzt eigene Tabellen sind; die Oberfläche nutzt dafür Projektionen (Kursliste, Raumplan).
+
+## Nacharbeit (17.11.2026)
+
+Personenliste als schmale Projektion (nur die angezeigten Werte zum heutigen Tag), Kursliste als virtualisiertes Endlos-Scrollen mit Keyset
+(Blöcke zu 50, Zähler der Filter-Chips per SQL), Index je Versionstabelle auf (Person, ErsetztDurchVorgangId, GueltigVon), offenes Ende
+als 99991231.
+
+| Messpunkt | 3 000 | 30 000 | Ziel |
+|---|---:|---:|---|
+| Personenliste, erste Seite (50, nach Name) | 7 ms | 5 ms | < 30 ms ✓ |
+| – davon Sortierabfrage | 1 ms | 1 ms | |
+| Personenliste, Folgeseite (Keyset) | 4 ms | 5 ms | < 30 ms ✓ |
+| Filter Rolle Dozierende | 8 ms | 20 ms | |
+| Volltextsuche „müller“ (ohne Index) | 17 ms | 181 ms | < 300 ms |
+| Personendetail | 2 ms | 2 ms | |
+| Kursliste: erster Block (50) + Zähler der Filter-Chips | 5 ms | 5 ms | < 100 ms ✓ |
+| Kursliste: Folgeblock beim Scrollen | 1 ms | 4 ms | |
+| Kursliste alt (alle Kurse des Semesters auf einmal) | 28 ms | 142 ms | – |
+| Raumplan einer Woche | 17 ms | 89 ms | |
+| Rundschreiben-Empfänger (alle Teilnehmenden) | 4 ms | 56 ms | |
+| **Dateigröße** (nach Checkpoint) | 13 MB | 97 MB | |
+
+Einordnung:
+- **Personenliste 71 ms → 5 ms:** Die Nachladeabfragen (Merkmale, E-Mails, Wohnort) für die 50 Personen der Seite nutzten den Index auf
+  `ErsetztDurchVorgangId` (bei fast allen Zeilen NULL) und lasen damit die ganze Tabelle (Merkmale allein 16 ms). Der neue Index
+  `IX_<Tabelle>_PersonId_Stand` (Person, ErsetztDurchVorgangId, GueltigVon) bringt sie auf je unter 1 ms.
+- **Kursliste:** Die erste Anzeige braucht unabhängig von der Kurszahl ~5 ms; weitere Blöcke lädt die Liste beim Scrollen nach.
+- Werte sind Mediane aus mehreren Läufen; Einzelmessungen schwanken um etwa ±20 % (Suche 134–181 ms).

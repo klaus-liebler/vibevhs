@@ -12,6 +12,9 @@ public static class Speicherformate
 {
     public static byte[] IdBytes(Guid id) => id.ToByteArray(bigEndian: true);
 
+    /// <summary>Gespeicherter Wert für „offenes Ende“ (NFA-15).</summary>
+    public const int Offen = 99991231;
+
     public static int Tag(DateOnly d) => (d.Year * 10000) + (d.Month * 100) + d.Day;
 
     public static DateOnly Tag(int z) => new(z / 10000, z / 100 % 100, z % 100);
@@ -26,6 +29,19 @@ public static class Speicherformate
 }
 
 internal sealed class IdAlsBytes() : ValueConverter<Guid, byte[]>(g => Speicherformate.IdBytes(g), b => new Guid(b, true));
+
+/// <summary>
+/// Ende einer Gültigkeit (NFA-15): offenes Ende als 99991231 statt NULL. Abfragen „gilt am Tag“ werden so zu <c>GueltigBis &gt; tag</c>
+/// ohne <c>OR … IS NULL</c> (indexfreundlich); in der Fachklasse bleibt das offene Ende <c>null</c>.
+/// </summary>
+// EF1001: Konverter, die NULL umwandeln („convertsNulls“), kennzeichnet EF Core als nicht stabile API. Bewusst genutzt (NFA-15), durch die
+// Versions- und Zeitumstellungstests abgesichert.
+#pragma warning disable EF1001
+internal sealed class OffenesEnde() : ValueConverter<DateOnly?, int>(
+    d => d == null ? Speicherformate.Offen : Speicherformate.Tag(d.Value),
+    z => z == Speicherformate.Offen ? null : Speicherformate.Tag(z),
+    convertsNulls: true);
+#pragma warning restore EF1001
 
 internal sealed class TagAlsZahl() : ValueConverter<DateOnly, int>(d => Speicherformate.Tag(d), z => Speicherformate.Tag(z));
 

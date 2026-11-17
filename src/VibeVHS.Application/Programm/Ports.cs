@@ -21,7 +21,13 @@ public sealed record KursZeile(
     int MaxTeilnehmende,
     bool Archiviert = false);
 
-public sealed record KursFilter(Guid? SemesterId = null, int? Fachbereich = null, Kursstatus? Status = null, string? Suche = null, bool Archivierte = false);
+/// <param name="NachKursnummer">Keyset: nur Kurse nach dieser Kursnummer (eindeutig, Listenreihenfolge).</param>
+/// <param name="Anzahl">Blockgröße für das Endlos-Scrollen; <c>null</c> = alle.</param>
+public sealed record KursFilter(Guid? SemesterId = null, int? Fachbereich = null, Kursstatus? Status = null, string? Suche = null, bool Archivierte = false,
+    string? NachKursnummer = null, int? Anzahl = null);
+
+/// <summary>Trefferzahlen für die Filter-Chips der Kursliste: je Wert mit den übrigen gesetzten Filtern.</summary>
+public sealed record Kurszahlen(int Gesamt, IReadOnlyDictionary<int, int> Fachbereiche, IReadOnlyDictionary<Kursstatus, int> Status);
 
 /// <summary>Termin mit Kurs- und Ortsangaben für Raumplan und Konfliktprüfung.</summary>
 public sealed record PlanTermin(Termin Termin, string Kursnummer, IReadOnlyList<string> OrtNamen, string Dozent, int Fachbereich);
@@ -34,6 +40,9 @@ public interface IProgrammSpeicher : INamensquelle
     Task<IReadOnlyList<Kursart>> KursartenAsync(CancellationToken abbruch = default);
 
     Task<IReadOnlyList<KursZeile>> KurseAsync(KursFilter filter, CancellationToken abbruch = default);
+
+    /// <summary>Zähler für die Filter-Chips (Fachbereich, Status) und die Gesamtzahl, in SQL gezählt.</summary>
+    Task<Kurszahlen> KurszahlenAsync(KursFilter filter, CancellationToken abbruch = default);
 
     /// <summary>Kurs mit Veranstaltungen und Entgelten, verfolgt (für Änderungen).</summary>
     Task<Kurs?> KursLadenAsync(Guid id, CancellationToken abbruch = default);

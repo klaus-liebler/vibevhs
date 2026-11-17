@@ -57,6 +57,10 @@ public sealed class Namen
     public string Orte(IEnumerable<VeranstaltungsOrt> orte) => string.Join(" + ", orte.Select(o => Ort(o.OrtId)));
 
     public string? Organisation(Guid? id) => id is { } i ? _organisationen.GetValueOrDefault(i, "?") : null;
+
+    /// <summary>Name einer Person oder Organisation (z. B. Bevollmächtigte), heute.</summary>
+    public string PersonOderOrganisation(Guid id)
+        => _personen.ContainsKey(id) ? Person(id) : _organisationen.GetValueOrDefault(id, "?");
 }
 
 /// <summary>Ein Abschnitt der Namensgeschichte einer Person (fachliche Gültigkeit, halboffen), Name mit Titel.</summary>

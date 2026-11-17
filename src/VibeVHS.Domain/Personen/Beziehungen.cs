@@ -138,7 +138,11 @@ public sealed class Buchungsvollmacht : BitemporaleVersion<Buchungsvollmacht>
 
     public Guid BevollmaechtigterId { get; private set; }
 
+    /// <summary>Heutiger Name der bevollmächtigten Person bzw. Organisation (beim Laden gesetzt, nicht gespeichert).</summary>
     public string BevollmaechtigterName { get; private set; }
+
+    /// <summary>Namen ergänzen (gebündelt aus Personen bzw. Organisationen gelesen).</summary>
+    public void NameSetzen(string name) => BevollmaechtigterName = name;
 
     /// <summary>z. B. "Sorgerecht, Geburtsurkunde" oder "Betreuerausweis AG Steinfurt".</summary>
     public string Nachweis { get; private set; }
