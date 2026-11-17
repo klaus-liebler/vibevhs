@@ -1,6 +1,6 @@
 # VibeVHS – Buchungs-Shop-Plugin
 
-Nov 15, 2026 · @Klaus
+Stand: 17.11.2026
 
 VibeVHS bekommt eine öffentliche Buchungs-API; darauf setzen eine TYPO3-Extension für vhs-egs.de und eine Web-Komponente für jede andere Website auf. VibeVHS bleibt die einzige Datenquelle.
 

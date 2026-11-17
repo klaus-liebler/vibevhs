@@ -1,6 +1,6 @@
 # VibeVHS – Umsetzungsfahrplan
 
-Nov 14, 2026 · @Klaus
+Stand: 17.11.2026
 
 Schritt 4 von 4. Grundlage sind die [Anforderungsanalyse](https://claude.ai/artifact/5zHT9KccZeiUj1xS1BmKNG), das [Architekturdokument](https://claude.ai/artifact/XVL9kYS5XcAYwGsoDQ4CN3) und der [klickbare Prototyp](https://claude.ai/artifact/KR88btCTssLuRhCTYFGnbx).
 
@@ -24,7 +24,42 @@ Stufe 1 liefert die Verwaltung in neun Iterationen. Schon nach Iteration 3 läuf
 
 Drei Phasen mit je einer Abnahme durch Mitarbeitende der Verwaltung. Erst wenn eine Abnahme bestanden ist, beginnt die nächste Phase. So fließen Rückmeldungen früh ein.
 
-&#91;embedded content: Fahrplan Stufe 1 · 3 Phasen, 9 Iterationen, 3 Abnahmen\]
+```mermaid
+---
+title: Neun Iterationen, jede Phase endet mit einer Abnahme durch die Verwaltung
+---
+flowchart LR
+    subgraph PA["Phase A · Kern (Iteration 0 bis 3)"]
+        direction TB
+        I0["<b>I0 · Fundament</b><br/>Solution, Docker, Mock-Login<br/>Versionierung, Protokoll, Outbox"]
+        I1["<b>I1 · Personen</b><br/>Historie, Dubletten, Suche<br/>Listen mit virtuellem Scrollen"]
+        I2["<b>I2 · Programm</b><br/>Kurse, Termine, Räume<br/>Raumkonflikte, Feiertage NRW"]
+        I3["<b>I3 · Anmeldung</b><br/>Tresen, Buchungsprüfung<br/>Warteliste, Bestätigungen"]
+        I0 --> I1 --> I2 --> I3
+    end
+    AA{{"<b>Abnahme A: Kern-Durchlauf</b><br/>Kurs anlegen, Person anmelden,<br/>Bestätigung im Postausgang"}}
+    subgraph PB["Phase B · Tagesgeschäft (Iteration 4 bis 6)"]
+        direction TB
+        I4["<b>I4 · Durchführung</b><br/>Anwesenheit, QR-Check-in<br/>Bescheinigungen, Archiv, QR"]
+        I5["<b>I5 · Aufgaben</b><br/>Regeln, Gruppenkörbe<br/>Zeitplaner, Erinnerungen"]
+        I6["<b>I6 · Finanzen</b><br/>Konto, SEPA, Mahnwesen<br/>Honorare, Fibu- und Bank-Mock"]
+        I4 --> I5 --> I6
+    end
+    AB{{"<b>Abnahme B: Tagesgeschäft</b><br/>Eine Woche Testbetrieb mit<br/>Verwaltungsmitarbeitenden"}}
+    subgraph PC["Phase C · Pilotreife (Iteration 7 und 8)"]
+        direction TB
+        I7["<b>I7 · Integrationskurse</b><br/>UE-Anwesenheit, Abrechnung<br/>BAMF-Mock, Fahrtkosten"]
+        I8["<b>I8 · Betrieb und Daten</b><br/>Dashboard, Statistik, DSGVO<br/>Datenübernahme, Härtung"]
+        I7 --> I8
+    end
+    AC{{"<b>Abnahme C: Pilotbetrieb</b><br/>Altdaten übernommen,<br/>Datenschutz und IT freigegeben"}}
+    I3 --> AA --> I4
+    I6 --> AB --> I7
+    I8 --> AC
+```
+
+*Richtwert etwa zwei Wochen je Iteration, Neuschätzung nach Iteration 1. Später ergänzt: I2a Datenschutz (vorgezogen, nach I2) und
+I9 Webshop (nach I8), siehe Arbeitspakete.*
 
 Nach Abnahme C folgt der Pilotbetrieb. Danach werden die Portale (Stufen 2 und 3) und die echten Schnittstellen (Stufe 4) geplant.
 

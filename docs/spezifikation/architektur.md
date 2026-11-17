@@ -1,6 +1,6 @@
 # VibeVHS – Architektur und Fachkonzepte
 
-Nov 14, 2026 · @Klaus
+Stand: 17.11.2026
 
 Dieses Dokument ist Schritt 2 von 4. Es setzt die [Anforderungsanalyse](https://claude.ai/artifact/5zHT9KccZeiUj1xS1BmKNG) technisch um: Endausbau mit Portalen im Blick, implementiert wird zuerst die Verwaltung.
 
@@ -8,7 +8,42 @@ Dieses Dokument ist Schritt 2 von 4. Es setzt die [Anforderungsanalyse](https://
 
 VibeVHS ist ein modularer Monolith: eine Anwendung, ein Docker-Image, eine SQLite-Datei. Das passt zu einer einzelnen VHS und zum kommunalen Betrieb, und die Fachmodule bleiben trotzdem sauber getrennt.
 
-&#91;embedded content: Architektur · 4 Kanäle, 5 Schichten, Adapter zu 24 Schnittstellen\]
+```mermaid
+---
+title: Alle Kanäle nutzen dieselbe Fachlogik, externe Systeme nur über Adapter
+---
+flowchart LR
+    subgraph Kanaele["Kanäle"]
+        direction TB
+        K1["<b>Verwaltung</b><br/>Browser, Stufe 1"]
+        K2["Dozierendenportal<br/>mobil, Endausbau"]
+        K3["Teilnehmendenportal<br/>Web, Endausbau"]
+        K4["Website und QR<br/>Kursdaten, QR-Check-in"]
+    end
+    subgraph VibeVHS["VibeVHS: ein Docker-Container (ASP.NET Core, modularer Monolith)"]
+        direction TB
+        W["<b>Web</b><br/>Blazor-Oberfläche und REST-API (OpenAPI)"]
+        A["<b>Anwendung</b><br/>Use Cases, Buchungsprüfung, Workflows"]
+        M["<b>Fachmodule</b><br/>Programm · Anmeldung · Teilnahme<br/>Finanzen · Integrationskurse · Auswertung"]
+        D["<b>Domäne</b><br/>Entitäten, zeitliche Versionen, Regeln"]
+        I["<b>Infrastruktur</b><br/>EF Core, Outbox, Jobs, PDF und QR<br/>Adapter je Schnittstelle: Mock oder echt"]
+        S[("SQLite-Datei und Dokumentarchiv")]
+        W --> A --> M --> D
+        I --> S
+    end
+    subgraph Extern["Externe Systeme (24 insgesamt)"]
+        E["Kommunale Anmeldung · Finanzsoftware<br/>Bank (SEPA, camt) · BAMF InGe-Online<br/>Statistik DIE, NRW · E-Mail und SMS<br/>Übersetzungsdienst · vhs.cloud, Kursportale<br/>DMS, Kalender, Druck"]
+    end
+    K1 --> W
+    K2 -.-> W
+    K3 -.-> W
+    K4 -.-> W
+    I -- Adapter --> E
+    classDef stufe1 stroke-width:3px
+    class K1 stufe1
+```
+
+*Durchgezogen/fett: Stufe 1 · gestrichelt: Endausbau, im Datenmodell vorbereitet. Die Infrastruktur implementiert die Ports der Anwendung (Abhängigkeiten zeigen nach innen).*
 
 Die Verwaltung arbeitet mit einer Blazor-Oberfläche. Die REST-API entsteht von Anfang an mit, weil die Portale und die Website später genau diese API nutzen. So gelten Buchungsregeln und Stichtagslogik für alle Kanäle gleich.
 
@@ -34,7 +69,44 @@ Nachteil von Blazor Server: Jede offene Sitzung belegt eine Verbindung und etwas
 
 Das Modell umfasst den Endausbau mit Portalen. 16 Entitäten sind zeitlich versioniert (neu: Kontaktdaten und Merkmalswerte); alle Vorgänge wie Belegung, Anwesenheit und Zahlung sind unveränderliche Ereignisse. Die Feldlisten entstehen mit dem Code in Schritt 4.
 
-&#91;embedded content: Datenmodell · 6 Bereiche, Entitäten im Überblick\]
+```mermaid
+---
+title: Sechs Bereiche, 16 zeitlich versionierte Entitäten (⏱)
+---
+flowchart TB
+    subgraph P["Personen und Organisation"]
+        direction TB
+        P1["⏱ Person<br/>⏱ Organisation<br/>⏱ Zugehörigkeit<br/>⏱ Buchungsvollmacht<br/>⏱ VHS-Daten, Briefkopf<br/>Benutzerkonto, Rolle<br/>Einwilligung<br/>⏱ Kontaktdaten, Sprache"]
+    end
+    subgraph G["Programm"]
+        direction TB
+        G1["Semester, Fachbereich<br/>Kursart<br/>⏱ Kurs<br/>Veranstaltung, Serie<br/>⏱ Ort, Gebäude, Merkmale<br/>⏱ Entgelt<br/>⏱ Buchungsrichtlinie<br/>Kurszielgruppe<br/>Dozenteneinsatz"]
+    end
+    subgraph T["Teilnahme"]
+        direction TB
+        T1["Belegung<br/>Wartelisteneintrag<br/>Anwesenheit<br/>Check-in-Code<br/>⏱ Ermäßigung<br/>Kursfeedback<br/>Kontingent, Reservierung"]
+    end
+    subgraph F["Finanzen"]
+        direction TB
+        F1["⏱ Honorarsatz<br/>Honorarvertrag<br/>Rechnung, Posten<br/>Zahlung<br/>⏱ SEPA-Mandat<br/>Mahnung<br/>Finanzübergabe"]
+    end
+    subgraph IK["Integrationskurse"]
+        direction TB
+        IK1["⏱ Teilnahmeberechtigung<br/>Kursmodul<br/>BAMF-Meldung<br/>Prüfung<br/>Fahrtkosten"]
+    end
+    subgraph Q["Querschnitt"]
+        direction TB
+        Q1["Dokumentarchiv<br/>Audit-Protokoll<br/>Outbox, Inbox<br/>Übersetzungstoken<br/>Aufgabe, Wiedervorlage<br/>⏱ Länderregeln (NRW)"]
+    end
+    P1 -- "bucht / belegt" --> T1
+    G1 -- "Kurs → Belegung" --> T1
+    T1 -- "Posten → Rechnung" --> F1
+    P1 -. "Berechtigung" .-> IK1
+    G1 -. "Integrationskurs" .-> IK1
+```
+
+*⏱ = zeitlich versioniert (Gültigkeit und Erfassungszeit); alle übrigen Bewegungsdaten sind unveränderliche Ereignisse. Stand der Konzeption;
+das tatsächliche Schema mit allen Tabellen steht in [`../datenmodell.md`](../datenmodell.md).*
 
 Die Bereiche hängen über wenige Kernbeziehungen zusammen:
 

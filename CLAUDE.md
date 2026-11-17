@@ -5,10 +5,10 @@ Kursleitungen und Teilnehmende; Routinen automatisiert, aber immer protokolliert
 
 ## Konzeptdokumente
 
-**Das Repo ist die führende Quelle** (seit 17.11.2026): `docs/spezifikation/` mit `anforderungen.md`, `architektur.md`, `fahrplan.md`,
-`buchungs-shop-plugin.md` und `prototyp-verwaltung.html`. Änderungen an Anforderungen und Konzepten dort vornehmen und mitcommitten.
-Die Claude Docs/Artifacts (Anforderungen 5zHT9KccZeiUj1xS1BmKNG, Architektur XVL9kYS5XcAYwGsoDQ4CN3, Fahrplan FFRgE1BfKbphyCYxcVz4S9,
-Shop VsQFogXRz3dzQYZajLgoMm, Prototyp KR88btCTssLuRhCTYFGnbx unter https://claude.ai/artifact/…) sind nur noch Ausgangsstand und werden nicht weiter gepflegt.
+**Spezifikation liegt in `docs/spezifikation/` und ist führend; bei fachlichen Änderungen die betroffene Spezifikationsdatei im selben Commit mitpflegen (FA-/NFA-Nummern nie neu vergeben).**
+Dateien: `anforderungen.md`, `architektur.md`, `fahrplan.md`, `buchungs-shop-plugin.md`, `prototyp-verwaltung.html`.
+Archiv (Stand 17.11.2026, nicht mehr gepflegt): die Claude Docs/Artifacts (Anforderungen 5zHT9KccZeiUj1xS1BmKNG, Architektur XVL9kYS5XcAYwGsoDQ4CN3, Fahrplan FFRgE1BfKbphyCYxcVz4S9,
+Shop VsQFogXRz3dzQYZajLgoMm, Prototyp KR88btCTssLuRhCTYFGnbx unter https://claude.ai/artifact/…) – nur noch als Archiv.
 
 - Im Repo: `docs/README.md` (Gesamtüberblick je Iteration), `docs/schnittstellen.md`, `docs/betrieb.md`, `docs/sicherheit.md`, `docs/webshop.md`,
   `docs/dozierendenportal.md`, `docs/abnahme-a.md` (Abnahme-Drehbuch), `deploy/server/README-server.md` (Bereitstellung)
@@ -52,6 +52,7 @@ Eigene Testinstanz: Port **5199**, eigene Datenbank (`ConnectionStrings__VibeVHS
 - Server liebler.iui.hs-osnabrueck.de: **Änderungen nur nach Klaus' Go je Schritt**; jeden ssh-Befehl vorher in
   `deploy/server/protokoll/<datum>-*.md` eintragen (Befehl wörtlich, gekürzte Ausgabe, Geheimnisse geschwärzt).
 - Berichte und Oberfläche auf Deutsch.
+- Spezifikation liegt in `docs/spezifikation/` und ist führend; bei fachlichen Änderungen die betroffene Spezifikationsdatei im selben Commit mitpflegen (FA-/NFA-Nummern nie neu vergeben).
 
 ## Konventionen
 

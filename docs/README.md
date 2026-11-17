@@ -9,9 +9,9 @@ Alle geplanten Schnittstellen nach außen (Mail, Messaging, VHS-Systeme, Stadtve
 
 ## Konzepte
 
-**Führende Quelle ist das Repo:** [`spezifikation/`](spezifikation/README.md). Die früheren Claude Docs/Artifacts sind nur noch Ausgangsstand.
+**Regel:** Spezifikation liegt in [`docs/spezifikation/`](spezifikation/README.md) und ist führend; bei fachlichen Änderungen die betroffene Spezifikationsdatei im selben Commit mitpflegen (FA-/NFA-Nummern nie neu vergeben). Die Claude Docs/Artifacts sind ein Archiv (Stand 17.11.2026).
 
-| Dokument | Im Repo (führend) | Ausgangsstand (nicht mehr gepflegt) |
+| Dokument | Im Repo (führend) | Archiv (17.11.2026, nicht mehr gepflegt) |
 |---|---|---|
 | Anforderungen | [spezifikation/anforderungen.md](spezifikation/anforderungen.md) | https://claude.ai/artifact/5zHT9KccZeiUj1xS1BmKNG |
 | Architektur und Datenmodell | [spezifikation/architektur.md](spezifikation/architektur.md) | https://claude.ai/artifact/XVL9kYS5XcAYwGsoDQ4CN3 |

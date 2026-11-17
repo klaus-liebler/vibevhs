@@ -1,7 +1,8 @@
 # Spezifikation
 
-**Diese Dateien sind die führende Quelle** für Anforderungen und Konzepte von VibeVHS (Festlegung von Klaus, 17.11.2026).
-Änderungen werden hier vorgenommen und mit dem Code committet; so passen Spezifikation und Umsetzung im selben Stand zusammen.
+**Die Dateien hier sind die maßgebliche Fassung** der Spezifikation von VibeVHS (Festlegung von Klaus, 17.11.2026).
+Änderungen an Anforderungen, Architektur, Fahrplan, Shop-Konzept und Prototyp werden ab jetzt direkt in diesen Dateien gemacht und
+zusammen mit dem Code committet. FA-/NFA-Nummern werden nie neu vergeben.
 
 | Datei | Inhalt |
 |---|---|
@@ -14,12 +15,12 @@
 Ergänzende, ausführlichere Dokumente liegen eine Ebene höher in `docs/` (z. B. `nichtfunktionale-anforderungen.md`, `datenmodell.md`,
 `schnittstellen.md`, `webshop.md`).
 
-## Herkunft
+## Archiv
 
-Übernommen am 17.11.2026 als Markdown-Export aus den Claude Docs/Artifacts. Diese sind nur noch Ausgangsstand und werden nicht weiter
-gepflegt:
+Übernommen am 17.11.2026 als Markdown-Export aus den Claude Docs/Artifacts. Diese sind **archivierte Stände vom 17.11.2026** und werden
+nicht mehr gepflegt; die Links dienen nur noch als Archiv:
 
-| Datei | Ausgangsstand |
+| Datei | Archiv |
 |---|---|
 | anforderungen.md | https://claude.ai/artifact/5zHT9KccZeiUj1xS1BmKNG |
 | architektur.md | https://claude.ai/artifact/XVL9kYS5XcAYwGsoDQ4CN3 |
@@ -27,5 +28,5 @@ gepflegt:
 | buchungs-shop-plugin.md | https://claude.ai/artifact/VsQFogXRz3dzQYZajLgoMm |
 | prototyp-verwaltung.html | https://claude.ai/artifact/KR88btCTssLuRhCTYFGnbx |
 
-Beim Export fehlen drei eingebettete Grafiken (in `architektur.md` die Architektur- und die Datenmodell-Übersicht, in `fahrplan.md` die
-Fahrplan-Grafik); sie stehen als Platzhalter „embedded content: …“ im Text. Bei Bedarf als Mermaid-Diagramm im Repo nachbauen.
+Die drei Grafiken der Claude Docs (Architektur- und Datenmodell-Übersicht, Fahrplan) sind beim Übernehmen als Mermaid-Diagramme nachgebaut
+worden, mit denselben Inhalten.

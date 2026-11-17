@@ -1,6 +1,6 @@
 # VibeVHS – Anforderungsanalyse und Use Cases
 
-Nov 14, 2026 · @Klaus
+Stand: 17.11.2026
 
 ## Ziel, Umfang und Quellen
 
