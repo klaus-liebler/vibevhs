@@ -46,8 +46,7 @@ public sealed class DemodatenZeitbezugTests
 
     private static async Task<Kennzahlen> SeedenAsync(DateTimeOffset jetzt)
     {
-        await using var h = await ShopTestHost.StartenAsync();
-        h.Uhr.SetUtcNow(jetzt);
+        await using var h = await ShopTestHost.StartenAsync(jetzt: jetzt);
         await using (var bereich = h.App.Services.CreateAsyncScope())
         {
             var d = bereich.ServiceProvider;
@@ -92,14 +91,35 @@ public sealed class DemodatenZeitbezugTests
             heute);
     }
 
-    [Fact]
-    public async Task Demodaten_sind_relativ_zum_Tagesdatum()
+    /// <summary>Feste Uhrzeit (10:00 in Emsdetten) an einem Tag – der Test hängt nie vom echten Datum ab.</summary>
+    private static DateTimeOffset Um10(string tag)
     {
-        // Die Testuhr kann nicht zurückgestellt werden: „heute“ ist das echte Datum, „später“ 60 Tage danach.
-        var bezug = DateTimeOffset.UtcNow.AddMinutes(1);
-        var heute = await SeedenAsync(bezug);
-        var spaeter = await SeedenAsync(bezug.AddDays(60));
+        var d = DateOnly.Parse(tag, System.Globalization.CultureInfo.InvariantCulture);
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin");
+        var lokal = d.ToDateTime(new TimeOnly(10, 0));
+        return new DateTimeOffset(lokal, zone.GetUtcOffset(lokal));
+    }
 
+    [Theory]
+    [InlineData("2027-01-15")] // 16.11.2026 + 60 Tage (Freitag, über die Weihnachtsferien hinweg)
+    [InlineData("2027-01-16")] // Samstag danach
+    [InlineData("2026-12-30")] // mitten in den Weihnachtsferien NRW (23.12.2026–06.01.2027)
+    public async Task Demodaten_sind_relativ_zum_Tagesdatum(string tag)
+    {
+        // Die Demodaten werden um ganze Wochen verschoben; verglichen wird deshalb mit demselben Wochentag in der Bezugswoche
+        // (Montag 16.11.2026 bis Sonntag 22.11.2026) – dort sieht die Demo genauso aus.
+        var datum = DateOnly.Parse(tag, System.Globalization.CultureInfo.InvariantCulture);
+        var bezugstag = Demozeit.Bezugstag.AddDays(datum.DayNumber - Demozeit.Bezugstag.DayNumber - Demozeit.Fuer(datum).Tage);
+        var bezug = await SeedenAsync(Um10(bezugstag.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)));
+        var spaeter = await SeedenAsync(Um10(tag));
+        TestContext.Current.TestOutputHelper?.WriteLine($"Bezug {bezugstag:dd.MM.yyyy}: {bezug} | {datum:dd.MM.yyyy}: {spaeter}");
+        bezug.Heute.ShouldBe(bezugstag);
+        spaeter.Heute.ShouldBe(datum);
+        VergleichPruefen(bezug, spaeter);
+    }
+
+    private static void VergleichPruefen(Kennzahlen heute, Kennzahlen spaeter)
+    {
         // Es gibt jeweils ein aktuelles Semester; Name und Kürzel folgen der Verschiebung (z. B. 16.11.2026 → „Herbst 2026“, „26H“).
         heute.Kuerzel.ShouldBe(Demozeit.Fuer(heute.Heute).Kuerzel("26H"));
         spaeter.Kuerzel.ShouldBe(Demozeit.Fuer(spaeter.Heute).Kuerzel("26H"));
@@ -114,7 +134,6 @@ public sealed class DemodatenZeitbezugTests
         spaeter.UeberfaelligeRechnungen.ShouldBeInRange(heute.UeberfaelligeRechnungen - 3, heute.UeberfaelligeRechnungen + 3);
         spaeter.UeberfaelligeAufgaben.ShouldBeInRange(heute.UeberfaelligeAufgaben - 3, heute.UeberfaelligeAufgaben + 3);
         spaeter.OffeneAufgaben.ShouldBeInRange(heute.OffeneAufgaben - 5, heute.OffeneAufgaben + 5);
-        TestContext.Current.TestOutputHelper?.WriteLine($"heute:   {heute}\nspäter:  {spaeter}");
     }
 
     [Theory]
