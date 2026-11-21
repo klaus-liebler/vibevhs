@@ -17,19 +17,81 @@ namespace VibeVHS.Infrastructure;
 
 public static class Registrierung
 {
-    /// <param name="strengeAbfragepruefung">Abfragen ohne eindeutige Sortierung brechen ab (Entwicklung, Tests) statt nur protokolliert zu werden.</param>
-    /// <param name="basisVerzeichnis">Relative Datenbankpfade werden hierzu aufgelöst (Inhaltsverzeichnis der Anwendung).</param>
-    public static IServiceCollection AddVibeVhsInfrastruktur(this IServiceCollection dienste, IConfiguration konfiguration,
-        string basisVerzeichnis, bool strengeAbfragepruefung = false)
+    /// <summary>
+    /// Liest die Verbindungszeichenfolge (ConnectionStrings:VibeVHS bzw. ConnectionStrings__VibeVHS) und löst relative Pfade auf.
+    /// Fehlt sie, gilt „Data Source=data/vibevhs.db“; ist sie ungültig, bricht der Start mit einer verständlichen Meldung ab.
+    /// </summary>
+    public static SqliteConnectionStringBuilder Datenbankverbindung(string? wert, string basisVerzeichnis)
     {
-        var verbindung = new SqliteConnectionStringBuilder(konfiguration.GetConnectionString("VibeVHS") ?? "Data Source=data/vibevhs.db");
+        const string hinweis = "Erwartet z. B. „Data Source=/var/lib/vibevhs/vibevhs.db“. In einer systemd-Unit die ganze Zuweisung " +
+                               "in Anführungszeichen setzen: Environment=\"ConnectionStrings__VibeVHS=Data Source=…\" (sonst trennt systemd am Leerzeichen).";
+        SqliteConnectionStringBuilder verbindung;
+        try
+        {
+            verbindung = new SqliteConnectionStringBuilder(string.IsNullOrWhiteSpace(wert) ? "Data Source=data/vibevhs.db" : wert);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidOperationException($"Ungültige Datenbank-Verbindungszeichenfolge ConnectionStrings:VibeVHS = „{wert}“. {hinweis}", ex);
+        }
+
+        if (string.IsNullOrWhiteSpace(verbindung.DataSource))
+        {
+            throw new InvalidOperationException($"Datenbank-Verbindungszeichenfolge ConnectionStrings:VibeVHS = „{wert}“ nennt keine Datei (Data Source fehlt). {hinweis}");
+        }
+
         if (!Path.IsPathRooted(verbindung.DataSource) && verbindung.DataSource != ":memory:")
         {
             verbindung.DataSource = Path.GetFullPath(Path.Combine(basisVerzeichnis, verbindung.DataSource));
         }
 
-        dienste.AddDbContext<VibeVhsDbContext>(o => o.UseSqlite(verbindung.ToString(),
-            s => s.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)).Konfigurieren(strengeAbfragepruefung));
+        return verbindung;
+    }
+
+    /// <summary>
+    /// Verbindung der Kommentar-Datenbank: ConnectionStrings:Kommentare, sonst „kommentare.db“ im Verzeichnis der (ersten)
+    /// Hauptdatenbank; liegt diese im Arbeitsspeicher, unter data/ im Basisverzeichnis.
+    /// </summary>
+    public static string KommentarVerbindung(IConfiguration konfiguration, string hauptverbindung, string basisVerzeichnis)
+    {
+        if (konfiguration.GetConnectionString("Kommentare") is { Length: > 0 } eigene)
+        {
+            return Datenbankverbindung(eigene, basisVerzeichnis).ToString();
+        }
+
+        var haupt = new SqliteConnectionStringBuilder(hauptverbindung).DataSource;
+        var verzeichnis = haupt == ":memory:" ? Path.Combine(basisVerzeichnis, "data") : Path.GetDirectoryName(Path.GetFullPath(haupt))!;
+        return new SqliteConnectionStringBuilder { DataSource = Path.Combine(verzeichnis, "kommentare.db") }.ToString();
+    }
+
+    /// <param name="strengeAbfragepruefung">Abfragen ohne eindeutige Sortierung brechen ab (Entwicklung, Tests) statt nur protokolliert zu werden.</param>
+    /// <param name="basisVerzeichnis">Relative Datenbankpfade werden hierzu aufgelöst (Inhaltsverzeichnis der Anwendung).</param>
+    public static IServiceCollection AddVibeVhsInfrastruktur(this IServiceCollection dienste, IConfiguration konfiguration,
+        string basisVerzeichnis, bool strengeAbfragepruefung = false)
+    {
+        // Anzeige- und Eingabezeitzone (Einstellung „Zeitzone“, z. B. Europe/Berlin); ohne Einstellung die Systemzeitzone des Servers.
+        Domain.Gemeinsam.Zeitzone.Festlegen(konfiguration["Zeitzone"]);
+
+        // Mandanten (Vorbereitung „eine Datenbank je VHS“): Mandanten:<Kennung>:Datenbank / :Host; ohne Eintrag genau ein Mandant „standard“.
+        var mandanten = konfiguration.GetSection("Mandanten").GetChildren()
+            .Select(m => new Application.Betrieb.Mandant(m.Key, Datenbankverbindung(m["Datenbank"], basisVerzeichnis).ToString(), m["Host"]))
+            .ToList();
+        if (mandanten.Count == 0)
+        {
+            mandanten.Add(new Application.Betrieb.Mandant("standard", Datenbankverbindung(konfiguration.GetConnectionString("VibeVHS"), basisVerzeichnis).ToString()));
+        }
+
+        dienste.AddSingleton(new Application.Betrieb.Mandanten(mandanten));
+        dienste.AddScoped<Application.Betrieb.Mandantenkontext>();
+        dienste.AddDbContext<VibeVhsDbContext>((d, o) => o.UseSqlite(d.GetRequiredService<Application.Betrieb.Mandantenkontext>().Aktuell.Verbindung,
+            s => s.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)).Konfigurieren(strengeAbfragepruefung)
+            .AddInterceptors(StichzeitBeimLaden.Instanz));
+
+        // Kommentare zu Spezifikation/Doku: eigene Datei (Standard: kommentare.db neben der Hauptdatenbank), übersteht deren Neuanlage.
+        var kommentarOrt = new Dokumentation.KommentarDatenbankOrt(KommentarVerbindung(konfiguration, mandanten[0].Verbindung, basisVerzeichnis));
+        dienste.AddSingleton(kommentarOrt);
+        dienste.AddDbContext<Dokumentation.KommentarDbContext>(o => o.UseSqlite(kommentarOrt.Verbindung).Konfigurieren(strengeAbfragepruefung));
+        dienste.AddScoped<Application.Dokumentation.IKommentarSpeicher, Dokumentation.KommentarSpeicher>();
 
         dienste.AddScoped<IPersonenSpeicher, PersonenSpeicher>();
         dienste.AddScoped<INachrichtenSpeicher, NachrichtenSpeicher>();
@@ -42,6 +104,7 @@ public static class Registrierung
         dienste.AddScoped<StartdatenLader>();
         dienste.AddScoped<DublettenSuche>();
         dienste.AddScoped<IDublettenSuche>(d => d.GetRequiredService<DublettenSuche>());
+        dienste.AddScoped<Application.Programm.INamensquelle, Namensquelle>();
         dienste.AddScoped<PersonenAbfrage>();
         dienste.AddScoped<IPersonenAbfrage>(d => d.GetRequiredService<PersonenAbfrage>());
         dienste.AddScoped<IPersonenExport>(d => d.GetRequiredService<PersonenAbfrage>());

@@ -1,3 +1,4 @@
+using VibeVHS.Domain.Gemeinsam;
 using Microsoft.EntityFrameworkCore;
 using VibeVHS.Application.Finanzen;
 using VibeVHS.Application.Sicherheit;
@@ -67,7 +68,7 @@ internal static class FinanzMapping
             b.ToTable("Finanzeinstellungen");
             b.HasKey(x => x.Id);
             b.Property(x => x.Id).ValueGeneratedNever();
-            b.Property(x => x.Mahnstufen).AlsJson();
+            b.AlsTabelle(x => x.Mahnstufen, "Mahnstufen", "FinanzeinstellungenId");
         });
 
         mb.Entity<SepaMandat>(b =>
@@ -98,7 +99,7 @@ internal static class FinanzMapping
             b.HasKey(x => x.Id);
             b.Property(x => x.Id).ValueGeneratedNever();
             b.Property(x => x.NachrichtId).HasMaxLength(35);
-            b.Property(x => x.Posten).AlsJson();
+            b.AlsTabelle(x => x.Posten, "Zahlungsposten", "ZahlungslaufId");
             b.Ignore(x => x.Aktiv);
         });
 
@@ -126,7 +127,7 @@ internal static class FinanzMapping
             b.ToTable("Mahnlaeufe");
             b.HasKey(x => x.Id);
             b.Property(x => x.Id).ValueGeneratedNever();
-            b.Property(x => x.Posten).AlsJson();
+            b.AlsTabelle(x => x.Posten, "Mahnposten", "MahnlaufId");
             b.Ignore(x => x.Aktiv);
         });
 
@@ -137,7 +138,7 @@ internal static class FinanzMapping
             b.Property(x => x.Id).ValueGeneratedNever();
             b.HasIndex(x => x.PersonId);
             b.Property(x => x.Modell).HasMaxLength(60);
-            b.Property(x => x.Parameter).AlsJson();
+            b.FeldAlsTabelle<Honorarvertrag, Eintrag>("_parameter", nameof(Honorarvertrag.Parameter), "HonorarvertragParameter", "HonorarvertragId", 200);
         });
 
         mb.Entity<Uebergabe>(b =>
@@ -216,11 +217,12 @@ internal sealed class FinanzSpeicher(VibeVhsDbContext db) : IFinanzSpeicher
             .ToDictionaryAsync(x => x.Key, x => x.Anwesend, abbruch);
         var abgeschlossen = await db.Set<Listenabschluss>().AsNoTracking().Where(l => ids.Contains(l.VeranstaltungId)).Select(l => l.VeranstaltungId).ToListAsync(abbruch);
         var zu = abgeschlossen.ToHashSet();
+        var ortNamen = await db.Orte.IgnoreAutoIncludes().AsNoTracking().ToDictionaryAsync(o => o.Id, o => o.Anzeige, abbruch);
         return termine.Where(v => kurse.ContainsKey(v.KursId)).Select(v =>
         {
             var k = kurse[v.KursId];
             return new Dozententermin(v.DozentId!.Value, v.Id, v.KursId, k.Kursnummer, arten.GetValueOrDefault(k.KursartId, "?"), k.Fachbereich, v.Beginn, v.Ende,
-                v.Ausgefallen, v.AusgefallenAm, v.Bemerkung, string.Join(" + ", v.Orte.Select(o => o.OrtName)), belegungen.Count(b => b.KursId == v.KursId),
+                v.Ausgefallen, v.AusgefallenAm, v.Bemerkung, string.Join(" + ", v.Orte.Select(o => ortNamen.GetValueOrDefault(o.OrtId, "?"))), belegungen.Count(b => b.KursId == v.KursId),
                 anwesend.TryGetValue(v.Id, out var n) ? n : zu.Contains(v.Id) ? 0 : null, belegungen.Count(b => b.KursId == v.KursId && b.Ermaessigt),
                 v.Orte.FirstOrDefault()?.OrtId);
         }).ToList();

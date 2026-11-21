@@ -24,6 +24,12 @@ var deutsch = CultureInfo.GetCultureInfo("de-DE");
 CultureInfo.DefaultThreadCurrentCulture = deutsch;
 CultureInfo.DefaultThreadCurrentUICulture = deutsch;
 
+// Healthcheck im Container (das aspnet-Image hat kein curl): „dotnet VibeVHS.Web.dll --gesundheit“ fragt /gesund ab.
+if (args.Contains("--gesundheit"))
+{
+    return await VibeVHS.Web.Betrieb.Gesundheit.PruefenAsync(Environment.GetEnvironmentVariable("GESUNDHEIT_URL") ?? "http://127.0.0.1:8080/gesund");
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSerilog((dienste, log) => log
@@ -65,6 +71,8 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<BenutzerKontext>();
 builder.Services.AddScoped<IAktuellerBenutzer, AktuellerBenutzer>();
 builder.Services.AddScoped<Vorgang>();
+// Hilfe, Spezifikation und Doku (docs/**/*.md, beim Bauen nach Dokumentation/ kopiert).
+builder.Services.AddSingleton<VibeVHS.Web.Dokumentation.Dokumentkatalog>(_ => new());
 
 // Handy-Test im lokalen Netz (Profil "lan"): HTTPS auf allen Schnittstellen, öffentliche Adresse = LAN-IP.
 VibeVHS.Web.LanBetrieb.Einrichten(builder);
@@ -94,8 +102,22 @@ builder.Services.AddDataProtection()
 var hinterProxy = builder.Configuration.GetValue("ReverseProxy:Aktiv", false);
 if (hinterProxy)
 {
+    // Vertraut werden nur Proxys aus Loopback und den konfigurierten Netzen (Docker: Netz des Proxy-Containers).
+    var netze = builder.Configuration.GetSection("ReverseProxy:VertrauteNetze").Get<string[]>() ?? [];
     builder.Services.Configure<ForwardedHeadersOptions>(o =>
-        o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost);
+    {
+        o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+        foreach (var netz in netze)
+        {
+            o.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(netz));
+        }
+
+        // Nur der eigene Hostname wird als X-Forwarded-Host übernommen.
+        if (builder.Configuration["ReverseProxy:Host"] is { Length: > 0 } host)
+        {
+            o.AllowedHosts = [host];
+        }
+    });
 }
 
 var app = builder.Build();
@@ -104,7 +126,23 @@ foreach (var plugin in honorarPlugins)
     app.Logger.LogInformation("Honorarmodell-Plugin geladen: {Plugin}", plugin);
 }
 
-await DatenbankInitialisierung.InitialisierenAsync(app.Services);
+try
+{
+    await DatenbankInitialisierung.InitialisierenAsync(app.Services);
+}
+catch (DatenbankschemaVeraltetException fehler)
+{
+    // Entwicklungsphase ohne Migrationen: klare Meldung statt Absturz mit unverständlichen SQL-Fehlern.
+    app.Logger.LogCritical("{Meldung}", fehler.Message);
+    Console.Error.WriteLine(fehler.Message);
+    return 2;
+}
+catch (VibeVHS.Infrastructure.Dokumentation.KommentarSchemaException fehler)
+{
+    app.Logger.LogCritical("{Meldung}", fehler.Message);
+    Console.Error.WriteLine(fehler.Message);
+    return 2;
+}
 
 // Startdaten der VHS (Briefkopf, Fachbereiche, Benutzerkonten). Idempotent: lädt nur, was noch fehlt.
 var startdaten = app.Configuration["Startdaten:Datei"] ?? Path.Combine("Startdaten", "testbenutzer-vhs-egs.json");
@@ -136,31 +174,7 @@ await using (var bereich = app.Services.CreateAsyncScope())
 
 if (app.Configuration.GetValue("Demodaten:Anlegen", false))
 {
-    await Demodaten.AnlegenAsync(app.Services);
-    await Demodaten.MassendatenAnlegenAsync(app.Services, app.Configuration.GetValue("Demodaten:Massendaten", 0));
-    await ProgrammDemodaten.AnlegenAsync(app.Services);
-    // Nachgereichte Demodaten dürfen den Start einer bestehenden Instanz nie verhindern.
-    foreach (var (name, anlegen) in new (string, Func<IServiceProvider, Task>)[]
-             {
-                 ("Anmeldungen", AnmeldungDemodaten.AnlegenAsync),
-                 ("Qualifikationen", QualifikationsDemodaten.AnlegenAsync),
-                 ("Sprachfreigaben", QualifikationsDemodaten.SprachfreigabenAnlegenAsync),
-                 ("Merkmal-Typen", MerkmalDemodaten.AnlegenAsync),
-                 ("Teilnehmendenportal", TeilnehmendenDemodaten.AnlegenAsync),
-                 ("Durchführung", DurchfuehrungDemodaten.AnlegenAsync),
-                 ("Integration", IntegrationDemodaten.AnlegenAsync),
-                 ("Finanzen", FinanzDemodaten.AnlegenAsync),
-             })
-    {
-        try
-        {
-            await anlegen(app.Services);
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or Microsoft.EntityFrameworkCore.DbUpdateException)
-        {
-            app.Logger.LogWarning(ex, "Demodaten {Name} konnten nicht angelegt werden", name);
-        }
-    }
+    await Demodaten.AllesAnlegenAsync(app.Services, app.Configuration.GetValue("Demodaten:Massendaten", 0), app.Logger);
 }
 
 if (hinterProxy)
@@ -192,6 +206,10 @@ VibeVHS.Web.Sicherheit.DozierendenBereich.UseDozierendenBereich(app);
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+// Lebenszeichen für Container-Healthcheck und Proxy: Datenbank erreichbar? Ohne Anmeldung, ohne Inhalte.
+app.MapGet("/gesund", async (VibeVhsDbContext db) => await db.Database.CanConnectAsync()
+    ? Results.Text("ok")
+    : Results.Text("Datenbank nicht erreichbar", statusCode: StatusCodes.Status503ServiceUnavailable)).DisableRateLimiting();
 app.MapPost("/abmelden", async (HttpContext http) =>
 {
     await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
@@ -334,6 +352,19 @@ app.MapGet("/postausgang/{id:guid}/anhang", async (Guid id, VibeVHS.Application.
         ? Results.File(System.Text.Encoding.UTF8.GetBytes(inhalt), n.AnhangTyp ?? "application/octet-stream", name)
         : Results.NotFound()).RequireAuthorization();
 
+// Kommentare zu Spezifikation und Doku als Markdown (zum Einarbeiten); Rechte prüft der Dienst.
+app.MapGet("/dokumentation/kommentare.md", async (VibeVHS.Application.Dokumentation.KommentarDienst kommentare) =>
+{
+    try
+    {
+        return Results.File(System.Text.Encoding.UTF8.GetBytes(await kommentare.AlsMarkdownAsync()), "text/markdown; charset=utf-8", "kommentare-vibevhs.md");
+    }
+    catch (InvalidOperationException)
+    {
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    }
+}).RequireAuthorization();
+
 // Excel-Export der Personenliste mit den aktuellen Filtern. Jeder Export wird protokolliert (DSGVO).
 app.MapGet("/personen/export", async (string? suche, string? rolle, string? status, int? fb, bool? dubletten,
     IPersonenExport export, IAuditProtokoll protokoll, VibeVhsDbContext db, TimeProvider uhr) =>
@@ -357,3 +388,4 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 await app.RunAsync();
+return 0;

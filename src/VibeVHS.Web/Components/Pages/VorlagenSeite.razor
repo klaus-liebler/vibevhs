@@ -33,6 +33,15 @@
             <h2>@gewaehlt.Bezeichnung</h2>
             <RadzenFormField Text="Betreff" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="betreff" @bind-Value:after="Vorschau" Disabled="@(!Pflegen.Erlaubt)" /></RadzenFormField>
             <RadzenFormField Text="Text" Variant="Variant.Outlined"><RadzenTextArea @bind-Value="text" @bind-Value:after="Vorschau" Rows="12" Disabled="@(!Pflegen.Erlaubt)" /></RadzenFormField>
+            <div class="vhs-row" title="Gilt für den Platzhalter {Anrede}. Ohne gepflegte Anrede (divers, keine Angabe) heißt es immer „Guten Tag Dr. Kim Muster“.">
+                <span class="vhs-small">Anrede {Anrede}:</span>
+                <RadzenRadioButtonList TValue="VibeVHS.Domain.Personen.Anredestil" @bind-Value="stil" @bind-Value:after="Vorschau" Disabled="@(!Pflegen.Erlaubt)" Orientation="Orientation.Horizontal">
+                    <Items>
+                        <RadzenRadioButtonListItem Text="förmlich („Sehr geehrte Frau Dr. Muster“)" Value="VibeVHS.Domain.Personen.Anredestil.Foermlich" />
+                        <RadzenRadioButtonListItem Text="informell („Guten Tag Frau Dr. Muster“)" Value="VibeVHS.Domain.Personen.Anredestil.Informell" />
+                    </Items>
+                </RadzenRadioButtonList>
+            </div>
             <div class="vhs-row">
                 <BegruendeterButton Text="Speichern" Icon="save" Freigabe="@Pflegen" Click="SpeichernAsync" />
                 <RadzenButton Text="Vorschau aktualisieren" Icon="visibility" ButtonStyle="ButtonStyle.Light" Click="Vorschau" />
@@ -49,6 +58,7 @@
     private IReadOnlyList<Textvorlage> vorlagen = [];
     private Textvorlage? gewaehlt;
     private string betreff = string.Empty, text = string.Empty;
+    private VibeVHS.Domain.Personen.Anredestil stil;
     private (string Betreff, string Text) vorschau;
     private Rolle? rolle;
 
@@ -71,17 +81,18 @@
         gewaehlt = v;
         betreff = v.Betreff;
         text = v.Text;
+        stil = v.Anredestil;
         Vorschau();
     }
 
-    private void Vorschau() => vorschau = VorlagenDienst.Vorschau(betreff, text);
+    private void Vorschau() => vorschau = VorlagenDienst.Vorschau(betreff, text, stil);
 
     private async Task SpeichernAsync()
     {
         try
         {
             var schluessel = gewaehlt!.Schluessel;
-            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VorlagenDienst>().AendernAsync(schluessel, betreff, text));
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VorlagenDienst>().AendernAsync(schluessel, betreff, text, anredestil: stil));
             Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", "Die Vorlage gilt ab sofort für neue Mails.");
             await LadenAsync();
             gewaehlt = vorlagen.First(v => v.Schluessel == schluessel);

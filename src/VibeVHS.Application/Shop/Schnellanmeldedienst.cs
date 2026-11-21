@@ -70,6 +70,7 @@ public sealed class Schnellanmeldedienst(
         var ermaessigt = (await anmeldung.ErmaessigungHeuteAsync(personId, abbruch)) is not null && entgelt?.ErmaessigtCent is not null;
         var zahlart = await ZahlartAsync(personId, abbruch);
         var termine = kurs.Veranstaltungen.Where(v => !v.Ausgefallen).OrderBy(v => v.Beginn).ToList();
+        var namen = await anmeldung.NamenAsync(kurs, abbruch);
         var status = pruefung.Code switch
         {
             Buchungscode.Buchbar => "Es ist ein Platz frei.",
@@ -77,7 +78,7 @@ public sealed class Schnellanmeldedienst(
             _ => pruefung.Erklaerung,
         };
         return new SchnellVorschau(kurs.Kursnummer, kurs.Titel, termine.FirstOrDefault()?.Beginn, ShopText.Zeiten(termine),
-            termine.FirstOrDefault()?.Orte.FirstOrDefault()?.OrtName, termine.Count, ermaessigt ? entgelt!.ErmaessigtCent : entgelt?.Cent, ermaessigt,
+            termine.FirstOrDefault()?.Orte.FirstOrDefault() is { } ersterOrt ? namen.Ort(ersterOrt.OrtId) : null, termine.Count, ermaessigt ? entgelt!.ErmaessigtCent : entgelt?.Cent, ermaessigt,
             zahlart, zahlart == Zahlart.Lastschrift ? "SEPA-Lastschrift (Ihr bestehendes Mandat)" : "Rechnung (Überweisung)",
             pruefung.Moeglich, pruefung.Code == Buchungscode.Warteliste, status, person.AktuellerName(jetzt).Vorname,
             optionen.AgbVersion, optionen.AgbUrl, optionen.DatenschutzVersion, optionen.DatenschutzUrl);
@@ -117,9 +118,8 @@ public sealed class Schnellanmeldedienst(
             var kostenpflichtig = e.Belegung.EntgeltCent > 0 && e.Belegung.Status != Belegungsstatus.Warteliste;
             if (kostenpflichtig && person.EMail is { Length: > 0 } mail && mail != "–" && !person.IstAnonymisiert)
             {
-                var name = person.AktuellerName(uhr.GetLocalNow());
                 await post.KundenmailEinreihenAsync(mail, person.Anzeigename, $"Ihre Schnellanmeldung: {kurs.Titel}",
-                    $"Guten Tag {name.Vorname} {name.Nachname},\n\nSie haben sich soeben über Ihren persönlichen Link für „{kurs.Titel}“ ({kurs.Kursnummer}) angemeldet "
+                    $"{person.Briefanrede(uhr.GetLocalNow())},\n\nSie haben sich soeben über Ihren persönlichen Link für „{kurs.Titel}“ ({kurs.Kursnummer}) angemeldet "
                     + $"(Entgelt {e.Belegung.Entgelt}).\n\nWaren Sie das nicht, oder möchten Sie es sich anders überlegen? Bis {(jetzt + KostenfreieFrist).ToLocalTime():dd.MM.yyyy HH:mm} Uhr "
                     + $"können Sie sich hier kostenlos wieder abmelden, danach gelten die Abmeldefristen der AGB:\n{stornoLink(token)}\n\n"
                     + "Ihr persönlicher Link ist nur für Sie bestimmt. Bitte geben Sie ihn nicht weiter; bei Verlust sperrt der Teilnehmerservice ihn sofort.",

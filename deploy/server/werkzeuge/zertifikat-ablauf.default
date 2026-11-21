@@ -1,0 +1,7 @@
+# Einstellungen für /usr/local/sbin/zertifikat-ablauf (täglicher Timer zertifikat-ablauf.timer)
+# Geprüfte Zertifikate (Leerzeichen-getrennt)
+DATEIEN="/etc/ssl/liebler/fullchain.pem"
+# Ab wie vielen Tagen vor Ablauf gewarnt wird
+WARNTAGE=30
+# Optional: Mailadresse für die Warnung (braucht ein Mailprogramm auf dem Server, z. B. Paket bsd-mailx mit Relay)
+MAIL_AN=""

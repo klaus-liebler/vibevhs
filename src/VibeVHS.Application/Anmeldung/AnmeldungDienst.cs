@@ -153,7 +153,9 @@ public sealed class AnmeldungDienst(
         var jetzt = uhr.GetLocalNow();
         var bestehend = belegungen.Where(b => b.PersonId == person.Id && b.Offen).Select(b => (Belegungsstatus?)b.Status).FirstOrDefault();
         var reserviert = reservierungen is null ? 0 : await reservierungen.ReserviertAsync(kurs.Id, auftrag.Warenkorb, abbruch);
-        var lage = new Buchungslage(belegungen.Count(b => b.HaeltPlatz) + reserviert, belegungen.Count(b => b.Status == Belegungsstatus.Warteliste), bestehend);
+        var auftraggeber = kurs.AuftraggeberId is { } ag ? (await programm.LadenAsync([], [], [ag], abbruch)).Organisation(ag) : null;
+        var lage = new Buchungslage(belegungen.Count(b => b.HaeltPlatz) + reserviert, belegungen.Count(b => b.Status == Belegungsstatus.Warteliste), bestehend,
+            auftraggeber);
         var pruefung = Buchungspruefung.Pruefen(kurs, person, weg, auftrag.BevollmaechtigterId, lage, jetzt);
         var ueberbuchen = auftrag.Ueberbuchen && pruefung.Ueberbuchbar;
         if (!pruefung.Moeglich && !(pruefung.Code == Buchungscode.Ausgebucht && ueberbuchen))
@@ -182,7 +184,7 @@ public sealed class AnmeldungDienst(
 
         var nachricht = warteplatz is null
             ? await BestaetigungAsync(person, kurs, belegung, abbruch)
-            : await MailAsync(person, Textvorlagen.Wartelisteneintrag, Werte(person, kurs, belegung, ("Warteplatz", warteplatz.Value.ToString(De))), null, abbruch);
+            : await MailAsync(person, Textvorlagen.Wartelisteneintrag, await WerteAsync(person, kurs, belegung, ("Warteplatz", warteplatz.Value.ToString(De))), null, abbruch);
         await speicher.SpeichernAsync(abbruch);
         return new AnmeldeErgebnis(belegung, pruefung, nachricht);
     }
@@ -315,7 +317,7 @@ public sealed class AnmeldungDienst(
             var person = await personen.LadenAsync(b.PersonId, abbruch);
             if (person is not null)
             {
-                await MailAsync(person, Textvorlagen.Kursabsage, Werte(person, kurs, b, ("Regel", grund)), null, abbruch);
+                await MailAsync(person, Textvorlagen.Kursabsage, await WerteAsync(person, kurs, b, ("Regel", grund)), null, abbruch);
             }
         }
 
@@ -335,7 +337,7 @@ public sealed class AnmeldungDienst(
         {
             b.Erinnern(jetzt);
             var person = await personen.LadenAsync(b.PersonId, abbruch);
-            if (person is not null && await MailAsync(person, Textvorlagen.Kurserinnerung, Werte(person, kurs, b), null, abbruch) is not null)
+            if (person is not null && await MailAsync(person, Textvorlagen.Kurserinnerung, await WerteAsync(person, kurs, b), null, abbruch) is not null)
             {
                 anzahl++;
             }
@@ -372,7 +374,7 @@ public sealed class AnmeldungDienst(
             var person = await personen.LadenAsync(b.PersonId, abbruch);
             if (person is not null)
             {
-                await MailAsync(person, Textvorlagen.Nachrueckangebot, Werte(person, kurs, b, ("Frist", $"{frist:dd.MM.yyyy, HH:mm} Uhr")), null, abbruch);
+                await MailAsync(person, Textvorlagen.Nachrueckangebot, await WerteAsync(person, kurs, b, ("Frist", $"{frist:dd.MM.yyyy, HH:mm} Uhr")), null, abbruch);
             }
         }
 
@@ -429,7 +431,7 @@ public sealed class AnmeldungDienst(
         if (person is not null)
         {
             await MailAsync(person, Textvorlagen.Stornobestaetigung,
-                Werte(person, kurs, b, ("Regel", regel.Erklaerung), ("Gebuehr", regel.Gebuehr.ToString())), null, abbruch);
+                await WerteAsync(person, kurs, b, ("Regel", regel.Erklaerung), ("Gebuehr", regel.Gebuehr.ToString())), null, abbruch);
         }
 
         if (hielt)
@@ -493,8 +495,8 @@ public sealed class AnmeldungDienst(
             $"{Pseudonym.Person(person.Id)} von {altKurs.Kursnummer} auf {neuKurs.Kursnummer} umgebucht · Gebühr {new Geld(gebuehr)} · neues Entgelt {neu.Entgelt} eingefroren",
             nameof(Person), person.Id, abbruch: abbruch);
         await MailAsync(person, Textvorlagen.Umbuchungsbestaetigung,
-            Werte(person, neuKurs, neu, ("Kursnummer", altKurs.Kursnummer), ("NeuerKurs", $"{neuKurs.Kursnummer} {neuKurs.Titel}"), ("Gebuehr", new Geld(gebuehr).ToString())),
-            Anhang(neuKurs), abbruch);
+            await WerteAsync(person, neuKurs, neu, ("Kursnummer", altKurs.Kursnummer), ("NeuerKurs", $"{neuKurs.Kursnummer} {neuKurs.Titel}"), ("Gebuehr", new Geld(gebuehr).ToString())),
+            await AnhangAsync(neuKurs), abbruch);
         if (hielt)
         {
             await NachrueckenAsync(altKurs, altBelegungen, abbruch);
@@ -528,7 +530,7 @@ public sealed class AnmeldungDienst(
         }
 
         await protokoll.ProtokollierenAsync(ergebnis.Code == Einbuchungscode.Eingebucht ? "Kontingent.Eingebucht" : "Kontingent.Warteliste",
-            $"{Pseudonym.Person(b.PersonId)} {(ergebnis.Code == Einbuchungscode.Eingebucht ? "eingebucht" : "auf die Warteliste gesetzt")}: {kurs.Kursnummer} am {v.Beginn:dd.MM.yyyy HH:mm} ({vo.OrtName}) · Kontingent: {Text(b.Kontingent)}",
+            $"{Pseudonym.Person(b.PersonId)} {(ergebnis.Code == Einbuchungscode.Eingebucht ? "eingebucht" : "auf die Warteliste gesetzt")}: {kurs.Kursnummer} am {v.Beginn:dd.MM.yyyy HH:mm} ({verzeichnis.Finden(vo.OrtId)?.Anzeige}) · Kontingent: {Text(b.Kontingent)}",
             nameof(Person), b.PersonId, abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
         return ergebnis;
@@ -580,7 +582,7 @@ public sealed class AnmeldungDienst(
             if (person is not null)
             {
                 await MailAsync(person, Textvorlagen.Einbuchungsbestaetigung,
-                    Werte(person, kurs, wartend, ("Veranstaltung", $"{v.Beginn:ddd dd.MM.yyyy, HH:mm} Uhr ({vo.OrtName})")), null, abbruch);
+                    await WerteAsync(person, kurs, wartend, ("Veranstaltung", $"{v.Beginn:ddd dd.MM.yyyy, HH:mm} Uhr ({verzeichnis.Finden(vo.OrtId)?.Anzeige})")), null, abbruch);
             }
 
             break;
@@ -643,8 +645,11 @@ public sealed class AnmeldungDienst(
     {
         var b = await BelegungAsync(belegungId, abbruch);
         var kurs = await KursAsync(b.KursId, abbruch);
-        return ($"{kurs.Kursnummer}-termine.ics", Kalenderdatei.Erzeugen(kurs, Termine(kurs, b), await EinrichtungAsync(abbruch), uhr.GetUtcNow()));
+        return ($"{kurs.Kursnummer}-termine.ics", Kalenderdatei.Erzeugen(kurs, Termine(kurs, b), await EinrichtungAsync(abbruch), uhr.GetUtcNow(), await programm.FuerKurseAsync([kurs], abbruch)));
     }
+
+    /// <summary>Namen (Orte, Lehrkräfte, Auftraggeber) eines Kurses zur Laufzeit.</summary>
+    public Task<Namen> NamenAsync(Kurs kurs, CancellationToken abbruch = default) => programm.FuerKurseAsync([kurs], abbruch);
 
     // ---------- Hilfen ----------
 
@@ -653,17 +658,18 @@ public sealed class AnmeldungDienst(
             ? kurs.Veranstaltungen.Where(v => b.Einbuchungen.ContainsKey(v.Id))
             : kurs.Veranstaltungen.Where(v => v.Ende >= uhr.GetLocalNow().LocalDateTime);
 
-    private (string, string, string)? Anhang(Kurs kurs, Belegung? b = null)
+    private async Task<(string, string, string)?> AnhangAsync(Kurs kurs, Belegung? b = null)
     {
+        var namen = await programm.FuerKurseAsync([kurs]);
         var termine = b is null ? kurs.Veranstaltungen.Where(v => v.Ende >= uhr.GetLocalNow().LocalDateTime) : Termine(kurs, b);
         var liste = termine.ToList();
-        return liste.Count == 0 ? null : ($"{kurs.Kursnummer}-termine.ics", "text/calendar", Kalenderdatei.Erzeugen(kurs, liste, "Volkshochschule", uhr.GetUtcNow()));
+        return liste.Count == 0 ? null : ($"{kurs.Kursnummer}-termine.ics", "text/calendar", Kalenderdatei.Erzeugen(kurs, liste, "Volkshochschule", uhr.GetUtcNow(), namen));
     }
 
     /// <summary>Bestätigung mit Kalenderdatei, persönlichem Check-in-Link (Gerät merken) und QR-Ausweis als Bild.</summary>
-    private Task<Guid?> BestaetigungAsync(Person person, Kurs kurs, Belegung b, CancellationToken abbruch)
+    private async Task<Guid?> BestaetigungAsync(Person person, Kurs kurs, Belegung b, CancellationToken abbruch)
     {
-        var werte = Werte(person, kurs, b);
+        var werte = await WerteAsync(person, kurs, b);
         List<Postausgang.Mailanhang> weitere = [];
         if (MailMoeglich(person))
         {
@@ -671,7 +677,7 @@ public sealed class AnmeldungDienst(
             weitere.Add(new Postausgang.Mailanhang("checkin-ausweis.svg", "image/svg+xml", qr.Svg(zugang.AusweisErzeugen(person.Id))));
         }
 
-        return MailAsync(person, Textvorlagen.Anmeldebestaetigung, werte, Anhang(kurs, b), abbruch, weitere);
+        return await MailAsync(person, Textvorlagen.Anmeldebestaetigung, werte, await AnhangAsync(kurs, b), abbruch, weitere);
     }
 
     private static bool MailMoeglich(Person person) => person.EMail is { Length: > 0 } m && m != "–" && !person.IstAnonymisiert;
@@ -688,6 +694,7 @@ public sealed class AnmeldungDienst(
         var vorschlag = Textvorlagen.Vorschlaege.First(v => v.Schluessel == vorlageSchluessel);
         vorlage ??= new Textvorlage(vorschlag.Schluessel, vorschlag.Bezeichnung, vorschlag.Betreff, vorschlag.Text, uhr.GetUtcNow(), "Vorschlag");
         werte["Einrichtung"] = await EinrichtungAsync(abbruch);
+        werte["Anrede"] = person.Briefanrede(uhr.GetLocalNow(), vorlage.Anredestil);
         var (betreff, text) = vorlage.Fuellen(werte);
         if (werte.TryGetValue("Checkinlink", out var checkin) && !text.Contains(checkin, StringComparison.Ordinal))
         {
@@ -700,8 +707,9 @@ public sealed class AnmeldungDienst(
 
     private static string ZeilenOhneLeere(string text) => text.Replace("\n\n\n", "\n\n", StringComparison.Ordinal);
 
-    private Dictionary<string, string> Werte(Person person, Kurs kurs, Belegung b, params (string, string)[] weitere)
+    private async Task<Dictionary<string, string>> WerteAsync(Person person, Kurs kurs, Belegung b, params (string, string)[] weitere)
     {
+        var verzeichnis = await programm.OrtsverzeichnisAsync();
         var termine = kurs.Veranstaltungen.Where(v => !v.Ausgefallen).OrderBy(v => v.Beginn).ToList();
         var erster = termine.FirstOrDefault(v => v.Ende >= uhr.GetLocalNow().LocalDateTime) ?? termine.FirstOrDefault();
         var frist = kurs.ErsterTermin?.Date.AddDays(-kurs.Richtlinie.StornofristTage);
@@ -711,7 +719,7 @@ public sealed class AnmeldungDienst(
             ["Kursnummer"] = kurs.Kursnummer,
             ["Kurstitel"] = kurs.Titel,
             ["Beginn"] = erster is null ? "wird noch bekannt gegeben" : erster.Beginn.ToString("ddd dd.MM.yyyy, HH:mm 'Uhr'", De),
-            ["Ort"] = erster is null ? "–" : string.Join(" + ", erster.Orte.Select(o => o.OrtName)),
+            ["Ort"] = erster is null ? "–" : string.Join(" + ", erster.Orte.Select(o => verzeichnis.Finden(o.OrtId)?.Anzeige ?? "?")),
             ["Termine"] = kurs.Umfang == Kursumfang.Unbefristet ? "fortlaufend" : $"{termine.Count} Termine",
             ["Entgelt"] = b.Entgelt + (b.Ermaessigt ? " (ermäßigt)" : ""),
             ["Zahlart"] = BelegungAnzeige.Zahlart(b.Zahlart),

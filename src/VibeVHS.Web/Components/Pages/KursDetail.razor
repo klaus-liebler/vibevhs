@@ -1,4 +1,4 @@
-﻿@page "/kurse/{Id:guid}"
+@page "/kurse/{Id:guid}"
 @using VibeVHS.Application.Programm
 @using VibeVHS.Domain.Programm
 @inject Vorgang Vorgang
@@ -20,7 +20,7 @@
         <h1>@kurs.Kursnummer @kurs.Titel</h1>
         <p class="vhs-sub">
             <StatusPille Stil="@(kurs.Status == Kursstatus.Veroeffentlicht ? "gut" : kurs.Status == Kursstatus.Abgesagt ? "krit" : "neutral")">@KursAnzeige.Status(kurs.Status)</StatusPille>
-            FB @kurs.Fachbereich · @NutzungsartAnzeige.Text(kurs.Nutzungsart) · @KursAnzeige.Sichtbarkeit(kurs.Sichtbarkeit)@(kurs.AuftraggeberName is null ? "" : $" für {kurs.AuftraggeberName}")
+            FB @kurs.Fachbereich · @NutzungsartAnzeige.Text(verzeichnis!.NutzungsartVon(kurs)) · @KursAnzeige.Sichtbarkeit(kurs.Sichtbarkeit)@(namen.Organisation(kurs.AuftraggeberId) is { } ag ? $" für {ag}" : "")
             · @kurs.MinTeilnehmende–@kurs.MaxTeilnehmende Teilnehmende
         </p>
     </div>
@@ -31,7 +31,7 @@
             <a class="vhs-btn vhs-btn-light" href="@($"kurse/qr/{Uri.EscapeDataString(kurs.Kursnummer)}.svg")" download title="Vektorgrafik für den Druck">SVG</a>
         }
         <BegruendeterButton Text="Veröffentlichen" Icon="public" Freigabe="@VeroeffentlichenFreigabe" Click="@(() => StatusAsync(Kursstatus.Veroeffentlicht))" />
-        <BegruendeterButton Text="Absagen" Icon="cancel" ButtonStyle="ButtonStyle.Light" Freigabe="@AbsagenFreigabe" Click="@(() => StatusAsync(Kursstatus.Abgesagt))" />
+        <BegruendeterButton Text="Absagen …" Icon="cancel" ButtonStyle="ButtonStyle.Light" Freigabe="@AbsagenFreigabe" Click="@(() => { absageOffen = true; absageGrund = null; })" />
     </div>
 </div>
 
@@ -43,6 +43,29 @@
 }
 
 <NaechsteSchritte Titel="Wie geht es weiter?" Schritte="@folgeschritte" />
+
+@if (absageOffen && kurs.Status != Kursstatus.Abgesagt)
+{
+    @* Absage mit Bestätigung und Grund; derselbe Dienst wie bei der Aufgabe „absagen oder durchführen?“ *@
+    var offeneBelegungen = teilnehmende.Count(t => t.Belegung.Offen);
+    var kuenftigeTermine = kurs.Veranstaltungen.Count(v => !v.Ausgefallen && v.Beginn >= Uhr.GetLocalNow().DateTime);
+    <section class="vhs-card vhs-einschub" id="kurs-absagen" aria-labelledby="h-absagen">
+        <div class="vhs-head"><h2 id="h-absagen">Kurs absagen</h2></div>
+        <div class="vhs-alert vhs-warn" role="note">
+            <b>@offeneBelegungen</b> offene Belegung(en) (Angemeldete, Warteliste, Nachrückangebote) werden ohne Gebühr aufgehoben;
+            die Personen bekommen eine Absage per Mail mit Übersetzungslink. <b>@kuenftigeTermine</b> künftige Termin(e) fallen aus.
+            Bereits gestellte Rechnungen werden im nächsten Rechnungslauf storniert. Die Absage lässt sich nicht zurücknehmen.
+        </div>
+        <label for="absage-grund" class="vhs-small"><b>Grund für die Teilnehmenden *</b> (steht in der Absage)</label>
+        <textarea id="absage-grund" class="vhs-textarea" rows="2" maxlength="300" @bind="absageGrund" @bind:event="oninput"
+                  placeholder="z. B. Mindestteilnehmerzahl nicht erreicht · Kursleitung erkrankt"></textarea>
+        <div class="vhs-row">
+            <BegruendeterButton Text="Absagen und Teilnehmende benachrichtigen" Icon="cancel" ButtonStyle="ButtonStyle.Danger" IsBusy="@absageLaeuft"
+                                Freigabe="@AbsageBestaetigenFreigabe" Click="AbsagenAsync" />
+            <RadzenButton Text="Abbrechen" ButtonStyle="ButtonStyle.Light" Click="@(() => absageOffen = false)" />
+        </div>
+    </section>
+}
 
 @if (nachrichtTermin is { } nt)
 {
@@ -63,7 +86,7 @@
     <section class="vhs-card">
         <h2>Kursdaten</h2>
         <dl class="vhs-kv">
-            <dt>Team</dt><dd>@(kurs.Team.Count == 0 ? "–" : string.Join(", ", kurs.Team.Select(t => t.Name + (t.Leitung ? " (Leitung)" : ""))))</dd><dd></dd>
+            <dt>Team</dt><dd>@(kurs.Team.Count == 0 ? "–" : string.Join(", ", kurs.Team.Select(t => namen.Team(kurs, t) + (t.Leitung ? " (Leitung)" : ""))))</dd><dd></dd>
             <dt>Serie</dt><dd>@SerieText</dd><dd></dd>
             <dt>Entgelt</dt>
             <dd>
@@ -138,11 +161,11 @@
                     var e = EignungAm(t.PersonId, AenderungsTag);
                     if (e is null || e.Geeignet)
                     {
-                        <button class="vhs-chip @(aDozent == t.PersonId ? "on" : "")" title="@(e?.Code == Eignungscode.Ausnahme ? "mit Ausnahme" : "geeignet")" @onclick="@(() => aDozent = t.PersonId)">@t.Name</button>
+                        <button class="vhs-chip @(aDozent == t.PersonId ? "on" : "")" title="@(e?.Code == Eignungscode.Ausnahme ? "mit Ausnahme" : "geeignet")" @onclick="@(() => aDozent = t.PersonId)">@namen.Team(kurs, t)</button>
                     }
                     else
                     {
-                        <span class="vhs-why" tabindex="0" data-why="@($"{t.Name} am {AenderungsTag:dd.MM.yyyy}: {e.Begruendung}")"><button class="vhs-chip" disabled>@t.Name</button></span>
+                        <span class="vhs-why" tabindex="0" data-why="@($"{namen.Team(kurs, t)} am {AenderungsTag:dd.MM.yyyy}: {e.Begruendung}")"><button class="vhs-chip" disabled>@namen.Team(kurs, t)</button></span>
                     }
                 }
             </div>
@@ -169,7 +192,7 @@
         {
             var e = teamEignung.FirstOrDefault(x => x.PersonId == t.PersonId);
             <div>
-                <span class="vhs-grow"><a href="@($"personen/{t.PersonId}")">@t.Name</a> @if (t.Leitung) { <StatusPille Stil="neutral">Leitung</StatusPille> }</span>
+                <span class="vhs-grow"><a href="@($"personen/{t.PersonId}")">@namen.Team(kurs, t)</a> @if (t.Leitung) { <StatusPille Stil="neutral">Leitung</StatusPille> }</span>
                 @if (e is null || kurs.BenoetigteDozierendenmerkmale.Count == 0) { }
                 else if (e.Geeignet)
                 {
@@ -223,7 +246,7 @@
     }
     @foreach (var a in ausnahmen)
     {
-        <p class="vhs-small vhs-muted" style="margin:0">Ausnahme: @(kurs.Team.FirstOrDefault(t => t.PersonId == a.PersonId)?.Name ?? "?") · „@(verzeichnis.Katalog.GetValueOrDefault(a.Schluessel)?.Name ?? a.Schluessel)“ · @a.Begruendung · @a.ErteiltVon, @a.ErteiltAm.ToLocalTime().ToString("dd.MM.yyyy")</p>
+        <p class="vhs-small vhs-muted" style="margin:0">Ausnahme: @namen.Person(a.PersonId) · „@(verzeichnis.Katalog.GetValueOrDefault(a.Schluessel)?.Name ?? a.Schluessel)“ · @a.Begruendung · @a.ErteiltVon, @a.ErteiltAm.ToLocalTime().ToString("dd.MM.yyyy")</p>
     }
 </section>
 
@@ -240,9 +263,9 @@
                         <td class="vhs-mono"><a href="@Ruecksprung.Detail($"anwesenheit/{v.Id}", Ruecksprung.Aktuell(Navigation))" title="Anwesenheitsliste" @onclick:stopPropagation="true">@v.Nummer</a></td>
                         <td>@v.Beginn.ToString("ddd dd.MM.yyyy")</td>
                         <td class="vhs-mono">@v.Beginn.ToString("HH:mm")–@v.Ende.ToString("HH:mm")</td>
-                        <td>@string.Join(" + ", v.Orte.Select(o => o.OrtName))</td>
+                        <td>@namen.Orte(v.Orte)</td>
                         <td class="vhs-small">
-                            @v.DozentName
+                            @namen.Dozent(v)
                             @if (betroffen.TryGetValue(v.Id, out var be))
                             {
                                 <span class="vhs-why" tabindex="0" data-why="@be.Begruendung"><StatusPille Stil="@(be.Geeignet ? "info" : "krit")">@(be.Geeignet ? "Ausnahme" : "Qualifikation fehlt")</StatusPille></span>
@@ -428,6 +451,7 @@
     private int? Neu { get; set; }
 
     private Kurs? kurs;
+    private Namen namen = Namen.Leer;
     private Ortsverzeichnis? verzeichnis;
     private IReadOnlyList<Ort> buchbareOrte = [];
     private IReadOnlyList<Konflikt> konflikte = [];
@@ -469,6 +493,35 @@
 
     private Freigabe AbsagenFreigabe => Planen.Und(() => kurs!.Status == Kursstatus.Abgesagt ? Freigabe.Nein("Der Kurs ist bereits abgesagt.") : Freigabe.Ja);
 
+    private bool absageOffen;
+    private string? absageGrund;
+    private bool absageLaeuft;
+
+    private Freigabe AbsageBestaetigenFreigabe => AbsagenFreigabe.Und(() => string.IsNullOrWhiteSpace(absageGrund)
+        ? Freigabe.Nein("Bitte zuerst einen Grund eingeben – er steht in der Absage an die Teilnehmenden.")
+        : Freigabe.Ja);
+
+    private async Task AbsagenAsync()
+    {
+        absageLaeuft = true;
+        try
+        {
+            var n = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<VibeVHS.Application.Anmeldung.AnmeldungDienst>().KursAbsagenAsync(Id, absageGrund!.Trim()));
+            absageOffen = false;
+            await LadenAsync();
+            Hinweise.Notify(NotificationSeverity.Success, "Kurs abgesagt", n == 0 ? "Es gab keine offenen Belegungen." : $"{n} Absage(n) liegen im Postausgang.");
+            folgeschritte = [new("Postausgang ansehen", "postausgang", "Absagen mit Übersetzungslink", Hauptschritt: n > 0), new("Raumplan ansehen", "raumplan"), new("Protokoll ansehen", "protokoll")];
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht abgesagt", ex.Message);
+        }
+        finally
+        {
+            absageLaeuft = false;
+        }
+    }
+
     private Freigabe AendernFreigabe => Planen.Und(() =>
         !TimeOnly.TryParse(aBeginn, out _) ? Freigabe.Nein("Beginn bitte als hh:mm eingeben.")
         : modus != "zusatz" && gewaehlt is null ? Freigabe.Nein("Bitte unten den Termin anklicken, der geändert werden soll.")
@@ -502,6 +555,7 @@
         {
             var p = d.GetRequiredService<IProgrammSpeicher>();
             kurs = await p.KursLadenAsync(Id);
+            namen = kurs is null ? Namen.Leer : await p.FuerKurseAsync([kurs]);
             verzeichnis = await p.OrtsverzeichnisAsync();
             teilnehmende = await d.GetRequiredService<VibeVHS.Application.Anmeldung.AnmeldungDienst>().TeilnehmendeAsync(Id);
             lage = VibeVHS.Application.Anmeldung.Einbuchungslage.Berechnen(teilnehmende.Select(t => t.Belegung));
@@ -614,8 +668,6 @@
     {
         await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().StatusSetzenAsync(Id, status));
         await LadenAsync();
-        folgeschritte = status == Kursstatus.Abgesagt
-            ? [new("Teilnehmende umbuchen oder abmelden", $"kurse/{Id}", "Je Belegung: Umbuchungsvorschläge oder kostenlose Abmeldung (Kurs abgesagt)", Hauptschritt: true)]
-            : [new("Person anmelden", $"anmeldung?kurs={Id}", Hauptschritt: true), new("Zur Kursliste", "kurse")];
+        folgeschritte = [new("Person anmelden", $"anmeldung?kurs={Id}", Hauptschritt: true), new("Zur Kursliste", "kurse")];
     }
 }

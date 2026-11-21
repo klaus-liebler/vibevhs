@@ -1,3 +1,4 @@
+using VibeVHS.Domain.Gemeinsam;
 using Microsoft.EntityFrameworkCore;
 using VibeVHS.Application.Portal;
 using VibeVHS.Application.Sicherheit;
@@ -5,6 +6,7 @@ using VibeVHS.Domain.Personen;
 using VibeVHS.Domain.Portal;
 using VibeVHS.Domain.Programm;
 using VibeVHS.Infrastructure.Datenbank;
+using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Infrastructure.Portal;
 
@@ -33,7 +35,7 @@ internal static class PortalMapping
             b.Property(x => x.Id).ValueGeneratedNever();
             b.HasIndex(x => x.PersonId);
             b.HasIndex(x => x.Status);
-            b.Property(x => x.Daten).AlsJson();
+            b.FeldAlsTabelle<Portalantrag, Eintrag>("_daten", nameof(Portalantrag.Daten), "PortalanliegenAngaben", "PortalanliegenId", 1000);
         });
     }
 }
@@ -56,11 +58,10 @@ internal sealed class PortalSpeicher(VibeVhsDbContext db) : IPortalSpeicher
 
     public Task<Portalantrag?> AntragAsync(Guid id, CancellationToken abbruch = default) => db.Set<Portalantrag>().FirstOrDefaultAsync(a => a.Id == id, abbruch);
 
-    /// <summary>Kurse mit der Person im Team (JSON-Spalte, Suche per LIKE auf die ID) oder als Leitung eines Termins.</summary>
+    /// <summary>Kurse mit der Person im Team (Tabelle KursTeam, Index auf PersonId) oder als Leitung eines Termins.</summary>
     public async Task<IReadOnlyList<Kurs>> KurseDerPersonAsync(Guid personId, CancellationToken abbruch = default)
     {
-        var muster = $"%{personId:D}%";
-        var imTeam = await db.Database.SqlQuery<Guid>($"SELECT Id AS Value FROM Kurse WHERE Team LIKE {muster} AND ArchiviertAm IS NULL").ToListAsync(abbruch);
+        var imTeam = await db.Kurse.IgnoreAutoIncludes().Where(k => k.ArchiviertAm == null && k.Team.Any(t => t.PersonId == personId)).Select(k => k.Id).ToListAsync(abbruch);
         var leitet = await db.Veranstaltungen.Where(v => v.DozentId == personId).Select(v => v.KursId).Distinct().ToListAsync(abbruch);
         var ids = imTeam.Concat(leitet).Distinct().ToList();
         return await db.Kurse.Include(k => k.Veranstaltungen).Where(k => ids.Contains(k.Id) && k.ArchiviertAm == null).ToListAsync(abbruch);
@@ -68,8 +69,8 @@ internal sealed class PortalSpeicher(VibeVhsDbContext db) : IPortalSpeicher
 
     public async Task<IReadOnlyList<Person>> PersonenMitEMailAsync(string eMail, CancellationToken abbruch = default)
     {
-        var mail = eMail.Trim().ToLower(System.Globalization.CultureInfo.InvariantCulture);
-        return await db.Personen.Where(p => p.EMail != null && p.EMail.ToLower() == mail).ToListAsync(abbruch);
+        var mitAdresse = db.MitEMail(eMail, DateOnly.FromDateTime(DateTime.Today));
+        return await db.Personen.Where(p => mitAdresse.Contains(p.Id)).OrderBy(p => p.Id).ToListAsync(abbruch);
     }
 
     public Task<Benutzerkonto?> KontoZurPersonAsync(Guid personId, CancellationToken abbruch = default)

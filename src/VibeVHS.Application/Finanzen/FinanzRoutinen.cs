@@ -29,6 +29,8 @@ public sealed class FinanzRoutinen(
 
     public async Task<Finanzlauf> TaeglichAsync(bool mailen = true, CancellationToken abbruch = default)
     {
+        // Zuerst Druckstücke nachholen, die beim Festschreiben gescheitert sind (z. B. fehlende Schrift), dann der Rechnungslauf.
+        await finanzen.DruckstueckeNachholenAsync(mailen, abbruch);
         var rechnungen = await finanzen.RechnungslaufAsync(mailen, abbruch);
 
         var lastschrift = await zahlungen.LastschriftVorschlagAsync(abbruch);

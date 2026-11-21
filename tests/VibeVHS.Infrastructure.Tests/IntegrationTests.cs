@@ -95,11 +95,11 @@ public class IntegrationTests
         dozentin.RolleHinzufuegen(Personenrolle.Dozierende, new DateOnly(2020, 1, 1), Erfassung.Erst(jetzt.AddYears(-5)));
         dozentin.BeschaeftigungAendernAb(Beschaeftigungsart.Freiberuflich, new DateOnly(2020, 1, 1), Erfassung.Erst(jetzt.AddYears(-5)));
         dozentin.AdresseHinzufuegen(null, "Marktstr. 1", "48268", "Greven", new DateOnly(2020, 1, 1), Erfassung.Erst(jetzt.AddYears(-5)));
-        var kurs = new Kurs("26H-401", "Integrationskurs Modul 1–2", semester, 4, art, 1, 20).MitTeam([new KursDozent(dozentin.Id, "Maria Rossi", true)]);
+        var kurs = new Kurs("26H-401", "Integrationskurs Modul 1–2", semester, 4, art, 1, 20).MitTeam([new KursDozent(dozentin.Id, true)]);
         kurs.SerieFestlegen(new Serienregel
         {
             Start = new DateOnly(2026, 11, 2), Anzahl = 6, Wochentage = [DayOfWeek.Monday], Beginn = new TimeOnly(8, 0), DauerMinuten = 240, OrtIds = [raum.Id],
-        }, Kalender.OhneFerien, _ => "A 1.10 Kursraum", new DateOnly(2027, 6, 30));
+        }, Kalender.OhneFerien, new DateOnly(2027, 6, 30));
         kurs.StatusSetzen(Kursstatus.Veroeffentlicht);
         var orte = new[] { ("48268", "Greven"), ("48282", "Emsdetten"), ("48429", "Rheine") };
         var liste = orte.Select((o, i) =>

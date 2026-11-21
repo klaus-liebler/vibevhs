@@ -1,0 +1,156 @@
+@page "/dokumentation"
+@page "/dokumentation/{Bereich}/{Name}"
+@using VibeVHS.Application.Dokumentation
+@using VibeVHS.Domain.Gemeinsam
+@using VibeVHS.Web.Dokumentation
+@inject Vorgang Vorgang
+@inject Dokumentkatalog Katalog
+
+@* Spezifikation und Doku in der Anwendung – Leitung, Verwaltungsleitung, Systemverwaltung; mit Kommentaren je Abschnitt. *@
+
+<PageTitle>@(dokument?.Titel ?? "Dokumentation") · VibeVHS</PageTitle>
+
+@if (!recht.Erlaubt)
+{
+    <div class="vhs-head"><div><h1>Dokumentation</h1></div></div>
+    <div class="vhs-alert vhs-info">@recht.Begruendung Die Hilfe zur Bedienung steht allen offen: <a href="hilfe">Hilfe</a>.</div>
+}
+else if (Bereich is null)
+{
+    <div class="vhs-head">
+        <div>
+            <h1>Dokumentation</h1>
+            <p class="vhs-sub">Spezifikation und technische Doku. Kommentare je Abschnitt – sie landen in einer eigenen Datei und gehen beim Neuaufbau der Testdatenbank nicht verloren.</p>
+        </div>
+        <div class="vhs-row">
+            <a class="rz-button rz-button-md rz-variant-outlined rz-primary" href="dokumentation/kommentare/alle">Alle Kommentare (@offeneGesamt offen)</a>
+        </div>
+    </div>
+
+    @foreach (var gruppe in Dokumentkatalog.Alle.GroupBy(d => d.Gruppe))
+    {
+        <section class="vhs-card">
+            <div class="vhs-head"><h2>@gruppe.Key</h2>
+                @if (gruppe.Key == Dokumentkatalog.GruppeSpezifikation)
+                {
+                    <span class="vhs-small vhs-muted">Maßgebliche Fassung, gepflegt im Repo zusammen mit dem Code (docs/spezifikation).</span>
+                }
+            </div>
+            <div class="vhs-list">
+                @foreach (var d in gruppe)
+                {
+                    var (gesamt, offenAnzahl) = Zaehlen(d.Schluessel);
+                    <div>
+                        <div class="vhs-grow"><a href="@d.Adresse"><b>@d.Titel</b></a><br /><span class="vhs-small vhs-muted">@d.Beschreibung</span></div>
+                        @if (gesamt > 0)
+                        {
+                            <StatusPille Stil="@(offenAnzahl > 0 ? "warn" : "neutral")">@gesamt Kommentar(e), @offenAnzahl offen</StatusPille>
+                        }
+                        @if (d.Archiv is { } url)
+                        {
+                            <a class="vhs-small vhs-muted" href="@url" target="_blank" rel="noopener" title="Stand 17.11.2026, nicht mehr gepflegt">Archiv ↗</a>
+                        }
+                    </div>
+                }
+            </div>
+        </section>
+    }
+}
+else if (Bereich == "kommentare")
+{
+    <div class="vhs-head">
+        <div>
+            <a href="dokumentation" class="vhs-small">← Dokumentation</a>
+            <h1>Alle Kommentare</h1>
+            <p class="vhs-sub">@alle.Count(f => !f.Start.Erledigt) offen, @alle.Count(f => f.Start.Erledigt) erledigt. Zum Einarbeiten als Markdown herunterladen.</p>
+        </div>
+        <div class="vhs-row"><a class="rz-button rz-button-md rz-variant-filled rz-primary" href="dokumentation/kommentare.md">Als Markdown herunterladen</a></div>
+    </div>
+    <nav class="vhs-chips" aria-label="Filter">
+        <a class="vhs-chip @(!MitErledigten ? "on" : "")" href="dokumentation/kommentare/alle">nur offene</a>
+        <a class="vhs-chip @(MitErledigten ? "on" : "")" href="dokumentation/kommentare/alle?erledigt=1">auch erledigte</a>
+    </nav>
+    <section class="vhs-card">
+        <div class="vhs-tbl">
+            <table>
+                <thead><tr><th>Dokument / Abschnitt</th><th>Kommentar</th><th>Von</th><th>Antworten</th><th>Status</th></tr></thead>
+                <tbody>
+                    @{ var sichtbar = alle.Where(f => MitErledigten || !f.Start.Erledigt).ToList(); }
+                    @if (sichtbar.Count == 0) { <tr><td colspan="5" class="vhs-muted">Keine Kommentare.</td></tr> }
+                    @foreach (var f in sichtbar)
+                    {
+                        var d = Dokumentkatalog.Finden(f.Start.Dokument);
+                        <tr>
+                            <td><a href="@($"{d?.Adresse ?? "dokumentation"}#{f.Start.Abschnitt}")">@(d?.Titel ?? f.Start.Dokument)</a><br />
+                                <span class="vhs-small vhs-muted">@(f.Start.AbschnittTitel.Length > 0 ? f.Start.AbschnittTitel : "ganzes Dokument")</span></td>
+                            <td class="vhs-kommentar-text">@f.Start.Text</td>
+                            <td class="vhs-small">@f.Start.VerfasstVonName<br /><span class="vhs-muted">@Zeitzone.Ortszeit(f.Start.Am).ToString("dd.MM.yyyy")</span></td>
+                            <td>@f.Antworten.Count</td>
+                            <td><StatusPille Stil="@(f.Start.Erledigt ? "gut" : "warn")">@(f.Start.Erledigt ? "erledigt" : "offen")</StatusPille></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+else if (dokument is null || abschnitte is null)
+{
+    <div class="vhs-head"><div><a href="dokumentation" class="vhs-small">← Dokumentation</a><h1>Dokument nicht gefunden</h1></div></div>
+    <div class="vhs-alert vhs-warn">Dieses Dokument gibt es in dieser Version nicht (oder die Datei fehlt in der Auslieferung).</div>
+}
+else
+{
+    <div class="vhs-head">
+        <div>
+            <a href="dokumentation" class="vhs-small">← Dokumentation</a>
+            <h1>@dokument.Titel</h1>
+            <p class="vhs-sub">@dokument.Gruppe · @dokument.Beschreibung</p>
+        </div>
+        @if (dokument.Archiv is { } url)
+        {
+            <div class="vhs-row"><a class="vhs-small vhs-muted" href="@url" target="_blank" rel="noopener" title="Stand 17.11.2026, nicht mehr gepflegt">Archivfassung (Claude Docs) ↗</a></div>
+        }
+    </div>
+    <DokumentAnsicht Dokument="@dokument" Abschnitte="@abschnitte" Kommentieren="true" />
+}
+
+@code {
+    [Parameter]
+    public string? Bereich { get; set; }
+
+    [Parameter]
+    public string? Name { get; set; }
+
+    [SupplyParameterFromQuery(Name = "erledigt")]
+    private int? Erledigt { get; set; }
+
+    private bool MitErledigten => Erledigt == 1;
+
+    private Freigabe recht = Freigabe.Ja;
+    private Dokument? dokument;
+    private IReadOnlyList<Abschnitt>? abschnitte;
+    private IReadOnlyList<Kommentarfaden> alle = [];
+    private int offeneGesamt;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        recht = Freigabe.NurFuer(rolle, KommentarDienst.Rollen);
+        if (!recht.Erlaubt)
+        {
+            return;
+        }
+
+        alle = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<KommentarDienst>().AlleAsync());
+        offeneGesamt = alle.Count(f => !f.Start.Erledigt);
+        dokument = Bereich is null or "kommentare" ? null : Dokumentkatalog.Finden($"{Bereich}/{Name}");
+        abschnitte = dokument is null ? null : Katalog.Laden(dokument, rolle);
+    }
+
+    private (int Gesamt, int Offen) Zaehlen(string schluessel)
+    {
+        var liste = alle.Where(f => f.Start.Dokument == schluessel).ToList();
+        return (liste.Count, liste.Count(f => !f.Start.Erledigt));
+    }
+}

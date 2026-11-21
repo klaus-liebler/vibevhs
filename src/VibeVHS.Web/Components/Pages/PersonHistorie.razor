@@ -5,6 +5,7 @@
 @inject Vorgang Vorgang
 @inject TimeProvider Uhr
 @inject NavigationManager Navigation
+@inject NotificationService Hinweise
 
 <PageTitle>Datenhistorie · VibeVHS</PageTitle>
 
@@ -26,7 +27,9 @@
     </div>
 </div>
 
-<section class="vhs-card">
+<NaechsteSchritte Schritte="@folgeschritte" />
+
+<section class="vhs-card" id="stand">
     <h2>Stichtag</h2>
     <p class="vhs-small vhs-muted" style="margin:-6px 0 0">
         Wie war der Stand am …, und was war dazu am … bekannt? So arbeitet z. B. der Nachdruck eines alten Briefs.
@@ -90,9 +93,45 @@
                     }
                     <b>@Anzeige(e, e.NeuerWert)</b>
                 </div>
-                <div class="vhs-small vhs-muted">
-                    gültig @Zeitraum(e.GueltigVon, e.GueltigBis) · erfasst von @e.ErfasstVon · @e.Grund
+                <div class="vhs-row" style="justify-content:space-between">
+                    <span class="vhs-small vhs-muted">gültig @Zeitraum(e.GueltigVon, e.GueltigBis) · erfasst von @e.ErfasstVon · @e.Grund</span>
+                    <BegruendeterButton Text="Datum korrigieren" Icon="edit_calendar" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                        Freigabe="@KorrekturFreigabe(e)" Click="@(() => KorrekturOeffnen(e))" />
                 </div>
+                @if (korrekturFuer == e)
+                {
+                    <div class="vhs-card vhs-einschub" aria-label="Datum korrigieren">
+                        <b>Datum korrigieren: @e.Feld</b>
+                        <p class="vhs-small vhs-muted" style="margin:4px 0">
+                            Das Datum war falsch erfasst. Die bisherigen Angaben bleiben als ersetzt sichtbar; @(e.Korrektur == Stammdatenaenderung.Datumskorrektur.Umzug
+                                ? "die vorherige Adresse und das Kennzeichen „üblicher Aufenthaltsort“ werden mit korrigiert."
+                                : "die angrenzende Angabe wird mit verschoben.")
+                        </p>
+                        @if (e.Korrektur != Stammdatenaenderung.Datumskorrektur.Umzug && e.GueltigBis is not null)
+                        {
+                            <div class="vhs-row">
+                                <label class="vhs-small"><input type="radio" name="grenze" checked="@(!korrekturEnde)" @onchange="@(() => { korrekturEnde = false; korrekturNeu = e.GueltigVon; })" /> Beginn (gültig ab @e.GueltigVon.ToString("dd.MM.yyyy"))</label>
+                                <label class="vhs-small"><input type="radio" name="grenze" checked="@korrekturEnde" @onchange="@(() => { korrekturEnde = true; korrekturNeu = e.GueltigBis!.Value.AddDays(-1); })" /> Ende (gültig bis @e.GueltigBis.Value.AddDays(-1).ToString("dd.MM.yyyy"))</label>
+                            </div>
+                        }
+                        <div class="vhs-fields">
+                            <RadzenFormField Text="@(korrekturEnde ? "Richtig: gültig bis (einschließlich)" : "Richtig: gültig ab")" Variant="Variant.Outlined">
+                                <RadzenDatePicker TValue="DateOnly" @bind-Value="korrekturNeu" DateFormat="dd.MM.yyyy" />
+                            </RadzenFormField>
+                            <RadzenFormField Text="Grund bzw. Nachweis *" Variant="Variant.Outlined" Style="flex:1 1 320px">
+                                <RadzenTextBox @bind-Value="korrekturGrund" @bind-Value:event="oninput" Placeholder="z. B. Meldebescheinigung vom 20.09." />
+                            </RadzenFormField>
+                        </div>
+                        <div class="vhs-row">
+                            <BegruendeterButton Text="Korrektur speichern" Icon="save" Click="@(() => KorrigierenAsync(e))" Freigabe="@KorrekturSpeichernFreigabe(e)" IsBusy="@korrigiert" />
+                            <RadzenButton Text="Abbrechen" ButtonStyle="ButtonStyle.Light" Click="@(() => korrekturFuer = null)" />
+                        </div>
+                        @if (korrekturFehler is not null)
+                        {
+                            <div class="vhs-alert vhs-crit">@korrekturFehler</div>
+                        }
+                    </div>
+                }
             </li>
         }
     </ol>
@@ -109,6 +148,72 @@
     private PersonenStand? heute;
     private IReadOnlyList<HistorienEintrag> eintraege = [];
     private readonly HashSet<string> filter = [];
+    private VibeVHS.Application.Sicherheit.Rolle? rolle;
+    private HistorienEintrag? korrekturFuer;
+    private bool korrekturEnde, korrigiert;
+    private DateOnly korrekturNeu;
+    private string? korrekturGrund, korrekturFehler;
+    private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
+
+    private Freigabe KorrekturFreigabe(HistorienEintrag e)
+        => rolle is not { } r || !Stammdatenaenderung.DatumKorrigierenRollen.Contains(r)
+            ? Freigabe.Nein("Daten korrigieren dürfen Teilnehmerservice, Integrationskurs-Team, Verwaltungs- und Fachbereichsleitung sowie Leitung.")
+            : person?.Datenschutz != VibeVHS.Domain.Datenschutz.Datenschutzstatus.Aktiv
+                ? Freigabe.Nein("Die Person ist gesperrt oder anonymisiert; Stammdaten sind schreibgeschützt.")
+                : e.Ersetzt
+                    ? Freigabe.Nein("Diese Erfassung ist bereits ersetzt. Korrigiert wird immer der aktuelle Stand (nicht blass dargestellte Einträge).")
+                    : e.Art == Erfassungsart.Beendet
+                        ? Freigabe.Nein("Das ist das Ende einer Angabe. Bitte beim Eintrag davor „Ende“ korrigieren.")
+                        : e.Korrektur is null
+                            ? Freigabe.Nein("Für diese Angabe gibt es keine Datumskorrektur (nur Name, Angaben, Adressen und Adresskennzeichen).")
+                            : e.Korrektur == Stammdatenaenderung.Datumskorrektur.Umzug && e.Art == Erfassungsart.Ersterfassung
+                                ? Freigabe.Nein("Diese Adresse ist die erste erfasste Adresse; ihr Beginn ist kein Umzugsdatum. Bitte als Korrektur der Adresse erfassen.")
+                                : Freigabe.Ja;
+
+    private Freigabe KorrekturSpeichernFreigabe(HistorienEintrag e)
+        => string.IsNullOrWhiteSpace(korrekturGrund)
+            ? Freigabe.Nein("Bitte einen Grund bzw. Nachweis angeben (steht in der Datenhistorie).")
+            : NeueGrenze(e) == BisherigeGrenze(e)
+                ? Freigabe.Nein("Das neue Datum ist dasselbe wie bisher.")
+                : Freigabe.Ja;
+
+    private DateOnly BisherigeGrenze(HistorienEintrag e) => korrekturEnde ? e.GueltigBis!.Value : e.GueltigVon;
+
+    // Ende wird einschließlich eingegeben, gespeichert ist es ausschließlich (Tag danach).
+    private DateOnly NeueGrenze(HistorienEintrag e) => korrekturEnde ? korrekturNeu.AddDays(1) : korrekturNeu;
+
+    private void KorrekturOeffnen(HistorienEintrag e)
+    {
+        korrekturFuer = e;
+        korrekturEnde = false;
+        korrekturNeu = e.GueltigVon;
+        korrekturGrund = null;
+        korrekturFehler = null;
+    }
+
+    private async Task KorrigierenAsync(HistorienEintrag e)
+    {
+        korrigiert = true;
+        korrekturFehler = null;
+        try
+        {
+            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<Stammdatenaenderung>()
+                .DatumKorrigierenAsync(Id, e.Korrektur!.Value, e.KorrekturBezug, BisherigeGrenze(e), NeueGrenze(e), korrekturGrund!));
+            Hinweise.Notify(NotificationSeverity.Success, "Datum korrigiert", $"{e.Feld}: {(korrekturEnde ? "Ende" : "Beginn")} jetzt {korrekturNeu:dd.MM.yyyy}.");
+            korrekturFuer = null;
+            folgeschritte = [new NaechsterSchritt("Stand zum neuen Datum prüfen", $"personen/{Id}/historie#stand", "Wert am Stichtag mit dem korrigierten Datum ansehen", Hauptschritt: true),
+                new NaechsterSchritt("Zur Person", $"personen/{Id}")];
+            await OnParametersSetAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            korrekturFehler = ex.Message;
+        }
+        finally
+        {
+            korrigiert = false;
+        }
+    }
     private bool ersetzteZeigen = true;
     private DateOnly? stichtag;
     private DateTime? wissensstand;
@@ -129,6 +234,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        rolle ??= (await Vorgang.BenutzerAsync()).Rolle;
         person = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenSpeicher>().LadenAsync(Id));
         var jetzt = Uhr.GetLocalNow();
         if (person is not null)

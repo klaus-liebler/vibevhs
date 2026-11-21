@@ -12,7 +12,7 @@
 <div class="vhs-head">
     <div>
         <h1>Kurse</h1>
-        <p class="vhs-sub">@zeilen.Count Kurse@(semester is null ? "" : $" im {semester.Name}") · Konflikte werden beim Planen geprüft</p>
+        <p class="vhs-sub">@(zahlen?.Gesamt ?? 0) Kurse@(semester is null ? "" : $" im {semester.Name}") · Konflikte werden beim Planen geprüft</p>
     </div>
     <div class="vhs-row">
         <BegruendeterButton Text="Kurs anlegen" Icon="add" Freigabe="@Planen" Click="@(() => Navigation.NavigateTo("kurse/neu"))" />
@@ -49,7 +49,7 @@
         <RadzenDropDown TValue="Guid?" @bind-Value="semesterId" @bind-Value:after="LadenAsync" aria-label="Semester" Data="@alleSemester" TextProperty="Name" ValueProperty="Id" Style="min-width:180px" />
         <div class="vhs-suche" style="flex:1 1 280px">
             <RadzenIcon Icon="search" />
-            <input type="search" @bind="suche" @bind:event="oninput" @bind:after="LadenAsync" placeholder="Kursnummer oder Titel" aria-label="Kurse suchen" />
+            <input type="search" @bind="suche" @bind:event="oninput" @bind:after="SucheGeaendertAsync" placeholder="Kursnummer oder Titel" aria-label="Kurse suchen" />
         </div>
         <label class="vhs-small"><input type="checkbox" @bind="archivierte" @bind:after="LadenAsync" /> archivierte Kurse zeigen</label>
     </div>
@@ -57,46 +57,60 @@
         <span class="vhs-filter-lbl">Fachbereich</span>
         @foreach (var fb in fachbereiche)
         {
-            var n = alle.Count(z => z.Fachbereich == fb.Nr);
-            <button class="vhs-chip @(fachbereich == fb.Nr ? "on" : "")" title="@fb.Anzeige" disabled="@(n == 0)" @onclick="@(() => { fachbereich = fachbereich == fb.Nr ? null : fb.Nr; Filtern(); })" aria-pressed="@(fachbereich == fb.Nr ? "true" : "false")">FB @fb.Nr <span class="vhs-chip-n">@n</span></button>
+            var n = zahlen?.Fachbereiche.GetValueOrDefault(fb.Nr) ?? 0;
+            <button class="vhs-chip @(fachbereich == fb.Nr ? "on" : "")" title="@fb.Anzeige" disabled="@(n == 0)" @onclick="@(async () => { fachbereich = fachbereich == fb.Nr ? null : fb.Nr; await LadenAsync(); })" aria-pressed="@(fachbereich == fb.Nr ? "true" : "false")">FB @fb.Nr <span class="vhs-chip-n">@n</span></button>
         }
         <span class="vhs-filter-lbl">Status</span>
         @foreach (var s in Enum.GetValues<Kursstatus>())
         {
-            var n = alle.Count(z => z.Status == s);
-            <button class="vhs-chip @(status == s ? "on" : "")" disabled="@(n == 0)" @onclick="@(() => { status = status == s ? null : s; Filtern(); })" aria-pressed="@(status == s ? "true" : "false")">@KursAnzeige.Status(s) <span class="vhs-chip-n">@n</span></button>
+            var n = zahlen?.Status.GetValueOrDefault(s) ?? 0;
+            <button class="vhs-chip @(status == s ? "on" : "")" disabled="@(n == 0)" @onclick="@(async () => { status = status == s ? null : s; await LadenAsync(); })" aria-pressed="@(status == s ? "true" : "false")">@KursAnzeige.Status(s) <span class="vhs-chip-n">@n</span></button>
         }
     </div>
-    <div class="vhs-tbl" data-liste="kurse">
-        <table>
-            <thead><tr><th>Nr.</th><th>Titel</th><th>FB</th><th>Termine</th><th>Ort</th><th>Leitung</th><th>Plätze</th><th>Status</th></tr></thead>
-            <tbody>
-                @foreach (var z in zeilen)
-                {
-                    <tr class="vhs-klickzeile" data-zeile="@z.Id" @onclick="@(() => Navigation.NavigateTo(DetailLink(z.Id)))">
-                        <td class="vhs-mono">@z.Kursnummer</td>
-                        <td><a href="@DetailLink(z.Id)" @onclick:stopPropagation="true">@z.Titel</a>
-                            @if (z.Sichtbarkeit != Sichtbarkeit.Oeffentlich) { <StatusPille Stil="info">@KursAnzeige.Sichtbarkeit(z.Sichtbarkeit)</StatusPille> }
-                            @if (z.Umfang == Kursumfang.Unbefristet) { <StatusPille Stil="neutral">fortlaufend</StatusPille> }
-                        </td>
-                        <td>@z.Fachbereich</td>
-                        <td class="vhs-small">@(z.ErsterTermin is { } e ? $"{e:ddd dd.MM.} {e:HH:mm}" : "–")@(z.Termine > 1 ? $" · {z.Termine}×" : "")</td>
-                        <td class="vhs-small">@z.Ort</td>
-                        <td class="vhs-small">@z.Leitung</td>
-                        <td class="vhs-mono">@z.MaxTeilnehmende</td>
-                        <td><StatusPille Stil="@(z.Status == Kursstatus.Veroeffentlicht ? "gut" : z.Status == Kursstatus.Abgesagt ? "krit" : "neutral")">@KursAnzeige.Status(z.Status)</StatusPille></td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+    <div class="vhs-vliste-kopf vhs-kursliste" aria-hidden="true">
+        <span>Nr.</span><span>Titel</span><span>FB</span><span>Termine</span><span>Ort</span><span>Leitung</span><span>Plätze</span><span>Status</span>
     </div>
+    <div class="vhs-vliste" role="list" aria-label="Kurse" data-liste="kurse">
+        <Virtualize @ref="liste" TItem="KursZeile" ItemsProvider="BlockLadenAsync" ItemComparer="@GleicheId" ItemSize="46" OverscanCount="15" Context="z">
+            <ItemContent>
+                <a @key="z.Id" class="vhs-vzeile vhs-kursliste" role="listitem" data-zeile="@z.Id" href="@DetailLink(z.Id)">
+                    <span class="vhs-mono">@z.Kursnummer</span>
+                    <span class="vhs-ellipse"><b>@z.Titel</b>
+                        @if (z.Sichtbarkeit != Sichtbarkeit.Oeffentlich) { <StatusPille Stil="info">@KursAnzeige.Sichtbarkeit(z.Sichtbarkeit)</StatusPille> }
+                        @if (z.Umfang == Kursumfang.Unbefristet) { <StatusPille Stil="neutral">fortlaufend</StatusPille> }
+                    </span>
+                    <span>@z.Fachbereich</span>
+                    <span class="vhs-small">@(z.ErsterTermin is { } e ? $"{e:ddd dd.MM.} {e:HH:mm}" : "–")@(z.Termine > 1 ? $" · {z.Termine}×" : "")</span>
+                    <span class="vhs-small vhs-ellipse">@z.Ort</span>
+                    <span class="vhs-small vhs-ellipse">@z.Leitung</span>
+                    <span class="vhs-mono">@z.MaxTeilnehmende</span>
+                    <span><StatusPille Stil="@(z.Status == Kursstatus.Veroeffentlicht ? "gut" : z.Status == Kursstatus.Abgesagt ? "krit" : "neutral")">@KursAnzeige.Status(z.Status)</StatusPille></span>
+                </a>
+            </ItemContent>
+            <Placeholder>
+                <div class="vhs-vzeile vhs-muted">wird geladen …</div>
+            </Placeholder>
+            <EmptyContent>
+                <div class="vhs-vzeile vhs-muted">Keine Kurse gefunden. Suchbegriff kürzen oder Filter zurücksetzen.</div>
+            </EmptyContent>
+        </Virtualize>
+    </div>
+    <p class="vhs-small vhs-muted" style="margin:0">@(zahlen?.Gesamt ?? 0) Treffer · beim Scrollen werden je @Blockgroesse weitere nachgeladen</p>
 </section>
 
 @code {
     private IReadOnlyList<Semester> alleSemester = [];
     private IReadOnlyList<Fachbereich> fachbereiche = [];
-    private IReadOnlyList<KursZeile> alle = [];
-    private List<KursZeile> zeilen = [];
+    private const int Blockgroesse = 50;
+
+    private static readonly IEqualityComparer<KursZeile> GleicheId = EqualityComparer<KursZeile>.Create((a, b) => a?.Id == b?.Id, z => z.Id.GetHashCode());
+
+    private Virtualize<KursZeile>? liste;
+    private Kurszahlen? zahlen;
+    private readonly List<KursZeile> geladen = [];
+    private bool ende;
+    private readonly SemaphoreSlim ladesperre = new(1, 1);
+    private CancellationTokenSource? sucheVerzoegerung;
     private Semester? semester;
     private Guid? semesterId;
     private string? suche;
@@ -153,19 +167,72 @@
         await LadenAsync();
     }
 
+    private KursFilter Filter => new(semesterId, fachbereich, status, suche, archivierte);
+
+    /// <summary>Filter oder Semester geändert: Zähler neu, Liste von vorn (Keyset-Blöcke lädt Virtualize beim Scrollen nach).</summary>
     private async Task LadenAsync()
     {
         semester = alleSemester.FirstOrDefault(s => s.Id == semesterId);
-        alle = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IProgrammSpeicher>().KurseAsync(new KursFilter(semesterId, Suche: suche, Archivierte: archivierte)));
-        Filtern();
-    }
+        zahlen = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IProgrammSpeicher>().KurszahlenAsync(Filter));
+        await ladesperre.WaitAsync();
+        try
+        {
+            geladen.Clear();
+            ende = false;
+        }
+        finally
+        {
+            ladesperre.Release();
+        }
 
-    private void Filtern()
-    {
-        zeilen = alle.Where(z => (fachbereich is null || z.Fachbereich == fachbereich) && (status is null || z.Status == status)).ToList();
+        if (liste is not null)
+        {
+            await liste.RefreshDataAsync();
+        }
+
         if (zustandSchreiben)
         {
             Ruecksprung.ZustandSetzen(Navigation, ListenUrl);
+        }
+    }
+
+    /// <summary>Suche mit kurzer Verzögerung (nicht bei jedem Tastendruck neu laden).</summary>
+    private async Task SucheGeaendertAsync()
+    {
+        sucheVerzoegerung?.Cancel();
+        sucheVerzoegerung = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(250, sucheVerzoegerung.Token);
+            await LadenAsync();
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    /// <summary>Virtualize fragt nach Positionen; geladen wird per Keyset (Kursnummer) in Blöcken, bis die Position erreicht ist.</summary>
+    private async ValueTask<ItemsProviderResult<KursZeile>> BlockLadenAsync(ItemsProviderRequest anfrage)
+    {
+        await ladesperre.WaitAsync(anfrage.CancellationToken);
+        try
+        {
+            var filter = Filter;
+            while (!ende && (geladen.Count == 0 || geladen.Count < anfrage.StartIndex + anfrage.Count))
+            {
+                var nach = geladen.Count == 0 ? null : geladen[^1].Kursnummer;
+                var block = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IProgrammSpeicher>()
+                    .KurseAsync(filter with { NachKursnummer = nach, Anzahl = Blockgroesse }, anfrage.CancellationToken));
+                geladen.AddRange(block);
+                ende = block.Count < Blockgroesse;
+            }
+
+            var gesamt = ende ? geladen.Count : Math.Max(zahlen?.Gesamt ?? 0, geladen.Count + 1);
+            return new ItemsProviderResult<KursZeile>(geladen.Skip(anfrage.StartIndex).Take(anfrage.Count).ToList(), gesamt);
+        }
+        finally
+        {
+            ladesperre.Release();
         }
     }
 

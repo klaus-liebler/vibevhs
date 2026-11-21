@@ -27,11 +27,12 @@ internal static class IntegrationDemodaten
             return;
         }
 
+        var z = await Demozeit.LadenAsync(db, d.GetRequiredService<TimeProvider>());
         var integration = d.GetRequiredService<IntegrationDienst>();
         var qr = d.GetRequiredService<IQrCode>();
         var notizen = new List<string>();
         var nr = 0;
-        foreach (var (kursnummer, bamf, art) in new[] { ("26H-401", "IK-2026-11-0401", Integrationskursart.Allgemein), ("26H-402", "IK-2026-10-0402", Integrationskursart.Alphabetisierung) })
+        foreach (var (kursnummer, bamf, art) in new[] { (z.Nr("26H-401"), $"IK-{z.D(2026, 11, 2):yyyy-MM}-0401", Integrationskursart.Allgemein), (z.Nr("26H-402"), $"IK-{z.D(2026, 10, 12):yyyy-MM}-0402", Integrationskursart.Alphabetisierung) })
         {
             if (await db.Kurse.IgnoreAutoIncludes().FirstOrDefaultAsync(k => k.Kursnummer == kursnummer) is not { } kurs)
             {
@@ -45,7 +46,7 @@ internal static class IntegrationDemodaten
                 var pid = belegungen[i].PersonId;
                 var befreit = i % 3 != 1;
                 await integration.BerechtigungErfassenAsync(pid, i % 2 == 0 ? Berechtigungsart.Berechtigungsschein : Berechtigungsart.Verpflichtung, $"TN-{4711000 + nr++}",
-                    i % 2 == 0 ? "BAMF" : "Jobcenter Kreis Steinfurt", new DateOnly(2026, 8, 1).AddDays(i), new DateOnly(2027, 8, 1), art == Integrationskursart.Allgemein ? 700 : 1000,
+                    i % 2 == 0 ? "BAMF" : "Jobcenter Kreis Steinfurt", z.D(2026, 8, 1).AddDays(i), z.D(2027, 8, 1), art == Integrationskursart.Allgemein ? 700 : 1000,
                     befreit, befreit ? "Bezug von Bürgergeld" : null, befreit && i % 2 == 0);
                 if (i < belegungen.Count - 2)
                 {
@@ -62,7 +63,7 @@ internal static class IntegrationDemodaten
         }
 
         // Eine vergangene Anwesenheit mit „Zweifel“ beim Sichtvergleich → vorläufig, Aufgabe Ausweiskontrolle
-        if (await db.Kurse.IgnoreAutoIncludes().FirstOrDefaultAsync(k => k.Kursnummer == "26H-401") is { } k401
+        if (await db.Kurse.IgnoreAutoIncludes().FirstOrDefaultAsync(k => k.Kursnummer == z.Nr("26H-401")) is { } k401
             && await db.Set<Anwesenheit>().Where(a => a.KursId == k401.Id && a.Status == Anwesenheitsstatus.Anwesend).OrderByDescending(a => a.Datum).ThenBy(a => a.Id).FirstOrDefaultAsync() is { } a)
         {
             a.VorlaeufigSetzen(IntegrationDienst.GrundZweifel);
@@ -70,9 +71,9 @@ internal static class IntegrationDemodaten
             notizen.Add("1 vorläufige Anwesenheit (Zweifel)");
         }
 
-        if (await db.Kurse.IgnoreAutoIncludes().FirstOrDefaultAsync(k => k.Kursnummer == "26H-401") is { } kurs401)
+        if (await db.Kurse.IgnoreAutoIncludes().FirstOrDefaultAsync(k => k.Kursnummer == z.Nr("26H-401")) is { } kurs401)
         {
-            await integration.PruefungAnlegenAsync(Pruefungsart.Dtz, new DateTime(2027, 2, 20, 9, 0, 0), "vhs-Haus Emsdetten, A 1.10", kurs401.Id);
+            await integration.PruefungAnlegenAsync(Pruefungsart.Dtz, z.DT(2027, 2, 20, 9, 0), "vhs-Haus Emsdetten, A 1.10", kurs401.Id);
         }
 
         await d.GetRequiredService<IntegrationRoutinen>().AufgabenAbgleichenAsync();

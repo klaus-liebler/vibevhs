@@ -167,7 +167,14 @@ public sealed class Portalantrag
     public string Text { get; private set; }
 
     /// <summary>Strukturierte Angaben (z. B. IBAN, Kontoinhaber; Wochentage; Merkmal).</summary>
-    public Dictionary<string, string> Daten { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile).</remarks>
+    public IReadOnlyDictionary<string, string> Daten
+    {
+        get => Gemeinsam.Listenwerte.Woerterbuch(_daten);
+        private set => _daten = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Eintrag> _daten = [];
 
     /// <summary>Veranstaltung (Ausfall) oder Beleg (Honorareinwand).</summary>
     public Guid? BezugId { get; private set; }

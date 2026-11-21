@@ -86,16 +86,14 @@ public sealed class StartdatenLader(VibeVhsDbContext db, IAuditProtokoll protoko
                 rollen.Add(rolle);
             }
 
-            var person = await db.Personen.FirstOrDefaultAsync(p => p.Benutzerkennung == login, abbruch);
-            if (person is null)
-            {
-                var (titel, vorname, nachname) = NameZerlegen(b.Name);
-                person = Person.Anlegen(vorname, nachname, heute, jetzt, von: "Startdaten");
-                person.TitelSetzen(titel);
-                person.AlsMitarbeitendeVerknuepfen(login, heute, Erfassung.Erst(jetzt, "Startdaten", "Benutzerkonto aus den Startdaten"));
-                db.Personen.Add(person);
-                neuePersonen++;
-            }
+            // Die Verknüpfung Konto ↔ Person steht nur am Konto (Benutzerkonten.PersonId); ein neues Konto bekommt eine neue Person.
+            var (titel, vornameRoh, nachnameRoh) = NameZerlegen(b.Name);
+            var (vorname, vorsatz, nachname, zusatz) = Namensvorsatz.Zerlegen(vornameRoh, nachnameRoh);
+            var person = Person.Anlegen(vorname, nachname, heute, jetzt, von: "Startdaten", vorsatz: vorsatz, zusatz: zusatz);
+            person.TitelSetzen(titel);
+            person.AlsMitarbeitendeVerknuepfen(heute, Erfassung.Erst(jetzt, "Startdaten", "Benutzerkonto aus den Startdaten"));
+            db.Personen.Add(person);
+            neuePersonen++;
 
             db.Benutzerkonten.Add(new Benutzerkonto(login, b.Name, b.Funktion, rollen, b.Fachbereiche, person.Id, b.Hinweis));
             neueKonten++;
@@ -117,20 +115,14 @@ public sealed class StartdatenLader(VibeVhsDbContext db, IAuditProtokoll protoko
     /// <summary>"Dr. Kai Lüken" → ("Dr.", "Kai", "Lüken"). Der Nachname ist das letzte Wort.</summary>
     public static (string? Titel, string Vorname, string Nachname) NameZerlegen(string name)
     {
-        var teile = name.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-        var titel = new List<string>();
-        while (teile.Count > 2 && teile[0].EndsWith('.'))
-        {
-            titel.Add(teile[0]);
-            teile.RemoveAt(0);
-        }
-
+        var (titel, rest, _) = Titelerkennung.Abtrennen(name, null);
+        var teile = rest.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         if (teile.Count < 2)
         {
             throw new InvalidDataException($"Name „{name}“ braucht Vor- und Nachnamen.");
         }
 
-        return (titel.Count > 0 ? string.Join(' ', titel) : null, string.Join(' ', teile[..^1]), teile[^1]);
+        return (titel, string.Join(' ', teile[..^1]), teile[^1]);
     }
 }
 

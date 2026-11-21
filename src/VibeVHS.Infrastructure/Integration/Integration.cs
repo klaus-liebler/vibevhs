@@ -15,8 +15,8 @@ internal static class IntegrationMapping
             b.ToTable("Integrationskurse");
             b.HasKey(x => x.KursId);
             b.Property(x => x.BamfKursnummer).HasMaxLength(40);
-            b.Property(x => x.Abschnitte).AlsJson();
-            b.Property(x => x.Abrechnungen).AlsJson();
+            b.AlsTabelle(x => x.Abschnitte, "IntegrationskursAbschnitte", "IntegrationskursId");
+            b.AlsTabelle(x => x.Abrechnungen, "IntegrationskursAbrechnungen", "IntegrationskursId");
         });
 
         mb.Entity<Teilnahmeberechtigung>(b =>
@@ -128,7 +128,7 @@ internal sealed class IntegrationSpeicher(VibeVhsDbContext db) : IIntegrationSpe
     public async Task<IReadOnlyList<IkKurszeile>> IntegrationskurseAsync(CancellationToken abbruch = default)
     {
         var kurse = await db.Kurse.AsNoTracking().Include(k => k.Veranstaltungen)
-            .Where(k => k.Nutzungsart == Domain.Programm.Nutzungsart.Integrationskurs && k.ArchiviertAm == null).ToListAsync(abbruch);
+            .Where(k => db.Kursarten.Any(a => a.Id == k.KursartId && a.Nutzungsart == Domain.Programm.Nutzungsart.Integrationskurs) && k.ArchiviertAm == null).ToListAsync(abbruch);
         var daten = await db.Set<Integrationskursdaten>().AsNoTracking().ToDictionaryAsync(d => d.KursId, abbruch);
         return kurse.Select(k => new IkKurszeile(k.Id, k.Kursnummer, k.Titel, k.Status, k.ErsterTermin, daten.GetValueOrDefault(k.Id)?.BamfKursnummer,
                 daten.GetValueOrDefault(k.Id)?.KursbeginnGemeldetAm))

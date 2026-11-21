@@ -1,4 +1,4 @@
-@page "/personen"
+﻿@page "/personen"
 @using System.Diagnostics
 @using Microsoft.AspNetCore.Components.Web.Virtualization
 @using VibeVHS.Application.Personen
@@ -40,8 +40,17 @@
     <section class="vhs-card">
         <h2>Neue Person</h2>
         <div class="vhs-fields">
-            <RadzenFormField Text="Vorname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="vorname" @bind-Value:after="DublettenPruefenAsync" /></RadzenFormField>
+            <RadzenFormField Text="Titel" Variant="Variant.Outlined" Style="max-width:9em"><RadzenTextBox @bind-Value="titel" Placeholder="z. B. Dr." /></RadzenFormField>
+            <RadzenFormField Text="@(nurEinName ? "Vorname (keiner)" : "Vorname *")" Variant="Variant.Outlined">
+                <RadzenTextBox @bind-Value="vorname" @bind-Value:after="DublettenPruefenAsync" Disabled="@nurEinName"
+                               title="@(nurEinName ? "Nur ein Name laut Ausweis: Der Name steht im Feld Nachname, ein Vorname wird nicht erfasst." : null)" />
+            </RadzenFormField>
             <RadzenFormField Text="Nachname *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nachname" @bind-Value:after="DublettenPruefenAsync" /></RadzenFormField>
+            <RadzenFormField Text="Vorsatz" Variant="Variant.Outlined" Style="max-width:8em"><RadzenTextBox @bind-Value="vorsatz" Placeholder="z. B. von" title="Namensvorsatz wie „von“, „van der“: steht vor dem Nachnamen, sortiert wird nach dem Nachnamen" /></RadzenFormField>
+            <RadzenFormField Text="Namenszusatz" Variant="Variant.Outlined" Style="max-width:8em"><RadzenTextBox @bind-Value="zusatz" Placeholder="z. B. jun." /></RadzenFormField>
+            <label class="vhs-small" style="align-self:center" title="z. B. bei Ausweisen aus Indonesien oder Afghanistan: Der einzige Name kommt ins Feld Nachname.">
+                <input type="checkbox" @bind="nurEinName" @bind:after="NurEinNameGeaendertAsync" data-testid="nur-ein-name" /> Nur ein Name laut Ausweis
+            </label>
             <RadzenFormField Text="Geburtsdatum" Variant="Variant.Outlined">
                 <RadzenDatePicker TValue="DateOnly?" @bind-Value="geburtsdatum" @bind-Value:after="DublettenPruefenAsync" DateFormat="dd.MM.yyyy" />
             </RadzenFormField>
@@ -50,6 +59,20 @@
                 <RadzenDropDown TValue="string" @bind-Value="sprache" Data="@Sprachen.Alle" TextProperty="Name" ValueProperty="Code" />
             </RadzenFormField>
         </div>
+        @if (Titelerkennung.Erkannt(vorname, nachname) is { } erkannt)
+        {
+            <div class="vhs-alert vhs-info" role="status" data-testid="titel-erkannt">
+                „@erkannt“ steht im Namen und sieht wie ein akademischer Grad aus. Titel werden getrennt gespeichert (für Anrede, Sortierung und Suche).
+                <RadzenButton Text="Als Titel übernehmen" Icon="school" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Info" Click="TitelUebernehmenAsync" />
+            </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(nachname) && string.IsNullOrWhiteSpace(vorsatz) && Namensvorsatz.Zerlegen(vorname, nachname!) is { Vorsatz.Length: > 0 } nv)
+        {
+            <div class="vhs-alert vhs-info" role="status" data-testid="vorsatz-erkannt">
+                „@nv.Vorsatz“ sieht wie ein Namensvorsatz aus. Getrennt gespeichert erscheint die Person unter „@nv.Nachname“ in der Liste und wird mit „@nv.Vorsatz @nv.Nachname“ angesprochen.
+                <RadzenButton Text="Als Vorsatz übernehmen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Info" Click="VorsatzUebernehmen" />
+            </div>
+        }
         @if (kandidaten.Count > 0)
         {
             <div class="vhs-alert vhs-warn" role="alert">
@@ -252,7 +275,8 @@
     private int? Neu { get; set; }
 
     private bool formularOffen, speichert, dublettenGeprueft;
-    private string? vorname, nachname, eMail, fehler;
+    private string? titel, vorname, nachname, eMail, fehler, vorsatz, zusatz;
+    private bool nurEinName;
     private string sprache = "de";
     private DateOnly? geburtsdatum;
     private IReadOnlyList<DublettenKandidat> kandidaten = [];
@@ -267,8 +291,8 @@
     private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
 
     private Freigabe SpeichernFreigabe =>
-        string.IsNullOrWhiteSpace(vorname) || string.IsNullOrWhiteSpace(nachname)
-            ? Freigabe.Nein("Bitte zuerst Vor- und Nachnamen eintragen (Pflichtfelder).")
+        (!nurEinName && string.IsNullOrWhiteSpace(vorname)) || string.IsNullOrWhiteSpace(nachname)
+            ? Freigabe.Nein(nurEinName ? "Bitte den Namen laut Ausweis im Feld Nachname eintragen." : "Bitte zuerst Vor- und Nachnamen eintragen (Pflichtfelder) – oder „Nur ein Name laut Ausweis“ ankreuzen.")
             : kandidaten.Count > 0 && !dublettenGeprueft
                 ? Freigabe.Nein("Es gibt eine mögliche Dublette. Bitte prüfen und bestätigen, dass es eine andere Person ist – oder die vorhandene Person öffnen.")
                 : Freigabe.Ja;
@@ -402,12 +426,43 @@
         _ => "info",
     };
 
+    private void VorsatzUebernehmen()
+    {
+        var (v, vs, n, z) = Namensvorsatz.Zerlegen(vorname, nachname ?? "");
+        (vorname, vorsatz, nachname) = (v, vs, n);
+        zusatz = string.IsNullOrWhiteSpace(zusatz) && z.Length > 0 ? z : zusatz;
+    }
+
+    private async Task NurEinNameGeaendertAsync()
+    {
+        if (nurEinName)
+        {
+            vorname = null;
+        }
+
+        await DublettenPruefenAsync();
+    }
+
+    private async Task TitelUebernehmenAsync()
+    {
+        var (erkannt, v, n) = Titelerkennung.Abtrennen(vorname, nachname);
+        if (erkannt is null || v.Length == 0 || n.Length == 0)
+        {
+            return;
+        }
+
+        titel = Titelerkennung.Zusammen(titel, erkannt);
+        vorname = v;
+        nachname = n;
+        await DublettenPruefenAsync();
+    }
+
     private async Task DublettenPruefenAsync()
     {
         dublettenGeprueft = false;
-        kandidaten = string.IsNullOrWhiteSpace(vorname) || string.IsNullOrWhiteSpace(nachname)
+        kandidaten = (!nurEinName && string.IsNullOrWhiteSpace(vorname)) || string.IsNullOrWhiteSpace(nachname)
             ? []
-            : await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IDublettenSuche>().KandidatenAsync(vorname!, nachname!, geburtsdatum));
+            : await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IDublettenSuche>().KandidatenAsync(nurEinName ? "" : vorname!, nachname!, geburtsdatum));
     }
 
     private async Task SpeichernAsync()
@@ -417,8 +472,8 @@
         try
         {
             var person = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<PersonenDienst>()
-                .AnlegenAsync(vorname!, nachname!, geburtsdatum, eMail, sprache));
-            var name = $"{vorname} {nachname}";
+                .AnlegenAsync(nurEinName ? "" : vorname!, nachname!, geburtsdatum, eMail, sprache, titel: titel, vorsatz: vorsatz, zusatz: zusatz));
+            var name = person.Anzeigename;
             Hinweise.Notify(NotificationSeverity.Success, "Gespeichert", $"{name} wurde angelegt und protokolliert.");
             folgeTitel = $"{name} wurde angelegt. Wie geht es weiter?";
             folgeschritte =
@@ -427,7 +482,8 @@
                 new("Zu einem Kurs anmelden", $"anmeldung?person={person.Id}", "Tresen-Assistent mit dieser Person starten"),
                 new("Weitere Person anlegen", "personen?neu=1"),
             ];
-            vorname = nachname = eMail = null;
+            titel = vorname = nachname = eMail = vorsatz = zusatz = null;
+            nurEinName = false;
             geburtsdatum = null;
             sprache = "de";
             kandidaten = [];

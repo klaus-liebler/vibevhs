@@ -86,4 +86,12 @@ public class SprachfreigabeTests
     [Fact]
     public void Anzeige_nennt_die_Sprache()
         => Anforderung.Anzeige("sprachfreigabe=Englisch", Katalog).ShouldBe("Lehrfreigabe Sprachkurs (Eignungsprüfung der vhs): Englisch");
+
+    [Fact]
+    public void Deutsch_DaF_DaZ_mit_Schraegstrich_ist_ein_Wert_und_laesst_sich_mit_anderen_kombinieren()
+    {
+        Anforderung.Werte("Deutsch (DaF/DaZ), Englisch").ShouldBe([Sprachfreigabe.DeutschWert, "Englisch"]);
+        Freigabe.WertPruefen("Deutsch (DaF/DaZ), Englisch").ShouldNotBeNull();
+        Anforderung.WertPasst("Englisch; Deutsch (DaF/DaZ)", Sprachfreigabe.DeutschWert).ShouldBeTrue();
+    }
 }

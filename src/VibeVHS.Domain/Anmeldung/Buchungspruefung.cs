@@ -46,7 +46,8 @@ public sealed record Buchungsergebnis(Buchungscode Code, string? Begruendung = n
 }
 
 /// <summary>Belegungslage eines Kurses und die bestehende Belegung der Person (falls vorhanden).</summary>
-public sealed record Buchungslage(int Belegt, int Wartend, Belegungsstatus? Bestehend = null);
+/// <param name="Auftraggeber">Name der beauftragenden Organisation (nur für die Meldung bei geschlossenen Kursen; zur Laufzeit gelesen).</param>
+public sealed record Buchungslage(int Belegt, int Wartend, Belegungsstatus? Bestehend = null, string? Auftraggeber = null);
 
 /// <summary>
 /// Die eine Buchungsprüfung für alle Wege (Tresen, Integrationskurs-Team, online, Auftraggeber).
@@ -135,7 +136,7 @@ public static class Buchungspruefung
             if (!dazu)
             {
                 return new(Buchungscode.GeschlossenZielgruppe,
-                    $"Geschlossener Kurs für {kurs.AuftraggeberName}. {person.Anzeigename} gehört laut Stammdaten nicht dazu.",
+                    $"Geschlossener Kurs für {lage.Auftraggeber ?? "eine beauftragende Organisation"}. {person.Anzeigename} gehört laut Stammdaten nicht dazu.",
                     "Zugehörigkeit zur Organisation an der Person eintragen, wenn das zutrifft.");
             }
         }

@@ -21,7 +21,9 @@ public sealed record StammdatenEingabe(
     string? Postleitzahl,
     string? Ort,
     string? Telefon,
-    string? EMail)
+    string? EMail,
+    string? Vorsatz = null,
+    string? Zusatz = null)
 {
     /// <summary>Die Anschrift, die der Dialog zeigt und ändert: üblicher Aufenthaltsort, sonst Briefanschrift, sonst die erste.</summary>
     public static Postadresse? Hauptanschrift(PersonenStand s) => s.Aufenthaltsort ?? s.BriefAn ?? s.Adressen.FirstOrDefault();
@@ -30,7 +32,8 @@ public sealed record StammdatenEingabe(
         s.Anrede, s.Titel, s.Name?.Vorname ?? "", s.Name?.Nachname ?? "", s.Geburtsname, s.Geburtsdatum, s.Geschlecht, s.Sprache,
         Hauptanschrift(s)?.Zusatz, Hauptanschrift(s)?.Strasse, Hauptanschrift(s)?.Postleitzahl, Hauptanschrift(s)?.Ort,
         (s.Rufnummern.FirstOrDefault(r => r.Bevorzugt) ?? s.Rufnummern.FirstOrDefault())?.Nummer,
-        (s.EMails.FirstOrDefault(e => e.Bevorzugt) ?? s.EMails.FirstOrDefault())?.Adresse);
+        (s.EMails.FirstOrDefault(e => e.Bevorzugt) ?? s.EMails.FirstOrDefault())?.Adresse,
+        s.Name?.Vorsatz ?? "", s.Name?.Zusatz ?? "");
 }
 
 /// <param name="Geaendert">Bezeichnungen der geänderten Felder (ohne Werte, für Meldung und Protokoll).</param>
@@ -55,9 +58,9 @@ public sealed class Stammdatenaenderung(IPersonenSpeicher speicher, IAuditProtok
             throw new ArgumentException("Bitte einen Grund bzw. Nachweis angeben (steht in der Datenhistorie).");
         }
 
-        if (string.IsNullOrWhiteSpace(neu.Vorname) || string.IsNullOrWhiteSpace(neu.Nachname))
+        if (string.IsNullOrWhiteSpace(neu.Nachname))
         {
-            throw new ArgumentException("Vor- und Nachname sind Pflicht.");
+            throw new ArgumentException("Der Nachname ist Pflicht (bei nur einem Namen laut Ausweis steht er dort, der Vorname bleibt leer).");
         }
 
         var person = await speicher.LadenAsync(personId, abbruch) ?? throw new InvalidOperationException("Person nicht gefunden.");
@@ -75,23 +78,18 @@ public sealed class Stammdatenaenderung(IPersonenSpeicher speicher, IAuditProtok
         var geaendert = new List<string>();
         static bool Anders(string? a, string? b) => !string.Equals((a ?? "").Trim(), (b ?? "").Trim(), StringComparison.Ordinal);
 
-        var nameNeu = Anders(alt.Vorname, neu.Vorname) || Anders(alt.Nachname, neu.Nachname);
+        var nameNeu = Anders(alt.Vorname, neu.Vorname) || Anders(alt.Nachname, neu.Nachname) || Anders(alt.Vorsatz, neu.Vorsatz) || Anders(alt.Zusatz, neu.Zusatz);
         if (nameNeu)
         {
             _ = korrektur
-                ? person.NameKorrigieren(neu.Vorname.Trim(), neu.Nachname.Trim(), datum, g, jetzt, von)
-                : person.NameAendernAb(neu.Vorname.Trim(), neu.Nachname.Trim(), datum, g, jetzt, von);
+                ? person.NameKorrigieren((neu.Vorname ?? "").Trim(), neu.Nachname.Trim(), datum, g, jetzt, von, neu.Vorsatz, neu.Zusatz)
+                : person.NameAendernAb((neu.Vorname ?? "").Trim(), neu.Nachname.Trim(), datum, g, jetzt, von, neu.Vorsatz, neu.Zusatz);
             geaendert.Add("Name");
-        }
-
-        if (Anders(alt.Titel, neu.Titel))
-        {
-            person.TitelSetzen(neu.Titel);
-            geaendert.Add("Titel");
         }
 
         foreach (var (art, a, n, feld) in new[]
                  {
+                     (MerkmalArt.Titel, alt.Titel, neu.Titel, "Titel"),
                      (MerkmalArt.Anrede, alt.Anrede, neu.Anrede, "Anrede"),
                      (MerkmalArt.Geschlecht, alt.Geschlecht, neu.Geschlecht, "Geschlecht"),
                      (MerkmalArt.Geburtsname, alt.Geburtsname, neu.Geburtsname, "Geburtsname"),
@@ -129,6 +127,65 @@ public sealed class Stammdatenaenderung(IPersonenSpeicher speicher, IAuditProtok
             nameof(Person), personId, abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
         return new StammdatenErgebnis(geaendert, nameNeu);
+    }
+
+    public static readonly Rolle[] DatumKorrigierenRollen =
+        [Rolle.Teilnehmerservice, Rolle.IntegrationskursTeam, Rolle.Fachbereichsleitung, Rolle.Verwaltungsleitung, Rolle.Leitung];
+
+    /// <summary>Was an einer Gültigkeitsgrenze korrigiert wird.</summary>
+    public enum Datumskorrektur
+    {
+        Umzug,
+        Name,
+        Angabe,
+        Kennzeichen,
+    }
+
+    /// <summary>
+    /// Gültigkeitsbeginn bzw. -ende korrigieren (Datum war falsch erfasst), z. B. „Umzugsdatum korrigieren“. Strenges Modell: die bisherigen
+    /// Zeilen bleiben als ersetzt erhalten, die Korrektur steht mit Grund in der Datenhistorie.
+    /// </summary>
+    /// <param name="bezug">Umzug: AdressId der neuen Adresse; Angabe: <see cref="MerkmalArt"/>; Kennzeichen: <see cref="AdressKennzeichenArt"/>.</param>
+    public async Task DatumKorrigierenAsync(Guid personId, Datumskorrektur was, string? bezug, DateOnly bisher, DateOnly neu, string grund,
+        CancellationToken abbruch = default)
+    {
+        if (string.IsNullOrWhiteSpace(grund))
+        {
+            throw new ArgumentException("Bitte einen Grund bzw. Nachweis angeben (steht in der Datenhistorie).");
+        }
+
+        var wer = await benutzer.ErmittelnAsync(abbruch);
+        if (wer.Rolle is not { } rolle || !DatumKorrigierenRollen.Contains(rolle))
+        {
+            throw new UnauthorizedAccessException("Daten korrigieren dürfen Teilnehmerservice, Integrationskurs-Team, Verwaltungs- und Fachbereichsleitung sowie Leitung.");
+        }
+
+        var person = await speicher.LadenAsync(personId, abbruch) ?? throw new InvalidOperationException("Person nicht gefunden.");
+        if (person.Datenschutz != Datenschutzstatus.Aktiv)
+        {
+            throw new InvalidOperationException("Die Person ist gesperrt oder anonymisiert; Stammdaten sind schreibgeschützt.");
+        }
+
+        var e = Erfassung.Korrektur(uhr.GetLocalNow(), grund.Trim(), wer.Anzeige);
+        switch (was)
+        {
+            case Datumskorrektur.Umzug:
+                person.UmzugsdatumKorrigieren(Guid.Parse(bezug ?? throw new ArgumentException("Bitte die neue Adresse angeben.")), neu, e);
+                break;
+            case Datumskorrektur.Name:
+                person.NamensaenderungsdatumKorrigieren(bisher, neu, e);
+                break;
+            case Datumskorrektur.Angabe:
+                person.AngabedatumKorrigieren(Enum.Parse<MerkmalArt>(bezug ?? throw new ArgumentException("Bitte die Angabe wählen.")), bisher, neu, e);
+                break;
+            default:
+                person.KennzeichendatumKorrigieren(Enum.Parse<AdressKennzeichenArt>(bezug ?? throw new ArgumentException("Bitte das Kennzeichen wählen.")), bisher, neu, e);
+                break;
+        }
+
+        await protokoll.ProtokollierenAsync("Person.DatumKorrigiert",
+            $"{Pseudonym.Person(personId)}: {was} – Datum {bisher:dd.MM.yyyy} korrigiert auf {neu:dd.MM.yyyy}", nameof(Person), personId, abbruch: abbruch);
+        await speicher.SpeichernAsync(abbruch);
     }
 
     private static void AnschriftUebernehmen(Person person, StammdatenEingabe alt, StammdatenEingabe neu, bool korrektur, DateOnly datum, Erfassung e,

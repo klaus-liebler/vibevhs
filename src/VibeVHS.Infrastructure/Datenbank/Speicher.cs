@@ -4,6 +4,7 @@ using VibeVHS.Application.Postausgang;
 using VibeVHS.Application.Protokoll;
 using VibeVHS.Application.Sicherheit;
 using VibeVHS.Domain.Personen;
+using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Infrastructure.Datenbank;
 
@@ -11,13 +12,23 @@ internal sealed class PersonenSpeicher(VibeVhsDbContext db) : IPersonenSpeicher
 {
     public void Hinzufuegen(Person person) => db.Personen.Add(person);
 
-    public Task<Person?> LadenAsync(Guid id, CancellationToken abbruch = default)
-        => db.Personen.FirstOrDefaultAsync(p => p.Id == id, abbruch);
+    public async Task<Person?> LadenAsync(Guid id, CancellationToken abbruch = default)
+    {
+        var p = await db.Personen.FirstOrDefaultAsync(p => p.Id == id, abbruch);
+        if (p is not null)
+        {
+            await Bevollmaechtigtennamen.ErgaenzenAsync(db, [p], abbruch);
+        }
+
+        return p;
+    }
 
     public async Task<IReadOnlyList<Person>> LadenAsync(IEnumerable<Guid> ids, CancellationToken abbruch = default)
     {
         var liste = ids.ToList();
-        return await db.Personen.Where(p => liste.Contains(p.Id)).ToListAsync(abbruch);
+        var personen = await db.Personen.Where(p => liste.Contains(p.Id)).ToListAsync(abbruch);
+        await Bevollmaechtigtennamen.ErgaenzenAsync(db, personen, abbruch);
+        return personen;
     }
 
     public void AusschlussHinzufuegen(DublettenAusschluss ausschluss) => db.DublettenAusschluesse.Add(ausschluss);
@@ -30,8 +41,7 @@ internal sealed class PersonenSpeicher(VibeVhsDbContext db) : IPersonenSpeicher
     public async Task<IReadOnlyDictionary<Guid, string>> AnzeigenamenAsync(IEnumerable<Guid> ids, CancellationToken abbruch = default)
     {
         var liste = ids.Distinct().ToList();
-        return await db.Personen.IgnoreAutoIncludes().AsNoTracking().Where(p => liste.Contains(p.Id))
-            .ToDictionaryAsync(p => p.Id, p => p.Anzeigename, abbruch);
+        return await db.AnzeigenamenAsync(liste, DateOnly.FromDateTime(DateTime.Today), abbruch);
     }
 
     public Task SpeichernAsync(CancellationToken abbruch = default) => db.SaveChangesAsync(abbruch);

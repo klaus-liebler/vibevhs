@@ -5,13 +5,13 @@ Kursleitungen und Teilnehmende; Routinen automatisiert, aber immer protokolliert
 
 ## Konzeptdokumente
 
-- Anforderungen: https://claude.ai/artifact/5zHT9KccZeiUj1xS1BmKNG
-- Architektur: https://claude.ai/artifact/XVL9kYS5XcAYwGsoDQ4CN3
-- Fahrplan: https://claude.ai/artifact/FFRgE1BfKbphyCYxcVz4S9
-- Shop-Konzept: https://claude.ai/artifact/VsQFogXRz3dzQYZajLgoMm
-- Prototyp: https://claude.ai/artifact/KR88btCTssLuRhCTYFGnbx
-- Im Repo: `docs/README.md` (Gesamtüberblick je Iteration), `docs/betrieb.md`, `docs/sicherheit.md`, `docs/webshop.md`,
-  `docs/dozierendenportal.md`, `docs/abnahme-a.md` (Abnahme-Drehbuch), `deploy/server/README-server.md` (Bereitstellung)
+**Spezifikation liegt in `docs/spezifikation/` und ist führend; bei fachlichen Änderungen die betroffene Spezifikationsdatei im selben Commit mitpflegen (FA-/NFA-Nummern nie neu vergeben).**
+Dateien: `anforderungen.md`, `architektur.md`, `fahrplan.md`, `buchungs-shop-plugin.md`, `prototyp-verwaltung.html`.
+Archiv (Stand 17.11.2026, nicht mehr gepflegt): die Claude Docs/Artifacts (Anforderungen 5zHT9KccZeiUj1xS1BmKNG, Architektur XVL9kYS5XcAYwGsoDQ4CN3, Fahrplan FFRgE1BfKbphyCYxcVz4S9,
+Shop VsQFogXRz3dzQYZajLgoMm, Prototyp KR88btCTssLuRhCTYFGnbx unter https://claude.ai/artifact/…) – nur noch als Archiv.
+
+- Im Repo: `docs/README.md` (Gesamtüberblick je Iteration), `docs/schnittstellen.md`, `docs/betrieb.md`, `docs/sicherheit.md`, `docs/webshop.md`,
+  `docs/dozierendenportal.md`, `docs/abnahme-a.md` (Abnahme-Drehbuch), `docs/bereitstellung.md` (Bereitstellung und Betrieb für Admins), `deploy/server/README-server.md` (Runbook)
 
 ## Stack und Struktur
 
@@ -23,12 +23,12 @@ PDFsharp/MigraDoc, QRCoder, html5-qrcode. **Nicht verwenden:** QuestPDF, Nager.D
 ```
 src/VibeVHS.Domain          Fachmodell (bitemporal: BitemporaleVersion, ZeitlicheHistorie), keine Abhängigkeiten
 src/VibeVHS.Application     Dienste/Anwendungsfälle, Ports (I…Speicher), Rechteprüfung, Protokoll
-src/VibeVHS.Infrastructure  EF Core (VibeVhsDbContext, Migrationen in Datenbank/Migrationen), Quartz-Jobs, PDF, Startdaten
+src/VibeVHS.Infrastructure  EF Core (VibeVhsDbContext, Schema per EnsureCreated – derzeit keine Migrationen), Quartz-Jobs, PDF, Startdaten
 src/VibeVHS.Adapters.Mocks  Testanmeldung, Mail/Schnittstellen, Übersetzer, Virenprüfung, Geokodierer, BAMF (Mocks)
 src/VibeVHS.Web             Blazor-Seiten (Components/Pages, Bausteine, Layout), Shop-API, Portale, Demodaten (Entwicklung/)
-tests/…                     Domain, Application, Infrastructure (SQLite in-memory mit Migrationen), Web (ShopTestHost), Shop.Komponente (Headless-Edge)
+tests/…                     Domain, Application, Infrastructure (SQLite in-memory, Schema wie im Betrieb), Web (ShopTestHost), Shop.Komponente (Headless-Edge)
 tools/Testdaten             Startdaten vhs EGS (testbenutzer-vhs-egs.json, logo), Beispiel-CSV für Importe
-deploy/server               Bereitstellungs-Kit (nur Branch deploy-vorbereitung)
+deploy/server               Bereitstellungs-Kit (Runbook, Schritt-Skripte, deploy.ps1)
 ```
 
 ## Befehle
@@ -36,8 +36,8 @@ deploy/server               Bereitstellungs-Kit (nur Branch deploy-vorbereitung)
 ```powershell
 dotnet build VibeVHS.slnx                                    # TreatWarningsAsErrors
 dotnet test --project tests/VibeVHS.Web.Tests [--filter-class "*Name*"]
-dotnet ef migrations add Name -p src/VibeVHS.Infrastructure -s src/VibeVHS.Infrastructure -o Datenbank/Migrationen
 node tests/Shop.Komponente/komponententest.mjs http://localhost:5199
+node tests/Touren/tourpruefung.mjs http://localhost:5199 [tour-id …]   # geführte Touren durchspielen (Hinweise = Schritte mit Vorarbeit)
 ```
 
 Läuft Klaus' Instanz (sperrt `src/VibeVHS.Web/bin`), mit eigenem Ausgabeordner bauen/testen: `--artifacts-path <temp>`.
@@ -46,6 +46,7 @@ Eigene Testinstanz: Port **5199**, eigene Datenbank (`ConnectionStrings__VibeVHS
 
 ## Regeln für die Zusammenarbeit
 
+- **Alles in main:** keine Feature- oder Langläufer-Branches; direkt auf `main` arbeiten und committen (seit 21.11.2026, deploy-vorbereitung ist gemergt).
 - **Nur lokal committen, nie pushen.** Commit-Trailer: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - **Klaus' laufende Instanz nie beenden oder anfassen**; Tests immer auf eigener DB/Port 5199.
 - Build und alle Tests grün halten; neue Funktionen mit Tests (Rechte, Grenzfälle) und, bei Oberfläche, Browserprüfung.
@@ -53,6 +54,14 @@ Eigene Testinstanz: Port **5199**, eigene Datenbank (`ConnectionStrings__VibeVHS
 - Server liebler.iui.hs-osnabrueck.de: **Änderungen nur nach Klaus' Go je Schritt**; jeden ssh-Befehl vorher in
   `deploy/server/protokoll/<datum>-*.md` eintragen (Befehl wörtlich, gekürzte Ausgabe, Geheimnisse geschwärzt).
 - Berichte und Oberfläche auf Deutsch.
+- **Spezifikation und Umsetzung synchron halten:** Was in einer Sitzung entschieden oder gebaut wird (neue Funktionen,
+  geänderte Abläufe, Betriebsregeln, auch Erkenntnisse aus dem Chat), fließt im selben Commit in `docs/spezifikation/`
+  ein (siehe unten). Kommentare aus der App (Verwaltung → Dokumentation → Alle Kommentare, Export
+  `/dokumentation/kommentare.md`) einarbeiten und dort als erledigt markieren.
+- **Auf fraktionperfekt übertragen:** Was hier entsteht (Funktionen, Betriebs-/Deploy-Werkzeuge, Regeln), inhaltlich
+  angepasst auch in `C:\repos\fraktionperfekt` umsetzen (dort gelten dessen eigene Regeln, z. B. EF-Migrationen statt
+  Neuaufbau der Datenbank). Je Übertragung kurz festhalten, was übernommen und was bewusst weggelassen wurde.
+- Spezifikation liegt in `docs/spezifikation/` und ist führend; bei fachlichen Änderungen die betroffene Spezifikationsdatei im selben Commit mitpflegen (FA-/NFA-Nummern nie neu vergeben).
 
 ## Konventionen
 
@@ -60,6 +69,17 @@ Eigene Testinstanz: Port **5199**, eigene Datenbank (`ConnectionStrings__VibeVHS
 - **Gesperrte Aktionen erklären:** `BegruendeterButton` mit `Freigabe` (Nein + Grund als Tooltip), z. B. „Bitte zuerst …“.
 - **Folgeschritte anbieten:** nach jeder Aktion `NaechsteSchritte` (Hauptschritt markiert); Anker brauchen den Seitenpfad (`personen/{id}#…`).
 - **Bitemporal:** Stammdaten, Rollen, Merkmale, Adressen … nie überschreiben – „Änderung ab Datum“ vs. „Korrektur“, mit Grund; Datenhistorie zeigt alles.
+- **Datenbank ohne Migrationen (Entwicklungsphase, nur Testdaten):** Schema per `EnsureCreated` aus dem Modell, danach Sichten `v_…` und
+  Schemaversion (`Schemainfo`, Prüfsumme). Passt eine vorhandene Datei nicht zum Modell, bricht der Start mit „Datenbankschema veraltet –
+  Datei löschen oder beiseitelegen“ ab. **Vor dem ersten Produktivbetrieb werden wieder EF-Migrationen eingeführt.**
+- **Normalisiert (11/2026):** keine Kopien (Namen, Anzeigetexte, Stände werden zur Laufzeit gelesen: `INamensquelle`, `Personensicht`),
+  keine JSON-Spalten (Listen als eigene Tabellen, `Wertlisten`/`Listenwert<T>`), Erfassungsangaben im `Aenderungsvorgang`. Speicherformate:
+  Ids 16 Byte (UUIDv7 über `Ids.Neu`), Tage JJJJMMTT, Zeitpunkte/Termine UTC-ms (Anzeige über `Zeitzone`). Namen sortieren per Collation
+  `DIN5007_2` (registriert in `SqliteErweiterungen`, ebenso `suchtext()`); Suche direkt in den Versionen (kein Suchindex).
+- **Stammdaten-Spalten (Grundreinigung 11/2026):** neue Personenangabe = versioniertes Merkmal (`MerkmalArt`, `AngabeAendern`), nie eine
+  überschreibbare Spalte. Spalten der Stammdatentabellen stehen mit Einstufung in `Infrastructure/Datenbank/Spalteneinstufung.cs`
+  (Führend / Anonymisierungsrest – Lese-Caches gibt es nicht mehr). Statistik rechnet zur Laufzeit (Geschlecht zum Kursdatum, Alter zum 31.12.).
+  `ArchitekturTests` A/B/C sichern das ab.
 - **Zurück zur Liste:** Listen schreiben Filter in die URL, Detail-Links tragen `?zurueck=` (`Ruecksprung`), Detailseiten `ZurueckZurListe`; zuletzt geöffnete Zeile wird markiert.
 - **Datenschutz:** keine Personendaten in Logs/Protokoll (Pseudonyme `Pseudonym.Person(id)`), Exporte und Zugriffe auf Gesperrte protokollieren.
 - **Mehrsprachigkeit:** jede Mail an Kundinnen/Kunden mit Übersetzungslink, jeder Brief mit QR-Code „Translate this letter in your language“ (Dokumentarchiv mit SHA-256).
@@ -77,7 +97,10 @@ Anmeldung, Durchführung (Anwesenheit, Check-in per QR, Bescheinigungen, Briefe)
 Finanzen/GoBD (Rechnungen, SEPA, Mahnwesen, Honorare, XRechnung), Integrationskurse (BAMF), Betrieb (Sicherung, Import, Auswertungen),
 Webshop (API, Web-Komponente, TYPO3), Kurs-QR/Schnellanmeldung, Dozierenden- und Teilnehmendenportal.
 
-Zuletzt (Funde aus Klaus' Test):
+Zuletzt (17.11.2026): Hilfe, Impressum, Dokumentation mit Kommentaren (`kommentare.db`), Abnahme-/Schulungsmodus mit Touren
+(`wwwroot/touren/abnahme.json`, `tour.js`), `deploy.ps1 -DbNeu`, Schnittstellenübersicht `docs/schnittstellen.md`.
+
+Davor (Funde aus Klaus' Test):
 - Startseite: Zähler-Badges, geordneter Startabgleich, „Heute automatisch erledigt“ gruppiert
 - „Zurück zur gefilterten Liste“, Kurs-QR-Bogen mit Logo, Logo und Website als Einstellung
 - Benutzerverwaltung (Einstellungen → Benutzer)
@@ -93,10 +116,10 @@ Virenscanner und Übersetzer (heute Mocks), interne Lehrfreigaben/Eignungsprüfu
 
 ## Laufende Arbeit: Bereitstellung
 
-Ziel: https://liebler.iui.hs-osnabrueck.de/vibevhs (Testsystem, nginx statt Apache, Let's Encrypt via certbot-snap,
-Node-RED unter /nodered). Branch **deploy-vorbereitung** (main hineingemergt): Pfad-Basis /vibevhs, `/gesund`, Testsystem-Banner,
-Kit `deploy/server` (Runbook, `schritte/01–07` mit Sicherung/Prüfung/Rückweg, `deploy.ps1`).
+Ziel: https://liebler.iui.hs-osnabrueck.de/vibevhs (Testsystem, nginx statt Apache, Hochschulzertifikat GEANT/HARICA in
+/etc/ssl/liebler für nginx und mosquitto – kein Let's Encrypt, Node-RED unter /nodered nur lokal per http). In main: Pfad-Basis /vibevhs, `/gesund`, Testsystem-Banner,
+Kit `deploy/server` (Runbook, `schritte/01–08` mit Sicherung/Prüfung/Rückweg, `werkzeuge/zertifikat-tauschen.sh`, `deploy.ps1`).
 Erkundung (lesend) erledigt: `deploy/server/protokoll/2026-11-16-erkundung.md`. SSH: `ssh liebler` (Benutzer srvadmin,
 Schlüssel `id_ed25519_liebler_iui_hs_osnabrueck`, sudo mit Passwort).
-Nächste Schritte: Kit hochladen (`deploy.ps1 -NurKit`), dann 01 SSH härten → 02 Pakete → 03 nginx → 04 Node-RED → 05 Zertifikat →
-06 Dienst + `deploy.ps1` → 07 Firewall – **jeweils erst nach Klaus' Go**. Danach deploy-vorbereitung nach main mergen.
+Nächste Schritte: Kit hochladen (`deploy.ps1 -NurKit`), dann 01 SSH härten → 02 Pakete → 03 nginx → 04 Node-RED → 05 mosquitto-Zertifikat →
+06 Dienst + `deploy.ps1` → 07 Firewall → später 08 certbot aufräumen – **jeweils erst nach Klaus' Go**.

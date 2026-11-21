@@ -7,6 +7,7 @@ using VibeVHS.Domain.Gemeinsam;
 using VibeVHS.Domain.Personen;
 using VibeVHS.Domain.Programm;
 using VibeVHS.Infrastructure.Datenbank;
+using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Infrastructure.Datenschutz;
 
@@ -78,12 +79,16 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
     public async Task<IReadOnlyList<PersonAktivitaet>> InaktivePersonenAsync(DateTimeOffset vor, CancellationToken abbruch = default)
     {
         var heute = DateOnly.FromDateTime(DateTime.Today);
+        // Mitarbeitende (Person an einem Verwaltungskonto) fallen nicht unter den Löschlauf; Portalkonten zählen nicht.
+        var mitarbeitende = (await db.Benutzerkonten.AsNoTracking().Where(k => k.PersonId != null).ToListAsync(abbruch))
+            .Where(k => !k.IstPortalkonto).Select(k => k.PersonId!.Value).ToHashSet();
         var kandidaten = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
-            .Where(p => p.Benutzerkennung == null && p.Status != Personenstatus.Zusammengefuehrt
+            .Where(p => !mitarbeitende.Contains(p.Id) && p.Status != Personenstatus.Zusammengefuehrt
                         && (p.Datenschutz == Datenschutzstatus.Aktiv || p.Datenschutz == Datenschutzstatus.Archiviert
                             || (p.Datenschutz == Datenschutzstatus.Gesperrt && p.GesperrtBis < heute)))
-            .Select(p => new { p.Id, p.Anzeigename, p.AngelegtAm, p.Datenschutz })
+            .Select(p => new { p.Id, p.AngelegtAm, p.Datenschutz })
             .ToListAsync(abbruch);
+        var anzeigenamen = await db.AnzeigenamenAsync(kandidaten.Select(k => k.Id).ToList(), heute, abbruch);
 
         var letzte = kandidaten.ToDictionary(k => k.Id, k => k.AngelegtAm);
         void Max(IEnumerable<(Guid Id, DateTimeOffset Am)> werte)
@@ -123,7 +128,7 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
 
         return kandidaten
             .Where(k => letzte[k.Id] < vor || (k.Datenschutz == Datenschutzstatus.Gesperrt))
-            .Select(k => new PersonAktivitaet(k.Id, k.Anzeigename, letzte[k.Id], k.Datenschutz))
+            .Select(k => new PersonAktivitaet(k.Id, anzeigenamen.GetValueOrDefault(k.Id, "?"), letzte[k.Id], k.Datenschutz))
             .OrderBy(k => k.LetzteAktivitaet)
             .ToList();
     }
@@ -133,7 +138,7 @@ internal sealed class DatenschutzSpeicher(VibeVhsDbContext db) : IDatenschutzSpe
         where T : BitemporaleVersion<T>
     {
         var roh = await db.Set<T>().AsNoTracking()
-            .Select(v => new { Id = EF.Property<Guid>(v, "PersonId"), v.ErfasstAm })
+            .Select(v => new { Id = EF.Property<Guid>(v, "PersonId"), ErfasstAm = v.ErfasstDurch.Am })
             .ToListAsync(abbruch);
         return roh.GroupBy(x => x.Id).Select(g => (g.Key, g.Max(x => x.ErfasstAm)));
     }

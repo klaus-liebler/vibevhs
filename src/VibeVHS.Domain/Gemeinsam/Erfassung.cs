@@ -22,6 +22,12 @@ public enum Erfassungsart
 /// <summary>Wann, von wem, wie und warum eine Version erfasst wurde.</summary>
 public sealed record Erfassung(DateTimeOffset Am, string Von, Erfassungsart Art, string Grund)
 {
+    /// <summary>
+    /// Der Änderungsvorgang dieser Erfassung (Zeitpunkt, Person, Grund – einmal gespeichert). Kopien mit anderer Art (<c>with { Art = … }</c>)
+    /// gehören zum selben Vorgang.
+    /// </summary>
+    public Aenderungsvorgang Vorgang { get; init; } = new(Am, Von, Grund);
+
     public const string System = "System";
 
     public static Erfassung Erst(DateTimeOffset am, string? von = null, string grund = "Ersterfassung")

@@ -13,6 +13,13 @@
     <PackageReference Include="Radzen.Blazor" />
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Markdig" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Dokumentation in der Anwendung (Hilfe, Spezifikation, Betriebsdoku): docs/**/*.md → Dokumentation/… -->
+    <Content Include="..\..\docs\**\*.md" Link="Dokumentation\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

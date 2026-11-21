@@ -225,14 +225,16 @@ public class KursUndPlanungTests
     public void Kapazitaet_hybrid_summiert_Orte_und_begrenzt_auf_Kurshoechstzahl()
     {
         var (v, _, raum, online, _) = Orte();
-        var vortrag = new Kurs("26H-110", "Vortrag Klimaanpassung", Herbst, 1, new Kursart("Vortrag", Nutzungsart.Vortrag, [], Buchungsrichtlinie.Oeffentlich), 0, 150);
+        var vortragsart = new Kursart("Vortrag", Nutzungsart.Vortrag, [], Buchungsrichtlinie.Oeffentlich);
+        var vortrag = new Kurs("26H-110", "Vortrag Klimaanpassung", Herbst, 1, vortragsart, 0, 150);
+        v = new Ortsverzeichnis(v.Alle, v.Katalog.Values, [vortragsart]); // Nutzungsart kommt aus der Kursart (keine Kopie am Kurs)
         var termin = vortrag.EinzelveranstaltungHinzufuegen(new DateTime(2026, 11, 26, 19, 0, 0), new DateTime(2026, 11, 26, 20, 30, 0),
-            [new VeranstaltungsOrt(raum.Id, raum.Anzeige), new VeranstaltungsOrt(online.Id, online.Anzeige)], null);
+            [new VeranstaltungsOrt(raum.Id), new VeranstaltungsOrt(online.Id)], null);
 
         Ortsplanung.Kapazitaet(termin, vortrag, v).ShouldBe(140);
 
         var mitEigenerZahl = vortrag.EinzelveranstaltungHinzufuegen(new DateTime(2026, 11, 27, 19, 0, 0), new DateTime(2026, 11, 27, 20, 0, 0),
-            [new VeranstaltungsOrt(raum.Id, raum.Anzeige), new VeranstaltungsOrt(online.Id, online.Anzeige, 200)], null);
+            [new VeranstaltungsOrt(raum.Id), new VeranstaltungsOrt(online.Id, 200)], null);
         Ortsplanung.Kapazitaet(mitEigenerZahl, vortrag, v).ShouldBe(150);
     }
 
@@ -272,14 +274,14 @@ public class KursUndPlanungTests
         {
             Start = new DateOnly(2026, 11, 3), Anzahl = 8, Wochentage = [DayOfWeek.Tuesday], Beginn = new TimeOnly(18, 0), DauerMinuten = 90,
             OrtIds = [raum.Id], FerienAuslassen = true,
-        }, kalender, id => v.Finden(id)!.Anzeige, new DateOnly(2027, 3, 1));
+        }, kalender, new DateOnly(2027, 3, 1));
         kurs.Veranstaltungen.Count.ShouldBe(8);
         kurs.Veranstaltungen.ShouldNotContain(x => x.Datum == new DateOnly(2026, 12, 29));
 
         var dritte = kurs.Veranstaltungen.OrderBy(x => x.Beginn).ElementAt(2);
-        dritte.NurDieseAendern(dritte.Beginn.AddHours(1), dritte.Ende.AddHours(1), [new VeranstaltungsOrt(online.Id, online.Anzeige)], null, "online wegen Renovierung");
+        dritte.NurDieseAendern(dritte.Beginn.AddHours(1), dritte.Ende.AddHours(1), [new VeranstaltungsOrt(online.Id)], null, "online wegen Renovierung");
 
-        kurs.SerieAendernAb(new DateOnly(2026, 11, 10), kurs.Serie! with { Beginn = new TimeOnly(17, 30) }, kalender, id => v.Finden(id)!.Anzeige, new DateOnly(2027, 3, 1));
+        kurs.SerieAendernAb(new DateOnly(2026, 11, 10), kurs.Serie! with { Beginn = new TimeOnly(17, 30) }, kalender, new DateOnly(2027, 3, 1));
 
         var liste = kurs.Veranstaltungen.OrderBy(x => x.Beginn).ToList();
         liste.Count.ShouldBe(8);
@@ -300,13 +302,13 @@ public class KursUndPlanungTests
         {
             Start = new DateOnly(2026, 11, 2), Wochentage = [DayOfWeek.Monday], Beginn = new TimeOnly(18, 0), DauerMinuten = 60, OrtIds = [raum.Id],
             FerienAuslassen = false,
-        }, Kalender.OhneFerien, id => v.Finden(id)!.Anzeige, new DateOnly(2026, 11, 30));
+        }, Kalender.OhneFerien, new DateOnly(2026, 11, 30));
 
         pilates.Umfang.ShouldBe(Kursumfang.Unbefristet);
         pilates.Veranstaltungen.Count.ShouldBe(5);
-        pilates.Fortschreiben(Kalender.OhneFerien, id => v.Finden(id)!.Anzeige, new DateOnly(2026, 12, 28)).ShouldBe(4);
+        pilates.Fortschreiben(Kalender.OhneFerien, new DateOnly(2026, 12, 28)).ShouldBe(4);
         pilates.Veranstaltungen.Count.ShouldBe(9);
-        pilates.Fortschreiben(Kalender.OhneFerien, id => v.Finden(id)!.Anzeige, new DateOnly(2026, 12, 28)).ShouldBe(0);
+        pilates.Fortschreiben(Kalender.OhneFerien, new DateOnly(2026, 12, 28)).ShouldBe(0);
         pilates.Richtlinie.Belegung.ShouldBe(Belegungsart.Kontingent);
     }
 
@@ -320,10 +322,10 @@ public class KursUndPlanungTests
         {
             Start = new DateOnly(2026, 9, 1), Anzahl = 10, Wochentage = [DayOfWeek.Tuesday], Beginn = new TimeOnly(18, 0), DauerMinuten = 90,
             OrtIds = [raum.Id],
-        }, Kalender.OhneFerien, id => v.Finden(id)!.Anzeige, new DateOnly(2027, 1, 31));
+        }, Kalender.OhneFerien, new DateOnly(2027, 1, 31));
 
         var tage = Kurs.Verschiebung(Herbst, Fruehjahr);
-        var kopie = kurs.KopieFuer(Fruehjahr, Kurs.NummerFuer(kurs.Kursnummer, Fruehjahr), tage, Kalender.OhneFerien, id => v.Finden(id)!.Anzeige,
+        var kopie = kurs.KopieFuer(Fruehjahr, Kurs.NummerFuer(kurs.Kursnummer, Fruehjahr), tage, Kalender.OhneFerien,
             new DateOnly(2027, 7, 31), Erfassung.Erst(Jetzt));
 
         (tage % 7).ShouldBe(0);

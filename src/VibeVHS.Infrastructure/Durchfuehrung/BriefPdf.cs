@@ -9,13 +9,7 @@ namespace VibeVHS.Infrastructure.Durchfuehrung;
 /// <summary>Briefe als PDF (MigraDoc) mit QR-Code „Translate this letter in your language“ in der Fußzeile jeder Seite.</summary>
 internal sealed class BriefPdf(IQrCode qr, VibeVHS.Application.Stammdaten.Briefkopf? briefkopf = null) : IBriefPdf
 {
-    static BriefPdf()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            GlobalFontSettings.UseWindowsFontsUnderWindows = true;
-        }
-    }
+    static BriefPdf() => VibeVHS.Infrastructure.Dokumente.Schriften.Einrichten();
 
     public byte[] Erzeugen(Brief brief)
     {

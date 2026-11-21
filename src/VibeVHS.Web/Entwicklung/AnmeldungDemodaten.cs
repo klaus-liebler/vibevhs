@@ -4,6 +4,7 @@ using VibeVHS.Domain.Anmeldung;
 using VibeVHS.Domain.Personen;
 using VibeVHS.Domain.Programm;
 using VibeVHS.Infrastructure.Datenbank;
+using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Web.Entwicklung;
 
@@ -25,6 +26,7 @@ internal static class AnmeldungDemodaten
 
         var uhr = bereich.ServiceProvider.GetRequiredService<TimeProvider>();
         var jetzt = uhr.GetLocalNow();
+        var z = await Demozeit.LadenAsync(db, uhr);
         var zufall = new Random(4711);
         var kurse = await db.Kurse.Include(k => k.Veranstaltungen).Where(k => k.ArchiviertAm == null).ToListAsync();
         var konten = await db.Benutzerkonten.AsNoTracking().ToListAsync();
@@ -33,10 +35,15 @@ internal static class AnmeldungDemodaten
             .Select(n => new Buchender(n, null, "Teilnehmerservice")).ToArray();
         var ikTeam = new Buchender(Name("sylvia.beckmann", "Sylvia Beckmann"), "sylvia.beckmann", "Integrationskurs-Team");
 
-        var teilnehmende = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
-            .Where(p => (p.Rollen & Personenrolle.Teilnehmende) == Personenrolle.Teilnehmende && p.Status == Personenstatus.Aktiv
-                        && p.Datenschutz == VibeVHS.Domain.Datenschutz.Datenschutzstatus.Aktiv && p.Benutzerkennung == null)
-            .OrderBy(p => p.Sortierschluessel).Select(p => new { p.Id, p.Anzeigename }).Take(4000).ToListAsync();
+        var kontoPersonen = await db.Benutzerkonten.AsNoTracking().Where(k => k.PersonId != null).Select(k => k.PersonId!.Value).ToListAsync();
+        var heuteTag = DateOnly.FromDateTime(uhr.GetLocalNow().Date);
+        var mitRolle = db.MitRolle(Personenrolle.Teilnehmende, heuteTag);
+        var tnIds = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
+            .Where(p => mitRolle.Contains(p.Id) && p.Status == Personenstatus.Aktiv
+                        && p.Datenschutz == VibeVHS.Domain.Datenschutz.Datenschutzstatus.Aktiv && !kontoPersonen.Contains(p.Id))
+            .NachNameSortiert(db, heuteTag).Select(p => p.Id).Take(4000).ToListAsync();
+        var tnNamen = await db.AnzeigenamenAsync(tnIds, heuteTag);
+        var teilnehmende = tnIds.Select(id => new { Id = id, Anzeigename = tnNamen.GetValueOrDefault(id, "") }).ToList();
         if (teilnehmende.Count == 0)
         {
             return;
@@ -49,6 +56,11 @@ internal static class AnmeldungDemodaten
         var nadia = PersonNamens("Nadia Haddad");
         var reserviert = new HashSet<Guid?> { mehmet, olena, sabine, nadia };
         var pool = teilnehmende.Where(p => !reserviert.Contains(p.Id)).Select(p => p.Id).OrderBy(_ => zufall.Next()).ToList();
+        if (pool.Count == 0)
+        {
+            // Ohne Massendaten (z. B. Testsystem) nur die benannten Demopersonen; keine Füllbuchungen.
+            pool = teilnehmende.Select(p => p.Id).ToList();
+        }
         var zeiger = 0;
         Guid Naechste() => pool[zeiger++ % pool.Count];
 
@@ -62,8 +74,8 @@ internal static class AnmeldungDemodaten
         Ermaessigung? olenaErm = null;
         if (olena is { } oid)
         {
-            olenaErm = new Ermaessigung(oid, "Bürgergeld / Grundsicherung", "Bescheid Jobcenter vom 02.09.2026 (Kopie in der Akte)",
-                new DateOnly(2026, 9, 1), new DateOnly(2027, 3, 31), jetzt, "Demodaten");
+            olenaErm = new Ermaessigung(oid, "Bürgergeld / Grundsicherung", $"Bescheid Jobcenter vom {z.D(2026, 9, 2):dd.MM.yyyy} (Kopie in der Akte)",
+                z.D(2026, 9, 1), z.D(2027, 3, 31), jetzt, "Demodaten");
             db.Ermaessigungen.Add(olenaErm);
         }
 
@@ -71,7 +83,7 @@ internal static class AnmeldungDemodaten
         DateTimeOffset Buchungszeit(Kurs k)
         {
             var beginn = k.ErsterTermin ?? jetzt.DateTime;
-            var start = new DateTime(2026, 8, 10, 9, 0, 0);
+            var start = z.DT(2026, 8, 10, 9, 0);
             var ende = beginn < jetzt.DateTime ? beginn.AddDays(-1) : jetzt.DateTime.AddDays(-1);
             if (ende <= start)
             {
@@ -97,7 +109,7 @@ internal static class AnmeldungDemodaten
         foreach (var k in kurse.Where(k => k.Status != Kursstatus.Entwurf))
         {
             var max = k.MaxTeilnehmende;
-            switch (k.Kursnummer)
+            switch (z.Alt(k.Kursnummer))
             {
                 case "26H-704":
                     PilatesAnlegen(k);
@@ -155,7 +167,7 @@ internal static class AnmeldungDemodaten
                 case "26H-504": // abgesagt, Teilnehmende müssen umgebucht oder abgemeldet werden
                     foreach (var _ in Enumerable.Range(0, 5))
                     {
-                        Buchen(k, Naechste(), false, Tresen(), ZufallsZahlart(), am: new DateTimeOffset(2026, 8, 20, 10, 0, 0, jetzt.Offset));
+                        Buchen(k, Naechste(), false, Tresen(), ZufallsZahlart(), am: z.DTO(2026, 8, 20, 10, 0));
                     }
 
                     continue;
@@ -167,13 +179,13 @@ internal static class AnmeldungDemodaten
                 ziel = zufall.Next(15, 45); // Vorträge
             }
 
-            if (k.Kursnummer == "26H-501" && mehmet is { } m)
+            if (k.Kursnummer == z.Nr("26H-501") && mehmet is { } m)
             {
                 Buchen(k, m, false, Tresen(), Domain.Anmeldung.Zahlart.Lastschrift);
                 ziel--;
             }
 
-            if (k.Kursnummer == "26H-403" && olena is { } o)
+            if (k.Kursnummer == z.Nr("26H-403") && olena is { } o)
             {
                 Buchen(k, o, false, Tresen(), Domain.Anmeldung.Zahlart.Ueberweisung, erm: olenaErm);
                 ziel--;
@@ -196,7 +208,7 @@ internal static class AnmeldungDemodaten
 
             foreach (var pid in personen)
             {
-                var am = new DateTimeOffset(2026, 9, 1, 10, 0, 0, jetzt.Offset).AddDays(zufall.Next(0, 60)).AddHours(zufall.Next(8));
+                var am = z.DTO(2026, 9, 1, 10, 0).AddDays(zufall.Next(0, 60)).AddHours(zufall.Next(8));
                 if (pid == nadia)
                 {
                     am = jetzt.AddDays(-5);

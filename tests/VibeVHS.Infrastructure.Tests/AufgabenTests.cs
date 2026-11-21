@@ -61,7 +61,7 @@ public class AufgabenTests
         {
             Start = start ?? new DateOnly(2026, 11, 24), Anzahl = 8, Wochentage = [(start ?? new DateOnly(2026, 11, 24)).DayOfWeek],
             Beginn = new TimeOnly(18, 0), DauerMinuten = 90, OrtIds = [raum.Id],
-        }, Kalender.OhneFerien, _ => "A 1.12 Seminarraum", new DateOnly(2027, 6, 30));
+        }, Kalender.OhneFerien, new DateOnly(2027, 6, 30));
         kurs.StatusSetzen(Kursstatus.Veroeffentlicht);
         var liste = Enumerable.Range(1, personen).Select(i =>
         {

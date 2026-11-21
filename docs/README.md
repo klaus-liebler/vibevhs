@@ -4,15 +4,20 @@ Webbasierte Verwaltungssoftware für Volkshochschulen: einfach zu bedienen für 
 Teilnehmende, eingebunden in die kommunale Infrastruktur, DSGVO-konform, mit Schnittstellen zu Abrechnungsstellen
 (z. B. BAMF-Integrationskurse) und automatisierten, immer protokollierten Routineabläufen.
 
+Alle geplanten Schnittstellen nach außen (Mail, Messaging, VHS-Systeme, Stadtverwaltung, Finanzen, BAMF) mit Stand:
+[schnittstellen.md](schnittstellen.md).
+
 ## Konzepte
 
-| Dokument | Link |
-|---|---|
-| Anforderungen | https://claude.ai/artifact/5zHT9KccZeiUj1xS1BmKNG |
-| Architektur und Datenmodell | https://claude.ai/artifact/XVL9kYS5XcAYwGsoDQ4CN3 |
-| Umsetzungsfahrplan | https://claude.ai/artifact/FFRgE1BfKbphyCYxcVz4S9 |
-| Klick-Prototyp (online) | https://claude.ai/artifact/KR88btCTssLuRhCTYFGnbx |
-| Klick-Prototyp (lokal) | [`prototyp/prototyp-verwaltung.html`](../prototyp/prototyp-verwaltung.html) |
+**Regel:** Spezifikation liegt in [`docs/spezifikation/`](spezifikation/README.md) und ist führend; bei fachlichen Änderungen die betroffene Spezifikationsdatei im selben Commit mitpflegen (FA-/NFA-Nummern nie neu vergeben). Die Claude Docs/Artifacts sind ein Archiv (Stand 17.11.2026).
+
+| Dokument | Im Repo (führend) | Archiv (17.11.2026, nicht mehr gepflegt) |
+|---|---|---|
+| Anforderungen | [spezifikation/anforderungen.md](spezifikation/anforderungen.md) | https://claude.ai/artifact/5zHT9KccZeiUj1xS1BmKNG |
+| Architektur und Datenmodell | [spezifikation/architektur.md](spezifikation/architektur.md) | https://claude.ai/artifact/XVL9kYS5XcAYwGsoDQ4CN3 |
+| Umsetzungsfahrplan | [spezifikation/fahrplan.md](spezifikation/fahrplan.md) | https://claude.ai/artifact/FFRgE1BfKbphyCYxcVz4S9 |
+| Buchungs-Shop-Plugin | [spezifikation/buchungs-shop-plugin.md](spezifikation/buchungs-shop-plugin.md) | https://claude.ai/artifact/VsQFogXRz3dzQYZajLgoMm |
+| Klick-Prototyp | [spezifikation/prototyp-verwaltung.html](spezifikation/prototyp-verwaltung.html) | https://claude.ai/artifact/KR88btCTssLuRhCTYFGnbx |
 
 ## Voraussetzungen
 
@@ -32,8 +37,8 @@ Dann im Browser <http://localhost:5189> öffnen und bei der **Testanmeldung** ei
 wechselt die aktive Rolle oben rechts (Leitung, Verwaltungsleitung, Fachbereichsleitung, Teilnehmerservice,
 Buchhaltung, Integrationskurs-Team, Systemverwaltung).
 
-Beim ersten Start wird die SQLite-Datenbank `src/VibeVHS.Web/data/vibevhs.db` angelegt (WAL-Modus, Migrationen
-werden automatisch eingespielt). Danach werden die **Startdaten** der Pilot-VHS geladen (idempotent, nur was fehlt):
+Beim ersten Start wird die SQLite-Datenbank `src/VibeVHS.Web/data/vibevhs.db` neu aus dem Modell angelegt (WAL-Modus,
+lesbare Sichten `v_…`, Schemaversion; derzeit ohne Migrationen – bei geändertem Modell die Datei löschen, siehe docs/betrieb.md). Danach werden die **Startdaten** der Pilot-VHS geladen (idempotent, nur was fehlt):
 Briefkopf, Fachbereiche 1 bis 8 und die Benutzerkonten samt zugehöriger Person (Rolle Mitarbeitende).
 In der Entwicklungsumgebung kommen fünf fiktive Beispielpersonen dazu, darunter Anna Becker mit Namenshistorie.
 
@@ -69,12 +74,12 @@ den Sortierschlüssel, der die Id enthält). In Entwicklung und Tests bricht ein
 |---|---|
 | `src/VibeVHS.Domain` | Fachkern ohne Abhängigkeiten: bitemporale Versionen (`BitemporaleVersion`, `ZeitlicheHistorie.AlsStichtag`), `Geld` in Cent, GUID v7, `Person` mit versioniertem Namen |
 | `src/VibeVHS.Application` | Anwendungsfälle und Ports: Rollen, `Freigabe` (gesperrt immer mit Begründung), `NaechsterSchritt`, Postausgang (Outbox) mit Übersetzungslink, Audit-Protokoll, Personendienst |
-| `src/VibeVHS.Infrastructure` | EF Core + SQLite (WAL), Migrationen, Speicher, Quartz-Job für die Zustellung |
+| `src/VibeVHS.Infrastructure` | EF Core + SQLite (WAL), Schema per EnsureCreated, Speicher, Quartz-Job für die Zustellung |
 | `src/VibeVHS.Adapters.Mocks` | Mock-Anmeldung (Konto + Rolle), simulierte Mail- und Schnittstellenkanäle |
 | `src/VibeVHS.Web` | Blazor Web App (Interactive Server, Radzen), deutsche Oberfläche |
 | `tests/*` | xUnit v3 + Shouldly |
 | `tools/Testdaten` | Testdaten-Generator (Bogus, fester Startwert) |
-| `deploy/` | Docker (folgt) |
+| `deploy/` | Bereitstellung auf dem Linux-Testserver (Kit, Runbook, `deploy.ps1`), Überblick: `docs/bereitstellung.md` |
 
 ## Leitlinien in der Oberfläche
 
@@ -412,6 +417,20 @@ Fachbereichsleitung und Prüfung lesen).
   Vollmacht, Termine und Kalender-Abo, Check-in-Link und Ausweis, Unterlagen, Dokumente (Originale) und Teilnehmerkonto,
   eigene Daten (E-Mail mit Bestätigung, Einwilligungen, SEPA-Mandat), Auskunft/Löschung als Vorgang, Hilfe in einfacher Sprache.
 - Details: `docs/dozierendenportal.md`.
+
+## Hilfe, Dokumentation und Abnahmemodus (I10, FA-159, FA-160, QA-56, QA-57)
+
+- **Hilfe** `/hilfe` für alle Verwaltungsrollen (`docs/hilfe.md`): Aufbau, Grundprinzipien, Abläufe Schritt für Schritt,
+  mit Inhaltsverzeichnis; Link oben rechts und in der Navigation.
+- **Impressum** `/impressum` ohne Anmeldung, verlinkt in allen Fußzeilen; Text unter Einstellungen → Einrichtung (Markdown),
+  bis dahin ein deutlich markierter Platzhalter.
+- **Dokumentation** `/dokumentation` (Leitung, Verwaltungsleitung, Systemverwaltung): Spezifikation und technische Doku aus
+  `docs/` mit **Kommentaren je Abschnitt** (Antworten, offen/erledigt, Übersicht „Alle Kommentare“, Export
+  `/dokumentation/kommentare.md`). Kommentare liegen in `kommentare.db` und überstehen den Neuaufbau der Testdatenbank.
+- **Abnahme- und Schulungsmodus** (`Abnahmemodus:Aktiv`, in Entwicklung und Testsystem an): zwölf geführte Touren nach dem
+  Abnahme-Drehbuch auf der Hilfeseite; Sprechblasen zeigen Klicks und Eingaben direkt an der Oberfläche, Kontowechsel
+  inklusive. `node tests/Touren/tourpruefung.mjs http://localhost:5199` spielt alle Touren durch.
+- **Ausrollen** mit `deploy.ps1 -DbNeu`, wenn sich das Schema geändert hat (siehe `deploy/server/README-server.md`).
 
 ## Testbenutzer der Pilot-VHS
 

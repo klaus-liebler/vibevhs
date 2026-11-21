@@ -29,3 +29,4 @@ internal sealed class MerkmalAblaufJob(ProgrammDienst programm, ILogger<MerkmalA
         log.LogInformation("Ablaufende Merkmale: {Ergebnis}", ergebnis);
     }
 }
+

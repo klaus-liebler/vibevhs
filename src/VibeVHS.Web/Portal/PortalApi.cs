@@ -193,9 +193,5 @@ public static class PortalApi
     }
 
     private static IResult Seite(string titel, string inhalt, int status = 200)
-        => Results.Content($"""
-            <!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>{titel} · Dozierendenportal</title><link rel="stylesheet" href="/shop/seite.css"></head>
-            <body><main><h1>{titel}</h1>{inhalt}</main></body></html>
-            """, "text/html; charset=utf-8", Encoding.UTF8, status);
+        => new VibeVHS.Web.Shop.HtmlSeite(titel, inhalt, status, " · Dozierendenportal");
 }

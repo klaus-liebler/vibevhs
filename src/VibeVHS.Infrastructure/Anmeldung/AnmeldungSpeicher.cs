@@ -10,11 +10,12 @@ namespace VibeVHS.Infrastructure.Anmeldung;
 internal sealed class AnmeldungSpeicher(VibeVhsDbContext db) : IAnmeldungSpeicher, IVorlagenSpeicher
 {
     public async Task<IReadOnlyList<Belegung>> BelegungenDesKursesAsync(Guid kursId, CancellationToken abbruch = default)
-        => await db.Belegungen.Where(b => b.KursId == kursId).ToListAsync(abbruch);
+        => await Personen.Bevollmaechtigtennamen.ErgaenzenAsync(db, await db.Belegungen.Where(b => b.KursId == kursId).ToListAsync(abbruch), abbruch);
 
     public async Task<IReadOnlyList<PersonBelegung>> BelegungenDerPersonAsync(Guid personId, CancellationToken abbruch = default)
     {
-        var belegungen = await db.Belegungen.AsNoTracking().Where(b => b.PersonId == personId).OrderByDescending(b => b.GebuchtAm).ToListAsync(abbruch);
+        var belegungen = await Personen.Bevollmaechtigtennamen.ErgaenzenAsync(db,
+            await db.Belegungen.AsNoTracking().Where(b => b.PersonId == personId).OrderByDescending(b => b.GebuchtAm).ToListAsync(abbruch), abbruch);
         var ids = belegungen.Select(b => b.KursId).Distinct().ToList();
         var kurse = await db.Kurse.IgnoreAutoIncludes().AsNoTracking().Where(k => ids.Contains(k.Id))
             .Select(k => new { k.Id, k.Titel, k.Status }).ToDictionaryAsync(k => k.Id, abbruch);
@@ -25,10 +26,10 @@ internal sealed class AnmeldungSpeicher(VibeVhsDbContext db) : IAnmeldungSpeiche
     }
 
     public async Task<IReadOnlyList<Belegung>> BelegungenZuPersonAsync(Guid personId, CancellationToken abbruch = default)
-        => await db.Belegungen.Where(b => b.PersonId == personId).ToListAsync(abbruch);
+        => await Personen.Bevollmaechtigtennamen.ErgaenzenAsync(db, await db.Belegungen.Where(b => b.PersonId == personId).ToListAsync(abbruch), abbruch);
 
-    public Task<Belegung?> BelegungLadenAsync(Guid id, CancellationToken abbruch = default)
-        => db.Belegungen.FirstOrDefaultAsync(b => b.Id == id, abbruch);
+    public async Task<Belegung?> BelegungLadenAsync(Guid id, CancellationToken abbruch = default)
+        => (await Personen.Bevollmaechtigtennamen.ErgaenzenAsync(db, await db.Belegungen.Where(b => b.Id == id).ToListAsync(abbruch), abbruch)).FirstOrDefault();
 
     public async Task<IReadOnlyDictionary<Guid, (int Belegt, int Wartend)>> BelegungszahlenAsync(IEnumerable<Guid> kursIds, CancellationToken abbruch = default)
     {

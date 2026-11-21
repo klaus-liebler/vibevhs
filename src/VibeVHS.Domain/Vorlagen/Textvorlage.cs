@@ -39,6 +39,16 @@ public sealed partial class Textvorlage
 
     public string GeaendertVon { get; private set; }
 
+    /// <summary>Wie {Anrede} ausfällt: förmlich („Sehr geehrte Frau Dr. Muster“, Standard) oder informell („Guten Tag Frau Dr. Muster“).</summary>
+    public VibeVHS.Domain.Personen.Anredestil Anredestil { get; private set; }
+
+    public void AnredestilSetzen(VibeVHS.Domain.Personen.Anredestil stil, DateTimeOffset am, string von)
+    {
+        Anredestil = stil;
+        GeaendertAm = am;
+        GeaendertVon = von;
+    }
+
     public void Aendern(string betreff, string text, DateTimeOffset am, string von)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(betreff);
@@ -82,33 +92,34 @@ public static class Textvorlagen
 
     public static IReadOnlyList<string> BekanntePlatzhalter { get; } =
     [
-        "Name", "Kursnummer", "Kurstitel", "Beginn", "Ort", "Termine", "Entgelt", "Zahlart", "Abmeldefrist", "Warteplatz", "Frist",
+        "Anrede", "Name", "Kursnummer", "Kurstitel", "Beginn", "Ort", "Termine", "Entgelt", "Zahlart", "Abmeldefrist", "Warteplatz", "Frist",
         "Gebuehr", "Regel", "NeuerKurs", "Veranstaltung", "Kontingent", "Einrichtung", "Checkinlink",
     ];
 
     public static IReadOnlyList<(string Schluessel, string Bezeichnung, string Betreff, string Text)> Vorschlaege { get; } =
     [
         (Anmeldebestaetigung, "Anmeldebestätigung", "Anmeldebestätigung: {Kursnummer} {Kurstitel}",
-            "Guten Tag {Name},\n\nvielen Dank für Ihre Anmeldung zum Kurs „{Kurstitel}“ ({Kursnummer}).\n\nBeginn: {Beginn}\nOrt: {Ort}\nTermine: {Termine}\nEntgelt: {Entgelt} ({Zahlart})\n{Kontingent}\n\nAlle Termine finden Sie als Kalenderdatei im Anhang. Eine kostenlose Abmeldung ist bis {Abmeldefrist} möglich.\n\nPersönlicher Check-in: Öffnen Sie diesen Link einmal auf Ihrem Handy – danach genügt ein Scan des QR-Codes im Kursraum.\n{Checkinlink}\nIm Anhang finden Sie außerdem Ihren QR-Ausweis zum Vorzeigen bei der Kursleitung.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
+            "{Anrede},\n\nvielen Dank für Ihre Anmeldung zum Kurs „{Kurstitel}“ ({Kursnummer}).\n\nBeginn: {Beginn}\nOrt: {Ort}\nTermine: {Termine}\nEntgelt: {Entgelt} ({Zahlart})\n{Kontingent}\n\nAlle Termine finden Sie als Kalenderdatei im Anhang. Eine kostenlose Abmeldung ist bis {Abmeldefrist} möglich.\n\nPersönlicher Check-in: Öffnen Sie diesen Link einmal auf Ihrem Handy – danach genügt ein Scan des QR-Codes im Kursraum.\n{Checkinlink}\nIm Anhang finden Sie außerdem Ihren QR-Ausweis zum Vorzeigen bei der Kursleitung.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
         (Wartelisteneintrag, "Eintrag auf die Warteliste", "Warteliste: {Kursnummer} {Kurstitel}",
-            "Guten Tag {Name},\n\nder Kurs „{Kurstitel}“ ({Kursnummer}) ist leider ausgebucht. Wir haben Sie auf die Warteliste gesetzt (Platz {Warteplatz}).\n\nSobald ein Platz frei wird, erhalten Sie ein Angebot mit einer Frist zur Annahme.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
+            "{Anrede},\n\nder Kurs „{Kurstitel}“ ({Kursnummer}) ist leider ausgebucht. Wir haben Sie auf die Warteliste gesetzt (Platz {Warteplatz}).\n\nSobald ein Platz frei wird, erhalten Sie ein Angebot mit einer Frist zur Annahme.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
         (Nachrueckangebot, "Nachrückangebot von der Warteliste", "Ein Platz ist frei: {Kursnummer} {Kurstitel}",
-            "Guten Tag {Name},\n\nim Kurs „{Kurstitel}“ ({Kursnummer}) ist ein Platz frei geworden. Wir halten ihn für Sie bis {Frist} bereit.\n\nBeginn: {Beginn}\nEntgelt: {Entgelt}\n\nBitte melden Sie sich bis dahin am Tresen, telefonisch oder per Antwort auf diese Mail. Danach geht der Platz an die nächste Person auf der Warteliste.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
+            "{Anrede},\n\nim Kurs „{Kurstitel}“ ({Kursnummer}) ist ein Platz frei geworden. Wir halten ihn für Sie bis {Frist} bereit.\n\nBeginn: {Beginn}\nEntgelt: {Entgelt}\n\nBitte melden Sie sich bis dahin am Tresen, telefonisch oder per Antwort auf diese Mail. Danach geht der Platz an die nächste Person auf der Warteliste.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
         (Stornobestaetigung, "Abmeldebestätigung", "Abmeldung: {Kursnummer} {Kurstitel}",
-            "Guten Tag {Name},\n\nwir haben Ihre Abmeldung vom Kurs „{Kurstitel}“ ({Kursnummer}) erhalten.\n\n{Regel}\nFällige Gebühr: {Gebuehr}\n\nMit freundlichen Grüßen\n{Einrichtung}"),
+            "{Anrede},\n\nwir haben Ihre Abmeldung vom Kurs „{Kurstitel}“ ({Kursnummer}) erhalten.\n\n{Regel}\nFällige Gebühr: {Gebuehr}\n\nMit freundlichen Grüßen\n{Einrichtung}"),
         (Umbuchungsbestaetigung, "Umbuchungsbestätigung", "Umbuchung auf {NeuerKurs}",
-            "Guten Tag {Name},\n\nwir haben Sie vom Kurs {Kursnummer} auf den Kurs {NeuerKurs} umgebucht.\n\nBeginn: {Beginn}\nOrt: {Ort}\nEntgelt: {Entgelt}\nUmbuchungsgebühr: {Gebuehr}\n\nAlle Termine finden Sie als Kalenderdatei im Anhang.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
+            "{Anrede},\n\nwir haben Sie vom Kurs {Kursnummer} auf den Kurs {NeuerKurs} umgebucht.\n\nBeginn: {Beginn}\nOrt: {Ort}\nEntgelt: {Entgelt}\nUmbuchungsgebühr: {Gebuehr}\n\nAlle Termine finden Sie als Kalenderdatei im Anhang.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
         (Einbuchungsbestaetigung, "Nachgerückt in eine Veranstaltung", "Platz frei: {Kurstitel} am {Veranstaltung}",
-            "Guten Tag {Name},\n\nfür {Kurstitel} am {Veranstaltung} ist ein Platz frei geworden. Wir haben Sie von der Warteliste eingebucht.\n\nStand Ihres Kontingents: {Kontingent}\n\nFalls Sie nicht kommen können, tragen Sie sich bitte rechtzeitig aus.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
+            "{Anrede},\n\nfür {Kurstitel} am {Veranstaltung} ist ein Platz frei geworden. Wir haben Sie von der Warteliste eingebucht.\n\nStand Ihres Kontingents: {Kontingent}\n\nFalls Sie nicht kommen können, tragen Sie sich bitte rechtzeitig aus.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
         (Kursabsage, "Kursabsage", "Absage: {Kursnummer} {Kurstitel}",
-            "Guten Tag {Name},\n\nleider müssen wir den Kurs „{Kurstitel}“ ({Kursnummer}) absagen.\nGrund: {Regel}\n\nIhre Anmeldung ist damit aufgehoben; es fallen keine Kosten an. Bereits gezahlte Entgelte erstatten wir vollständig.\nGern buchen wir Sie auf einen ähnlichen Kurs um – sprechen Sie uns einfach an.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
+            "{Anrede},\n\nleider müssen wir den Kurs „{Kurstitel}“ ({Kursnummer}) absagen.\nGrund: {Regel}\n\nIhre Anmeldung ist damit aufgehoben; es fallen keine Kosten an. Bereits gezahlte Entgelte erstatten wir vollständig.\nGern buchen wir Sie auf einen ähnlichen Kurs um – sprechen Sie uns einfach an.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
         (Kurserinnerung, "Erinnerung vor Kursbeginn", "Bald geht es los: {Kursnummer} {Kurstitel}",
-            "Guten Tag {Name},\n\nwir freuen uns auf Sie! Ihr Kurs „{Kurstitel}“ ({Kursnummer}) beginnt bald.\n\nBeginn: {Beginn}\nOrt: {Ort}\n\nFalls Sie nicht teilnehmen können, sagen Sie uns bitte Bescheid – dann kann jemand von der Warteliste nachrücken.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
+            "{Anrede},\n\nwir freuen uns auf Sie! Ihr Kurs „{Kurstitel}“ ({Kursnummer}) beginnt bald.\n\nBeginn: {Beginn}\nOrt: {Ort}\n\nFalls Sie nicht teilnehmen können, sagen Sie uns bitte Bescheid – dann kann jemand von der Warteliste nachrücken.\n\nMit freundlichen Grüßen\n{Einrichtung}"),
     ];
 
     /// <summary>Beispielwerte für die Vorschau.</summary>
     public static IReadOnlyDictionary<string, string> Beispielwerte { get; } = new Dictionary<string, string>
     {
+        ["Anrede"] = "Sehr geehrte Frau Dr. Kovalenko",
         ["Name"] = "Olena Kovalenko",
         ["Kursnummer"] = "26H-501",
         ["Kurstitel"] = "Englisch A2 – Konversation",

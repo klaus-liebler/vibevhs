@@ -63,7 +63,6 @@ public class StartdatenTests
 
         var person = await db.Personen.SingleAsync(p => p.Id == konto.PersonId, ct);
         person.Titel.ShouldBe("Dr.");
-        person.Benutzerkennung.ShouldBe("heike.steinhorst");
         person.Rollen.HasFlag(Personenrolle.Mitarbeitende).ShouldBeTrue();
         var name = person.AktuellerName(t.Uhr.GetLocalNow());
         name.Vorname.ShouldBe("Heike");

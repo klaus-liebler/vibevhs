@@ -67,14 +67,14 @@ public class DurchfuehrungTests
         var kurs = new Kurs("TS-501", "Englisch A1", semester, 5, art, 1, 14);
         if (leitung is not null)
         {
-            kurs.MitTeam([new KursDozent(leitung.Id, leitung.Anzeigename, true)]);
+            kurs.MitTeam([new KursDozent(leitung.Id, true)]);
         }
 
         kurs.EntgeltSetzenAb(Geld.Euro(90), null, semester.Beginn, Erfassung.Erst(new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero)));
         kurs.SerieFestlegen(new Serienregel
         {
             Start = start, Anzahl = termine, Wochentage = [DayOfWeek.Tuesday], Beginn = new TimeOnly(18, 0), DauerMinuten = 90, OrtIds = [raum.Id, online.Id],
-        }, Kalender.OhneFerien, id => id == raum.Id ? "A 1.12 Kursraum" : "Online 1", start.AddDays(365));
+        }, Kalender.OhneFerien, start.AddDays(365));
         kurs.StatusSetzen(Kursstatus.Veroeffentlicht);
         var personen = person is not null
             ? [person]
@@ -396,7 +396,7 @@ public class DurchfuehrungTests
         {
             var verfaelscht = (byte[])dok.Pdf.Clone();
             verfaelscht[^20] ^= 0xFF;
-            await db.Database.ExecuteSqlAsync($"UPDATE Dokumente SET Pdf = {verfaelscht} WHERE Id = {dok.Id}", ct);
+            await db.Database.ExecuteSqlAsync($"UPDATE Dokumente SET Pdf = {verfaelscht} WHERE Id = {VibeVHS.Infrastructure.Datenbank.Speicherformate.IdBytes(dok.Id)}", ct);
         }
 
         await using (var db = t.NeuerKontext())

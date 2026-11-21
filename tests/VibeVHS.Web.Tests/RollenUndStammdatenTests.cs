@@ -136,4 +136,43 @@ public sealed class RollenUndStammdatenTests
         (await Should.ThrowAsync<InvalidOperationException>(() => MitAsync(h, Tresen, d => d.GetRequiredService<Stammdatenaenderung>()
             .AendernAsync(pid, StammdatenEingabe.Aus(stand2) with { Geschlecht = "weiblich" }, true, heute, "nichts", Ct)))).Message.ShouldContain("nichts geändert");
     }
+
+    [Fact]
+    public async Task Umzugsdatum_korrigieren_mit_Rechten_Grund_und_Datenhistorie()
+    {
+        await using var h = await StartenAsync();
+        var pid = await TeilnehmerinMitPortalkontoAsync(h);
+        var heute = DateOnly.FromDateTime(h.Uhr.GetLocalNow().Date);
+        var umzug = heute.AddDays(30);
+        await using (var bereich = h.App.Services.CreateAsyncScope())
+        {
+            var db = bereich.ServiceProvider.GetRequiredService<VibeVhsDbContext>();
+            var p = await db.Personen.SingleAsync(x => x.Id == pid, Ct);
+            var alt = p.Adressen.Single().AdressId;
+            p.AdressKennzeichnenAb(AdressKennzeichenArt.UeblicherAufenthaltsort, alt, new DateOnly(2024, 1, 1), Erfassung.Erst(h.Uhr.GetLocalNow()));
+            p.UmzugAb(alt, null, "Bergweg 2", "48268", "Greven", umzug, Erfassung.Aenderung(h.Uhr.GetLocalNow(), "Umzug gemeldet"));
+            await db.SaveChangesAsync(Ct);
+        }
+
+        h.Uhr.Advance(TimeSpan.FromMinutes(5));
+        var eintrag = (await MitAsync(h, Tresen, async d => Datenhistorie.Erstellen((await d.GetRequiredService<IPersonenSpeicher>().LadenAsync(pid, Ct))!)))
+            .First(e => e.Korrektur == Stammdatenaenderung.Datumskorrektur.Umzug && e.DatumKorrigierbar && e.GueltigVon == umzug);
+
+        // Ohne Recht (Buchhaltung) und ohne Grund geht es nicht.
+        var buchhaltung = new Benutzer("bea.buch", "Bea Buch", Rolle.Buchhaltung, [Rolle.Buchhaltung]);
+        await Should.ThrowAsync<UnauthorizedAccessException>(() => TunAsync(h, buchhaltung, d => d.GetRequiredService<Stammdatenaenderung>()
+            .DatumKorrigierenAsync(pid, eintrag.Korrektur!.Value, eintrag.KorrekturBezug, umzug, umzug.AddDays(-10), "Meldebescheinigung", Ct)));
+        await Should.ThrowAsync<ArgumentException>(() => TunAsync(h, Tresen, d => d.GetRequiredService<Stammdatenaenderung>()
+            .DatumKorrigierenAsync(pid, eintrag.Korrektur!.Value, eintrag.KorrekturBezug, umzug, umzug.AddDays(-10), " ", Ct)));
+
+        await TunAsync(h, Tresen, d => d.GetRequiredService<Stammdatenaenderung>()
+            .DatumKorrigierenAsync(pid, eintrag.Korrektur!.Value, eintrag.KorrekturBezug, umzug, umzug.AddDays(-10), "Meldebescheinigung", Ct));
+
+        h.Uhr.Advance(TimeSpan.FromMinutes(1));
+        var jetzt = h.Uhr.GetLocalNow();
+        var person = await MitAsync(h, Tresen, d => d.GetRequiredService<IPersonenSpeicher>().LadenAsync(pid, Ct));
+        person!.StandAm(umzug.AddDays(-5), jetzt).Aufenthaltsort!.Ort.ShouldBe("Greven");
+        person.StandAm(umzug.AddDays(-11), jetzt).Aufenthaltsort!.Ort.ShouldBe("Emsdetten");
+        Datenhistorie.Erstellen(person).ShouldContain(e => e.Art == Erfassungsart.Korrektur && e.Grund == "Meldebescheinigung");
+    }
 }

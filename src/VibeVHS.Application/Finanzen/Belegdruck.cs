@@ -86,6 +86,6 @@ public static class Belegdruck
             Belegart.Honorarabrechnung => $"anbei erhalten Sie Ihre Honorarabrechnung {b.Nummer} über {betrag}.",
             _ => $"anbei erhalten Sie den Beleg {b.Nummer} über {betrag}.",
         };
-        return $"Guten Tag {empfaenger.Name},\n\n{kern}\n\nMit freundlichen Grüßen\n{einrichtung}";
+        return $"{empfaenger.Briefanrede ?? $"Guten Tag {empfaenger.Name}"},\n\n{kern}\n\nMit freundlichen Grüßen\n{einrichtung}";
     }
 }

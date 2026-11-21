@@ -18,7 +18,7 @@ internal static class AnmeldungMapping
             b.Property(x => x.GebuchtVon).HasMaxLength(200);
             b.Property(x => x.GebuchtVonKennung).HasMaxLength(100);
             b.Property(x => x.GebuchtInRolle).HasMaxLength(50);
-            b.Property(x => x.BevollmaechtigterName).HasMaxLength(300);
+            b.Ignore(x => x.BevollmaechtigterName); // Name zur Laufzeit (Bevollmaechtigtennamen), keine Kopie
             b.Property(x => x.ErmaessigungNachweis).HasMaxLength(500);
             b.Property(x => x.StorniertVon).HasMaxLength(200);
             b.Property(x => x.StornoGrund).HasMaxLength(500);
@@ -61,6 +61,7 @@ internal static class AnmeldungMapping
             b.Property(x => x.Betreff).HasMaxLength(300);
             b.Property(x => x.Text).HasMaxLength(8000);
             b.Property(x => x.GeaendertVon).HasMaxLength(200);
+            b.Property(x => x.Anredestil).HasMaxLength(20);
         });
     }
 }

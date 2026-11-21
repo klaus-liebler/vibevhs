@@ -134,8 +134,8 @@ public static class Ortsplanung
         foreach (var vo in v.Orte)
         {
             var ort = verzeichnis.Finden(vo.OrtId);
-            var nutzung = ort?.Art == Ortsart.VirtuellerRaum ? Nutzungsart.Online : kurs.Nutzungsart;
-            summe += vo.Hoechstzahl ?? ort?.KapazitaetFuer(nutzung) ?? ort?.KapazitaetFuer(kurs.Nutzungsart) ?? 0;
+            var nutzung = ort?.Art == Ortsart.VirtuellerRaum ? Nutzungsart.Online : verzeichnis.NutzungsartVon(kurs);
+            summe += vo.Hoechstzahl ?? ort?.KapazitaetFuer(nutzung) ?? ort?.KapazitaetFuer(verzeichnis.NutzungsartVon(kurs)) ?? 0;
         }
 
         return Math.Min(summe, kurs.MaxTeilnehmende);
@@ -145,7 +145,7 @@ public static class Ortsplanung
     public static int KapazitaetAmOrt(VeranstaltungsOrt vo, Kurs kurs, Ortsverzeichnis verzeichnis)
     {
         var ort = verzeichnis.Finden(vo.OrtId);
-        var nutzung = ort?.Art == Ortsart.VirtuellerRaum ? Nutzungsart.Online : kurs.Nutzungsart;
-        return Math.Min(vo.Hoechstzahl ?? ort?.KapazitaetFuer(nutzung) ?? ort?.KapazitaetFuer(kurs.Nutzungsart) ?? 0, kurs.MaxTeilnehmende);
+        var nutzung = ort?.Art == Ortsart.VirtuellerRaum ? Nutzungsart.Online : verzeichnis.NutzungsartVon(kurs);
+        return Math.Min(vo.Hoechstzahl ?? ort?.KapazitaetFuer(nutzung) ?? ort?.KapazitaetFuer(verzeichnis.NutzungsartVon(kurs)) ?? 0, kurs.MaxTeilnehmende);
     }
 }

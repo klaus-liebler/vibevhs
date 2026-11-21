@@ -45,7 +45,8 @@ internal sealed class ShopTestHost : IAsyncDisposable
 
     public HttpClient Http { get; }
 
-    public static async Task<ShopTestHost> StartenAsync(IDictionary<string, string?>? konfiguration = null)
+    /// <param name="jetzt">Startzeit der Testuhr (Standard: echte Zeit). Die Uhr kann danach nur vorgestellt werden.</param>
+    public static async Task<ShopTestHost> StartenAsync(IDictionary<string, string?>? konfiguration = null, DateTimeOffset? jetzt = null)
     {
         var ordner = Path.Combine(Path.GetTempPath(), "vibevhs-shoptest-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(ordner);
@@ -77,7 +78,7 @@ internal sealed class ShopTestHost : IAsyncDisposable
             .AddVibeVhsInfrastruktur(builder.Configuration, ordner, strengeAbfragepruefung: true)
             .AddVibeVhsMocks(builder.Configuration);
         s.RemoveAll<IHostedService>();
-        var uhr = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var uhr = new FakeTimeProvider(jetzt ?? DateTimeOffset.UtcNow);
         uhr.SetLocalTimeZone(TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin"));
         s.Replace(ServiceDescriptor.Singleton<TimeProvider>(uhr));
         s.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(ordner, "schluessel")));
@@ -111,7 +112,7 @@ internal sealed class ShopTestHost : IAsyncDisposable
         kurs.SerieFestlegen(new Serienregel
         {
             Start = start, Anzahl = 6, Wochentage = [start.DayOfWeek], Beginn = new TimeOnly(19, 0), DauerMinuten = 90, OrtIds = [raum.Id],
-        }, Kalender.OhneFerien, _ => "B 1.01 Bewegungsraum", heute.AddDays(300));
+        }, Kalender.OhneFerien, heute.AddDays(300));
         kurs.StatusSetzen(status);
         db.AddRange(semester, art, haus, raum, kurs);
         await db.SaveChangesAsync();

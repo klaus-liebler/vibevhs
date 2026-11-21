@@ -13,8 +13,14 @@ using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Infrastructure.Datenbank;
 
-public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen) : DbContext(optionen)
+public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen, TimeProvider? uhr = null) : DbContext(optionen)
 {
+    /// <summary>Anwendungsuhr: Bezugszeitpunkt („jetzt“) geladener Personen für ihre berechneten Eigenschaften.</summary>
+    public TimeProvider Uhr { get; } = uhr ?? TimeProvider.System;
+
+    /// <summary>Für SQLite-Funktionen (Collation DIN5007_2) – registriert bei jeder Verbindung, auch bei von außen geöffneten.</summary>
+    private readonly bool _erweitert = SqliteErweiterungen.Registrieren(optionen);
+
     public DbSet<Person> Personen => Set<Person>();
 
     public DbSet<PersonName> PersonNamen => Set<PersonName>();
@@ -33,7 +39,6 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
 
     public DbSet<DublettenAusschluss> DublettenAusschluesse => Set<DublettenAusschluss>();
 
-    public DbSet<Suchindexeintrag> Suchindex => Set<Suchindexeintrag>();
 
     public DbSet<VibeVHS.Domain.Programm.Semester> Semester => Set<VibeVHS.Domain.Programm.Semester>();
 
@@ -59,41 +64,64 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
 
     public DbSet<VibeVHS.Domain.Vorlagen.Textvorlage> Vorlagen => Set<VibeVHS.Domain.Vorlagen.Textvorlage>();
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionen)
+        => optionen.AddInterceptors(SqliteErweiterungenBeimOeffnen.Instanz);
+
     protected override void ConfigureConventions(ModelConfigurationBuilder konfiguration)
     {
-        // SQLite kennt keinen Zeitstempel mit Offset; als sortierbare Zahl (UTC-Ticks) speichern.
-        konfiguration.Properties<DateTimeOffset>().HaveConversion<DateTimeOffsetToBinaryConverter>();
+        // Speicherformate (siehe Speicherformate.cs): Ids 16 Byte (Big Endian, UUIDv7), Tage JJJJMMTT, Zeitpunkte und Termine UTC-Millisekunden.
+        konfiguration.Properties<Guid>().HaveConversion<IdAlsBytes>();
+        konfiguration.Properties<DateOnly>().HaveConversion<TagAlsZahl>();
+        konfiguration.Properties<DateTimeOffset>().HaveConversion<ZeitpunktAlsMillisekunden>();
+        konfiguration.Properties<DateTime>().HaveConversion<TerminAlsUtcMillisekunden>();
         konfiguration.Properties<Enum>().HaveConversion<string>().HaveMaxLength(40);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Aenderungsvorgang>(b =>
+        {
+            b.ToTable("Aenderungsvorgaenge");
+            b.HasKey(v => v.Id);
+            b.Property(v => v.Id).ValueGeneratedNever();
+            b.Property(v => v.Von).HasMaxLength(200);
+            b.Property(v => v.Grund).HasMaxLength(500);
+            b.HasIndex(v => v.Am);
+        });
+
+        modelBuilder.HasDbFunction(typeof(SqlFunktionen).GetMethod(nameof(SqlFunktionen.Ganzzahl))!)
+            .HasTranslation(a => new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlUnaryExpression(ExpressionType.Convert, a[0], typeof(long),
+                new Microsoft.EntityFrameworkCore.Storage.LongTypeMapping("INTEGER")));
+        modelBuilder.HasDbFunction(typeof(SqlFunktionen).GetMethod(nameof(SqlFunktionen.Suchtext))!)
+            .HasTranslation(a => new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFunctionExpression("suchtext", a, nullable: true,
+                argumentsPropagateNullability: [true], typeof(string), new Microsoft.EntityFrameworkCore.Storage.StringTypeMapping("TEXT", System.Data.DbType.String)));
+        modelBuilder.HasDbFunction(typeof(SqlFunktionen).GetMethod(nameof(SqlFunktionen.Hex))!)
+            .HasTranslation(a => new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFunctionExpression("hex", a, nullable: true,
+                argumentsPropagateNullability: [true], typeof(string), new Microsoft.EntityFrameworkCore.Storage.StringTypeMapping("TEXT", System.Data.DbType.String)));
+
         modelBuilder.Entity<Person>(b =>
         {
             b.ToTable("Personen");
             b.HasKey(p => p.Id);
             b.Property(p => p.Id).ValueGeneratedNever();
-            b.Property(p => p.EMail).HasMaxLength(320);
-            b.Property(p => p.Sprache).HasMaxLength(10);
-            b.Property(p => p.Titel).HasMaxLength(50);
-            b.Property(p => p.Rollen).HasConversion<int>();
-            b.Property(p => p.Benutzerkennung).HasMaxLength(100);
-            b.HasIndex(p => p.Benutzerkennung).IsUnique();
+            // Keine Kopien: Anzeigename, Rollen, E-Mail, Sprache, Titel, Geburtsdatum, Wohnort und Sortierung werden aus den Versionen berechnet.
+            b.Ignore(p => p.EMail);
+            b.Ignore(p => p.Sprache);
+            b.Ignore(p => p.Titel);
+            b.Ignore(p => p.Rollen);
+            b.Ignore(p => p.Anzeigename);
+            b.Ignore(p => p.Sortiername);
+            b.Ignore(p => p.Wohnort);
+            b.Ignore(p => p.Geburtsdatum);
+            b.Ignore(p => p.Stichzeit);
             b.Property(p => p.Status).HasMaxLength(30);
-            b.Property(p => p.Anzeigename).HasMaxLength(300);
-            b.Property(p => p.Sortiername).HasMaxLength(300);
-            b.Property(p => p.Sortierschluessel).HasMaxLength(340);
-            b.Property(p => p.Wohnort).HasMaxLength(200);
-            b.PrimitiveCollection(p => p.Fachbereiche);
-            b.HasIndex(p => p.Sortierschluessel).IsUnique();
-            b.HasIndex(p => p.Geburtsdatum);
+            b.FeldAlsTabelle<Person, Listenwert<int>>("_fachbereiche", nameof(Person.Fachbereiche), "PersonFachbereiche", "PersonId");
             b.HasIndex(p => p.Status);
             b.Property(p => p.Datenschutz).HasMaxLength(20);
             b.HasIndex(p => p.Datenschutz);
             b.Property(p => p.Sperrgrund).HasMaxLength(2000);
-            b.Property(p => p.StatistikAltersgruppe).HasMaxLength(30);
-            b.Property(p => p.StatistikGebiet).HasMaxLength(100);
-            b.Property(p => p.StatistikGeschlecht).HasMaxLength(30);
+            b.Property(p => p.AnonymisiertGeburtskohorte).HasMaxLength(20);
+            b.Property(p => p.AnonymisiertGebiet).HasMaxLength(100);
             Unterliste(b, p => p.Namen, "_namen");
             Unterliste(b, p => p.Merkmale, "_merkmale");
             Unterliste(b, p => p.Adressen, "_adressen");
@@ -108,9 +136,14 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
 
         Version<PersonName>(modelBuilder, "PersonNamen", b =>
         {
-            b.Property(n => n.Vorname).HasMaxLength(200);
-            b.Property(n => n.Nachname).HasMaxLength(200);
-            b.HasIndex(n => n.Nachname);
+            // Sortierung nach DIN 5007-2 per Collation auf den Spalten (Index, ORDER BY und Vergleiche nutzen sie); kein Sortierschlüssel.
+            b.Property(n => n.Vorname).HasMaxLength(200).UseCollation(Domain.Gemeinsam.Din5007.Collation);
+            b.Property(n => n.Nachname).HasMaxLength(200).UseCollation(Domain.Gemeinsam.Din5007.Collation);
+            b.Ignore(n => n.Sortierschluessel);
+            b.Property(n => n.Vorsatz).HasMaxLength(30);
+            b.Property(n => n.Zusatz).HasMaxLength(20);
+            // Sortierindex beginnt mit „nicht ersetzt“ (ErsetztDurchVorgangId IS NULL), damit SQLite filtern und in Namensfolge lesen kann.
+            b.HasIndex("ErsetztDurchVorgangId", nameof(PersonName.Nachname), nameof(PersonName.Vorname)).HasDatabaseName("IX_PersonNamen_Sortierung");
         });
         Version<PersonMerkmal>(modelBuilder, "PersonMerkmale", b => b.Property(m => m.Inhalt).HasMaxLength(200));
         Version<Postadresse>(modelBuilder, "PersonAdressen", b =>
@@ -122,7 +155,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(a => a.Land).HasMaxLength(2);
             b.HasIndex(a => a.AdressId);
         });
-        Version<AdressKennzeichen>(modelBuilder, "PersonAdressKennzeichen", b => b.Property(k => k.AdressAnzeige).HasMaxLength(500));
+        Version<AdressKennzeichen>(modelBuilder, "PersonAdressKennzeichen", b => b.Ignore(k => k.AdressAnzeige));
         Version<Rufnummer>(modelBuilder, "PersonRufnummern", b =>
         {
             b.Property(r => r.Nummer).HasMaxLength(50);
@@ -131,13 +164,15 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
         });
         Version<Organisationszugehoerigkeit>(modelBuilder, "PersonOrganisationen", b =>
         {
-            b.Property(o => o.OrganisationName).HasMaxLength(300);
+            b.Ignore(o => o.OrganisationName);
+            b.HasOne(o => o.Organisation).WithMany().HasForeignKey(o => o.OrganisationId).OnDelete(DeleteBehavior.Restrict);
+            b.Navigation(o => o.Organisation).AutoInclude();
             b.Property(o => o.Funktion).HasMaxLength(200);
             b.HasIndex(o => o.OrganisationId);
         });
         Version<Buchungsvollmacht>(modelBuilder, "PersonVollmachten", b =>
         {
-            b.Property(v => v.BevollmaechtigterName).HasMaxLength(300);
+            b.Ignore(v => v.BevollmaechtigterName); // Name zur Laufzeit (Bevollmaechtigtennamen), keine Kopie
             b.Property(v => v.Nachweis).HasMaxLength(500);
             b.HasIndex(v => v.BevollmaechtigterId);
         });
@@ -197,17 +232,10 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(l => l.Freigabe2Name).HasMaxLength(200);
             b.Property(l => l.Freigabe1Kennung).HasMaxLength(100);
             b.Property(l => l.Freigabe2Kennung).HasMaxLength(100);
-            b.PrimitiveCollection(l => l.PersonIds);
+            b.FeldAlsTabelle<VibeVHS.Domain.Datenschutz.Loeschlauf, Listenwert<Guid>>("_personIds", nameof(VibeVHS.Domain.Datenschutz.Loeschlauf.PersonIds), "LoeschlaufPersonen", "LoeschlaufId");
         });
         Version<VibeVHS.Domain.Programm.KursEntgelt>(modelBuilder, "KursEntgelte", _ => { }, "KursId");
         Version<VibeVHS.Domain.Programm.OrtMerkmal>(modelBuilder, "OrtMerkmale", b => b.Property(m => m.Schluessel).HasMaxLength(40), "OrtId");
-
-        // FTS5-Volltextindex; wird per SQL in der Migration angelegt und von SaveChanges gepflegt.
-        modelBuilder.Entity<Suchindexeintrag>(b =>
-        {
-            b.ToTable("PersonSuche", t => t.ExcludeFromMigrations());
-            b.HasKey(s => s.PersonId);
-        });
 
         Version<EMailAdresse>(modelBuilder, "PersonEMails", b =>
         {
@@ -261,7 +289,8 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(e => e.Kurzname).HasMaxLength(50);
             b.Property(e => e.Bundesland).HasMaxLength(50);
             b.Property(e => e.Website).HasMaxLength(200);
-            b.PrimitiveCollection(e => e.Orte);
+            b.Property(e => e.Impressum).HasMaxLength(VibeVHS.Domain.Stammdaten.Einrichtung.ImpressumMaxZeichen);
+            b.FeldAlsTabelle<VibeVHS.Domain.Stammdaten.Einrichtung, Listenwert<string>>("_orte", nameof(VibeVHS.Domain.Stammdaten.Einrichtung.Orte), "EinrichtungOrte", "EinrichtungId", 100);
         });
 
         modelBuilder.Entity<Fachbereich>(b =>
@@ -279,11 +308,12 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Property(k => k.Id).ValueGeneratedNever();
             b.Property(k => k.Login).HasMaxLength(100);
             b.HasIndex(k => k.Login).IsUnique();
-            b.Property(k => k.Name).HasMaxLength(200);
+            b.Ignore(k => k.Name);
+            b.Property<string?>("_name").HasColumnName("Name").HasMaxLength(200);
             b.Property(k => k.Funktion).HasMaxLength(300);
             b.Property(k => k.Hinweis).HasMaxLength(500);
-            b.PrimitiveCollection(k => k.Rollen);
-            b.PrimitiveCollection(k => k.Fachbereiche);
+            b.FeldAlsTabelle<Benutzerkonto, Listenwert<Rolle>>("_rollen", nameof(Benutzerkonto.Rollen), "BenutzerkontoRollen", "BenutzerkontoId");
+            b.FeldAlsTabelle<Benutzerkonto, Listenwert<int>>("_fachbereiche", nameof(Benutzerkonto.Fachbereiche), "BenutzerkontoFachbereiche", "BenutzerkontoId");
         });
     }
 
@@ -303,9 +333,20 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.ToTable(tabelle);
             b.HasKey(v => v.Id);
             b.Property(v => v.Id).ValueGeneratedNever();
-            b.Property(v => v.Grund).HasMaxLength(500);
-            b.Property(v => v.ErfasstVon).HasMaxLength(200);
-            b.HasIndex(fremdschluessel, nameof(BitemporaleVersion<T>.GueltigVon));
+            b.Property(v => v.GueltigBis).HasConversion(new OffenesEnde()); // offenes Ende = 99991231 statt NULL (NFA-15)
+            // Zeitpunkt, Person und Grund stehen im Änderungsvorgang (Tabelle Aenderungsvorgaenge), nicht in jeder Zeile.
+            b.HasOne(v => v.ErfasstDurch).WithMany().HasForeignKey("ErfasstDurchVorgangId").IsRequired().OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(v => v.ErsetztDurch).WithMany().HasForeignKey("ErsetztDurchVorgangId").OnDelete(DeleteBehavior.Restrict);
+            b.Navigation(v => v.ErfasstDurch).AutoInclude();
+            b.Navigation(v => v.ErsetztDurch).AutoInclude();
+            b.Ignore(v => v.ErfasstAm);
+            b.Ignore(v => v.ErfasstVon);
+            b.Ignore(v => v.ErsetztAm);
+            b.Ignore(v => v.Grund);
+            // „Stand der Person(en) heute“: Person + nicht ersetzt + Gültigkeit in einem Index. Ohne ErsetztDurchVorgangId darin wählt SQLite
+            // den Index auf ErsetztDurchVorgangId (fast alle Zeilen NULL) und liest die ganze Tabelle (Personenliste 30.000: 16 ms statt 0,2 ms).
+            b.HasIndex(fremdschluessel, "ErsetztDurchVorgangId", nameof(BitemporaleVersion<T>.GueltigVon))
+                .HasDatabaseName($"IX_{tabelle}_{fremdschluessel}_Stand");
             weiter(b);
         });
     }
@@ -319,51 +360,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         NurAnfuegenPruefen();
-        var geaendert = GeaendertePersonen();
-        if (geaendert.Count == 0)
-        {
-            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-        }
-
-        var eigeneTransaktion = Database.CurrentTransaction is null ? await Database.BeginTransactionAsync(cancellationToken) : null;
-        try
-        {
-            var anzahl = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-            await PersonenSuchindex.AktualisierenAsync(this, geaendert, cancellationToken);
-            if (eigeneTransaktion is not null)
-            {
-                await eigeneTransaktion.CommitAsync(cancellationToken);
-            }
-
-            return anzahl;
-        }
-        finally
-        {
-            if (eigeneTransaktion is not null)
-            {
-                await eigeneTransaktion.DisposeAsync();
-            }
-        }
-    }
-
-    /// <summary>Personen, deren Daten (oder Unterlisten) sich in diesem Speichervorgang ändern.</summary>
-    private List<Person> GeaendertePersonen()
-    {
-        var ids = new HashSet<Guid>();
-        foreach (var e in ChangeTracker.Entries().Where(e => e.State is EntityState.Added or EntityState.Modified))
-        {
-            if (e.Entity is Person p)
-            {
-                ids.Add(p.Id);
-            }
-            else if (e.Entity is IHistorienwert && e.Metadata.FindProperty("PersonId") is not null
-                     && e.Property("PersonId").CurrentValue is Guid personId)
-            {
-                ids.Add(personId);
-            }
-        }
-
-        return ChangeTracker.Entries<Person>().Select(e => e.Entity).Where(p => ids.Contains(p.Id)).ToList();
+        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
     /// <summary>Protokolleinträge und Namensversionen dürfen nur angefügt, nie gelöscht werden.</summary>

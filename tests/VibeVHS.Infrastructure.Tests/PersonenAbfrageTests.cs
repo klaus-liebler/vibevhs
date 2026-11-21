@@ -49,7 +49,7 @@ public class PersonenAbfrageTests
 
         gesehen.Count.ShouldBe(daten.Personen.Count);
         gesehen.Select(z => z.Id).Distinct().Count().ShouldBe(gesehen.Count);
-        gesehen.Select(z => z.Sortierschluessel).ShouldBe(gesehen.Select(z => z.Sortierschluessel).Order(StringComparer.Ordinal));
+        gesehen.Select(z => z.Seite).ShouldBe(gesehen.Select(z => z.Seite).Order(Comparer<Seitenschluessel>.Create(Seitenschluessel.Vergleichen)));
     }
 
     [Fact]
@@ -199,8 +199,8 @@ public class PersonenAbfrageTests
         bytes[0].ShouldBe((byte)'P'); // xlsx ist ein ZIP-Archiv
         using var mappe = new ClosedXML.Excel.XLWorkbook(new MemoryStream(bytes));
         var zeilen = mappe.Worksheet(1).RowsUsed().Count() - 1;
-        zeilen.ShouldBe(await db.Personen.CountAsync(p => (p.Rollen & Personenrolle.Teilnehmende) == Personenrolle.Teilnehmende
-                                                          && p.Status != Personenstatus.Zusammengefuehrt, ct));
+        zeilen.ShouldBe((await db.Personen.AsNoTracking().ToListAsync(ct)).Count(p => (p.Rollen & Personenrolle.Teilnehmende) == Personenrolle.Teilnehmende
+                                                          && p.Status != Personenstatus.Zusammengefuehrt));
     }
 
     [Fact]

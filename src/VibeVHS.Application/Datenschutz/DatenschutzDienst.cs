@@ -314,11 +314,8 @@ public sealed class DatenschutzDienst(
             return;
         }
 
+        // Kurse und Termine kopieren keine Namen mehr: der Platzhalter erscheint dort automatisch (Namen werden zur Laufzeit gelesen).
         var platzhalter = person.Anonymisieren(jetzt);
-        foreach (var kurs in await speicher.KurseMitDozentAsync(person.Id, abbruch))
-        {
-            kurs.DozentAnonymisieren(person.Id, platzhalter);
-        }
 
         foreach (var andere in await speicher.PersonenMitVollmachtFuerAsync(person.Id, abbruch))
         {

@@ -165,7 +165,7 @@ public sealed partial class ZahlungsDienst(
                 if (await personen.LadenAsync(p.PersonId, abbruch) is { IstAnonymisiert: false, EMail: { Length: > 0 } mail } person && mail != "–")
                 {
                     await post.KundenmailEinreihenAsync(mail, person.Anzeigename, $"Ankündigung SEPA-Lastschrift zu {p.BelegNummer}",
-                        $"Guten Tag {person.Anzeigename},\n\nwir ziehen am {ausfuehrung:dd.MM.yyyy} den Betrag von {new Geld(p.BetragCent)} für {p.BelegNummer} von Ihrem Konto {Iban.Maskiert(p.Iban)} ein.\n\n"
+                        $"{person.Briefanrede(uhr.GetLocalNow())},\n\nwir ziehen am {ausfuehrung:dd.MM.yyyy} den Betrag von {new Geld(p.BetragCent)} für {p.BelegNummer} von Ihrem Konto {Iban.Maskiert(p.Iban)} ein.\n\n"
                         + $"Mandatsreferenz: {p.MandatReferenz}\nGläubiger-Identifikationsnummer: {einst.GlaeubigerId}\n\nBitte sorgen Sie für ausreichende Deckung. Bei Fragen erreichen Sie uns gern.\n\nMit freundlichen Grüßen\n{einrichtung}",
                         person.Sprache, person.Id, abbruch);
                 }

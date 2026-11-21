@@ -23,6 +23,12 @@ public enum Importfeld
     Ort,
     EMail,
     Telefon,
+
+    /// <summary>Akademischer Grad/Titel (z. B. „Dr.“). Fehlt die Spalte, wird ein Titel aus Vor- oder Nachname abgetrennt.</summary>
+    Titel,
+
+    /// <summary>Optional „ja/1/x“: nur ein Name laut Ausweis (sonst gilt: leerer Vorname = nur ein Name).</summary>
+    NurEinName,
 }
 
 public enum Importstatus
@@ -48,6 +54,9 @@ public sealed record Importpruefung(IReadOnlyList<Importzeile> Zeilen, bool Ausg
     public int Dubletten => Zeilen.Count(z => z.Status is Importstatus.Dublette or Importstatus.DubletteInDatei);
 
     public int Fehler => Zeilen.Count(z => z.Status == Importstatus.Fehler);
+
+    /// <summary>Neue Personen mit nur einem Namen laut Ausweis (leerer Vorname) – im Probelauf gesondert ausgewiesen, bitte prüfen.</summary>
+    public int NurEinName => Zeilen.Count(z => z.Status == Importstatus.Neu && z.Wert(Importfeld.Vorname).Length == 0);
 }
 
 public interface IImportSpeicher
@@ -80,6 +89,8 @@ public sealed class ImportDienst(IDublettenSuche dubletten, IPersonenSpeicher pe
         ["plz"] = Importfeld.Postleitzahl, ["postleitzahl"] = Importfeld.Postleitzahl,
         ["ort"] = Importfeld.Ort, ["wohnort"] = Importfeld.Ort,
         ["email"] = Importfeld.EMail, ["e-mail"] = Importfeld.EMail, ["mail"] = Importfeld.EMail,
+        ["nureinname"] = Importfeld.NurEinName, ["nur ein name"] = Importfeld.NurEinName,
+        ["titel"] = Importfeld.Titel, ["akad. grad"] = Importfeld.Titel, ["akadgrad"] = Importfeld.Titel, ["grad"] = Importfeld.Titel,
         ["telefon"] = Importfeld.Telefon, ["tel"] = Importfeld.Telefon, ["telefonprivat"] = Importfeld.Telefon, ["mobil"] = Importfeld.Telefon, ["handy"] = Importfeld.Telefon,
     };
 
@@ -201,9 +212,9 @@ public sealed class ImportDienst(IDublettenSuche dubletten, IPersonenSpeicher pe
         ArgumentNullException.ThrowIfNull(datei);
         ArgumentNullException.ThrowIfNull(zuordnung);
         await RechtAsync(abbruch);
-        if (!zuordnung.Values.Contains(Importfeld.Nachname) || !zuordnung.Values.Contains(Importfeld.Vorname))
+        if (!zuordnung.Values.Contains(Importfeld.Nachname))
         {
-            throw new InvalidOperationException("Bitte mindestens die Spalten für Vorname und Nachname zuordnen.");
+            throw new InvalidOperationException("Bitte mindestens die Spalte für den Nachnamen zuordnen (Vorname leer = nur ein Name laut Ausweis).");
         }
 
         var gesehen = new Dictionary<string, int>();
@@ -215,10 +226,29 @@ public sealed class ImportDienst(IDublettenSuche dubletten, IPersonenSpeicher pe
                 .ToDictionary(z => z.Value, z => roh[z.Key].Trim());
             var nr = n + 2; // Zeile in der Datei (1 = Kopf)
             string? fehler = null;
-            DateOnly? geburt = null;
-            if (!werte.ContainsKey(Importfeld.Vorname) || !werte.ContainsKey(Importfeld.Nachname))
+            string? titelHinweis = null;
+            var nurEinName = werte.GetValueOrDefault(Importfeld.NurEinName)?.Trim().ToLowerInvariant() is "ja" or "j" or "1" or "x" or "true" or "wahr";
+            if (werte.ContainsKey(Importfeld.Vorname) && werte.ContainsKey(Importfeld.Nachname))
             {
-                fehler = "Vor- oder Nachname fehlt";
+                // Titel im Namen („Dr. Kai“) abtrennen; eine eigene Titelspalte bleibt maßgeblich und wird ergänzt.
+                var (titel, vor, nach) = Titelerkennung.Abtrennen(werte[Importfeld.Vorname], werte[Importfeld.Nachname]);
+                if (titel is not null && vor.Length > 0 && nach.Length > 0)
+                {
+                    werte[Importfeld.Vorname] = vor;
+                    werte[Importfeld.Nachname] = nach;
+                    werte[Importfeld.Titel] = Titelerkennung.Zusammen(werte.GetValueOrDefault(Importfeld.Titel), titel)!;
+                    titelHinweis = $"Titel „{titel}“ aus dem Namen übernommen";
+                }
+            }
+
+            DateOnly? geburt = null;
+            if (!werte.ContainsKey(Importfeld.Nachname))
+            {
+                fehler = werte.ContainsKey(Importfeld.Vorname) ? "Nachname fehlt (bei nur einem Namen steht er im Nachnamen)" : "Vor- oder Nachname fehlt";
+            }
+            else if (nurEinName && werte.ContainsKey(Importfeld.Vorname))
+            {
+                fehler = "„Nur ein Name“ angekreuzt, aber ein Vorname angegeben – bitte klären";
             }
             else if (werte.TryGetValue(Importfeld.Geburtsdatum, out var g))
             {
@@ -249,7 +279,7 @@ public sealed class ImportDienst(IDublettenSuche dubletten, IPersonenSpeicher pe
                 continue;
             }
 
-            var schluessel = $"{Suchtext.Normalisieren(werte[Importfeld.Vorname])}|{Suchtext.Normalisieren(werte[Importfeld.Nachname])}|{geburt}";
+            var schluessel = $"{Suchtext.Normalisieren(werte.GetValueOrDefault(Importfeld.Vorname))}|{Suchtext.Normalisieren(werte[Importfeld.Nachname])}|{geburt}";
             if (gesehen.TryGetValue(schluessel, out var erste))
             {
                 zeilen.Add(new Importzeile(nr, werte, Importstatus.DubletteInDatei, $"gleich wie Zeile {erste}", null));
@@ -257,10 +287,12 @@ public sealed class ImportDienst(IDublettenSuche dubletten, IPersonenSpeicher pe
             }
 
             gesehen[schluessel] = nr;
-            var kandidaten = await dubletten.KandidatenAsync(werte[Importfeld.Vorname], werte[Importfeld.Nachname], geburt, abbruch: abbruch);
+            var kandidaten = await dubletten.KandidatenAsync(werte.GetValueOrDefault(Importfeld.Vorname) ?? "", werte[Importfeld.Nachname], geburt, abbruch: abbruch);
             zeilen.Add(kandidaten.FirstOrDefault() is { } k
                 ? new Importzeile(nr, werte, Importstatus.Dublette, $"vorhanden: {k.Anzeigename}{(k.Geburtsdatum is { } kg ? $", geb. {kg:dd.MM.yyyy}" : "")} – {k.Grund}", k.Id)
-                : new Importzeile(nr, werte, Importstatus.Neu, "wird angelegt", null));
+                : new Importzeile(nr, werte, Importstatus.Neu,
+                    (werte.ContainsKey(Importfeld.Vorname) ? "wird angelegt" : "wird angelegt – nur ein Name laut Ausweis, bitte prüfen")
+                    + (titelHinweis is null ? "" : $" ({titelHinweis})"), null));
         }
 
         return new Importpruefung(zeilen, false, 0);
@@ -285,6 +317,7 @@ public sealed class ImportDienst(IDublettenSuche dubletten, IPersonenSpeicher pe
                 DateTimeStyles.None, out var g) ? (g.Year > heute.Year ? g.AddYears(-100) : g) : null;
             var p = Person.Anlegen(z.Wert(Importfeld.Vorname), z.Wert(Importfeld.Nachname), heute, jetzt, geburt,
                 string.IsNullOrWhiteSpace(z.Wert(Importfeld.EMail)) ? null : z.Wert(Importfeld.EMail), "de", $"Import {datei.Name}");
+            p.TitelSetzen(z.Wert(Importfeld.Titel));
             p.RolleHinzufuegen(Personenrolle.Teilnehmende, heute, Erfassung.Erst(jetzt, $"Import {datei.Name}"));
             if (!string.IsNullOrWhiteSpace(z.Wert(Importfeld.Strasse)) && !string.IsNullOrWhiteSpace(z.Wert(Importfeld.Ort)))
             {

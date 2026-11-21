@@ -20,7 +20,6 @@ public sealed record KursEntwurf(
     Geld? Ermaessigt,
     Sichtbarkeit? Sichtbarkeit = null,
     Guid? AuftraggeberId = null,
-    string? AuftraggeberName = null,
     string? Beschreibung = null,
     string? Kursnummer = null,
     string? Ausnahmebegruendung = null);
@@ -164,11 +163,11 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
         kurs.MitDozierendenmerkmalen(Sprachfreigabe.Konkretisieren(kurs.BenoetigteDozierendenmerkmale, kurs.Titel));
         if (entwurf.Sichtbarkeit is { } s)
         {
-            kurs.MitSichtbarkeit(s, entwurf.AuftraggeberId, entwurf.AuftraggeberName);
+            kurs.MitSichtbarkeit(s, entwurf.AuftraggeberId);
         }
 
         kurs.EntgeltSetzenAb(entwurf.Entgelt, entwurf.Ermaessigt, semester.Beginn, Erfassung.Erst(uhr.GetLocalNow(), wer.Anzeige));
-        kurs.SerieFestlegen(entwurf.Serie, await speicher.KalenderAsync(abbruch), id => verzeichnis.Finden(id)?.Anzeige ?? "?", Horizont);
+        kurs.SerieFestlegen(entwurf.Serie, await speicher.KalenderAsync(abbruch), Horizont);
         speicher.Hinzufuegen(kurs);
         await protokoll.ProtokollierenAsync("Kurs.Angelegt",
             $"Kurs {kurs.Kursnummer} „{kurs.Titel}“ angelegt: {kurs.Veranstaltungen.Count} Veranstaltungen{(vorschau.Konflikte.Count > 0 ? $", {vorschau.Konflikte.Count} Konflikte" : "")}",
@@ -189,7 +188,7 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
         var kalender = await speicher.KalenderAsync(abbruch);
         var neueTage = Seriengenerator.Erzeugen(neueRegel with { Start = ab }, kalender, neueRegel.Unbefristet ? Horizont : null).Where(t => t.Findet).Select(t => t.Datum);
         await EinsatzPruefenAsync(kurs, neueRegel.DozentId ?? kurs.Leitung?.PersonId, neueTage, abbruch);
-        kurs.SerieAendernAb(ab, neueRegel, kalender, id => verzeichnis.Finden(id)?.Anzeige ?? "?", Horizont);
+        kurs.SerieAendernAb(ab, neueRegel, kalender, Horizont);
         await protokoll.ProtokollierenAsync("Kurs.SerieGeaendert",
             $"{kurs.Kursnummer}: alle Termine ab {ab:dd.MM.yyyy} geändert ({string.Join("/", neueRegel.Wochentage.Select(KursAnzeige.Wochentag))} {neueRegel.Beginn:HH\\:mm}, {neueRegel.DauerMinuten} Min.); einzeln geänderte Termine bleiben",
             nameof(Kurs), kursId, abbruch: abbruch);
@@ -210,9 +209,9 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
         }
 
         await EinsatzPruefenAsync(kurs, dozent?.PersonId, [DateOnly.FromDateTime(beginn)], abbruch);
-        v.NurDieseAendern(beginn, ende, ortIds.Select(id => new VeranstaltungsOrt(id, verzeichnis.Finden(id)?.Anzeige ?? "?")), dozent, bemerkung);
+        v.NurDieseAendern(beginn, ende, ortIds.Select(id => new VeranstaltungsOrt(id)), dozent, bemerkung);
         await protokoll.ProtokollierenAsync("Kurs.TerminGeaendert",
-            $"{kurs.Kursnummer}: Termin {v.Nummer} geändert auf {beginn:dd.MM.yyyy HH:mm}–{ende:HH:mm} ({string.Join(", ", v.Orte.Select(o => o.OrtName))})",
+            $"{kurs.Kursnummer}: Termin {v.Nummer} geändert auf {beginn:dd.MM.yyyy HH:mm}–{ende:HH:mm} ({string.Join(", ", v.Orte.Select(o => verzeichnis.Finden(o.OrtId)?.Anzeige ?? "?"))})",
             nameof(Kurs), kursId, abbruch: abbruch);
         await speicher.SpeichernAsync(abbruch);
     }
@@ -234,7 +233,7 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
         var verzeichnis = await speicher.OrtsverzeichnisAsync(abbruch);
         var dozent = dozentId is { } d ? kurs.Team.FirstOrDefault(t => t.PersonId == d) : kurs.Leitung;
         await EinsatzPruefenAsync(kurs, dozent?.PersonId, [DateOnly.FromDateTime(beginn)], abbruch);
-        var v = kurs.EinzelveranstaltungHinzufuegen(beginn, ende, ortIds.Select(id => new VeranstaltungsOrt(id, verzeichnis.Finden(id)?.Anzeige ?? "?")), dozent);
+        var v = kurs.EinzelveranstaltungHinzufuegen(beginn, ende, ortIds.Select(id => new VeranstaltungsOrt(id)), dozent);
         speicher.Hinzufuegen(v);
         await protokoll.ProtokollierenAsync("Kurs.Einzeltermin", $"{kurs.Kursnummer}: Einzelveranstaltung am {beginn:dd.MM.yyyy HH:mm} hinzugefügt",
             nameof(Kurs), kursId, abbruch: abbruch);
@@ -250,8 +249,15 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
         await speicher.SpeichernAsync(abbruch);
     }
 
+    /// <remarks>Absagen geht nur über <see cref="Anmeldung.AnmeldungDienst.KursAbsagenAsync"/> (Grund, Belegungen aufheben,
+    /// Teilnehmende benachrichtigen) – ein stiller Statuswechsel ließe Angemeldete ohne Nachricht zurück.</remarks>
     public async Task StatusSetzenAsync(Guid kursId, Kursstatus status, CancellationToken abbruch = default)
     {
+        if (status == Kursstatus.Abgesagt)
+        {
+            throw new InvalidOperationException("Einen Kurs bitte über „Absagen“ mit Grund absagen – dabei werden alle Teilnehmenden benachrichtigt.");
+        }
+
         var kurs = await KursAsync(kursId, abbruch);
         kurs.StatusSetzen(status);
         await protokoll.ProtokollierenAsync("Kurs.Status", $"{kurs.Kursnummer}: Status {KursAnzeige.Status(status)}", nameof(Kurs), kursId, abbruch: abbruch);
@@ -282,7 +288,7 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
                 continue;
             }
 
-            var kopie = kurs.KopieFuer(nach, nummer, tage, kalender, id => verzeichnis.Finden(id)?.Anzeige ?? "?",
+            var kopie = kurs.KopieFuer(nach, nummer, tage, kalender,
                 nach.Ende, Erfassung.Erst(uhr.GetLocalNow(), wer.Anzeige, $"Semesterkopie aus {von.Name}"));
             speicher.Hinzufuegen(kopie);
             anzahl++;
@@ -331,7 +337,7 @@ public sealed class ProgrammDienst(IProgrammSpeicher speicher, IAuditProtokoll p
         foreach (var kurs in await speicher.UnbefristeteKurseAsync(abbruch))
         {
             var vorher = kurs.Veranstaltungen.Select(v => v.Id).ToHashSet();
-            var anzahl = kurs.Fortschreiben(kalender, id => verzeichnis.Finden(id)?.Anzeige ?? "?", Horizont);
+            var anzahl = kurs.Fortschreiben(kalender, Horizont);
             foreach (var v in kurs.Veranstaltungen.Where(v => !vorher.Contains(v.Id)))
             {
                 speicher.Hinzufuegen(v);

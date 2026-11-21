@@ -65,7 +65,6 @@ public sealed class Organisationszugehoerigkeit : BitemporaleVersion<Organisatio
 {
     private Organisationszugehoerigkeit()
     {
-        OrganisationName = string.Empty;
     }
 
     public Organisationszugehoerigkeit(Guid organisationId, string organisationName, string? funktion, DateOnly gueltigVon,
@@ -73,14 +72,19 @@ public sealed class Organisationszugehoerigkeit : BitemporaleVersion<Organisatio
         : base(gueltigVon, gueltigBis, erfassung)
     {
         OrganisationId = organisationId;
-        OrganisationName = organisationName;
+        _nameBeimAnlegen = organisationName;
         Funktion = string.IsNullOrWhiteSpace(funktion) ? null : funktion.Trim();
     }
 
     public Guid OrganisationId { get; private set; }
 
-    /// <summary>Name zum Erfassungszeitpunkt (für die Historie).</summary>
-    public string OrganisationName { get; private set; }
+    /// <summary>Die Organisation (beim Laden mitgelesen; ihr Name wird nicht kopiert).</summary>
+    public Organisation? Organisation { get; private set; }
+
+    private readonly string? _nameBeimAnlegen;
+
+    /// <summary>Heutiger Name der Organisation (keine Kopie in der Datenbank).</summary>
+    public string OrganisationName => Organisation?.Name ?? _nameBeimAnlegen ?? "?";
 
     public string? Funktion { get; private set; }
 
@@ -134,7 +138,11 @@ public sealed class Buchungsvollmacht : BitemporaleVersion<Buchungsvollmacht>
 
     public Guid BevollmaechtigterId { get; private set; }
 
+    /// <summary>Heutiger Name der bevollmächtigten Person bzw. Organisation (beim Laden gesetzt, nicht gespeichert).</summary>
     public string BevollmaechtigterName { get; private set; }
+
+    /// <summary>Namen ergänzen (gebündelt aus Personen bzw. Organisationen gelesen).</summary>
+    public void NameSetzen(string name) => BevollmaechtigterName = name;
 
     /// <summary>z. B. "Sorgerecht, Geburtsurkunde" oder "Betreuerausweis AG Steinfurt".</summary>
     public string Nachweis { get; private set; }

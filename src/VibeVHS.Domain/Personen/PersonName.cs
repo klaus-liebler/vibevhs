@@ -9,14 +9,19 @@ public sealed class PersonName : BitemporaleVersion<PersonName>
     {
         Vorname = string.Empty;
         Nachname = string.Empty;
+        Vorsatz = string.Empty;
+        Zusatz = string.Empty;
     }
 
-    public PersonName(string vorname, string nachname, DateOnly gueltigVon, DateOnly? gueltigBis, Erfassung erfassung)
+    public PersonName(string vorname, string nachname, DateOnly gueltigVon, DateOnly? gueltigBis, Erfassung erfassung, string? vorsatz = null,
+        string? zusatz = null)
         : base(gueltigVon, gueltigBis, erfassung)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(vorname);
+        Vorsatz = vorsatz?.Trim() ?? string.Empty;
+        Zusatz = zusatz?.Trim() ?? string.Empty;
+        // Vorname leer = „nur ein Name laut Ausweis“ (z. B. indonesische oder afghanische Dokumente); der Name steht dann im Nachnamen.
         ArgumentException.ThrowIfNullOrWhiteSpace(nachname);
-        Vorname = vorname.Trim();
+        Vorname = vorname?.Trim() ?? string.Empty;
         Nachname = nachname.Trim();
     }
 
@@ -30,12 +35,35 @@ public sealed class PersonName : BitemporaleVersion<PersonName>
 
     public string Nachname { get; private set; }
 
-    public string Anzeige => $"{Vorname} {Nachname}";
+    /// <summary>Namensvorsatz („von“, „van der“): in Anzeige und Anrede vor dem Nachnamen, bei der Sortierung nachgestellt.</summary>
+    public string Vorsatz { get; private set; }
+
+    /// <summary>Namenszusatz („jun.“, „sen.“): in der Anzeige hinten.</summary>
+    public string Zusatz { get; private set; }
+
+    /// <summary>Nachname mit Vorsatz, z. B. „von Berg“ (für die Anrede „Frau von Berg“).</summary>
+    public string NachnameMitVorsatz => Vorsatz.Length == 0 ? Nachname : $"{Vorsatz} {Nachname}";
+
+    /// <summary>
+    /// Normalisierte Sortierform („berg anna von“) für Vergleiche in C# (z. B. Dublettenprüfung). Nicht gespeichert: in der Datenbank sortiert
+    /// die Collation DIN5007_2 auf Nachname und Vorname (siehe <see cref="Din5007"/>).
+    /// </summary>
+    public string Sortierschluessel => Suchtext.Normalisieren(Sortierform);
+
+    /// <summary>Sortierform nach DIN 5007-2 (Telefonbuch): Nachname, Vorname, Vorsatz – „Berg Anna von“.</summary>
+    public string Sortierform => string.Join(' ', new[] { Nachname, Vorname, Vorsatz }.Where(t => t.Length > 0));
+
+    /// <summary>Kennzeichen „nur ein Name laut Ausweis“: kein Vorname, der einzige Name steht im Nachnamen.</summary>
+    public bool NurEinName => Vorname.Length == 0;
+
+    public string Anzeige => string.Join(' ', new[] { Vorname, Vorsatz, Nachname, Zusatz }.Where(t => t.Length > 0));
 
     internal void Anonymisieren(string vorname, string nachname)
     {
         Vorname = vorname;
         Nachname = nachname;
+        Vorsatz = string.Empty;
+        Zusatz = string.Empty;
     }
 
     public override string Datenart => "Name";
@@ -47,7 +75,7 @@ public sealed class PersonName : BitemporaleVersion<PersonName>
     public override string Wert => Anzeige;
 
     protected internal override PersonName KopieMit(DateOnly gueltigVon, DateOnly? gueltigBis, Erfassung erfassung)
-        => new(Vorname, Nachname, gueltigVon, gueltigBis, erfassung);
+        => new(Vorname, Nachname, gueltigVon, gueltigBis, erfassung, Vorsatz, Zusatz);
 
     public override string ToString() => Anzeige;
 }

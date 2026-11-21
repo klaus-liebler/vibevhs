@@ -358,7 +358,7 @@ public sealed class QualifikationsDienst(
         }
 
         var team = kurs.Team.Where(t => t.PersonId != personId).Select(t => leitung ? t with { Leitung = false } : t).ToList();
-        team.Add(new KursDozent(personId, person.Anzeigename, leitung || team.Count == 0));
+        team.Add(new KursDozent(personId, leitung || team.Count == 0));
         kurs.MitTeam(team);
         await protokoll.ProtokollierenAsync("Kurs.Team", $"{kurs.Kursnummer}: {Pseudonym.Person(personId)} ins Dozierendenteam aufgenommen{(leitung ? " (Leitung)" : "")} von {wer.Anzeige}",
             nameof(Kurs), kursId, abbruch: abbruch);
@@ -440,13 +440,14 @@ public sealed class QualifikationsDienst(
             }
 
             var betroffen = await BetroffeneVeranstaltungenAsync(kurs, abbruch);
+            var namen = await programm.FuerKurseAsync([kurs], abbruch);
             foreach (var gruppe in betroffen.Where(b => !b.Value.Geeignet)
                          .Select(b => (V: kurs.Veranstaltungen.First(v => v.Id == b.Key), E: b.Value))
                          .GroupBy(x => x.V.DozentId!.Value))
             {
                 var erster = gruppe.OrderBy(x => x.V.Beginn).First();
                 einsatz.Add(new($"qualifikation-einsatz:{kurs.Id:N}:{gruppe.Key:N}",
-                    $"{kurs.Kursnummer}: {gruppe.Count()} Veranstaltung(en) ab {erster.V.Datum:dd.MM.yyyy} mit {erster.V.DozentName} – {erster.E.Begruendung}",
+                    $"{kurs.Kursnummer}: {gruppe.Count()} Veranstaltung(en) ab {erster.V.Datum:dd.MM.yyyy} mit {namen.Dozent(erster.V)} – {erster.E.Begruendung}",
                     erster.E.AusnahmeMoeglich ? "Nachweis eintragen, andere Person einplanen oder Ausnahme mit Begründung erteilen."
                         : "Nachweis eintragen oder eine andere, zugelassene Person einplanen (keine Ausnahme möglich).",
                     erster.V.Datum.AddDays(-14), $"kurse/{kurs.Id}", kurs.Fachbereich,

@@ -67,6 +67,24 @@ else
         </div>
     </section>
 
+    <section class="vhs-card" aria-labelledby="h-impressum">
+        <div class="vhs-head"><h2 id="h-impressum">Impressum</h2>
+            <span class="vhs-small vhs-muted">öffentlich unter <a href="impressum" target="_blank">/impressum</a>, verlinkt in allen Fußzeilen; Markdown (z. B. **fett**, Leerzeile = neuer Absatz)</span></div>
+        @if (string.IsNullOrWhiteSpace(einrichtung.Impressum))
+        {
+            <div class="vhs-alert vhs-warn">Noch kein Impressum gepflegt – die Seite zeigt einen Platzhalter. Die Vorlage unten bitte vollständig anpassen.</div>
+        }
+        <textarea class="vhs-textarea vhs-mono" rows="14" maxlength="@Einrichtung.ImpressumMaxZeichen" aria-label="Impressum (Markdown)"
+                  disabled="@(!recht.Erlaubt)" @bind="impressum" @bind:event="oninput"></textarea>
+        <div class="vhs-row">
+            <BegruendeterButton Text="Impressum speichern" Icon="save"
+                                Freigabe="@(recht.Und(() => impressum == (einrichtung.Impressum ?? ImpressumVorlage) ? Freigabe.Nein("Bitte zuerst den Text anpassen – noch keine Änderung.") : Freigabe.Ja))"
+                                Click="@(() => SpeichernAsync(d => d.ImpressumSetzenAsync(impressum == ImpressumVorlage ? null : impressum), "Impressum gespeichert",
+                                    [new("Impressum ansehen", "impressum", "So sieht es die Öffentlichkeit", Hauptschritt: true), new("Protokoll ansehen", "protokoll")]))" />
+            <span class="vhs-small vhs-muted">@(impressum?.Length ?? 0) / @Einrichtung.ImpressumMaxZeichen Zeichen</span>
+        </div>
+    </section>
+
     <NaechsteSchritte Schritte="@folgeschritte" />
 }
 }
@@ -77,6 +95,27 @@ else
 
     private Einrichtung? einrichtung;
     private string? website;
+    private string? impressum;
+
+    /// <summary>Vorlage für ein leeres Impressum (§ 5 DDG); wird nicht gespeichert, solange sie unverändert ist.</summary>
+    private static readonly string ImpressumVorlage = """
+        **[Name der Volkshochschule]**
+        [Träger, z. B. Zweckverband / Stadt …]
+        [Straße Hausnummer]
+        [PLZ Ort]
+
+        **Vertreten durch:** [Name, Funktion]
+
+        **Kontakt:** Telefon [ … ] · E-Mail [ … ]
+
+        **Aufsichtsbehörde:** [ … ]
+
+        **Umsatzsteuer-Identifikationsnummer:** [ … ] (falls vorhanden)
+
+        **Verantwortlich für den Inhalt:** [Name, Anschrift]
+
+        **Betrieb des Testsystems:** [Betreiber, Kontakt]
+        """;
     private Freigabe recht = Freigabe.Ja;
     private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
 
@@ -90,6 +129,7 @@ else
     {
         einrichtung = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IStammdaten>().EinrichtungAsync());
         website = einrichtung?.Website;
+        impressum = einrichtung?.Impressum ?? ImpressumVorlage;
     }
 
     private async Task LogoHochladenAsync(InputFileChangeEventArgs e)
@@ -107,13 +147,13 @@ else
         }
     }
 
-    private async Task SpeichernAsync(Func<EinrichtungDienst, Task> aktion, string meldung)
+    private async Task SpeichernAsync(Func<EinrichtungDienst, Task> aktion, string meldung, IReadOnlyList<NaechsterSchritt>? schritte = null)
     {
         try
         {
             await Vorgang.AusfuehrenAsync(d => aktion(d.GetRequiredService<EinrichtungDienst>()));
             Hinweise.Notify(NotificationSeverity.Success, "Einstellungen", meldung);
-            folgeschritte =
+            folgeschritte = schritte ??
             [
                 new("Kurs-QR-Bogen ansehen", "kurse", "Logo und Website im Kopf und in der Fußzeile prüfen", Hauptschritt: true),
                 new("Protokoll ansehen", "protokoll"),

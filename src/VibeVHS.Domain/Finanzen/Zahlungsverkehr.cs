@@ -10,6 +10,7 @@ public sealed class Finanzeinstellungen
 {
     private Finanzeinstellungen()
     {
+        Mahnstufen = []; // beim Laden füllt EF die Liste aus der Tabelle Mahnstufen (keine Standardwerte vorbelegen)
         Kontoinhaber = string.Empty;
         Iban = string.Empty;
         GlaeubigerId = string.Empty;
@@ -655,7 +656,14 @@ public sealed class Honorarvertrag
     public string Modell { get; private set; }
 
     /// <summary>Parameterwerte (invariante Schreibweise, z. B. "32.50").</summary>
-    public Dictionary<string, string> Parameter { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile).</remarks>
+    public IReadOnlyDictionary<string, string> Parameter
+    {
+        get => Gemeinsam.Listenwerte.Woerterbuch(_parameter);
+        private set => _parameter = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Eintrag> _parameter = [];
 
     public DateOnly GueltigAb { get; private set; }
 

@@ -32,7 +32,14 @@ public sealed class Einrichtung
     public string Kurzname { get; private set; }
 
     /// <summary>Standorte (z. B. Emsdetten, Greven, Saerbeck).</summary>
-    public List<string> Orte { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<string> Orte
+    {
+        get => Gemeinsam.Listenwerte.Werte(_orte);
+        private set => _orte = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<string>> _orte = [];
 
     public string Bundesland { get; private set; }
 
@@ -43,6 +50,24 @@ public sealed class Einrichtung
     public string? Website { get; private set; }
 
     public const int LogoMaxBytes = 512 * 1024;
+
+    /// <summary>
+    /// Impressum (Anbieterkennzeichnung nach § 5 DDG) als Markdown; öffentlich unter /impressum. Leer: die Seite zeigt einen
+    /// deutlich markierten Platzhalter mit dem Hinweis, es in den Einstellungen zu pflegen.
+    /// </summary>
+    public string? Impressum { get; private set; }
+
+    public const int ImpressumMaxZeichen = 8000;
+
+    public void ImpressumSetzen(string? text)
+    {
+        if (text is { Length: > ImpressumMaxZeichen })
+        {
+            throw new ArgumentException($"Das Impressum ist zu lang (höchstens {ImpressumMaxZeichen} Zeichen).", nameof(text));
+        }
+
+        Impressum = string.IsNullOrWhiteSpace(text) ? null : text.Trim().ReplaceLineEndings("\n");
+    }
 
     /// <summary>Setzt oder entfernt (null) das Logo. Nur PNG oder JPEG.</summary>
     public void LogoSetzen(byte[]? bild)

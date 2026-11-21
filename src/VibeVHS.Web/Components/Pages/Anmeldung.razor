@@ -246,7 +246,7 @@ else if (schritt == 3 && person is not null && gewaehlt is not null)
 
     private IEnumerable<KursOption> SichtbareOptionen => optionen
         .Where(o => !nurBuchbare || o.Pruefung.Moeglich)
-        .Where(o => Suchtext.Woerter(kursSuche).All(w => o.Kurs.Suchtext.Contains(w, StringComparison.Ordinal)));
+        .Where(o => Suchtext.Normalisieren($"{o.Kurs.Kursnummer} {o.Kurs.Titel}") is var text && Suchtext.Woerter(kursSuche).All(w => text.Contains(w, StringComparison.Ordinal)));
 
     protected override async Task OnParametersSetAsync()
     {

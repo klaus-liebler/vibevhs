@@ -111,6 +111,29 @@ public sealed record Buchungsrecht(Buchungsweg Weg, bool DarfBuchen, bool DarfUe
 /// <summary>Buchungsrichtlinie eines Kurses (Vorlage aus der Kursart, je Kurs anpassbar).</summary>
 public sealed record Buchungsrichtlinie
 {
+    public Buchungsrichtlinie()
+    {
+    }
+
+    /// <summary>Kopie (auch für <c>with</c>): eigene Einträge der Rechte, damit zwei Richtlinien nie dieselben gespeicherten Zeilen teilen.</summary>
+    private Buchungsrichtlinie(Buchungsrichtlinie original)
+    {
+        Rechte = original.Rechte.Select(r => r with { }).ToList();
+        Belegung = original.Belegung;
+        KontingentAnzahl = original.KontingentAnzahl;
+        KontingentGueltigMonate = original.KontingentGueltigMonate;
+        VorabEinbuchung = original.VorabEinbuchung;
+        Warteliste = original.Warteliste;
+        StornofristTage = original.StornofristTage;
+        BearbeitungsgebuehrCent = original.BearbeitungsgebuehrCent;
+        UmbuchungsgebuehrCent = original.UmbuchungsgebuehrCent;
+        NachrueckfristTage = original.NachrueckfristTage;
+        EinbuchungsfristStunden = original.EinbuchungsfristStunden;
+        AustragefristStunden = original.AustragefristStunden;
+        NichterscheinenZaehlt = original.NichterscheinenZaehlt;
+        SelbstCheckin = original.SelbstCheckin;
+    }
+
     public List<Buchungsrecht> Rechte { get; init; } = [];
 
     public Belegungsart Belegung { get; init; } = Belegungsart.AlleVeranstaltungen;
@@ -195,7 +218,7 @@ public sealed class Kursart
     private Kursart()
     {
         Name = string.Empty;
-        Richtlinie = Buchungsrichtlinie.Oeffentlich;
+        Richtlinie = Buchungsrichtlinie.Oeffentlich with { };
     }
 
     public Kursart(string name, Nutzungsart nutzungsart, IEnumerable<string> merkmale, Buchungsrichtlinie richtlinie,
@@ -206,7 +229,7 @@ public sealed class Kursart
         Name = name.Trim();
         Nutzungsart = nutzungsart;
         BenoetigteMerkmale = merkmale.ToList();
-        Richtlinie = richtlinie;
+        Richtlinie = richtlinie with { };
         Sichtbarkeit = sichtbarkeit;
         FerienAuslassen = ferienAuslassen;
     }
@@ -218,7 +241,14 @@ public sealed class Kursart
     public Nutzungsart Nutzungsart { get; private set; }
 
     /// <summary>Merkmalsschlüssel, die jeder Ort haben muss (z. B. "bamf" für Integrationskurse).</summary>
-    public List<string> BenoetigteMerkmale { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<string> BenoetigteMerkmale
+    {
+        get => Gemeinsam.Listenwerte.Werte(_benoetigteMerkmale);
+        private set => _benoetigteMerkmale = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<string>> _benoetigteMerkmale = [];
 
     public Buchungsrichtlinie Richtlinie { get; private set; }
 
@@ -228,7 +258,14 @@ public sealed class Kursart
     public bool FerienAuslassen { get; private set; }
 
     /// <summary>Qualifikationen, die Dozierende am Veranstaltungstag haben müssen (z. B. "bamf-lk" für Integrationskurse).</summary>
-    public List<string> BenoetigteDozierendenmerkmale { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<string> BenoetigteDozierendenmerkmale
+    {
+        get => Gemeinsam.Listenwerte.Werte(_benoetigteDozierendenmerkmale);
+        private set => _benoetigteDozierendenmerkmale = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<string>> _benoetigteDozierendenmerkmale = [];
 
     public Kursart MitDozierendenmerkmalen(IEnumerable<string> schluessel)
     {
@@ -244,7 +281,8 @@ public sealed class Kursart
     }
 }
 
-public sealed record KursDozent(Guid PersonId, string Name, bool Leitung);
+/// <summary>Lehrkraft im Kursteam (Tabelle KursTeam). Der Name wird zur Laufzeit gelesen (Name zum Termindatum), nie kopiert.</summary>
+public sealed record KursDozent(Guid PersonId, bool Leitung);
 
 /// <summary>Entgelt eines Kurses in Cent (zeitlich gültig, z. B. Erhöhung ab Frühjahr).</summary>
 public sealed class KursEntgelt : BitemporaleVersion<KursEntgelt>
@@ -280,14 +318,14 @@ public sealed class KursEntgelt : BitemporaleVersion<KursEntgelt>
 }
 
 /// <summary>Ein Ort einer Veranstaltung; mehrere = hybrid. Eigene Höchstzahl überschreibt die Kapazität des Orts.</summary>
-public sealed record VeranstaltungsOrt(Guid OrtId, string OrtName, int? Hoechstzahl = null);
+/// <remarks>Tabelle VeranstaltungOrte; der Ortsname wird zur Laufzeit aus dem Ort gelesen.</remarks>
+public sealed record VeranstaltungsOrt(Guid OrtId, int? Hoechstzahl = null);
 
 /// <summary>Ein einzelner Termin eines Kurses.</summary>
 public sealed class Veranstaltung
 {
     private Veranstaltung()
     {
-        DozentName = string.Empty;
     }
 
     internal Veranstaltung(Guid kursId, int nummer, DateTime beginn, DateTime ende, IEnumerable<VeranstaltungsOrt> orte,
@@ -303,9 +341,8 @@ public sealed class Veranstaltung
         Nummer = nummer;
         Beginn = beginn;
         Ende = ende;
-        Orte = orte.ToList();
+        Orte = orte.DistinctBy(o => o.OrtId).Select(o => o with { }).ToList();
         DozentId = dozent?.PersonId;
-        DozentName = dozent?.Name ?? string.Empty;
         AusSerie = ausSerie;
     }
 
@@ -323,8 +360,6 @@ public sealed class Veranstaltung
     public List<VeranstaltungsOrt> Orte { get; private set; } = [];
 
     public Guid? DozentId { get; private set; }
-
-    public string DozentName { get; private set; }
 
     /// <summary>Von der Serienregel erzeugt (sonst Einzelveranstaltung).</summary>
     public bool AusSerie { get; private set; }
@@ -347,9 +382,8 @@ public sealed class Veranstaltung
 
         Beginn = beginn;
         Ende = ende;
-        Orte = orte.ToList();
+        Orte = orte.DistinctBy(o => o.OrtId).Select(o => o with { }).ToList();
         DozentId = dozent?.PersonId;
-        DozentName = dozent?.Name ?? string.Empty;
         Bemerkung = bemerkung;
         Ausnahme = true;
     }
@@ -366,14 +400,6 @@ public sealed class Veranstaltung
     }
 
     internal void Nummerieren(int nummer) => Nummer = nummer;
-
-    internal void DozentUmbenennen(Guid personId, string name)
-    {
-        if (DozentId == personId)
-        {
-            DozentName = name;
-        }
-    }
 }
 
 /// <summary>Kurs mit Team, Sichtbarkeit, Richtlinie, Entgelt (versioniert) und Veranstaltungen.</summary>
@@ -386,8 +412,7 @@ public sealed class Kurs
     {
         Kursnummer = string.Empty;
         Titel = string.Empty;
-        Suchtext = string.Empty;
-        Richtlinie = Buchungsrichtlinie.Oeffentlich;
+        Richtlinie = Buchungsrichtlinie.Oeffentlich with { };
     }
 
     public Kurs(string kursnummer, string titel, Semester semester, int fachbereich, Kursart kursart, int minTeilnehmende, int maxTeilnehmende)
@@ -407,15 +432,13 @@ public sealed class Kurs
         SemesterId = semester.Id;
         Fachbereich = fachbereich;
         KursartId = kursart.Id;
-        Nutzungsart = kursart.Nutzungsart;
         BenoetigteMerkmale = [.. kursart.BenoetigteMerkmale];
         BenoetigteDozierendenmerkmale = [.. kursart.BenoetigteDozierendenmerkmale];
-        Richtlinie = kursart.Richtlinie;
+        Richtlinie = kursart.Richtlinie with { };
         Sichtbarkeit = kursart.Sichtbarkeit;
         MinTeilnehmende = minTeilnehmende;
         MaxTeilnehmende = maxTeilnehmende;
         Status = Kursstatus.Entwurf;
-        Suchtext = Gemeinsam.Suchtext.Normalisieren($"{Kursnummer} {Titel}");
     }
 
     public Guid Id { get; private set; }
@@ -432,12 +455,25 @@ public sealed class Kurs
 
     public Guid KursartId { get; private set; }
 
-    public Nutzungsart Nutzungsart { get; private set; }
 
-    public List<string> BenoetigteMerkmale { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<string> BenoetigteMerkmale
+    {
+        get => Gemeinsam.Listenwerte.Werte(_benoetigteMerkmale);
+        private set => _benoetigteMerkmale = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<string>> _benoetigteMerkmale = [];
 
     /// <summary>Qualifikationen der Dozierenden (aus der Kursart, je Kurs ergänzbar, z. B. Alpha-Zusatzqualifikation).</summary>
-    public List<string> BenoetigteDozierendenmerkmale { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<string> BenoetigteDozierendenmerkmale
+    {
+        get => Gemeinsam.Listenwerte.Werte(_benoetigteDozierendenmerkmale);
+        private set => _benoetigteDozierendenmerkmale = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<string>> _benoetigteDozierendenmerkmale = [];
 
     public Kurs MitDozierendenmerkmalen(IEnumerable<string> schluessel)
     {
@@ -465,8 +501,6 @@ public sealed class Kurs
     /// <summary>Bei geschlossenen Kursen: die beauftragende Organisation.</summary>
     public Guid? AuftraggeberId { get; private set; }
 
-    public string? AuftraggeberName { get; private set; }
-
     public Buchungsrichtlinie Richtlinie { get; private set; }
 
     public int MinTeilnehmende { get; private set; }
@@ -487,8 +521,6 @@ public sealed class Kurs
     public IReadOnlyCollection<KursEntgelt> Entgelte => _entgelte;
 
     public IReadOnlyCollection<Veranstaltung> Veranstaltungen => _veranstaltungen;
-
-    public string Suchtext { get; private set; }
 
     /// <summary>Archiviert: schreibgeschützt und aus Standardlisten ausgeblendet; rückgängig machbar.</summary>
     public DateTimeOffset? ArchiviertAm { get; private set; }
@@ -517,16 +549,6 @@ public sealed class Kurs
         return EntgeltAm(beginn > heute ? beginn : heute, stand) ?? EntgeltAm(beginn, stand);
     }
 
-    /// <summary>Nach Anonymisierung einer Dozentin: Platzhalter statt Name im Team und an den Terminen; die Verknüpfung bleibt.</summary>
-    public void DozentAnonymisieren(Guid personId, string platzhalter)
-    {
-        Team = Team.Select(d => d.PersonId == personId ? d with { Name = platzhalter } : d).ToList();
-        foreach (var v in _veranstaltungen)
-        {
-            v.DozentUmbenennen(personId, platzhalter);
-        }
-    }
-
     public KursDozent? Leitung => Team.FirstOrDefault(d => d.Leitung) ?? Team.FirstOrDefault();
 
     public Kurs MitBeschreibung(string? text)
@@ -535,7 +557,7 @@ public sealed class Kurs
         return this;
     }
 
-    public Kurs MitSichtbarkeit(Sichtbarkeit sichtbarkeit, Guid? auftraggeberId = null, string? auftraggeberName = null)
+    public Kurs MitSichtbarkeit(Sichtbarkeit sichtbarkeit, Guid? auftraggeberId = null)
     {
         if (sichtbarkeit == Sichtbarkeit.Geschlossen && auftraggeberId is null)
         {
@@ -544,19 +566,18 @@ public sealed class Kurs
 
         Sichtbarkeit = sichtbarkeit;
         AuftraggeberId = auftraggeberId;
-        AuftraggeberName = auftraggeberName;
         return this;
     }
 
     public Kurs MitRichtlinie(Buchungsrichtlinie richtlinie)
     {
-        Richtlinie = richtlinie;
+        Richtlinie = richtlinie with { };
         return this;
     }
 
     public Kurs MitTeam(IEnumerable<KursDozent> team)
     {
-        Team = team.DistinctBy(d => d.PersonId).ToList();
+        Team = team.DistinctBy(d => d.PersonId).Select(d => d with { }).ToList();
         return this;
     }
 
@@ -571,7 +592,7 @@ public sealed class Kurs
     /// Schnellweg: Serie festlegen und Veranstaltungen erzeugen. Unbefristete Kurse werden bis <paramref name="horizont"/> erzeugt
     /// und später rollierend fortgeschrieben.
     /// </summary>
-    public IReadOnlyList<Serientermin> SerieFestlegen(Serienregel regel, Kalender kalender, Func<Guid, string> ortName, DateOnly horizont)
+    public IReadOnlyList<Serientermin> SerieFestlegen(Serienregel regel, Kalender kalender, DateOnly horizont)
     {
         ArgumentNullException.ThrowIfNull(regel);
         regel.Pruefen();
@@ -580,18 +601,18 @@ public sealed class Kurs
             throw new ArgumentException("Bitte mindestens einen Ort wählen.");
         }
 
-        Serie = regel;
+        Serie = regel with { };
         Umfang = regel.Unbefristet ? Kursumfang.Unbefristet : Kursumfang.Begrenzt;
         _veranstaltungen.RemoveAll(v => v.AusSerie && !v.Ausnahme);
         var termine = Seriengenerator.Erzeugen(regel, kalender, regel.Unbefristet ? horizont : null);
-        Hinzufuegen(termine, regel, ortName);
+        Hinzufuegen(termine, regel);
         ErzeugtBis = regel.Unbefristet ? horizont : termine.LastOrDefault()?.Datum;
         Nummerieren();
         return termine;
     }
 
     /// <summary>"Alle folgenden ändern": ab <paramref name="ab"/> gilt die neue Regel; frühere Termine und Ausnahmen bleiben.</summary>
-    public IReadOnlyList<Serientermin> SerieAendernAb(DateOnly ab, Serienregel neueRegel, Kalender kalender, Func<Guid, string> ortName, DateOnly horizont)
+    public IReadOnlyList<Serientermin> SerieAendernAb(DateOnly ab, Serienregel neueRegel, Kalender kalender, DateOnly horizont)
     {
         ArgumentNullException.ThrowIfNull(neueRegel);
         if (Serie is null)
@@ -609,7 +630,7 @@ public sealed class Kurs
 
         _veranstaltungen.RemoveAll(v => v.AusSerie && !v.Ausnahme && v.Datum >= ab);
         var termine = Seriengenerator.Erzeugen(regel, kalender, regel.Unbefristet ? horizont : null);
-        Hinzufuegen(termine, regel, ortName);
+        Hinzufuegen(termine, regel);
         Serie = neueRegel with { Start = Serie.Start, Anzahl = neueRegel.Anzahl };
         Umfang = regel.Unbefristet ? Kursumfang.Unbefristet : Kursumfang.Begrenzt;
         ErzeugtBis = regel.Unbefristet ? horizont : termine.LastOrDefault()?.Datum ?? ErzeugtBis;
@@ -618,7 +639,7 @@ public sealed class Kurs
     }
 
     /// <summary>Unbefristete Kurse rollierend bis zum Horizont fortschreiben. Liefert die Anzahl neuer Termine.</summary>
-    public int Fortschreiben(Kalender kalender, Func<Guid, string> ortName, DateOnly horizont)
+    public int Fortschreiben(Kalender kalender, DateOnly horizont)
     {
         if (Umfang != Kursumfang.Unbefristet || Serie is null || Status == Kursstatus.Abgesagt || (ErzeugtBis is { } e && e >= horizont))
         {
@@ -627,7 +648,7 @@ public sealed class Kurs
 
         var start = ErzeugtBis?.AddDays(1) ?? Serie.Start;
         var termine = Seriengenerator.Erzeugen(Serie with { Start = start, Ende = null, Anzahl = null }, kalender, horizont);
-        Hinzufuegen(termine, Serie, ortName);
+        Hinzufuegen(termine, Serie);
         ErzeugtBis = horizont;
         Nummerieren();
         return termine.Count(t => t.Findet);
@@ -641,10 +662,10 @@ public sealed class Kurs
         return v;
     }
 
-    private void Hinzufuegen(IEnumerable<Serientermin> termine, Serienregel regel, Func<Guid, string> ortName)
+    private void Hinzufuegen(IEnumerable<Serientermin> termine, Serienregel regel)
     {
         var dozent = regel.DozentId is { } d ? Team.FirstOrDefault(t => t.PersonId == d) : Leitung;
-        var orte = regel.OrtIds.Select(id => new VeranstaltungsOrt(id, ortName(id))).ToList();
+        var orte = regel.OrtIds.Select(id => new VeranstaltungsOrt(id)).ToList();
         foreach (var t in termine.Where(t => t.Findet))
         {
             if (_veranstaltungen.Any(v => v.Ausnahme && v.Datum == t.Datum))
@@ -666,7 +687,7 @@ public sealed class Kurs
     }
 
     /// <summary>Kopie in ein anderes Semester: Serie und Termine um <paramref name="verschiebungTage"/> verschoben, Status Entwurf.</summary>
-    public Kurs KopieFuer(Semester ziel, string neueNummer, int verschiebungTage, Kalender kalender, Func<Guid, string> ortName, DateOnly horizont, Erfassung erfassung)
+    public Kurs KopieFuer(Semester ziel, string neueNummer, int verschiebungTage, Kalender kalender, DateOnly horizont, Erfassung erfassung)
     {
         var kopie = new Kurs
         {
@@ -677,18 +698,15 @@ public sealed class Kurs
             SemesterId = ziel.Id,
             Fachbereich = Fachbereich,
             KursartId = KursartId,
-            Nutzungsart = Nutzungsart,
             BenoetigteMerkmale = [.. BenoetigteMerkmale],
             BenoetigteDozierendenmerkmale = [.. BenoetigteDozierendenmerkmale],
             Sichtbarkeit = Sichtbarkeit,
             AuftraggeberId = AuftraggeberId,
-            AuftraggeberName = AuftraggeberName,
-            Richtlinie = Richtlinie,
+            Richtlinie = Richtlinie with { },
             MinTeilnehmende = MinTeilnehmende,
             MaxTeilnehmende = MaxTeilnehmende,
             Status = Kursstatus.Entwurf,
-            Team = [.. Team],
-            Suchtext = Gemeinsam.Suchtext.Normalisieren($"{neueNummer} {Titel}"),
+            Team = Team.Select(d => d with { }).ToList(),
         };
 
         var entgelt = EntgeltAm(Serie?.Start ?? ziel.Beginn, erfassung.Am) ?? _entgelte.AktuellerVerlauf().LastOrDefault();
@@ -699,7 +717,7 @@ public sealed class Kurs
 
         if (Serie is not null)
         {
-            kopie.SerieFestlegen(Serie.Verschoben(verschiebungTage), kalender, ortName, horizont);
+            kopie.SerieFestlegen(Serie.Verschoben(verschiebungTage), kalender, horizont);
         }
 
         return kopie;

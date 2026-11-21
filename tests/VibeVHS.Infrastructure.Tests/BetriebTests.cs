@@ -59,7 +59,7 @@ public class BetriebTests
                 var kurs = new Kurs($"26H-{fb}{kursNr++:00}", $"Kurs {fb}/{k}", semester, fb, art, fb == 8 ? 20 : 3, fb == 8 ? 25 : 10);
                 kurs.EntgeltSetzenAb(Geld.Euro(80), null, semester.Beginn, Erfassung.Erst(jetzt.AddMonths(-3)));
                 kurs.SerieFestlegen(new Serienregel { Start = new DateOnly(2026, 11, 2), Anzahl = 10, Wochentage = [DayOfWeek.Monday], Beginn = new TimeOnly(18, 0), DauerMinuten = 90, OrtIds = [Guid.NewGuid()] },
-                    Kalender.OhneFerien, _ => "Raum", new DateOnly(2027, 6, 30));
+                    Kalender.OhneFerien, new DateOnly(2027, 6, 30));
                 kurs.StatusSetzen(Kursstatus.Veroeffentlicht);
                 db.Kurse.Add(kurs);
                 foreach (var p in leute.Take(fb == 8 ? 4 : 6))
@@ -70,6 +70,30 @@ public class BetriebTests
         }
 
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task Statistik_nimmt_Geschlecht_zum_Kursdatum_und_Alter_zum_Jahresende()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var t = await TestDatenbank.ErzeugenAsync();
+        await DatenAsync(t, personen: 6);
+        var jetzt = t.Uhr.GetLocalNow();
+        await using (var db = t.NeuerKontext())
+        {
+            // V1 (geb. 01.03.1955): Geschlecht „männlich“ zum Kursbeginn (02.11.2026), ab 01.12.2026 „weiblich“ – die Statistik 2026 zählt „männlich“.
+            var p = (await db.Personen.ToListAsync(ct)).Single(x => x.Anzeigename == "V1 N1");
+            p.AngabeAendern(MerkmalArt.Geschlecht, "männlich", new DateOnly(2025, 1, 1), Erfassung.Erst(jetzt), korrektur: false);
+            p.AngabeAendern(MerkmalArt.Geschlecht, "weiblich", new DateOnly(2026, 12, 1), Erfassung.Aenderung(jetzt, "Personenstand geändert"), korrektur: false);
+            await db.SaveChangesAsync(ct);
+        }
+
+        await using var db2 = t.NeuerKontext();
+        var faelle = await new Auswertungsquelle(db2, t.Uhr).StatistikfaelleAsync(2026, ct);
+        faelle.Count(f => f.Geschlecht == "männlich").ShouldBe(2); // in beiden Kursen (FB 5 und 8)
+        faelle.ShouldNotContain(f => f.Geschlecht == "weiblich");
+        // Altersgruppe zum 31.12.2026 (nicht „heute“): V1 ist dann 71.
+        faelle.Select(f => f.Altersgruppe).ShouldContain(VibeVHS.Domain.Datenschutz.Statistik.Altersgruppe(new DateOnly(1955, 3, 1), new DateOnly(2026, 12, 31)));
     }
 
     [Fact]
@@ -108,6 +132,55 @@ public class BetriebTests
     }
 
     [Fact]
+    public async Task Sicherung_nimmt_die_Kommentar_Datenbank_mit_und_raeumt_sie_mit_auf()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var ordner = Path.Combine(Path.GetTempPath(), $"vibevhs-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(ordner);
+        var uhr = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 11, 15, 1, 30, 0, TimeSpan.FromHours(1)));
+        try
+        {
+            var cs = new SqliteConnectionStringBuilder { DataSource = Path.Combine(ordner, "vibevhs.db"), Pooling = false }.ToString();
+            await using var db = new VibeVhsDbContext(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite(cs).Konfigurieren(streng: true).Options);
+            await Schema.AnlegenOderPruefenAsync(db, cs, ct);
+            var kommentarDatei = Path.Combine(ordner, "kommentare.db");
+            await using (var k = new VibeVHS.Infrastructure.Dokumentation.KommentarDbContext(new DbContextOptionsBuilder<VibeVHS.Infrastructure.Dokumentation.KommentarDbContext>()
+                             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = kommentarDatei, Pooling = false }.ToString()).Options))
+            {
+                await k.Database.EnsureCreatedAsync(ct);
+                k.Kommentare.Add(new VibeVHS.Domain.Dokumentation.Kommentar("hilfe", "", "", "gesichert?", "x", "X", null, uhr.GetUtcNow()));
+                await k.SaveChangesAsync(ct);
+            }
+
+            var konfig = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Sicherung:Behalten"] = "1" }).Build();
+            var b = new TestBenutzer(System);
+            var sicherung = new SqliteSicherung(db, konfig, new AuditProtokoll(db, b, uhr), b, uhr,
+                new VibeVHS.Infrastructure.Dokumentation.KommentarDatenbankOrt($"Data Source={kommentarDatei}"));
+
+            var erste = await sicherung.SichernAsync(ct);
+            var kopie = Path.Combine(ordner, "sicherung", SqliteSicherung.KommentarDatei(erste.Datei));
+            File.Exists(kopie).ShouldBeTrue();
+            await using (var pruef = new SqliteConnection($"Data Source={kopie};Pooling=False"))
+            {
+                await pruef.OpenAsync(ct);
+                await using var cmd = pruef.CreateCommand();
+                cmd.CommandText = "SELECT Text FROM Kommentare";
+                (await cmd.ExecuteScalarAsync(ct)).ShouldBe("gesichert?");
+            }
+
+            uhr.Advance(TimeSpan.FromDays(1));
+            var zweite = await sicherung.SichernAsync(ct);
+            File.Exists(kopie).ShouldBeFalse(); // mit der alten Hauptsicherung aufgeräumt (Behalten = 1)
+            File.Exists(Path.Combine(ordner, "sicherung", SqliteSicherung.KommentarDatei(zweite.Datei))).ShouldBeTrue();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            try { Directory.Delete(ordner, true); } catch (IOException) { /* Temp räumt auf */ }
+        }
+    }
+
+    [Fact]
     public async Task Sicherung_mit_Pruefsumme_Wiederherstellungstest_und_Aufbewahrung()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -118,7 +191,7 @@ public class BetriebTests
         {
             var cs = new SqliteConnectionStringBuilder { DataSource = Path.Combine(ordner, "vibevhs.db"), Pooling = false }.ToString();
             await using var db = new VibeVhsDbContext(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite(cs).Konfigurieren(streng: true).Options);
-            await db.Database.MigrateAsync(ct);
+            await Schema.AnlegenOderPruefenAsync(db, cs, ct);
             db.Personen.Add(Person.Anlegen("Anna", "Becker", new DateOnly(2025, 1, 1), uhr.GetLocalNow()));
             await db.SaveChangesAsync(ct);
             var konfig = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Sicherung:Behalten"] = "2" }).Build();
@@ -186,7 +259,7 @@ public class BetriebTests
         var dienst = new ImportDienst(new DublettenSuche(db), new PersonenSpeicher(db), new ImportSpeicher(db), protokoll, b, t.Uhr);
         var probe = await dienst.ProbelaufAsync(datei, zuordnung, ct);
         (probe.Neu, probe.Dubletten, probe.Fehler).ShouldBe((4, 2, 2));
-        probe.Zeilen.Single(z => z.Nr == 7).Hinweis.ShouldContain("Vor- oder Nachname");
+        probe.Zeilen.Single(z => z.Nr == 7).Hinweis.ShouldContain("Nachname fehlt");
         probe.Zeilen.Single(z => z.Nr == 8).Hinweis.ShouldContain("Postleitzahl");
         probe.Zeilen.Single(z => z.Nr == 6).Status.ShouldBe(Importstatus.DubletteInDatei);
         probe.Zeilen.Single(z => z.Nr == 9).Status.ShouldBe(Importstatus.Dublette);
@@ -202,6 +275,54 @@ public class BetriebTests
         var hildegard = await db.Personen.Include(p => p.Adressen).SingleAsync(p => p.Id == lauf.Zuordnungen[2].PersonId, ct);
         hildegard.Adressen.Single().Strasse.ShouldBe("Kirchweg 5; Hinterhaus");
         await Should.ThrowAsync<InvalidOperationException>(() => dienst.ImportierenAsync(datei, zuordnung, ct)); // gleiche Datei
+    }
+
+    [Fact]
+    public async Task Import_nimmt_Personen_mit_nur_einem_Namen_an_und_weist_sie_aus()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var t = await TestDatenbank.ErzeugenAsync();
+        await using var db = t.NeuerKontext();
+        var b = new TestBenutzer(System);
+        var dienst = new ImportDienst(new DublettenSuche(db), new PersonenSpeicher(db), new ImportSpeicher(db), new AuditProtokoll(db, b, t.Uhr), b, t.Uhr);
+        var datei = ImportDienst.Lesen("e.csv", Encoding.UTF8.GetBytes("Nr;Name;Vorname;NurEinName\n1;Rahimi;;\n2;Sukarno;;ja\n3;Widerspruch;Kai;ja\n4;Muster;Eva;\n"));
+        var zuordnung = ImportDienst.ZuordnungVorschlagen(datei.Spalten);
+        zuordnung.Values.ShouldContain(Importfeld.NurEinName);
+        var probe = await dienst.ProbelaufAsync(datei, zuordnung, ct);
+        (probe.Neu, probe.Fehler, probe.NurEinName).ShouldBe((3, 1, 2));
+        probe.Zeilen[0].Hinweis.ShouldContain("nur ein Name laut Ausweis");
+        probe.Zeilen[2].Hinweis.ShouldContain("Vorname angegeben");
+
+        await dienst.ImportierenAsync(datei, zuordnung, ct);
+        var jetzt = t.Uhr.GetLocalNow();
+        var namen = (await db.Personen.Include(p => p.Namen).AsNoTracking().ToListAsync(ct)).Select(p => p.AktuellerName(jetzt)).ToList();
+        namen.Where(n => n.NurEinName).Select(n => n.Nachname).Order().ShouldBe(["Rahimi", "Sukarno"]);
+    }
+
+    [Fact]
+    public async Task Import_trennt_Titel_aus_dem_Namen_ab_und_uebernimmt_eine_Titelspalte()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var t = await TestDatenbank.ErzeugenAsync();
+        await using var db = t.NeuerKontext();
+        var b = new TestBenutzer(System);
+        var dienst = new ImportDienst(new DublettenSuche(db), new PersonenSpeicher(db), new ImportSpeicher(db), new AuditProtokoll(db, b, t.Uhr), b, t.Uhr);
+
+        var ohneSpalte = ImportDienst.Lesen("a.csv", Encoding.UTF8.GetBytes("Nr;Name;Vorname\n1;Lüken;Dr. Kai\n2;Dr. Berg;Anna\n3;Ahlers;Jens\n"));
+        var probe = await dienst.ProbelaufAsync(ohneSpalte, ImportDienst.ZuordnungVorschlagen(ohneSpalte.Spalten), ct);
+        probe.Zeilen[0].Hinweis.ShouldContain("Titel „Dr.“");
+        await dienst.ImportierenAsync(ohneSpalte, ImportDienst.ZuordnungVorschlagen(ohneSpalte.Spalten), ct);
+
+        var mitSpalte = ImportDienst.Lesen("b.csv", Encoding.UTF8.GetBytes("Nr;Titel;Name;Vorname\n4;Prof.;Kranz;Dr. Eva\n"));
+        var zuordnung = ImportDienst.ZuordnungVorschlagen(mitSpalte.Spalten);
+        zuordnung.Values.ShouldContain(Importfeld.Titel);
+        await dienst.ImportierenAsync(mitSpalte, zuordnung, ct);
+
+        var personen = await db.Personen.Include(p => p.Namen).AsNoTracking().ToListAsync(ct);
+        var jetzt = t.Uhr.GetLocalNow();
+        string Name(Person p) => $"{p.Titel}|{p.AktuellerName(jetzt).Vorname}|{p.AktuellerName(jetzt).Nachname}";
+        personen.Select(Name).Order().ShouldBe(["|Jens|Ahlers", "Dr.|Anna|Berg", "Dr.|Kai|Lüken", "Prof. Dr.|Eva|Kranz"]);
+        personen.Single(p => p.Titel == "Dr." && p.Anzeigename.Contains("Kai")).Anzeigename.ShouldBe("Dr. Kai Lüken");
     }
 
     [Fact]
@@ -231,7 +352,7 @@ public class BetriebTests
                 var kurs = new Kurs($"26H-{i:000}", $"Kurs {i}", semester, 1 + (i % 8), art, 6, 15);
                 kurs.EntgeltSetzenAb(Geld.Euro(60 + (i % 40)), null, semester.Beginn, Erfassung.Erst(jetzt.AddMonths(-3)));
                 kurs.SerieFestlegen(new Serienregel { Start = new DateOnly(2026, 9, 1).AddDays(i % 60), Anzahl = 10, Wochentage = [(DayOfWeek)(1 + (i % 5))], Beginn = new TimeOnly(18, 0),
-                    DauerMinuten = 90, OrtIds = [Guid.NewGuid()] }, Kalender.OhneFerien, _ => "Raum", new DateOnly(2027, 6, 30));
+                    DauerMinuten = 90, OrtIds = [Guid.NewGuid()] }, Kalender.OhneFerien, new DateOnly(2027, 6, 30));
                 kurs.StatusSetzen(Kursstatus.Veroeffentlicht);
                 db.Kurse.Add(kurs);
                 for (var j = 0; j < 12; j++)

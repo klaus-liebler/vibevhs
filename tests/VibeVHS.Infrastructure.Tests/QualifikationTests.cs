@@ -48,11 +48,11 @@ public class QualifikationTests
         var semester = new Semester("Herbst 2026", "26H", new DateOnly(2026, 8, 24), new DateOnly(2027, 1, 31));
         var art = new Kursart("Integrationskurs", Nutzungsart.Integrationskurs, [], Buchungsrichtlinie.Integrationskurs, Sichtbarkeit.Intern)
             .MitDozierendenmerkmalen(["bamf-lk"]);
-        var kurs = new Kurs("26H-401", "Integrationskurs Modul 3", semester, 4, art, 8, 20).MitTeam([new KursDozent(mit.Id, "Maria Rossi", true)]);
+        var kurs = new Kurs("26H-401", "Integrationskurs Modul 3", semester, 4, art, 8, 20).MitTeam([new KursDozent(mit.Id, true)]);
         kurs.SerieFestlegen(new Serienregel
         {
             Start = new DateOnly(2026, 11, 17), Anzahl = 12, Wochentage = [DayOfWeek.Tuesday], Beginn = new TimeOnly(8, 30), DauerMinuten = 240, OrtIds = [Guid.NewGuid()],
-        }, Kalender.OhneFerien, _ => "A 1.10", new DateOnly(2027, 6, 30));
+        }, Kalender.OhneFerien, new DateOnly(2027, 6, 30));
         kurs.StatusSetzen(Kursstatus.Veroeffentlicht);
         db2.Personen.AddRange(mit, ohne);
         db2.Semester.Add(semester);

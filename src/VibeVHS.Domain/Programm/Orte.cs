@@ -116,7 +116,14 @@ public sealed class Merkmal
     public int? Max { get; private set; }
 
     /// <summary>Auswahlwerte, die nicht mehr neu vergeben werden (bestehende Einträge bleiben gültig).</summary>
-    public List<string> InaktiveWerte { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<string> InaktiveWerte
+    {
+        get => Gemeinsam.Listenwerte.Werte(_inaktiveWerte);
+        private set => _inaktiveWerte = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<string>> _inaktiveWerte = [];
 
     public IReadOnlyList<string> AktiveWerte => Werte.Where(w => !InaktiveWerte.Contains(w, StringComparer.OrdinalIgnoreCase)).ToList();
 
@@ -171,7 +178,7 @@ public sealed class Merkmal
 
         ArgumentException.ThrowIfNullOrWhiteSpace(wert);
         var w = wert.Trim();
-        InaktiveWerte.RemoveAll(x => x.Equals(w, StringComparison.OrdinalIgnoreCase));
+        InaktiveWerte = InaktiveWerte.Where(x => !x.Equals(w, StringComparison.OrdinalIgnoreCase)).ToList();
         if (!Werte.Contains(w, StringComparer.OrdinalIgnoreCase))
         {
             Werte = [.. Werte, w];
@@ -259,7 +266,14 @@ public sealed class Merkmal
     public bool Gesetzlich { get; private set; }
 
     /// <summary>Erlaubte Werte (z. B. Zulassungsart: direkt / mit Auflagen / nach Zusatzqualifizierung); leer = freier oder kein Wert.</summary>
-    public List<string> Werte { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<string> Werte
+    {
+        get => Gemeinsam.Listenwerte.Werte(_werte);
+        private set => _werte = Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<Gemeinsam.Listenwert<string>> _werte = [];
 
     /// <summary>So viele Tage vor Ablauf entsteht eine Aufgabe.</summary>
     public int VorlaufTage { get; private set; } = 60;
@@ -326,7 +340,6 @@ public sealed class Ort
     private Ort()
     {
         Name = string.Empty;
-        Suchtext = string.Empty;
     }
 
     public Ort(Ortsart art, string name, Guid? elternId = null, string? kurzname = null)
@@ -337,7 +350,6 @@ public sealed class Ort
         Name = name.Trim();
         Kurzname = string.IsNullOrWhiteSpace(kurzname) ? null : kurzname.Trim();
         ElternId = elternId;
-        Suchtext = Gemeinsam.Suchtext.Normalisieren($"{Name} {Kurzname}");
     }
 
     public Guid Id { get; private set; }
@@ -373,9 +385,6 @@ public sealed class Ort
 
     public IReadOnlyCollection<OrtMerkmal> Merkmale => _merkmale;
 
-    /// <summary>Normalisierter Text für die globale Suche.</summary>
-    public string Suchtext { get; private set; }
-
     public string Anzeige => Kurzname is null || Name.StartsWith(Kurzname, StringComparison.Ordinal) ? Name : $"{Kurzname} {Name}";
 
     /// <summary>Räume und virtuelle Räume sind exklusiv (Konflikt bei Überschneidung); Treffpunkte nicht.</summary>
@@ -390,7 +399,6 @@ public sealed class Ort
         Stadt = stadt;
         Breitengrad = breite;
         Laengengrad = laenge;
-        Suchtext = Gemeinsam.Suchtext.Normalisieren($"{Name} {Kurzname} {Strasse} {Stadt}");
         return this;
     }
 
@@ -448,9 +456,13 @@ public sealed record WirksamesMerkmal(Merkmal Merkmal, OrtMerkmal Eintrag, Ort H
 }
 
 /// <summary>Alle Orte mit ihrer Hierarchie: wirksame Merkmale (mit Vererbung), Pfad, Wegbeschreibung.</summary>
-public sealed class Ortsverzeichnis(IEnumerable<Ort> orte, IEnumerable<Merkmal> katalog)
+public sealed class Ortsverzeichnis(IEnumerable<Ort> orte, IEnumerable<Merkmal> katalog, IEnumerable<Kursart>? kursarten = null)
 {
     private readonly Dictionary<Guid, Ort> _orte = orte.ToDictionary(o => o.Id);
+    private readonly Dictionary<Guid, Nutzungsart> _nutzung = (kursarten ?? []).ToDictionary(k => k.Id, k => k.Nutzungsart);
+
+    /// <summary>Nutzungsart eines Kurses = die seiner Kursart (keine Kopie am Kurs); unbekannt → Seminar.</summary>
+    public Nutzungsart NutzungsartVon(Kurs kurs) => _nutzung.GetValueOrDefault(kurs.KursartId, Nutzungsart.Seminar);
     private readonly Dictionary<string, Merkmal> _katalog = katalog.ToDictionary(m => m.Schluessel);
 
     public IReadOnlyCollection<Ort> Alle => _orte.Values;

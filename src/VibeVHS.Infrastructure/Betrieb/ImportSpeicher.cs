@@ -14,7 +14,7 @@ internal static class BetriebMapping
             b.HasKey(x => x.Id);
             b.Property(x => x.Id).ValueGeneratedNever();
             b.HasIndex(x => x.Sha256);
-            b.Property(x => x.Zuordnungen).AlsJson();
+            b.AlsTabelle(x => x.Zuordnungen, "ImportZuordnungen", "ImportlaufId");
         });
 }
 

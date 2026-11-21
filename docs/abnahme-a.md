@@ -3,6 +3,8 @@
 **Teilnehmende:** 2–3 Verwaltungsmitarbeitende der vhs EGS (z. B. Teilnehmerservice, Fachbereichsleitung, Buchhaltung/Integrationskurs-Team)
 **Dauer:** 60–90 Minuten · **Adresse:** die lokale Testinstanz (z. B. `http://localhost:5189`) · **Daten:** ausschließlich fiktive Demodaten
 
+> **Datumsangaben:** Die Demodaten sind auf den 16.11.2026 zugeschnitten und werden beim Anlegen einer neuen Datenbank um ganze Wochen auf das aktuelle Datum verschoben (Kurse, Termine, Fristen, Rechnungen, Aufgaben …). Kursnummern und Semester heißen dann ggf. anders als unten (z. B. `27F-501` statt `26H-501`) – die Endziffern bleiben gleich.
+
 ## Ablauf
 
 1. **Begrüßung (5 min):** Ziel erklären: Wir testen die Software, nicht Sie. Fehler sind wertvolle Hinweise.
@@ -52,11 +54,13 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
 ## 2. Kurs per Schnellweg anlegen
 
 - **Testkonto:** Varvara Schatz · **Startpunkt:** **Kurse** → **Kurs anlegen**
-- **Aufgabe:** Legen Sie für Fachbereich 7 den Kurs „Rückenfit am Abend“ an: mittwochs 18:00–19:30, 10 Termine,
-  Ort *A 1.12*, 98 €, mindestens 6, höchstens 14 Personen. Prüfen Sie die Vorschau und veröffentlichen Sie den Kurs.
+- **Aufgabe:** Legen Sie für Fachbereich 7 den Kurs „Rückenfit am Abend“ (Kursart *Bewegungskurs*) an: mittwochs
+  18:00–19:30, 10 Termine, Ort *B 1.01 Bewegungsraum*, 98 €, mindestens 6, höchstens 14 Personen, mit einer geeigneten
+  Kursleitung. Prüfen Sie die Vorschau und veröffentlichen Sie den Kurs.
 - **Erwartung:**
   - Die Vorschau zeigt ausgelassene Ferien und Feiertage mit Grund sowie Raumkonflikte.
-  - Ungeeignete Orte und Kursleitungen sind gesperrt, mit Begründung (Tooltip).
+  - Ungeeignete Orte und Kursleitungen sind gesperrt, mit Begründung (Tooltip) – z. B. *A 1.12 Kursraum*: „Für die
+    Nutzungsart ‚Bewegung' ist hier keine Kapazität hinterlegt.“
   - Nach dem Veröffentlichen ist der Kurs am Tresen buchbar; der Raumplan zeigt ihn.
 - **Zeit:** ____ min · **Beobachtungen:**
 
@@ -134,6 +138,8 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
   - Absagen ist erst nach „Übernehmen“ möglich (Tooltip).
   - Alle Teilnehmenden bekommen eine Absage mit Übersetzungslink; künftige Termine fallen aus; die Aufgabe ist erledigt.
   - Im Rechnungslauf werden bereits gestellte Rechnungen storniert.
+  - Gibt es die Aufgabe nicht: auf der Kursseite **Absagen …** – die Bestätigung nennt betroffene Personen und Termine
+    und verlangt einen Grund; ohne Grund ist „Absagen und Teilnehmende benachrichtigen“ gesperrt (Tooltip).
 - **Zeit:** ____ min · **Beobachtungen:**
 
   &nbsp;

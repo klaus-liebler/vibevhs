@@ -4,6 +4,7 @@ using VibeVHS.Domain.Gemeinsam;
 using VibeVHS.Domain.Personen;
 using VibeVHS.Domain.Programm;
 using VibeVHS.Infrastructure.Datenbank;
+using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Web.Entwicklung;
 
@@ -27,6 +28,7 @@ internal static class QualifikationsDemodaten
 
         var uhr = bereich.ServiceProvider.GetRequiredService<TimeProvider>();
         var jetzt = uhr.GetLocalNow();
+        var z = await Demozeit.LadenAsync(db, uhr);
         var heute = DateOnly.FromDateTime(jetzt.Date);
         var e = Erfassung.Erst(jetzt, Von);
         var katalog = await db.Merkmale.AsNoTracking().ToDictionaryAsync(m => m.Schluessel);
@@ -35,10 +37,12 @@ internal static class QualifikationsDemodaten
             return;
         }
 
+        var heuteTag = DateOnly.FromDateTime(uhr.GetLocalNow().Date);
+        var dozRolle = db.MitRolle(Personenrolle.Dozierende, heuteTag);
         var dozierende = await db.Personen
-            .Where(p => (p.Rollen & Personenrolle.Dozierende) == Personenrolle.Dozierende && p.Status != Personenstatus.Zusammengefuehrt
+            .Where(p => dozRolle.Contains(p.Id) && p.Status != Personenstatus.Zusammengefuehrt
                         && p.Datenschutz == VibeVHS.Domain.Datenschutz.Datenschutzstatus.Aktiv)
-            .OrderBy(p => p.Sortierschluessel).ToListAsync();
+            .NachNameSortiert(db, heuteTag).ToListAsync();
         var zufall = new Random(815);
 
         // Beschäftigungsart: etwa jede fünfte Person festangestellt, Anna Becker wechselt 2026 in die Festanstellung.
@@ -49,8 +53,8 @@ internal static class QualifikationsDemodaten
             if (p.Anzeigename == "Anna Becker")
             {
                 p.BeschaeftigungAendernAb(Beschaeftigungsart.Freiberuflich, ab, erfasst);
-                p.BeschaeftigungAendernAb(Beschaeftigungsart.Festangestellt, new DateOnly(2026, 1, 1),
-                    Erfassung.Aenderung(new DateTimeOffset(2025, 12, 10, 10, 0, 0, TimeSpan.FromHours(1)), "Arbeitsvertrag vom 08.12.2025", Von));
+                p.BeschaeftigungAendernAb(Beschaeftigungsart.Festangestellt, z.D(2026, 1, 1),
+                    Erfassung.Aenderung(z.DTO(2025, 12, 10, 10, 0), $"Arbeitsvertrag vom {z.D(2025, 12, 8):dd.MM.yyyy}", Von));
                 continue;
             }
 
@@ -70,12 +74,12 @@ internal static class QualifikationsDemodaten
             }
 
             var alpha = kurs.BenoetigteDozierendenmerkmale.Contains("alpha");
-            var bis = alpha ? heute.AddDays(42) : new DateOnly(2028, 12, 31);
+            var bis = alpha ? heute.AddDays(42) : z.D(2028, 12, 31);
             p.QualifikationSetzenAb(katalog["bamf-lk"], alpha ? "mit Auflagen" : "direkt", $"Zulassungsbescheid BAMF Az. 81-{4711 + mitZulassung.Count}/{2023 + mitZulassung.Count}",
-                "Bundesamt für Migration und Flüchtlinge", new DateOnly(2023, 1, 1), bis, e);
+                "Bundesamt für Migration und Flüchtlinge", z.D(2023, 1, 1), bis, e);
             if (alpha)
             {
-                p.QualifikationSetzenAb(katalog["alpha"], null, "Zertifikat Zusatzqualifizierung Alphabetisierung (fiktiv)", "Goethe-Institut", new DateOnly(2022, 6, 1), null, e);
+                p.QualifikationSetzenAb(katalog["alpha"], null, "Zertifikat Zusatzqualifizierung Alphabetisierung (fiktiv)", "Goethe-Institut", z.D(2022, 6, 1), null, e);
             }
 
             notizen.Add($"{p.Anzeigename} ({kurs.Kursnummer}, BAMF bis {bis:dd.MM.yyyy})");
@@ -103,33 +107,33 @@ internal static class QualifikationsDemodaten
             {
                 Start = start, Anzahl = 24, Wochentage = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday],
                 Beginn = new TimeOnly(8, 30), DauerMinuten = 240, OrtIds = [raum.Id], FerienAuslassen = true,
-            }, kalender, _ => raum.Anzeige, heute.AddDays(12 * 7));
+            }, kalender, heute.AddDays(12 * 7));
             modul4.StatusSetzen(VibeVHS.Domain.Programm.Kursstatus.Veroeffentlicht);
             db.Kurse.Add(modul4);
-            notizen.Add($"{modul4.Kursnummer} mit {ablaufend.Name} ab {start:dd.MM.yyyy}");
+            notizen.Add($"{modul4.Kursnummer} ab {start:dd.MM.yyyy} (Lehrkraft mit ablaufender Zulassung)");
         }
 
         // Deutsch-Lehrkraft ohne BAMF-Zulassung (Sperre sichtbar), aber mit telc-Prüferlizenz
         var ohne = dozierende.FirstOrDefault(d => d.Fachbereiche.Contains(4) && !mitZulassung.Contains(d.Id));
         if (ohne is not null)
         {
-            ohne.QualifikationSetzenAb(katalog["telc-pruefer"], null, "Lizenz-Nr. T-2024-0815 (fiktiv)", "telc gGmbH", new DateOnly(2024, 3, 1), new DateOnly(2027, 2, 28), e);
+            ohne.QualifikationSetzenAb(katalog["telc-pruefer"], null, "Lizenz-Nr. T-2024-0815 (fiktiv)", "telc gGmbH", z.D(2024, 3, 1), z.D(2027, 2, 28), e);
             notizen.Add($"{ohne.Anzeigename} ohne BAMF-Zulassung");
         }
 
         // Weitere Beispiele: Übungsleiterlizenz und Erste Hilfe für Bewegung, Führungszeugnis
         foreach (var p in dozierende.Where(d => d.Fachbereiche.Contains(7) || d.Fachbereiche.Contains(8)).Take(6))
         {
-            p.QualifikationSetzenAb(katalog["uebungsleiter"], null, $"Lizenz Nr. {zufall.Next(10000, 99999)} (fiktiv)", "LandesSportBund NRW", new DateOnly(2023, 1, 1),
-                new DateOnly(2026 + zufall.Next(1, 3), 12, 31), e);
-            p.QualifikationSetzenAb(katalog["erste-hilfe"], null, "Bescheinigung Erste-Hilfe-Kurs (fiktiv)", "DRK Kreisverband Steinfurt", new DateOnly(2025, 2, 1),
-                new DateOnly(2027, 1, 31), e);
+            p.QualifikationSetzenAb(katalog["uebungsleiter"], null, $"Lizenz Nr. {zufall.Next(10000, 99999)} (fiktiv)", "LandesSportBund NRW", z.D(2023, 1, 1),
+                z.D(new DateOnly(2026 + zufall.Next(1, 3), 12, 31)), e);
+            p.QualifikationSetzenAb(katalog["erste-hilfe"], null, "Bescheinigung Erste-Hilfe-Kurs (fiktiv)", "DRK Kreisverband Steinfurt", z.D(2025, 2, 1),
+                z.D(2027, 1, 31), e);
         }
 
         if (dozierende.FirstOrDefault(d => d.Fachbereiche.Contains(3) && !mitZulassung.Contains(d.Id)) is { } fz)
         {
-            fz.QualifikationSetzenAb(katalog["fuehrungszeugnis"], null, "Erweitertes Führungszeugnis vom 15.01.2026 (Einsicht vermerkt)", "Stadt Emsdetten, Bürgerbüro",
-                new DateOnly(2026, 1, 15), new DateOnly(2031, 1, 14), e);
+            fz.QualifikationSetzenAb(katalog["fuehrungszeugnis"], null, $"Erweitertes Führungszeugnis vom {z.D(2026, 1, 15):dd.MM.yyyy} (Einsicht vermerkt)", "Stadt Emsdetten, Bürgerbüro",
+                z.D(2026, 1, 15), z.D(2031, 1, 14), e);
         }
 
         db.Protokoll.Add(new AuditEintrag(uhr.GetUtcNow(), "automatik", "Automatik", null, "Demodaten.Qualifikationen", null, null,
@@ -159,6 +163,7 @@ internal static class QualifikationsDemodaten
 
         var uhr = bereich.ServiceProvider.GetRequiredService<TimeProvider>();
         var jetzt = uhr.GetLocalNow();
+        var z = await Demozeit.LadenAsync(db, uhr);
         var e = Erfassung.Erst(jetzt, Von);
 
         // Kursart „Sprachkurs“ verlangt die Freigabe; die Kurse bestimmen ihre Sprache aus dem Titel.
@@ -200,10 +205,10 @@ internal static class QualifikationsDemodaten
 
             var werte = personId == ohne ? sprachen.Select(s => s == "Italienisch" ? "Französisch" : "Italienisch").Distinct().ToList() : sprachen;
             p.QualifikationSetzenAb(freigabe, string.Join(", ", werte), $"Hospitation und Gespräch mit der Fachbereichsleitung, Protokoll FB5-{2024}-{++nr:000} (fiktiv)",
-                "vhs Emsdetten-Greven-Saerbeck", new DateOnly(2024, 8, 1), null, e);
+                "vhs Emsdetten-Greven-Saerbeck", z.D(2024, 8, 1), null, e);
             if (werte.Contains(Sprachfreigabe.DeutschWert) && katalog.TryGetValue("daf-daz", out var daf))
             {
-                p.QualifikationSetzenAb(daf, null, "Zertifikat Zusatzqualifikation DaF/DaZ (fiktiv)", "Goethe-Institut", new DateOnly(2021, 3, 1), null, e);
+                p.QualifikationSetzenAb(daf, null, "Zertifikat Zusatzqualifikation DaF/DaZ (fiktiv)", "Goethe-Institut", z.D(2021, 3, 1), null, e);
             }
 
             notizen.Add($"{p.Anzeigename}: {string.Join(", ", werte)}{(personId == ohne ? " (Absicht: nicht passend)" : "")}");

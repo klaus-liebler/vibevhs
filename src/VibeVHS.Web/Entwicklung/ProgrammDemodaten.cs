@@ -4,6 +4,7 @@ using VibeVHS.Domain.Gemeinsam;
 using VibeVHS.Domain.Personen;
 using VibeVHS.Domain.Programm;
 using VibeVHS.Infrastructure.Datenbank;
+using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Web.Entwicklung;
 
@@ -29,6 +30,7 @@ internal static class ProgrammDemodaten
 
         var uhr = bereich.ServiceProvider.GetRequiredService<TimeProvider>();
         var jetzt = uhr.GetLocalNow();
+        var z = await Demozeit.LadenAsync(db, uhr);
         var e = Erfassung.Erst(jetzt, Von);
 
         // Merkmalskatalog (pflegbar)
@@ -70,8 +72,8 @@ internal static class ProgrammDemodaten
         db.Ferien.AddRange(ferien);
         var kalender = new Kalender(ferien);
 
-        var herbst = new Semester("Herbst 2026", "26H", new DateOnly(2026, 8, 24), new DateOnly(2027, 1, 31));
-        var fruehjahr = new Semester("Frühjahr 2027", "27F", new DateOnly(2027, 2, 1), new DateOnly(2027, 7, 31));
+        var herbst = new Semester(Demozeit.Semestername(z.Kuerzel("26H")), z.Kuerzel("26H"), z.D(2026, 8, 24), z.D(2027, 1, 31));
+        var fruehjahr = new Semester(Demozeit.Semestername(z.Kuerzel("27F")), z.Kuerzel("27F"), z.D(2027, 2, 1), z.D(2027, 7, 31));
         db.Semester.AddRange(herbst, fruehjahr);
 
         // Orte (echte Ortsnamen, fiktive Gebäude, Adressen und Räume)
@@ -83,7 +85,7 @@ internal static class ProgrammDemodaten
         }
 
         void Merk(Ort o, string schluessel, string? wert = null, string? nachweis = null, DateOnly? bis = null)
-            => o.MerkmalSetzenAb(m[schluessel], wert, nachweis, new DateOnly(2024, 1, 1), bis, e);
+            => o.MerkmalSetzenAb(m[schluessel], wert, nachweis, z.D(2024, 1, 1), bis, e);
 
         var ems = Neu(new Ort(Ortsart.Liegenschaft, "vhs-Haus Emsdetten (fiktiv)").MitAdresse("Bildungsweg 1", "48282", "Emsdetten", 52.1730, 7.5268)
             .MitLage("Zufahrt über den Bildungsweg; Parkplatz hinter Haus B, Bushaltestelle 100 m entfernt."));
@@ -119,8 +121,8 @@ internal static class ProgrammDemodaten
         Merk(r["A 0.01"], "beamer");
         Merk(r["A 0.05"], "kueche");
         Merk(r["A 0.05"], "wasser");
-        Merk(r["A 1.10"], "bamf", "gemeldet", "BAMF-Meldung Kursort (fiktiv)", new DateOnly(2027, 12, 31));
-        Merk(r["A 1.10"], "telc", "Lizenz", "telc-Prüfungszentrum (fiktiv)", new DateOnly(2027, 6, 30));
+        Merk(r["A 1.10"], "bamf", "gemeldet", "BAMF-Meldung Kursort (fiktiv)", z.D(2027, 12, 31));
+        Merk(r["A 1.10"], "telc", "Lizenz", "telc-Prüfungszentrum (fiktiv)", z.D(2027, 6, 30));
         Merk(r["A 1.12"], "beamer");
         Merk(r["A 2.01"], "pc", "12");
         Merk(r["A 2.01"], "beamer");
@@ -128,7 +130,7 @@ internal static class ProgrammDemodaten
         Merk(r["B 1.03"], "nbf", "1. OG ohne Aufzug");
         Merk(r["B 1.03"], "wasser");
         Merk(r["B 1.05"], "nbf", "1. OG ohne Aufzug");
-        Merk(r["B 1.05"], "bamf", "gemeldet", "BAMF-Meldung Kursort (fiktiv)", new DateOnly(2026, 12, 31)); // läuft bald ab → Aufgabe
+        Merk(r["B 1.05"], "bamf", "gemeldet", "BAMF-Meldung Kursort (fiktiv)", z.D(2026, 12, 31)); // läuft bald ab → Aufgabe
 
         var greven = Neu(new Ort(Ortsart.Liegenschaft, "Bildungszentrum Greven (fiktiv)").MitAdresse("Am Bildungshaus 3", "48268", "Greven", 52.0917, 7.6086)
             .MitLage("Eingang an der Rückseite, Fahrradstellplätze am Eingang."));
@@ -232,29 +234,33 @@ internal static class ProgrammDemodaten
         ];
 
         // Dozierende aus den Testdaten, passend zum Fachbereich
-        var dozierende = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
-            .Where(p => (p.Rollen & Personenrolle.Dozierende) == Personenrolle.Dozierende && p.Status != Personenstatus.Zusammengefuehrt)
-            .OrderBy(p => p.Sortierschluessel)
-            .Select(p => new { p.Id, p.Anzeigename, p.Fachbereiche })
+        var heuteTag = DateOnly.FromDateTime(uhr.GetLocalNow().Date);
+        var dozRolle = db.MitRolle(Personenrolle.Dozierende, heuteTag);
+        var dozRoh = await db.Personen.IgnoreAutoIncludes().AsNoTracking()
+            .Where(p => dozRolle.Contains(p.Id) && p.Status != Personenstatus.Zusammengefuehrt)
+            .NachNameSortiert(db, heuteTag)
+            .Select(p => new { p.Id, p.Fachbereiche })
             .ToListAsync();
+        var dozNamen = await db.AnzeigenamenAsync(dozRoh.Select(d => d.Id).ToList(), heuteTag);
+        var dozierende = dozRoh.Select(d => new { d.Id, Anzeigename = dozNamen.GetValueOrDefault(d.Id, ""), d.Fachbereiche }).ToList();
         var stadtwerke = await db.Organisationen.Where(o => o.Name.StartsWith("Stadtwerke")).OrderBy(o => o.Name).ThenBy(o => o.Id).FirstOrDefaultAsync();
         var horizont = DateOnly.FromDateTime(jetzt.Date).AddDays(12 * 7);
         var zaehler = 0;
         foreach (var p in plaene)
         {
             var semester = p.Nr.StartsWith("27F", StringComparison.Ordinal) ? fruehjahr : herbst;
-            var kurs = new Kurs(p.Nr, p.Titel, semester, p.Fb, arten[p.Art], p.Min, p.Max);
+            var kurs = new Kurs(z.Nr(p.Nr), p.Titel, semester, p.Fb, arten[p.Art], p.Min, p.Max);
             var passend = dozierende.Where(d => d.Fachbereiche.Contains(p.Fb)).ToList();
             var auswahl = passend.Count > 0 ? passend : dozierende;
             if (auswahl.Count > 0)
             {
                 var d = auswahl[zaehler++ % auswahl.Count];
-                kurs.MitTeam([new KursDozent(d.Id, d.Anzeigename, true)]);
+                kurs.MitTeam([new KursDozent(d.Id, true)]);
             }
 
             if (p.Art == "Firma" && stadtwerke is not null)
             {
-                kurs.MitSichtbarkeit(Sichtbarkeit.Geschlossen, stadtwerke.Id, stadtwerke.Name);
+                kurs.MitSichtbarkeit(Sichtbarkeit.Geschlossen, stadtwerke.Id);
             }
 
             kurs.EntgeltSetzenAb(Geld.Euro(p.Euro), p.Euro > 0 ? Geld.Euro(p.Euro * 3 / 4) : null, semester.Beginn, e);
@@ -266,14 +272,14 @@ internal static class ProgrammDemodaten
 
             kurs.SerieFestlegen(new Serienregel
             {
-                Start = DateOnly.Parse(p.Start, System.Globalization.CultureInfo.InvariantCulture),
+                Start = z.D(p.Start),
                 Anzahl = p.Anzahl,
                 Wochentage = [.. p.Tage],
                 Beginn = TimeOnly.Parse(p.Beginn, System.Globalization.CultureInfo.InvariantCulture),
                 DauerMinuten = p.Minuten,
                 OrtIds = ortIds,
                 FerienAuslassen = arten[p.Art].FerienAuslassen,
-            }, kalender, id => orte.First(o => o.Id == id).Anzeige, horizont);
+            }, kalender, horizont);
             kurs.StatusSetzen(p.Status);
             if (p.Titel.Contains("Alphabetisierung", StringComparison.Ordinal))
             {

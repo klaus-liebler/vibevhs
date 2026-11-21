@@ -56,9 +56,8 @@ public sealed class Terminnachricht(IProgrammSpeicher programm, IAnmeldungSpeich
                 continue;
             }
 
-            var name = p.AktuellerName(uhr.GetLocalNow());
             await post.KundenmailEinreihenAsync(mail, p.Anzeigename, $"{kurs.Titel}: {betreff.Trim()}",
-                $"Guten Tag {name.Vorname} {name.Nachname},\n\n{text.Trim()}\n\nMit freundlichen Grüßen\n{wer.Name}", p.Sprache, p.Id, abbruch);
+                $"{p.Briefanrede(uhr.GetLocalNow())},\n\n{text.Trim()}\n\nMit freundlichen Grüßen\n{wer.Name}", p.Sprache, p.Id, abbruch);
             versandt++;
         }
 

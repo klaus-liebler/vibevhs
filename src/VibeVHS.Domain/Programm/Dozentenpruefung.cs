@@ -275,8 +275,30 @@ public static class Anforderung
 
     public static string Bilden(string schluessel, string? wert) => string.IsNullOrWhiteSpace(wert) ? schluessel : $"{schluessel}={wert.Trim()}";
 
+    /// <summary>Werte trennen an „,“, „;“ und „/“ – nicht innerhalb von Klammern (z. B. „Deutsch (DaF/DaZ)“).</summary>
     public static IReadOnlyList<string> Werte(string? wertText)
-        => (wertText ?? "").Split(Trenner, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    {
+        var werte = new List<string>();
+        var tiefe = 0;
+        var start = 0;
+        var text = wertText ?? "";
+        for (var i = 0; i <= text.Length; i++)
+        {
+            var c = i < text.Length ? text[i] : ',';
+            tiefe += c switch { '(' => 1, ')' when tiefe > 0 => -1, _ => 0 };
+            if (tiefe == 0 && Array.IndexOf(Trenner, c) >= 0)
+            {
+                if (text[start..Math.Min(i, text.Length)].Trim() is { Length: > 0 } wert)
+                {
+                    werte.Add(wert);
+                }
+
+                start = i + 1;
+            }
+        }
+
+        return werte;
+    }
 
     public static bool WertPasst(string? vorhanden, string? verlangt)
         => verlangt is null || Werte(vorhanden).Contains(verlangt, StringComparer.OrdinalIgnoreCase);

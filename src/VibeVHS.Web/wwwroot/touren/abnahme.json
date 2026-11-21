@@ -1,0 +1,834 @@
+{
+  "beschreibung": "Geführte Touren nach docs/abnahme-a.md (Abnahme- und Schulungsmodus, tour.js). Ziele über sichtbaren Text oder Feldbeschriftung. Geprüft mit tests/Touren/tourpruefung.mjs.",
+  "touren": [
+    {
+      "id": "a01-person",
+      "titel": "1. Person anlegen und Namensänderung",
+      "konto": "Katja Friesen (Teilnehmerservice)",
+      "kontoName": "Katja Friesen",
+      "richtzeit": "6 min",
+      "beschreibung": "Neue Person mit Dublettenprüfung; Heirat als „Änderung ab Datum“ mit Datenhistorie.",
+      "abschluss": "Die Datenhistorie zeigt beide Namen mit Gültigkeit – ältere Dokumente behalten den alten Namen.",
+      "schritte": [
+        {
+          "seite": "",
+          "text": "Legen Sie **Mira Albers** an. Klicken Sie auf **Person anlegen**.",
+          "ziel": {
+            "text": "Person anlegen",
+            "in": "main"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "personen",
+          "text": "Vorname: **Mira**",
+          "ziel": {
+            "feld": "Vorname"
+          },
+          "weiter": "eingabe",
+          "wert": "Mira"
+        },
+        {
+          "seite": "personen",
+          "text": "Nachname: **Albers**. Gibt es ähnliche Personen, erscheinen gleich darunter mögliche Dubletten.",
+          "ziel": {
+            "feld": "Nachname"
+          },
+          "weiter": "eingabe",
+          "wert": "Albers"
+        },
+        {
+          "seite": "personen",
+          "text": "Geburtsdatum: **12.03.1992**",
+          "ziel": {
+            "feld": "Geburtsdatum"
+          },
+          "weiter": "eingabe",
+          "wert": "12.03.1992"
+        },
+        {
+          "seite": "personen",
+          "text": "E-Mail: **mira.albers@example.org**",
+          "ziel": {
+            "feld": "E-Mail"
+          },
+          "weiter": "eingabe",
+          "wert": "mira.albers@example.org"
+        },
+        {
+          "seite": "personen",
+          "text": "Zeigt VibeVHS **mögliche Dubletten**? Dann prüfen Sie kurz, ob es wirklich eine andere Person ist, und bestätigen das. Anschließend **Speichern**.",
+          "ziel": {
+            "text": "Speichern",
+            "in": "main",
+            "genau": true
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "personen",
+          "text": "Gespeichert. Die **nächsten Schritte** stehen bereit – öffnen Sie die Person.",
+          "ziel": {
+            "text": "Person öffnen"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "personen/",
+          "text": "Frau Albers hat geheiratet. Öffnen Sie **Stammdaten ändern** – nichts wird überschrieben.",
+          "ziel": {
+            "text": "Stammdaten ändern",
+            "css": "summary"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "personen/",
+          "text": "Neuer Nachname: **Albers-Kühn**",
+          "ziel": {
+            "feld": "Nachname",
+            "in": "details[open]"
+          },
+          "weiter": "eingabe",
+          "wert": "Albers-Kühn"
+        },
+        {
+          "seite": "personen/",
+          "text": "Geburtsname: **Albers**",
+          "ziel": {
+            "feld": "Geburtsname",
+            "in": "details[open]"
+          },
+          "weiter": "eingabe",
+          "wert": "Albers"
+        },
+        {
+          "seite": "personen/",
+          "text": "Wählen Sie **Änderung ab einem Datum** (Heirat) und als Datum den **1. dieses Monats**. Eine *Korrektur* wäre nur für Tippfehler.",
+          "ziel": {
+            "text": "Änderung ab einem Datum",
+            "in": "details[open]"
+          },
+          "weiter": "knopf"
+        },
+        {
+          "seite": "personen/",
+          "text": "Grund oder Nachweis, z. B. **Heirat, Urkunde vom …**",
+          "ziel": {
+            "feld": "Grund / Nachweis",
+            "in": "details[open]"
+          },
+          "weiter": "eingabe"
+        },
+        {
+          "seite": "personen/",
+          "text": "Jetzt **Änderung speichern**.",
+          "ziel": {
+            "text": "Änderung speichern"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "personen/",
+          "text": "Weil sich der Name geändert hat, schlägt VibeVHS als nächsten Schritt **Bescheinigungen neu ausstellen** vor. Sehen Sie sich zuletzt die **Datenhistorie** an.",
+          "ziel": {
+            "text": "Datenhistorie",
+            "genau": true
+          },
+          "weiter": "klick"
+        },
+        {
+          "text": "Hier steht jeder Stand mit Gültigkeit, wer ihn wann erfasst hat und warum. Mit „Wie war der Stand am …“ sehen Sie die Person zu einem beliebigen Tag.",
+          "weiter": "knopf"
+        }
+      ],
+      "start": ""
+    },
+    {
+      "id": "a02-kurs",
+      "titel": "2. Kurs per Schnellweg anlegen",
+      "konto": "Varvara Schatz (Fachbereichsleitung)",
+      "kontoName": "Varvara Schatz",
+      "richtzeit": "7 min",
+      "beschreibung": "„Rückenfit am Abend“ mit Ferienprüfung, Raumkonflikten und gesperrten Orten.",
+      "abschluss": "Veröffentlichte Kurse sind am Tresen und im Webshop buchbar und stehen im Raumplan.",
+      "start": "kurse",
+      "schritte": [
+        {
+          "seite": "kurse",
+          "text": "Klicken Sie auf **Kurs anlegen**.",
+          "ziel": {
+            "text": "Kurs anlegen",
+            "in": "main"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "kurse/neu",
+          "text": "Titel: **Rückenfit am Abend**",
+          "ziel": {
+            "feld": "Titel"
+          },
+          "weiter": "eingabe",
+          "wert": "Rückenfit am Abend"
+        },
+        {
+          "seite": "kurse/neu",
+          "text": "Wählen Sie den **Fachbereich 7 (Gesundheitsbildung)**. Danach „Weiter“.",
+          "ziel": {
+            "feld": "Fachbereich"
+          },
+          "weiter": "knopf",
+          "pruefer": {
+            "auswahl": "Gesundheitsbildung"
+          }
+        },
+        {
+          "seite": "kurse/neu",
+          "text": "Kursart: **Bewegungskurs**. Die Kursart bestimmt, welche Räume passen (Nutzungsart Bewegung) und was Kursleitungen mitbringen müssen. Danach „Weiter“.",
+          "ziel": {
+            "feld": "Kursart"
+          },
+          "weiter": "knopf",
+          "pruefer": {
+            "auswahl": "Bewegungskurs"
+          }
+        },
+        {
+          "seite": "kurse/neu",
+          "text": "Mindestzahl **6**",
+          "ziel": {
+            "feld": "Mindestzahl"
+          },
+          "weiter": "eingabe",
+          "wert": "6"
+        },
+        {
+          "seite": "kurse/neu",
+          "text": "Höchstzahl **14**",
+          "ziel": {
+            "feld": "Höchstzahl"
+          },
+          "weiter": "eingabe",
+          "wert": "14"
+        },
+        {
+          "seite": "kurse/neu",
+          "text": "Entgelt **98** €",
+          "ziel": {
+            "feld": "Entgelt"
+          },
+          "weiter": "eingabe",
+          "wert": "98"
+        },
+        {
+          "seite": "kurse/neu",
+          "text": "Kursleitung: Tippen Sie einige Buchstaben eines Namens ein. Ungeeignete Personen erscheinen gesperrt – der Hinweis nennt den Grund (z. B. fehlende Lehrfreigabe).",
+          "ziel": {
+            "css": "input[placeholder^='Dozierende suchen']"
+          },
+          "weiter": "eingabe",
+          "pruefer": {
+            "eingabe": "an"
+          }
+        },
+        {
+          "seite": "kurse/neu",
+          "text": "Wählen Sie eine **geeignete** Kursleitung.",
+          "ziel": {
+            "css": "button.vhs-chip[title='geeignet']"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "kurse/neu",
+          "text": "Wochentag: **Mi** (mittwochs)",
+          "ziel": {
+            "text": "Mi",
+            "in": "main",
+            "genau": true
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "kurse/neu",
+          "text": "Beginn **18:00**, Dauer **90** Minuten (bis 19:30).",
+          "ziel": {
+            "feld": "Beginn"
+          },
+          "weiter": "eingabe",
+          "wert": "18:00"
+        },
+        {
+          "seite": "kurse/neu",
+          "text": "Anzahl Termine: **10**",
+          "ziel": {
+            "feld": "Anzahl Termine"
+          },
+          "weiter": "eingabe",
+          "wert": "10"
+        },
+        {
+          "seite": "kurse/neu",
+          "text": "Fahren Sie über **A 1.12 Kursraum**: Er ist gesperrt – für die Nutzungsart „Bewegung“ ist dort keine Kapazität hinterlegt. So erklärt VibeVHS jede Sperre. Danach „Weiter“.",
+          "ziel": {
+            "text": "A 1.12",
+            "in": "main"
+          },
+          "weiter": "knopf"
+        },
+        {
+          "seite": "kurse/neu",
+          "text": "Ort: **B 1.01 Bewegungsraum**",
+          "ziel": {
+            "text": "B 1.01",
+            "in": "main"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "kurse/neu",
+          "text": "Klicken Sie auf **Vorschau berechnen**.",
+          "ziel": {
+            "text": "Vorschau berechnen"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "kurse/neu",
+          "text": "Die Vorschau zeigt jeden Termin, **ausgelassene Ferien und Feiertage mit Grund** und **Raumkonflikte**. Prüfen Sie sie und legen Sie den Kurs dann an bzw. **veröffentlichen** Sie ihn. Danach „Weiter“.",
+          "weiter": "knopf"
+        },
+        {
+          "text": "Als nächste Schritte bietet VibeVHS u. a. den **Raumplan** an – dort steht der Kurs jetzt mittwochs im Bewegungsraum.",
+          "weiter": "knopf"
+        }
+      ]
+    },
+    {
+      "id": "a03-tresen",
+      "titel": "3. Tresenanmeldung mit Lastschrift",
+      "konto": "Katja Friesen (Teilnehmerservice)",
+      "kontoName": "Katja Friesen",
+      "richtzeit": "6 min",
+      "beschreibung": "SEPA-Mandat mit IBAN-Prüfung erfassen, dann im neuen Kurs anmelden (Zahlart Lastschrift).",
+      "abschluss": "Die Bestätigung liegt im Postausgang – mit Übersetzungslink, Kalenderdatei und Check-in-Link.",
+      "start": "personen",
+      "schritte": [
+        {
+          "seite": "personen",
+          "text": "Suchen Sie **Albers-Kühn** (die Person aus Tour 1).",
+          "ziel": {
+            "css": "input[aria-label='Personen suchen']"
+          },
+          "weiter": "eingabe",
+          "wert": "Albers-Kühn"
+        },
+        {
+          "seite": "personen",
+          "text": "Öffnen Sie **Mira Albers-Kühn**.",
+          "ziel": {
+            "text": "Mira Albers-Kühn",
+            "in": "main"
+          },
+          "weiter": "klick",
+          "bedingt": "Person aus Tour 1"
+        },
+        {
+          "seite": "personen/",
+          "text": "Öffnen Sie **Mandat erfassen oder Auszahlungskonto setzen**.",
+          "ziel": {
+            "text": "Mandat erfassen",
+            "css": "summary"
+          },
+          "weiter": "klick",
+          "bedingt": "Person aus Tour 1"
+        },
+        {
+          "seite": "personen/",
+          "text": "Probieren Sie zuerst eine **falsche IBAN** (z. B. eine Ziffer vertauscht): Sie wird sofort mit Begründung abgelehnt. Richtig ist **DE89 3704 0044 0532 0130 00**.",
+          "ziel": {
+            "feld": "IBAN",
+            "in": "details[open]"
+          },
+          "weiter": "eingabe",
+          "wert": "DE89370400440532013000",
+          "bedingt": "Person aus Tour 1"
+        },
+        {
+          "seite": "personen/",
+          "text": "Kontoinhaber: **Mira Albers-Kühn**",
+          "ziel": {
+            "feld": "Kontoinhaber",
+            "in": "details[open]"
+          },
+          "weiter": "eingabe",
+          "bedingt": "Person aus Tour 1"
+        },
+        {
+          "seite": "personen/",
+          "text": "**Mandat unterschrieben am:** heute. Danach „Weiter“.",
+          "ziel": {
+            "feld": "Mandat unterschrieben am",
+            "in": "details[open]"
+          },
+          "weiter": "knopf",
+          "bedingt": "Person aus Tour 1"
+        },
+        {
+          "seite": "personen/",
+          "text": "**Lastschriftmandat speichern**",
+          "ziel": {
+            "text": "Lastschriftmandat speichern"
+          },
+          "weiter": "klick",
+          "bedingt": "Person aus Tour 1"
+        },
+        {
+          "seite": "personen/",
+          "text": "Jetzt anmelden: **Neue Anmeldung**.",
+          "ziel": {
+            "text": "Neue Anmeldung"
+          },
+          "weiter": "klick",
+          "bedingt": "Person aus Tour 1"
+        },
+        {
+          "seite": "anmeldung",
+          "text": "Wählen Sie den Kurs **Rückenfit am Abend** (Tour 2), Zahlart **Lastschrift**, und schließen Sie die Anmeldung ab. Danach „Weiter“.",
+          "weiter": "knopf"
+        },
+        {
+          "text": "Prüfen Sie die Bestätigung im **Postausgang**.",
+          "ziel": {
+            "text": "Postausgang",
+            "in": ".vhs-nav"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "postausgang",
+          "text": "Die Anmeldebestätigung enthält den **Übersetzungslink**, die **Kalenderdatei** und den persönlichen **Check-in-Link**. Im Testsystem geht nichts wirklich hinaus.",
+          "weiter": "knopf"
+        }
+      ]
+    },
+    {
+      "id": "a04-warteliste",
+      "titel": "4. Voller Kurs: Warteliste",
+      "konto": "Katja Friesen (Teilnehmerservice)",
+      "kontoName": "Katja Friesen",
+      "richtzeit": "5 min",
+      "beschreibung": "Anmeldung in einen ausgebuchten Kurs; Abmeldung löst ein Nachrückangebot aus.",
+      "abschluss": "Nach der Abmeldung bekommt Platz 1 automatisch ein Nachrückangebot mit Frist (Postausgang).",
+      "start": "anmeldung",
+      "schritte": [
+        {
+          "seite": "anmeldung",
+          "text": "Suchen Sie **Sabine Weber**.",
+          "ziel": {
+            "feld": "Person suchen"
+          },
+          "weiter": "eingabe",
+          "wert": "Sabine Weber"
+        },
+        {
+          "seite": "anmeldung",
+          "text": "Wählen Sie **Sabine Weber** aus der Trefferliste.",
+          "ziel": {
+            "text": "Sabine Weber"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "anmeldung",
+          "text": "**Weiter zur Kursauswahl**",
+          "ziel": {
+            "text": "Weiter zur Kursauswahl"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "anmeldung",
+          "text": "Wählen Sie **26H-801 Yoga am Abend** – der Kurs ist ausgebucht – und melden Sie an. Die Anmeldung landet auf der **Warteliste** mit Platznummer. Danach „Weiter“.",
+          "weiter": "knopf"
+        },
+        {
+          "text": "Öffnen Sie jetzt den Kurs (**Kurse** → 26H-801) und melden Sie eine angemeldete Person ab. Danach „Weiter“.",
+          "ziel": {
+            "text": "Kurse",
+            "in": ".vhs-nav"
+          },
+          "weiter": "knopf"
+        },
+        {
+          "text": "Im **Postausgang** steht das **Nachrückangebot mit Frist** für Platz 1 der Warteliste.",
+          "ziel": {
+            "text": "Postausgang",
+            "in": ".vhs-nav"
+          },
+          "weiter": "klick"
+        }
+      ]
+    },
+    {
+      "id": "a05-anwesenheit",
+      "titel": "5. Anwesenheit erfassen (Check-in)",
+      "konto": "Katja Friesen (Teilnehmerservice)",
+      "kontoName": "Katja Friesen",
+      "richtzeit": "5 min",
+      "beschreibung": "Anwesenheit mit Verspätung erfassen und die Liste abschließen.",
+      "abschluss": "Nach dem Abschließen gelten Nicht-Erfasste als „nicht anwesend“; Änderungen sind Nacherfassungen mit Grund.",
+      "start": "anwesenheit",
+      "schritte": [
+        {
+          "seite": "anwesenheit",
+          "text": "Hier stehen die Veranstaltungen des Tages. Öffnen Sie eine davon, z. B. **26H-701 Rückenfit**.",
+          "ziel": {
+            "text": "26H-701",
+            "in": "main"
+          },
+          "weiter": "klick"
+        },
+        {
+          "text": "Markieren Sie **zwei Personen als anwesend**, eine davon **30 Minuten verspätet**. Minuten und Unterrichtseinheiten erscheinen je Person. Danach „Weiter“.",
+          "weiter": "knopf"
+        },
+        {
+          "text": "Schließen Sie die Liste ab (**Abschließen**). Optional: **Termin-QR** zeigen – Teilnehmende checken dann selbst mit dem Handy ein. Danach „Weiter“.",
+          "weiter": "knopf"
+        }
+      ]
+    },
+    {
+      "id": "a06-bescheinigung",
+      "titel": "6. Bescheinigung nachdrucken",
+      "konto": "Katja Friesen (Teilnehmerservice)",
+      "kontoName": "Katja Friesen",
+      "richtzeit": "3 min",
+      "beschreibung": "Archiviertes Original mit Prüfsumme und Übersetzungs-QR nachdrucken.",
+      "abschluss": "Gedruckt wurde das archivierte Original; das Protokoll vermerkt den Nachdruck.",
+      "start": "personen",
+      "schritte": [
+        {
+          "seite": "personen",
+          "text": "Suchen Sie **Olena Kovalenko**.",
+          "ziel": {
+            "css": "input[aria-label='Personen suchen']"
+          },
+          "weiter": "eingabe",
+          "wert": "Kovalenko"
+        },
+        {
+          "seite": "personen",
+          "text": "Öffnen Sie **Olena Kovalenko**.",
+          "ziel": {
+            "text": "Olena Kovalenko",
+            "in": "main"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "personen/",
+          "text": "Im Bereich **Anwesenheit und Bescheinigungen** steht die Teilnahmebescheinigung für **25F-501**. Klicken Sie dort auf **Nachdruck (Original)**. Danach „Weiter“.",
+          "weiter": "knopf"
+        },
+        {
+          "text": "Der Nachdruck ist das archivierte Original (Prüfsumme geprüft), mit QR-Code „Translate this letter in your language“. Kontrollieren Sie den Eintrag im **Protokoll**.",
+          "ziel": {
+            "text": "Protokoll",
+            "in": ".vhs-nav"
+          },
+          "weiter": "klick"
+        }
+      ]
+    },
+    {
+      "id": "a07-aufgaben",
+      "titel": "7. Aufgabenkorb: übernehmen und zuweisen",
+      "konto": "Varvara Schatz (Fachbereichsleitung)",
+      "kontoName": "Varvara Schatz",
+      "richtzeit": "4 min",
+      "beschreibung": "Aufgaben aus dem Gruppenkorb übernehmen, zuweisen; gesperrtes „Erledigt“ verstehen.",
+      "abschluss": "Übernommene Aufgaben stehen unter „Meine Aufgaben“, zugewiesene unter „Bei Kolleg:innen“.",
+      "start": "",
+      "schritte": [
+        {
+          "seite": "",
+          "text": "Fahren Sie mit der Maus über **Erledigt …** – der Hinweis erklärt, warum es gesperrt ist. Danach „Weiter“.",
+          "ziel": {
+            "text": "Erledigt",
+            "in": "main"
+          },
+          "weiter": "knopf"
+        },
+        {
+          "seite": "",
+          "text": "Übernehmen Sie eine Aufgabe aus Ihrem Gruppenkorb: **Übernehmen**.",
+          "ziel": {
+            "text": "Übernehmen",
+            "in": "main",
+            "genau": true
+          },
+          "weiter": "klick",
+          "bedingt": "Aufgabe im Gruppenkorb (entsteht aus den Regeln; nach einem Durchlauf ggf. schon übernommen)"
+        },
+        {
+          "seite": "",
+          "text": "Weisen Sie eine zweite Aufgabe einer Kollegin zu: **Zuweisen …**",
+          "ziel": {
+            "text": "Zuweisen",
+            "in": "main"
+          },
+          "weiter": "klick",
+          "bedingt": "Aufgabe im Gruppenkorb (entsteht aus den Regeln; nach einem Durchlauf ggf. schon übernommen)"
+        },
+        {
+          "text": "Wählen Sie eine Kollegin und bestätigen Sie. Ein Klick auf den **Titel** einer Aufgabe öffnet direkt die passende Seite. Danach „Weiter“.",
+          "weiter": "knopf"
+        }
+      ]
+    },
+    {
+      "id": "a08-absage",
+      "titel": "8. Mindestteilnehmerzahl: Kurs absagen",
+      "konto": "Varvara Schatz (Fachbereichsleitung)",
+      "kontoName": "Varvara Schatz",
+      "richtzeit": "5 min",
+      "beschreibung": "Unterbelegten Kurs absagen; Absagen an alle, Termine fallen aus.",
+      "abschluss": "Der Kurs ist abgesagt, alle Teilnehmenden haben eine Absage mit Grund und Übersetzungslink, künftige Termine fallen aus.",
+      "start": "kurse",
+      "schritte": [
+        {
+          "seite": "kurse",
+          "text": "Der übliche Weg: Auf der Startseite liegt die Aufgabe **„26H-703 Gesund kochen mit wenig Geld: … absagen oder durchführen?“** – nach **Übernehmen** führt ihr Titel zur Entscheidung. Gibt es die Aufgabe gerade nicht, geht es über die Kursseite: Suchen Sie **26H-703**.",
+          "ziel": {
+            "css": "input[aria-label='Kurse suchen']"
+          },
+          "weiter": "eingabe",
+          "wert": "26H-703"
+        },
+        {
+          "seite": "kurse",
+          "text": "Öffnen Sie **26H-703 Gesund kochen mit wenig Geld**.",
+          "ziel": {
+            "text": "26H-703",
+            "in": "main"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "kurse/",
+          "text": "Zu wenige Anmeldungen: Klicken Sie auf **Absagen …**.",
+          "ziel": {
+            "text": "Absagen",
+            "in": "main .vhs-head"
+          },
+          "weiter": "klick",
+          "bedingt": "Kurs noch nicht abgesagt (frische Testdaten)"
+        },
+        {
+          "seite": "kurse/",
+          "text": "Die Bestätigung nennt, wie viele Personen und Termine betroffen sind. Tragen Sie den **Grund** ein, z. B. **Mindestteilnehmerzahl nicht erreicht** – er steht in der Absage.",
+          "ziel": {
+            "feld": "Grund für die Teilnehmenden"
+          },
+          "weiter": "eingabe",
+          "wert": "Mindestteilnehmerzahl nicht erreicht",
+          "bedingt": "Kurs noch nicht abgesagt (frische Testdaten)"
+        },
+        {
+          "seite": "kurse/",
+          "text": "Jetzt **Absagen und Teilnehmende benachrichtigen**. (Ohne Grund ist der Knopf gesperrt – der Hinweis sagt warum.)",
+          "ziel": {
+            "text": "Absagen und Teilnehmende benachrichtigen"
+          },
+          "weiter": "klick",
+          "bedingt": "Kurs noch nicht abgesagt (frische Testdaten)"
+        },
+        {
+          "text": "Prüfen Sie den **Postausgang**: die Absagen an alle Teilnehmenden, mit Grund und Übersetzungslink.",
+          "ziel": {
+            "text": "Postausgang",
+            "in": ".vhs-nav"
+          },
+          "weiter": "klick"
+        }
+      ]
+    },
+    {
+      "id": "a09-storno",
+      "titel": "9. Rechnung stornieren",
+      "konto": "Linda Lüke (Buchhaltung)",
+      "kontoName": "Linda Lüke",
+      "richtzeit": "4 min",
+      "beschreibung": "Storno mit Begründung; Rechnungen bleiben unveränderlich (GoBD).",
+      "abschluss": "Es gibt jetzt einen Stornobeleg mit eigener Nummer und Verweis; das Personenkonto ist ausgeglichen.",
+      "start": "finanzen",
+      "schritte": [
+        {
+          "seite": "finanzen",
+          "text": "Öffnen Sie **Belege**.",
+          "ziel": {
+            "text": "Belege",
+            "in": "main",
+            "genau": true
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "finanzen",
+          "text": "Wählen Sie eine **offene Rechnung**. Ohne Begründung ist **Stornieren** gesperrt (Hinweis beim Darüberfahren). Tragen Sie eine Begründung ein (z. B. „Kulanz, Entgelt erlassen“) und stornieren Sie. Danach „Weiter“.",
+          "weiter": "knopf"
+        },
+        {
+          "text": "Die Rechnung selbst lässt sich weder ändern noch löschen; der **Stornobeleg** (ST-…) verweist auf sie.",
+          "weiter": "knopf"
+        }
+      ]
+    },
+    {
+      "id": "a10-lastschrift",
+      "titel": "10. Lastschriftlauf freigeben",
+      "konto": "Linda Lüke (Buchhaltung)",
+      "kontoName": "Linda Lüke",
+      "richtzeit": "6 min",
+      "beschreibung": "Finanzroutinen, Lastschriftvorschlag prüfen, freigeben, SEPA-Datei erzeugen.",
+      "abschluss": "Die pain.008-Datei steht zum Herunterladen bereit; die Vorabankündigungen liegen im Postausgang.",
+      "start": "finanzen",
+      "schritte": [
+        {
+          "seite": "finanzen",
+          "text": "Führen Sie die Finanzroutinen aus – dabei entsteht u. a. die Rechnung aus Tour 3: **Finanzroutinen jetzt ausführen**.",
+          "ziel": {
+            "text": "Finanzroutinen jetzt ausführen"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "finanzen",
+          "text": "Öffnen Sie **Lastschrift & Überweisung**.",
+          "ziel": {
+            "text": "Lastschrift & Überweisung"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "finanzen",
+          "text": "**Lastschriftvorschlag erstellen** – die Automatik sammelt alle fälligen Posten mit gültigem Mandat.",
+          "ziel": {
+            "text": "Lastschriftvorschlag erstellen"
+          },
+          "weiter": "klick"
+        },
+        {
+          "seite": "finanzen",
+          "text": "Wählen Sie den neuen Lauf mit Status **Vorschlag**.",
+          "ziel": {
+            "text": "Vorschlag",
+            "in": "main .vhs-list"
+          },
+          "weiter": "klick",
+          "bedingt": "offene Lastschrift-Posten (Anmeldung aus Tour 3)"
+        },
+        {
+          "seite": "finanzen",
+          "text": "Prüfen Sie den Vorschlag: Er enthält die Rechnung von Frau Albers-Kühn mit **Mandatsreferenz** und Sequenz **FRST**. Geben Sie ihn frei – die **Vorabankündigungen** gehen dabei in den Postausgang. Danach „Weiter“.",
+          "weiter": "knopf"
+        },
+        {
+          "seite": "finanzen",
+          "text": "Erst nach der Freigabe: **SEPA-Datei erzeugen** und herunterladen (pain.008).",
+          "ziel": {
+            "text": "SEPA-Datei erzeugen"
+          },
+          "weiter": "klick",
+          "bedingt": "freigegebener Lauf"
+        }
+      ]
+    },
+    {
+      "id": "a11-integration",
+      "titel": "11. Integrationskurs: Ausweisprüfung und Kursbeginn",
+      "konto": "Sylvia Beckmann (Integrationskurs-Team)",
+      "kontoName": "Sylvia Beckmann",
+      "richtzeit": "6 min",
+      "beschreibung": "Gesperrten Kursbeginn verstehen, Ausweise prüfen, Kursbeginn an das BAMF melden.",
+      "abschluss": "Die Kursbeginnmeldung „BAMF (Mock)“ steht im Postausgang – nur mit Teilnehmernummern.",
+      "start": "integration",
+      "schritte": [
+        {
+          "seite": "integration",
+          "text": "Öffnen Sie den Kurs **26H-401**.",
+          "ziel": {
+            "text": "26H-401",
+            "in": "main .vhs-list"
+          },
+          "weiter": "klick"
+        },
+        {
+          "text": "**Kursbeginn an das BAMF melden** ist gesperrt. Fahren Sie mit der Maus darüber: Der Hinweis nennt die Personen ohne Ausweisprüfung. Danach „Weiter“.",
+          "ziel": {
+            "text": "Kursbeginn an das BAMF melden"
+          },
+          "weiter": "knopf"
+        },
+        {
+          "text": "Erfassen Sie die fehlenden Prüfungen: Original vorgelegt, **Stimmt mit Berechtigung überein**. Gespeichert werden nur Datum, prüfende Person, Dokumentart und Ergebnis – keine Kopie. Danach „Weiter“.",
+          "weiter": "knopf"
+        },
+        {
+          "text": "Jetzt **Kursbeginn an das BAMF melden**.",
+          "ziel": {
+            "text": "Kursbeginn an das BAMF melden"
+          },
+          "weiter": "klick",
+          "bedingt": "Ausweisprüfungen aller Teilnehmenden erfasst"
+        },
+        {
+          "text": "Im **Postausgang** steht die Meldung an das BAMF (Mock).",
+          "ziel": {
+            "text": "Postausgang",
+            "in": ".vhs-nav"
+          },
+          "weiter": "klick"
+        }
+      ]
+    },
+    {
+      "id": "a12-auswertung",
+      "titel": "12. Auswertung exportieren",
+      "konto": "Sonja Eickelkamp (Verwaltungsleitung)",
+      "kontoName": "Sonja Eickelkamp",
+      "richtzeit": "3 min",
+      "beschreibung": "Auslastung je Fachbereich als Excel-Datei exportieren.",
+      "abschluss": "Die Excel-Datei enthält echte Zahlen mit Autofilter; das Protokoll vermerkt den Export.",
+      "start": "auswertungen",
+      "schritte": [
+        {
+          "seite": "auswertungen",
+          "text": "Hier stehen Kursliste, Auslastung, Umsatz und Statistik. Wählen Sie das **laufende Semester** und sehen Sie sich die **Auslastung je Fachbereich** an. Danach „Weiter“.",
+          "weiter": "knopf"
+        },
+        {
+          "seite": "auswertungen",
+          "text": "Exportieren Sie die Tabelle als **Excel**-Datei und öffnen Sie sie.",
+          "ziel": {
+            "text": "Excel",
+            "in": "main",
+            "genau": true
+          },
+          "weiter": "klick"
+        },
+        {
+          "text": "Der Export ist protokolliert – sehen Sie im **Protokoll** nach.",
+          "ziel": {
+            "text": "Protokoll",
+            "in": ".vhs-nav"
+          },
+          "weiter": "klick"
+        }
+      ]
+    }
+  ]
+}

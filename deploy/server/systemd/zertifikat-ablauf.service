@@ -1,0 +1,9 @@
+# Ablaufwarnung Hochschulzertifikat – Ziel: /etc/systemd/system/zertifikat-ablauf.service (Schritt 03)
+[Unit]
+Description=Ablauf des Hochschulzertifikats prüfen
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/zertifikat-ablauf
+# Exit 1 = „läuft bald ab“ (Warnung steht im Journal) – kein Dienstfehler
+SuccessExitStatus=1

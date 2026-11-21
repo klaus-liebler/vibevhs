@@ -8,10 +8,15 @@ namespace VibeVHS.Application.Sicherheit;
 /// </summary>
 public sealed class Benutzerkonto
 {
+    /// <summary>Gespeicherter Name – nur bei Konten ohne Person (Funktionskonten); sonst <c>null</c>, der Name kommt aus der Person.</summary>
+    private string? _name;
+
+    /// <summary>Name der verknüpften Person, beim Laden gesetzt (keine Kopie in der Datenbank).</summary>
+    private string? _personenname;
+
     private Benutzerkonto()
     {
         Login = string.Empty;
-        Name = string.Empty;
     }
 
     public Benutzerkonto(string login, string name, string? funktion, IEnumerable<Rolle> rollen, IEnumerable<int> fachbereiche,
@@ -21,11 +26,11 @@ public sealed class Benutzerkonto
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         Id = Ids.Neu();
         Login = login.Trim().ToLowerInvariant();
-        Name = name.Trim();
+        PersonId = personId;
+        NameSetzen(name);
         Funktion = funktion;
         Rollen = rollen.Distinct().ToList();
         Fachbereiche = fachbereiche.Distinct().Order().ToList();
-        PersonId = personId;
         Hinweis = hinweis;
         if (Rollen.Count == 0)
         {
@@ -37,13 +42,28 @@ public sealed class Benutzerkonto
 
     public string Login { get; private set; }
 
-    public string Name { get; private set; }
+    /// <summary>Anzeigename: bei Konten mit Person deren heutiger Name, sonst der gespeicherte Name.</summary>
+    public string Name => PersonId is null ? _name ?? string.Empty : _personenname ?? _name ?? string.Empty;
 
     public string? Funktion { get; private set; }
 
-    public List<Rolle> Rollen { get; private set; } = [];
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="VibeVHS.Domain.Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<Rolle> Rollen
+    {
+        get => VibeVHS.Domain.Gemeinsam.Listenwerte.Werte(_rollen);
+        private set => _rollen = VibeVHS.Domain.Gemeinsam.Listenwerte.Von(value);
+    }
 
-    public List<int> Fachbereiche { get; private set; } = [];
+    private List<VibeVHS.Domain.Gemeinsam.Listenwert<Rolle>> _rollen = [];
+
+    /// <remarks>Gespeichert als eigene Tabelle (je Eintrag eine Zeile, siehe <see cref="VibeVHS.Domain.Gemeinsam.Listenwert{T}"/>).</remarks>
+    public List<int> Fachbereiche
+    {
+        get => VibeVHS.Domain.Gemeinsam.Listenwerte.Werte(_fachbereiche);
+        private set => _fachbereiche = VibeVHS.Domain.Gemeinsam.Listenwerte.Von(value);
+    }
+
+    private List<VibeVHS.Domain.Gemeinsam.Listenwert<int>> _fachbereiche = [];
 
     /// <summary>Verknüpfte Person (Rolle Mitarbeitende).</summary>
     public Guid? PersonId { get; private set; }
@@ -58,19 +78,39 @@ public sealed class Benutzerkonto
     public bool IstPortalkonto => Rollen.All(r => PortalRollen.Contains(r));
 
     /// <summary>Name, Funktion, Rollen und Fachbereiche ändern (Benutzerverwaltung). Wirkt ab der nächsten Anmeldung.</summary>
+    /// <remarks>Bei Konten mit Person bleibt der Name der Person maßgeblich; <paramref name="name"/> wird dann nicht gespeichert.</remarks>
     public void Aendern(string name, string? funktion, IEnumerable<Rolle> rollen, IEnumerable<int> fachbereiche)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (PersonId is null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        }
+
         var neu = rollen.Distinct().ToList();
         if (neu.Count == 0)
         {
             throw new ArgumentException("Ein Konto braucht mindestens eine Rolle.", nameof(rollen));
         }
 
-        Name = name.Trim();
+        NameSetzen(name);
         Funktion = string.IsNullOrWhiteSpace(funktion) ? null : funktion.Trim();
         Rollen = neu;
         Fachbereiche = fachbereiche.Distinct().Order().ToList();
+    }
+
+    /// <summary>Name der verknüpften Person zum heutigen Tag (vom Speicher beim Laden gesetzt, nicht gespeichert).</summary>
+    public void PersonennameSetzen(string? name) => _personenname = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+
+    private void NameSetzen(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
+
+        // Mit Person führt deren Name; gespeichert wird nur bei Funktionskonten ohne Person.
+        _name = PersonId is null ? name.Trim() : null;
+        _personenname ??= PersonId is null ? null : name.Trim();
     }
 
     public void Deaktivieren() => Aktiv = false;

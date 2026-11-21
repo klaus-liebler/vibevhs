@@ -18,6 +18,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Liberation-Schriften (SIL OFL 1.1) für PDFs, siehe Schriften/README.md -->
+    <EmbeddedResource Include="Schriften\*.ttf" LogicalName="VibeVHS.Schriften.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="VibeVHS.Infrastructure.Tests" />
   </ItemGroup>
 

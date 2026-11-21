@@ -19,7 +19,7 @@ internal static class ShopMapping
             b.HasKey(x => x.Id);
             b.Property(x => x.Id).ValueGeneratedNever();
             b.HasIndex(x => x.Status);
-            b.Property(x => x.Positionen).AlsJson();
+            b.AlsTabelle(x => x.Positionen, "WarenkorbPositionen", "WarenkorbId");
         });
         mb.Entity<Shopbuchung>(b =>
         {
@@ -28,8 +28,8 @@ internal static class ShopMapping
             b.Property(x => x.Id).ValueGeneratedNever();
             b.HasIndex(x => x.Idempotenzschluessel).IsUnique();
             b.HasIndex(x => x.WarenkorbId);
-            b.Property(x => x.Einwilligungen).AlsJson();
-            b.Property(x => x.Positionen).AlsJson();
+            b.AlsTabelle(x => x.Einwilligungen, "ShopbuchungEinwilligungen", "ShopbuchungId");
+            b.AlsTabelle(x => x.Positionen, "ShopbuchungPositionen", "ShopbuchungId");
         });
         mb.Entity<Shopkonto>(b =>
         {
@@ -46,7 +46,7 @@ internal static class ShopMapping
             b.Property(x => x.Id).ValueGeneratedNever();
             b.HasIndex(x => x.StornoHash).IsUnique();
             b.HasIndex(x => x.PersonId);
-            b.Property(x => x.Einwilligungen).AlsJson();
+            b.AlsTabelle(x => x.Einwilligungen, "SchnellanmeldungEinwilligungen", "SchnellanmeldungId");
         });
         mb.Entity<Kursstand>(b =>
         {

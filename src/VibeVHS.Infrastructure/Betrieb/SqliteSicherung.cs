@@ -16,7 +16,10 @@ namespace VibeVHS.Infrastructure.Betrieb;
 /// (Standard: <c>sicherung</c> neben der Datenbank), mit SHA-256 und Wiederherstellungstest. Unter Linux kann später
 /// Litestream die laufende Replikation übernehmen (Vorlage in <c>deploy/litestream.yml</c>).
 /// </summary>
-internal sealed class SqliteSicherung(VibeVhsDbContext db, IConfiguration konfiguration, IAuditProtokoll protokoll, IAktuellerBenutzer benutzer, TimeProvider uhr) : ISicherung
+/// <remarks>Die Kommentar-Datenbank (eigene Datei, siehe <see cref="Dokumentation.KommentarDbContext"/>) wird jeweils mitgesichert
+/// („kommentare-…db“ neben der Sicherung) und mit ihr aufgeräumt.</remarks>
+internal sealed class SqliteSicherung(VibeVhsDbContext db, IConfiguration konfiguration, IAuditProtokoll protokoll, IAktuellerBenutzer benutzer, TimeProvider uhr,
+    Dokumentation.KommentarDatenbankOrt? kommentare = null) : ISicherung
 {
     private static readonly string[] Kerntabellen = ["Personen", "Kurse", "Veranstaltungen", "Belegungen", "Belege", "Finanzprotokoll", "Protokoll"];
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
@@ -60,12 +63,14 @@ internal sealed class SqliteSicherung(VibeVhsDbContext db, IConfiguration konfig
             quelle.BackupDatabase(kopie);
         }
 
+        var kommentarSicherung = await KommentareSichernAsync(ziel, abbruch);
         var eintrag = new Sicherungseintrag(Path.GetFileName(ziel), am, new FileInfo(ziel).Length, await HashAsync(ziel, abbruch), null, null, null);
         await SchreibenAsync(eintrag, abbruch);
         eintrag = await TestenAsync(eintrag, abbruch);
         await AufraeumenAsync(abbruch);
         await protokoll.ProtokollierenAsync("Betrieb.Sicherung",
-            $"Datenbank gesichert: {eintrag.Datei} ({eintrag.Bytes / 1024} KB, SHA-256 {eintrag.Sha256[..16]}…); Wiederherstellungstest: {eintrag.Pruefergebnis}",
+            $"Datenbank gesichert: {eintrag.Datei} ({eintrag.Bytes / 1024} KB, SHA-256 {eintrag.Sha256[..16]}…); Wiederherstellungstest: {eintrag.Pruefergebnis}"
+            + (kommentarSicherung is null ? string.Empty : $"; Kommentare: {kommentarSicherung}"),
             erfolgreich: eintrag.Wiederherstellbar == true, abbruch: abbruch);
         await db.SaveChangesAsync(abbruch);
         return eintrag;
@@ -105,7 +110,7 @@ internal sealed class SqliteSicherung(VibeVhsDbContext db, IConfiguration konfig
 
     /// <summary>
     /// Prüfsumme vergleichen, Kopie in einen temporären Ordner „wiederherstellen“, öffnen, PRAGMA integrity_check,
-    /// Migrationsstand und Zeilenzahlen der Kerntabellen auslesen. Die laufende Datenbank bleibt unberührt.
+    /// Schemaversion und Zeilenzahlen der Kerntabellen auslesen. Die laufende Datenbank bleibt unberührt.
     /// </summary>
     private async Task<Sicherungseintrag> TestenAsync(Sicherungseintrag e, CancellationToken abbruch)
     {
@@ -128,20 +133,21 @@ internal sealed class SqliteSicherung(VibeVhsDbContext db, IConfiguration konfig
             try
             {
                 await using var c = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = test, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
+                VibeVHS.Infrastructure.Datenbank.SqliteErweiterungen.Registrieren(c); // integrity_check prüft auch den Index mit Collation DIN5007_2
                 await c.OpenAsync(abbruch);
                 var integritaet = (await Skalar(c, "PRAGMA integrity_check", abbruch))?.ToString();
-                migration = (await Skalar(c, "SELECT MigrationId FROM __EFMigrationsHistory ORDER BY MigrationId DESC LIMIT 1", abbruch))?.ToString();
+                migration = (await Skalar(c, "SELECT Version FROM Schemainfo LIMIT 1", abbruch))?.ToString();
                 var zaehlung = new List<string>();
                 foreach (var t in Kerntabellen)
                 {
                     zaehlung.Add($"{t} {await Skalar(c, $"SELECT COUNT(*) FROM \"{t}\"", abbruch)}");
                 }
 
-                var aktuell = (await db.Database.SqlQueryRaw<string>("SELECT MigrationId AS Value FROM __EFMigrationsHistory ORDER BY MigrationId DESC LIMIT 1").ToListAsync(abbruch))
+                var aktuell = (await db.Database.SqlQueryRaw<string>("SELECT Version AS Value FROM Schemainfo LIMIT 1").ToListAsync(abbruch))
                     .FirstOrDefault();
                 ok = integritaet == "ok" && migration == aktuell;
-                ergebnis = ok ? $"ok – Integrität geprüft, Migrationsstand {migration}, {string.Join(", ", zaehlung)}"
-                    : integritaet != "ok" ? $"Integritätsprüfung: {integritaet}" : $"Migrationsstand {migration} weicht vom laufenden Stand {aktuell} ab (ältere Version)";
+                ergebnis = ok ? $"ok – Integrität geprüft, Schemaversion {migration}, {string.Join(", ", zaehlung)}"
+                    : integritaet != "ok" ? $"Integritätsprüfung: {integritaet}" : $"Schemaversion {migration} weicht vom laufenden Stand {aktuell} ab (ältere Version)";
             }
             catch (SqliteException ex)
             {
@@ -175,7 +181,31 @@ internal sealed class SqliteSicherung(VibeVhsDbContext db, IConfiguration konfig
         {
             File.Delete(Path.Combine(Ordner, alt.Datei));
             File.Delete(Path.Combine(Ordner, Path.ChangeExtension(alt.Datei, ".json")));
+            File.Delete(Path.Combine(Ordner, KommentarDatei(alt.Datei)));
         }
+    }
+
+    /// <summary>„vibevhs-20261117-013000.db“ → „kommentare-20261117-013000.db“</summary>
+    internal static string KommentarDatei(string sicherung) => "kommentare-" + Path.GetFileName(sicherung)["vibevhs-".Length..];
+
+    /// <summary>Sichert die Kommentar-Datenbank neben die Hauptsicherung; null, wenn es (noch) keine gibt.</summary>
+    private async Task<string?> KommentareSichernAsync(string hauptsicherung, CancellationToken abbruch)
+    {
+        if (kommentare is null || kommentare.Datei is ":memory:" || !File.Exists(kommentare.Datei))
+        {
+            return null;
+        }
+
+        var ziel = Path.Combine(Path.GetDirectoryName(hauptsicherung)!, KommentarDatei(hauptsicherung));
+        await using (var quelle = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = kommentare.Datei, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString()))
+        await using (var kopie = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = ziel, Pooling = false }.ToString()))
+        {
+            await quelle.OpenAsync(abbruch);
+            await kopie.OpenAsync(abbruch);
+            quelle.BackupDatabase(kopie);
+        }
+
+        return $"{Path.GetFileName(ziel)} (SHA-256 {(await HashAsync(ziel, abbruch))[..16]}…)";
     }
 
     private static async Task<string> HashAsync(string pfad, CancellationToken abbruch)
