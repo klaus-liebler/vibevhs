@@ -1,7 +1,8 @@
 # Bereitstellung
 
 Testsystem auf **https://liebler.iui.hs-osnabrueck.de/vibevhs** (nginx als Reverse Proxy, Hochschulzertifikat, Node-RED unter
-`/nodered`). Alles dafür liegt in [`server/`](server/README-server.md):
+`/nodered`). **Gesamtbild für Admins** (Ablauf, Konfiguration, Pfade, Updates, Datenbank, Betrieb):
+[`docs/bereitstellung.md`](../docs/bereitstellung.md). Alles Technische liegt in [`server/`](server/README-server.md):
 
 - `server/README-server.md` – Runbook Schritt für Schritt (SSH-Schlüssel, Härtung, nginx statt Apache, Node-RED, Zertifikat, Dienst, Firewall)
 - `server/schritte/` – je sudo-Schritt ein Skript mit Sicherung, Prüfung und Rückweg

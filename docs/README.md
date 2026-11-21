@@ -79,7 +79,7 @@ den Sortierschlüssel, der die Id enthält). In Entwicklung und Tests bricht ein
 | `src/VibeVHS.Web` | Blazor Web App (Interactive Server, Radzen), deutsche Oberfläche |
 | `tests/*` | xUnit v3 + Shouldly |
 | `tools/Testdaten` | Testdaten-Generator (Bogus, fester Startwert) |
-| `deploy/` | Docker (folgt) |
+| `deploy/` | Bereitstellung auf dem Linux-Testserver (Kit, Runbook, `deploy.ps1`), Überblick: `docs/bereitstellung.md` |
 
 ## Leitlinien in der Oberfläche
 
