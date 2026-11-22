@@ -231,6 +231,49 @@ public sealed class PortalTests
     }
 
     [Fact]
+    public async Task Anmeldelink_legt_fuer_jede_Kursleitung_ein_eigenes_Konto_an()
+    {
+        // Früher: Login aus den ersten acht Hex-Zeichen der UUIDv7 (Zeitstempel) – die zweite Kursleitung aus demselben
+        // Zeitfenster scheiterte an „UNIQUE constraint failed: Benutzerkonten.Login“.
+        await using var w = await AufbauenAsync();
+        var neu = new List<Guid>();
+        await using (var bereich = w.H.App.Services.CreateAsyncScope())
+        {
+            var db = bereich.ServiceProvider.GetRequiredService<VibeVhsDbContext>();
+            var jetzt = w.H.Uhr.GetLocalNow();
+            foreach (var (v, n) in new[] { ("Carla", "Honorar"), ("Dieter", "Honorar") })
+            {
+                var p = Person.Anlegen(v, n, new DateOnly(2024, 1, 1), jetzt.AddYears(-2), null, $"{v.ToLowerInvariant()}@example.org");
+                p.RolleHinzufuegen(Personenrolle.Dozierende, new DateOnly(2024, 1, 1), Erfassung.Erst(jetzt.AddYears(-2)));
+                db.Personen.Add(p);
+                neu.Add(p.Id);
+            }
+
+            await db.SaveChangesAsync(Ct);
+        }
+
+        var konten = new List<Benutzerkonto>();
+        foreach (var (mail, personId) in new[] { ("carla@example.org", neu[0]), ("dieter@example.org", neu[1]) })
+        {
+            await MitAsync(w.H, Benutzer.Automatik, async d => { await d.GetRequiredService<DozentenportalDienst>().LinkAnfordernAsync(mail, Ct); return 0; });
+            string token;
+            await using (var bereich = w.H.App.Services.CreateAsyncScope())
+            {
+                var m = await bereich.ServiceProvider.GetRequiredService<VibeVhsDbContext>().Postausgang.SingleAsync(x => x.Betreff.Contains("Anmeldelink") && x.PersonId == personId, Ct);
+                token = Regex.Match(m.Inhalt, @"dozierende/link/([A-Za-z0-9_\-]+)").Groups[1].Value;
+            }
+
+            var konto = await MitAsync(w.H, Benutzer.Automatik, d => d.GetRequiredService<DozentenportalDienst>().LinkEinloesenAsync(token, Ct));
+            konto.ShouldNotBeNull();
+            konto.PersonId.ShouldBe(personId);
+            konto.Login.ShouldBe(Benutzerkonto.PortalLogin("doz", personId));
+            konten.Add(konto);
+        }
+
+        konten.Select(k => k.Login).Distinct().Count().ShouldBe(2);
+    }
+
+    [Fact]
     public async Task Anmeldelink_einmalig_und_15_Minuten_gueltig()
     {
         await using var w = await AufbauenAsync();

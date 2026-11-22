@@ -178,7 +178,7 @@ public sealed class TeilnehmendenportalDienst(
                 return null;
             }
 
-            konto = new Benutzerkonto($"tn-{Pseudonym.Kurz(person.Id).ToLowerInvariant()}", person.Anzeigename, "Teilnehmende (Portal)", [Rolle.Teilnehmende], [], person.Id,
+            konto = new Benutzerkonto(Benutzerkonto.PortalLogin("tn", person.Id),person.Anzeigename, "Teilnehmende (Portal)", [Rolle.Teilnehmende], [], person.Id,
                 "Portal-Konto: angelegt beim ersten Anmeldelink");
             speicher.Hinzufuegen(konto);
         }

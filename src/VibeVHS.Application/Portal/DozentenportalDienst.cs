@@ -127,7 +127,7 @@ public sealed class DozentenportalDienst(
                 return null;
             }
 
-            konto = new Benutzerkonto($"doz-{Pseudonym.Kurz(person.Id).ToLowerInvariant()}", person.Anzeigename, "Kursleitung (Portal)", [Rolle.Dozierende], [], person.Id,
+            konto = new Benutzerkonto(Benutzerkonto.PortalLogin("doz", person.Id),person.Anzeigename, "Kursleitung (Portal)", [Rolle.Dozierende], [], person.Id,
                 "Angelegt beim ersten Anmeldelink des Dozierendenportals");
             speicher.Hinzufuegen(konto);
         }

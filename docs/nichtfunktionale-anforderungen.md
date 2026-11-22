@@ -25,3 +25,4 @@ Anforderungstexte, keine eigene Nummerierung. Neue NFA zuerst dort anlegen, dann
 | NFA-23 | Konverter `IdAlsBytes` (16 Byte, big-endian) und `Ids.Neu` (monoton steigende UUIDv7). |
 | NFA-24 | Collation `DIN5007_2` (registriert in `SqliteErweiterungen`), Index `IX_PersonNamen_Sortierung`; Messung in [`messungen.md`](messungen.md). |
 | NFA-25 | Entscheidung „Eigene Datenbank je VHS“ in [`mandanten.md`](mandanten.md); Umsetzung der Mandantenauflösung dort als Plan beschrieben. |
+| NFA-28 | `Pseudonym.Kurz` nimmt die letzten acht Hex-Zeichen (Zufallsteil); Portal-Logins über `Benutzerkonto.PortalLogin` („doz-“/„tn-“ + volle Id). Tests: `PseudonymTests` (Domain), `Anmeldelink_legt_fuer_jede_Kursleitung_ein_eigenes_Konto_an` und `Anmeldelink_legt_fuer_jede_Person_ein_eigenes_Konto_an` (Web). |
