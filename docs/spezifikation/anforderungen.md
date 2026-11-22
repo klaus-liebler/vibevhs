@@ -488,6 +488,7 @@ Das System läuft als ein Docker-Image im kommunalen Rechenzentrum und hält all
 | NFA-25 | Je Mandant (vhs) gibt es eine eigene Datenbank. | Muss |
 | NFA-26 | Kommentare zur Spezifikation liegen in einer eigenen Datenbankdatei mit eigener Schemaversion; sie überstehen den Neuaufbau der Hauptdatenbank und werden mit ihr gesichert. | Muss |
 | NFA-27 | Solange es keine Migrationen gibt (Entwicklungsphase), legt das Ausrollen bei einer Schemaänderung die alte Datenbank beiseite, statt sie zu löschen; scheitert der Start, kommen vorige Version und vorige Datenbank automatisch zurück. Vor dem ersten Produktivbetrieb werden Migrationen eingeführt. | Muss |
+| NFA-28 | Kurzformen einer Id (Pseudonym „Person #…“ im Protokoll, Platzhalter nach Anonymisierung) stammen aus dem zufälligen Teil der UUIDv7, nicht aus dem Zeitstempel – sonst sehen alle Personen eines Imports gleich aus. Eindeutige Schlüssel wie Logins der Portal-Konten werden aus der vollen Id gebildet. | Muss |
 
 ## Entscheidungen
 

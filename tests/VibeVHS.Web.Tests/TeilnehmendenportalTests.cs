@@ -273,4 +273,46 @@ public sealed class TeilnehmendenportalTests
 
         (await MitAsync(w.H, Benutzer.Automatik, d => d.GetRequiredService<TeilnehmendenportalDienst>().LinkEinloesenAsync(token, Ct))).ShouldBeNull();
     }
+
+    [Fact]
+    public async Task Anmeldelink_legt_fuer_jede_Person_ein_eigenes_Konto_an()
+    {
+        // Früher: Login aus dem Zeitstempel-Anfang der UUIDv7 – die zweite Person aus demselben Zeitfenster bekam keinen Zugang.
+        await using var w = await AufbauenAsync();
+        var neu = new List<Guid>();
+        await using (var bereich = w.H.App.Services.CreateAsyncScope())
+        {
+            var db = bereich.ServiceProvider.GetRequiredService<VibeVhsDbContext>();
+            var jetzt = w.H.Uhr.GetLocalNow();
+            foreach (var v in new[] { "Ute", "Uwe" })
+            {
+                var p = Person.Anlegen(v, "Import", new DateOnly(2024, 1, 1), jetzt.AddYears(-2), null, $"{v.ToLowerInvariant()}@example.org");
+                p.RolleHinzufuegen(Personenrolle.Teilnehmende, new DateOnly(2024, 1, 1), Erfassung.Erst(jetzt.AddYears(-2)));
+                db.Personen.Add(p);
+                neu.Add(p.Id);
+            }
+
+            await db.SaveChangesAsync(Ct);
+        }
+
+        var logins = new List<string>();
+        foreach (var (mail, personId) in new[] { ("ute@example.org", neu[0]), ("uwe@example.org", neu[1]) })
+        {
+            await MitAsync(w.H, Benutzer.Automatik, async d => { await d.GetRequiredService<TeilnehmendenportalDienst>().LinkAnfordernAsync(mail, Ct); return 0; });
+            string token;
+            await using (var bereich = w.H.App.Services.CreateAsyncScope())
+            {
+                var m = await bereich.ServiceProvider.GetRequiredService<VibeVhsDbContext>().Postausgang.SingleAsync(x => x.Empfaenger == mail, Ct);
+                token = Regex.Match(m.Inhalt, @"teilnehmende/link/([A-Za-z0-9_\-]+)").Groups[1].Value;
+            }
+
+            var konto = await MitAsync(w.H, Benutzer.Automatik, d => d.GetRequiredService<TeilnehmendenportalDienst>().LinkEinloesenAsync(token, Ct));
+            konto.ShouldNotBeNull();
+            konto.PersonId.ShouldBe(personId);
+            konto.Login.ShouldBe(Benutzerkonto.PortalLogin("tn", personId));
+            logins.Add(konto.Login);
+        }
+
+        logins.Distinct().Count().ShouldBe(2);
+    }
 }

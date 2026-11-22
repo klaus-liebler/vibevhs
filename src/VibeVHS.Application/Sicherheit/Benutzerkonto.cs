@@ -77,6 +77,9 @@ public sealed class Benutzerkonto
 
     public bool IstPortalkonto => Rollen.All(r => PortalRollen.Contains(r));
 
+    /// <summary>Login eines Portal-Kontos („doz-…“, „tn-…“) aus der vollen Personen-Id – eindeutig, auch bei vielen Personen aus einem Import.</summary>
+    public static string PortalLogin(string praefix, Guid personId) => $"{praefix}-{personId:N}";
+
     /// <summary>Name, Funktion, Rollen und Fachbereiche ändern (Benutzerverwaltung). Wirkt ab der nächsten Anmeldung.</summary>
     /// <remarks>Bei Konten mit Person bleibt der Name der Person maßgeblich; <paramref name="name"/> wird dann nicht gespeichert.</remarks>
     public void Aendern(string name, string? funktion, IEnumerable<Rolle> rollen, IEnumerable<int> fachbereiche)

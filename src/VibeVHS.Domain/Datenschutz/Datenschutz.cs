@@ -25,7 +25,13 @@ public static class DatenschutzAnzeige
 /// <summary>Pseudonyme Bezeichnungen für Protokolle: Das Protokoll enthält nie Klarnamen von Personen.</summary>
 public static class Pseudonym
 {
-    public static string Kurz(Guid id) => id.ToString("N")[..8].ToUpperInvariant();
+    /// <summary>Acht Hex-Zeichen aus dem <b>zufälligen</b> Ende der Id.</summary>
+    /// <remarks>
+    /// Ids sind UUIDv7 (<see cref="Gemeinsam.Ids"/>): Die ersten 48 Bit sind der Zeitstempel, die ersten acht Hex-Zeichen
+    /// wären für alle Personen aus demselben Zeitfenster von gut einer Minute gleich (z. B. bei einem Import).
+    /// Zur Lesbarkeit im Protokoll gedacht, nicht als Schlüssel – eindeutig ist nur die volle Id.
+    /// </remarks>
+    public static string Kurz(Guid id) => id.ToString("N")[^8..].ToUpperInvariant();
 
     public static string Person(Guid id) => $"Person #{Kurz(id)}";
 }
