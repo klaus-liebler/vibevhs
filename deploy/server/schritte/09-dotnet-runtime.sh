@@ -45,9 +45,15 @@ else
                 add-apt-repository -y ppa:dotnet/backports
             fi
             apt-get update -q
-            if apt-cache policy "$PAKET" | grep -qE 'Candidate: [0-9]'; then
-                DEBIAN_FRONTEND=noninteractive apt-get install -y -q "$PAKET"
+            # LC_ALL=C: apt antwortet sonst in der Systemsprache („Installationskandidat:“ statt „Candidate:“)
+            # erst einlesen, dann prüfen: grep -q in der Pipe kann apt-cache unter pipefail per SIGPIPE scheitern lassen
+            politik=$(LC_ALL=C apt-cache policy "$PAKET")
+            if grep -qE 'Candidate: [0-9]' <<<"$politik"; then
+                DEBIAN_FRONTEND=noninteractive apt-get install -y -q -o Acquire::Retries=5 "$PAKET"
             else
+                info "Vorhandene ASP.NET-Core-Runtime-Pakete:"
+                apt-cache search --names-only '^aspnetcore-runtime' | sed 's/^/   /'
+                LC_ALL=C apt-cache policy "$PAKET" | sed 's/^/   /'
                 fehler "$PAKET gibt es in den Paketquellen nicht. Erneut starten mit --backports (Canonical-PPA, bevorzugt) oder --microsoft. Nichts installiert."
             fi
             ;;

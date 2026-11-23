@@ -19,7 +19,7 @@ neueste() { ls "$(wurzel)/shared/Microsoft.AspNetCore.App" 2>/dev/null | grep "^
 case "$ART" in
     apt|backports)
         apt-get update -q >/dev/null
-        DEBIAN_FRONTEND=noninteractive apt-get install -y -q --only-upgrade "aspnetcore-runtime-$KANAL" >/dev/null
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -q -o Acquire::Retries=5 --only-upgrade "aspnetcore-runtime-$KANAL" >/dev/null
         ;;
     microsoft)
         werkzeug=$(mktemp)

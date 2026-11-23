@@ -307,7 +307,9 @@ Installiert die ASP.NET-Core-Runtime 11.0 (`DOTNET_KANAL=11.0`) einmalig für al
 
 - **Quelle:** zuerst das signierte Ubuntu-Archiv (`aspnetcore-runtime-11.0`). Liefert Ubuntu 26.04 die Version nicht, bricht der Schritt
   ohne Änderung ab und nennt die Optionen: `--backports` (Canonical-PPA `ppa:dotnet/backports`, bevorzugt) oder `--microsoft`
-  (Microsofts `dotnet-install.sh` nach `/usr/share/dotnet`, Notlösung).
+  (Microsofts `dotnet-install.sh` nach `/usr/share/dotnet`, Notlösung). **Auf liebler (Ubuntu 26.04) war `--backports` nötig**
+  (eingerichtet am 23.11.2026, Runtime unter `/usr/lib/dotnet`); spätere Aufrufe ohne Option behalten diese Quelle. Meldet Launchpad
+  „503 Service Unavailable“, ist das ein vorübergehender Ausfall des PPA: einige Minuten warten, erneut starten (nichts wird halb installiert).
 - **Aktualisierung:** `dotnet-runtime-aktualisieren.timer` spielt nachts um 03:40 Patches ein und startet die .NET-Dienste nur bei einer
   neuen Runtime-Version neu. Sicherheitspatches von .NET brauchen damit kein neues Ausrollen mehr.
 - **Prüfen:** Ausgabe von `dotnet --list-runtimes` am Ende; `systemctl list-timers dotnet-runtime-aktualisieren.timer`.
