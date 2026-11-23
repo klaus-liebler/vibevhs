@@ -91,8 +91,8 @@ befristet (danach `sudo rm /etc/sudoers.d/srvadmin`).
 nginx, ufw, apache2-utils (htpasswd), at, sqlite3, curl, openssl und die passende `libicuNN` für .NET (kein certbot). nginx wird **nicht**
 gestartet (Apache belegt 80/443 noch). **Prüfen:** Ausgabe zeigt Versionen und „Apache läuft weiter“. Rückweg: nicht nötig.
 
-VibeVHS braucht **kein .NET auf dem Server**: `deploy.ps1` baut self-contained für linux-x64 (für Ubuntu 26.04 gibt es noch
-keine verlässliche Microsoft-Paketquelle).
+Die .NET-Runtime kommt mit **Schritt 09** einmalig für alle Apps auf den Server (siehe dort); bis dahin baut `deploy.ps1 -MitRuntime`
+self-contained für linux-x64.
 
 ---
 
@@ -178,7 +178,7 @@ Kestrel nur auf `127.0.0.1:5080`, `ASPNETCORE_ENVIRONMENT=Testsystem` (Pfad-Basi
 .\deploy\server\deploy.ps1
 ```
 
-Baut self-contained linux-x64, lädt Kit und Archiv hoch, sichert die Datenbank, ersetzt `/opt/vibevhs` (vorige Version
+Baut linux-x64 (framework-abhängig, rund 20 MB; `-MitRuntime` = self-contained), lädt Kit und Archiv hoch, sichert die Datenbank, ersetzt `/opt/vibevhs` (vorige Version
 bleibt als `/opt/vibevhs.vorher`) und prüft `http://127.0.0.1:5080/vibevhs/gesund`. Antwortet die neue Version nicht, kommt die
 vorige automatisch zurück. Von Hand zurück: `ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/ausrollen.sh --zurueck"`.
 
@@ -293,3 +293,23 @@ Bei der Hochschul-IT nachfragen.
 Geklärt (16.11.2026): Von außen kommt nur MQTT (8883) – Node-RED 1880 wird geschlossen. 8181, 9443, 8000, 5666, 8883 bleiben
 erreichbar. Kein Let's Encrypt: Hochschulzertifikat für nginx und mosquitto; alle Geräte vertrauen öffentlichen Wurzeln.
 Nur `srvadmin` meldet sich per SSH an (`AllowUsers srvadmin` bleibt).
+
+---
+
+## 09 · Gemeinsame .NET-Runtime (für VibeVHS, FraktionPerfekt, Podium, ProfOMat)
+
+```powershell
+ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/09-dotnet-runtime.sh"
+```
+
+Installiert die ASP.NET-Core-Runtime 11.0 (`DOTNET_KANAL=11.0`) einmalig für alle .NET-Apps. Danach bauen die Kits framework-abhängig
+(Uploads rund 20 statt 70 MB) und `ausrollen.sh` prüft vor jeder Änderung, ob die nötige Runtime da ist (gemeinsames `liebler-dotnet.sh`).
+
+- **Quelle:** zuerst das signierte Ubuntu-Archiv (`aspnetcore-runtime-11.0`). Liefert Ubuntu 26.04 die Version nicht, bricht der Schritt
+  ohne Änderung ab und nennt die Optionen: `--backports` (Canonical-PPA `ppa:dotnet/backports`, bevorzugt) oder `--microsoft`
+  (Microsofts `dotnet-install.sh` nach `/usr/share/dotnet`, Notlösung).
+- **Aktualisierung:** `dotnet-runtime-aktualisieren.timer` spielt nachts um 03:40 Patches ein und startet die .NET-Dienste nur bei einer
+  neuen Runtime-Version neu. Sicherheitspatches von .NET brauchen damit kein neues Ausrollen mehr.
+- **Prüfen:** Ausgabe von `dotnet --list-runtimes` am Ende; `systemctl list-timers dotnet-runtime-aktualisieren.timer`.
+- **Rückweg:** `09-zurueck.sh` (Timer aus, Runtime bleibt); `09-zurueck.sh --entfernen` löscht sie nur, wenn keine App in `/opt` mehr
+  framework-abhängig läuft – vorher die Apps mit `deploy.ps1 -MitRuntime` neu ausrollen.

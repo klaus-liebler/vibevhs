@@ -1,5 +1,5 @@
 # VibeVHS (Testsystem) als systemd-Dienst – Ziel: /etc/systemd/system/vibevhs.service (Schritt 06)
-# Self-contained Linux-Build in /opt/vibevhs (kein .NET auf dem Server nötig), Daten getrennt in /var/lib/vibevhs.
+# Linux-Build in /opt/vibevhs (framework-abhängig: gemeinsame ASP.NET-Core-Runtime aus VibeVHS-Schritt 09; mit deploy.ps1 -MitRuntime self-contained), Daten getrennt in /var/lib/vibevhs.
 # Geheimnisse (z. B. Anmeldung__Zugangscode) stehen nur in /etc/vibevhs/vibevhs.env (root, 0640), nie im Repository.
 [Unit]
 Description=VibeVHS Verwaltung (Testsystem)

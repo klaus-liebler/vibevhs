@@ -7,6 +7,7 @@
 #             („Datenbankschema veraltet“). Scheitert der Start, kommen vorige Version UND vorige Datenbank zurück.
 # Rückweg von Hand: sudo bash /tmp/vibevhs-kit/schritte/ausrollen.sh --zurueck
 source "$(dirname "$0")/gemeinsam.sh"
+source "$(dirname "$0")/liebler-dotnet.sh"
 als_root
 
 DB=/var/lib/vibevhs/vibevhs.db
@@ -34,6 +35,8 @@ archiv="${1:?Pfad zum Archiv fehlt}"
 neu=$(mktemp -d /opt/vibevhs.neu.XXXX)
 tar -xzf "$archiv" -C "$neu" --strip-components=1
 [[ -f "$neu/VibeVHS.Web" ]] || { rm -rf "$neu"; fehler "Archiv enthält kein VibeVHS.Web"; }
+# Framework-abhängiges Paket: passende gemeinsame Runtime vorhanden? (VibeVHS-Schritt 09) – sonst nichts ändern
+dotnet_pruefen "$neu" "VibeVHS.Web" || { rm -rf "$neu"; fehler "Ausrollen abgebrochen: Runtime fehlt (siehe oben). Nichts geändert."; }
 # Unter Windows gebaute Archive tragen keine Unix-Rechte (alles 666/777): Rechte hier festlegen
 chown -R root:root "$neu"
 find "$neu" -type d -exec chmod 755 {} +

@@ -13,7 +13,7 @@ Stand: 21.11.2026 · Zielsystem heute: **Testsystem** `https://liebler.iui.hs-os
 ```mermaid
 flowchart LR
     subgraph Entwicklungsrechner [Entwicklungsrechner Windows, im VPN]
-        Q[Quellcode] -->|dotnet publish linux-x64<br/>self-contained| A[vibevhs.tar.gz]
+        Q[Quellcode] -->|dotnet publish linux-x64<br/>framework-abhängig| A[vibevhs.tar.gz]
         K[deploy/server = Kit] --> KT[vibevhs-kit.tar.gz]
     end
     A -->|scp| T1[/tmp/vibevhs.tar.gz/]
@@ -32,8 +32,9 @@ flowchart LR
 
 Kernpunkte:
 
-- **Gebaut wird auf dem Entwicklungsrechner**, nicht auf dem Server. `deploy.ps1` erzeugt einen *self-contained* Build für
-  linux-x64 – die .NET-Laufzeit steckt im Paket, auf dem Server ist **kein .NET installiert**.
+- **Gebaut wird auf dem Entwicklungsrechner**, nicht auf dem Server. `deploy.ps1` erzeugt einen *framework-abhängigen* Build für
+  linux-x64 – die .NET-Laufzeit liegt einmal gemeinsam für alle Apps auf dem Server (Schritt 09) und wird nachts aktualisiert;
+  mit `-MitRuntime` steckt sie wie früher im Paket (self-contained).
 - **Programm und Daten sind getrennt:** Das Programm liegt in `/opt/vibevhs` und wird bei jedem Update komplett ersetzt;
   Datenbank, Dokumente, Schlüssel, Logs und Sicherungen liegen woanders und bleiben stehen.
 - **Nach außen spricht nur nginx** (443, TLS mit dem Hochschulzertifikat, vorgeschaltetes Zugangspasswort). Die Anwendung lauscht
@@ -92,6 +93,7 @@ Das Kit kommt vorher mit `.\deploy\server\deploy.ps1 -NurKit` nach `/tmp/vibevhs
 | Ausrollen | Programm nach `/opt/vibevhs` (Abschnitt 6) | `ausrollen.sh --zurueck` |
 | 07 `firewall` | ufw ergänzen: 443/80 offen, 22 nur aus dem VPN, 1880 zu; automatischer Rückweg nach 10 min, falls man sich aussperrt | `07-zurueck.sh` |
 | 08 `certbot-aufraeumen` | Let's Encrypt/certbot entfernen (nach Rückfrage je Teil) | `08-zurueck.sh` |
+| 09 `dotnet-runtime` | gemeinsame ASP.NET-Core-Runtime 11.0 für alle .NET-Apps, nachts aktualisiert (`dotnet-runtime-aktualisieren.timer`) | `09-zurueck.sh` |
 
 Schritt 03 nutzt ein **gemeinsames nginx-Schema** mit anderen Anwendungen auf demselben Server: `liebler.conf` enthält TLS und
 `include /etc/nginx/liebler.d/*.conf;`, jede Anwendung pflegt nur ihre eigene Datei darin. Ein erneuter Schritt 03 überschreibt
@@ -198,7 +200,7 @@ Ein Update ist dasselbe wie das erste Ausrollen. Auf dem Entwicklungsrechner, im
 
 **Auf dem Entwicklungsrechner (`deploy.ps1`):**
 
-1. `dotnet publish src\VibeVHS.Web -c Release -r linux-x64 --self-contained true` nach `deploy\ausgabe\vibevhs`
+1. `dotnet publish src\VibeVHS.Web -c Release -r linux-x64 --self-contained false` nach `deploy\ausgabe\vibevhs` (`-MitRuntime`: `true`)
    (ohne PDB-Dateien), `appsettings.Development.json` wird entfernt, Ergebnis gepackt als `deploy\ausgabe\vibevhs.tar.gz`.
 2. Kit (`deploy/server`) packen und nach `/tmp/vibevhs-kit` hochladen (der Ordner wird jedes Mal sauber ersetzt).
 3. Archiv nach `/tmp/vibevhs.tar.gz` hochladen.
@@ -368,9 +370,9 @@ ist. Kurzprüfung: `zertifikat-ablauf --kurz`. Empfehlung: zusätzlich einen Che
 ### Sicherheitsupdates
 
 - **Betriebssystem:** `unattended-upgrades` ist auf dem Server aktiv (Sicherheitsupdates von Ubuntu, inkl. nginx, OpenSSL, ICU).
-- **.NET-Laufzeit:** steckt im self-contained Build und wird **nicht** vom Betriebssystem aktualisiert. Sicherheitsupdates von .NET
-  kommen nur mit einem neuen Ausrollen. Deshalb nach jedem .NET-Patchday (meist zweiter Dienstag im Monat) SDK auf dem
-  Entwicklungsrechner aktualisieren und neu ausrollen – auch ohne fachliche Änderung.
+- **.NET-Laufzeit:** gemeinsam für alle Apps auf dem Server (Schritt 09); `dotnet-runtime-aktualisieren.timer` spielt Patches nachts
+  ein und startet die Dienste nur bei neuer Version neu – kein neues Ausrollen nötig. Nur Pakete mit `-MitRuntime` (self-contained)
+  bleiben auf dem Stand ihres Builds.
 - NuGet-Pakete der Anwendung ebenso: Update im Repository, Tests, ausrollen.
 
 ### Firewall und Netz
