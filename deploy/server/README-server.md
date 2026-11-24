@@ -178,19 +178,32 @@ Kestrel nur auf `127.0.0.1:5080`, `ASPNETCORE_ENVIRONMENT=Testsystem` (Pfad-Basi
 .\deploy\server\deploy.ps1
 ```
 
-Baut self-contained linux-x64, lädt Kit und Archiv hoch, sichert die Datenbank, ersetzt `/opt/vibevhs` (vorige Version
-bleibt als `/opt/vibevhs.vorher`) und prüft `http://127.0.0.1:5080/vibevhs/gesund`. Antwortet die neue Version nicht, kommt die
-vorige automatisch zurück. Von Hand zurück: `ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/ausrollen.sh --zurueck"`.
+Baut self-contained linux-x64 und lädt Kit und Archiv hoch. Auf dem Server (`schritte/ausrollen.sh`, seit 24.11.2026 „mitdenkend“):
 
-**Schemaänderung (solange es keine EF-Migrationen gibt):** Passt die vorhandene Datenbank nicht zum Modell, bricht der
-Start mit „Datenbankschema veraltet“ ab, die vorige Version kommt zurück, und das Skript nennt den Ausweg:
+1. **Prüflauf vor jeder Änderung:** Die neue Version läuft einmal als Dienstbenutzer mit der Umgebung des Dienstes
+   (`VibeVHS.Web --datenbankstand`, ändert nichts) und meldet je Datenbank: *Aktuell*, *Neu* (fehlt/leer, wird angelegt),
+   *Migrierbar* (ausstehende EF-Migrationen, sobald es welche gibt), *Veraltet* (Schema geändert, keine Migration) oder
+   *KeineVerbindung*. Bei *Veraltet* endet das Ausrollen, bevor die laufende Version angehalten wird, und `deploy.ps1` fragt,
+   ob mit neu aufgebauter Datenbank ausgerollt werden soll. Bei *KeineVerbindung* oder veralteter Kommentar-Datenbank endet es ebenso.
+2. Sicherung (`pg_dump` beider Datenbanken), Austausch von `/opt/vibevhs` (vorige Version bleibt als `/opt/vibevhs.vorher`), Start.
+3. **Warten mit Blick auf den Prozess:** `/gesund` wird jede Sekunde gefragt; beendet sich der Dienst oder startet systemd ihn neu,
+   wird sofort abgebrochen statt bis zum Zeitlimit zu warten. Alle 10 s erscheint die letzte Logzeile (Erststart mit Demodaten gut 2 min).
+4. **Log deuten:** Scheitert der Start, nennt das Skript die Ursache aus bekannten Meldungen (Schema veraltet, PostgreSQL nicht
+   erreichbar, Anmeldung abgelehnt, Port 5080 belegt, Rechte, Speicher, Absturz) mit dem nächsten Schritt und holt die vorige Version zurück.
+5. Läuft die neue Version, nennt es trotzdem Fehlermeldungen (ERR/FTL) aus dem Start.
+
+Von Hand zurück: `ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/ausrollen.sh --zurueck"`.
+Nur prüfen, ob die neue Version passt (ändert nichts): `.\deploy\server\deploy.ps1 -Pruefen`.
+
+**Schemaänderung (solange es keine EF-Migrationen gibt):** Der Prüflauf erkennt sie vorab; `deploy.ps1` bietet dann den Neuaufbau an,
+oder gleich:
 
 ```powershell
 .\deploy\server\deploy.ps1 -DbNeu            # mit Rückfrage; -OhneRueckfrage für Skripte
 ```
 
 `-DbNeu` benennt die Datenbank `vibevhs` im Container `vibevhs-db` in `vibevhs_alt_<zeitstempel>` um (nichts wird gelöscht), die
-Anwendung baut die Datenbank aus Start- und Demodaten neu auf (Erststart ~1 min, das Skript wartet bis 5 min). Scheitert der Start,
+Anwendung baut die Datenbank aus Start- und Demodaten neu auf (Erststart gut 2 min, das Skript wartet bis 5 min; ist das Schema unverändert, weist es darauf hin, dass -DbNeu nicht nötig gewesen wäre). Scheitert der Start,
 kommen vorige Version **und** vorige Datenbank zurück. Die Kommentar-Datenbank `vibevhs_kommentare` bleibt immer unberührt. Alte
 Datenbanken gelegentlich löschen: `docker exec vibevhs-db psql -U vibevhs -d postgres -c 'DROP DATABASE "vibevhs_alt_…"'`.
 (Vorfall dazu: `protokoll/2026-11-17-diagnose-502.md`.)

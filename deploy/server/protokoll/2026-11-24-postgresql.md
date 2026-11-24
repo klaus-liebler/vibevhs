@@ -64,3 +64,39 @@ ssh -t liebler "sudo cp -a /etc/nginx/snippets/vibevhs-ohne-passwort.conf /etc/n
 ```
 
 Ergebnis (24.11.2026 22:24): Klaus meldet OK. Lesend geprüft: Monitor-Zeile vorhanden, Sicherung `.vor-monitor` liegt da; `/vibevhs/monitor/test` → 200 ohne Passwort, `/vibevhs/` → 401 (Passwort weiter aktiv).
+
+## Befehl 8 (lesend, ohne sudo): Zustand nach Klaus' Ausrollen
+
+```
+ssh liebler 'systemctl is-active vibevhs; systemctl status vibevhs --no-pager | sed -n 1,12p; docker ps --format "{{.Names}} {{.Status}}" | grep vibevhs; curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:5080/vibevhs/gesund; ls -la /opt | grep vibevhs; ls /tmp/vibevhs-kit >/dev/null && echo kit'
+```
+
+Ausgabe: Dienst aktiv seit 23:51:10, /gesund → 200, /opt/vibevhs vom 23:51, vibevhs.vorher vom 22:20; docker ps ohne sudo nicht erlaubt.
+
+## Befehl 9 (lesend): Verlauf des Dienstes heute
+
+```
+ssh liebler 'journalctl -u vibevhs --since "2026-11-24 22:00" --no-pager -o short | grep -E "Started|Stopped|Main process exited|FTL|ERR|Failed|Datenbank|Schema|Kommentar" | head -60'
+```
+
+## Befehl 10 (lesend, ohne sudo; nur eine kurzlebige Benutzer-Unit): gibt systemd-run --wait den Exitcode weiter?
+
+```
+ssh liebler 'systemd --version | head -1; systemd-run --user --quiet --wait --pipe --collect sh -c "echo hallo; exit 3"; echo "exit=$?"'
+```
+
+Ausgabe: `hallo`, `exit=3` → Exitcode wird weitergegeben.
+
+## Befehl 11 (lesend)
+
+```
+ssh liebler 'systemctl show vibevhs -p Environment --value; systemctl show vibevhs -p NRestarts -p ActiveState -p SubState -p ExecMainStatus'
+```
+
+## Befehl 12 (ohne sudo, kurzlebige Benutzer-Unit): Umgebung des Dienstes an systemd-run weitergeben
+
+```
+ssh liebler 'systemd-run --user --quiet --wait --pipe --collect -p "Environment=$(systemctl show vibevhs -p Environment --value)" sh -c "echo \$ASPNETCORE_ENVIRONMENT \$Speicher__Logs \$ReverseProxy__Host"; echo exit=$?'
+```
+
+Ausgabe: `Testsystem /var/log/vibevhs liebler.iui.hs-osnabrueck.de`, exit=0 → die Umgebung kommt vollständig an.

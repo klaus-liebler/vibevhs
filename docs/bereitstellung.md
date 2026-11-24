@@ -213,15 +213,22 @@ Ein Update ist dasselbe wie das erste Ausrollen. Auf dem Entwicklungsrechner, im
 1. **Voraussetzungen prüfen** (Dienstbenutzer, Unit, Verzeichnisse aus Schritt 06). Fehlt etwas: Abbruch, nichts geändert.
 2. Archiv in einen temporären Ordner `/opt/vibevhs.neu.XXXX` entpacken, Rechte festlegen (root:root, 755/644, Programm ausführbar –
    unter Windows gebaute Archive haben keine Unix-Rechte).
+   **Prüflauf:** Die neue Version läuft einmal als Dienstbenutzer mit der Umgebung des Dienstes (`VibeVHS.Web --datenbankstand`,
+   ändert nichts) und meldet je Datenbank *Aktuell*, *Neu*, *Migrierbar*, *Veraltet* oder *KeineVerbindung*. Bei *Veraltet* ohne
+   `-DbNeu` endet das Ausrollen hier – die laufende Version wurde nicht angefasst – und `deploy.ps1` fragt, ob mit neu aufgebauter
+   Datenbank ausgerollt werden soll. Ohne Verbindung oder bei veralteter Kommentar-Datenbank endet es ebenso, mit Hinweis.
 3. **Datenbanken sichern** mit `pg_dump` im Container (konsistent, auch bei laufendem Dienst):
    `/var/backups/vibevhs/vor-update-<Zeit>-vibevhs.dump` und `vor-update-<Zeit>-vibevhs_kommentare.dump`.
 4. Dienst stoppen.
 5. Nur mit `-DbNeu`: Datenbank `vibevhs` in `vibevhs_alt_<Zeit>` umbenennen (offene Verbindungen werden beendet).
 6. **Tauschen:** altes `/opt/vibevhs.vorher` löschen, `/opt/vibevhs` → `/opt/vibevhs.vorher`, neuer Ordner → `/opt/vibevhs`.
-7. Dienst starten und `http://127.0.0.1:5080/vibevhs/gesund` abfragen (bis 90 s, mit `-DbNeu` bis 5 min).
-8. **Antwortet die Anwendung:** fertig, Archiv in `/tmp` gelöscht.
-   **Antwortet sie nicht:** Startlog anzeigen, mit `-DbNeu` die neu angelegte Datenbank verwerfen und die vorige zurücklegen,
-   automatisch zur vorigen Version zurück (`--zurueck`). Lag es am Schema, nennt das Skript den Ausweg `-DbNeu`.
+7. Dienst starten und `http://127.0.0.1:5080/vibevhs/gesund` jede Sekunde abfragen (bis 2 min, mit `-DbNeu` bis 5 min). Dabei
+   wird der Prozess beobachtet: beendet er sich oder startet systemd ihn neu, bricht das Warten sofort ab. Alle 10 s erscheint
+   die letzte Logzeile.
+8. **Antwortet die Anwendung:** fertig, Archiv in `/tmp` gelöscht; Fehlermeldungen (ERR/FTL) seit dem Start werden trotzdem genannt.
+   **Antwortet sie nicht:** Startlog anzeigen und **deuten** (bekannte Meldungen → Ursache und nächster Schritt: Schema veraltet,
+   PostgreSQL nicht erreichbar, Anmeldung abgelehnt, Port belegt, Rechte, Speicher, Absturz), mit `-DbNeu` die neu angelegte
+   Datenbank verwerfen und die vorige zurücklegen, automatisch zur vorigen Version zurück (`--zurueck`).
 
 Ausfallzeit: vom Stoppen bis zur ersten Antwort, normalerweise wenige Sekunden. Offene Blazor-Sitzungen verbinden sich danach neu;
 angemeldet bleiben alle, weil die Schlüssel in `/var/lib/vibevhs/schluessel` erhalten bleiben. Ungespeicherte Eingaben in gerade
@@ -234,6 +241,7 @@ offenen Formularen gehen verloren – Updates deshalb nicht mitten in der Arbeit
 | `deploy.ps1` | bauen, hochladen, einspielen (Normalfall) |
 | `deploy.ps1 -DbNeu` | wie oben, aber Datenbank vorher beiseitelegen; die Anwendung baut sie aus Start- und Demodaten neu auf. Fragt nach („j“), **alle auf dem Server erfassten Daten sind danach nicht mehr in der Anwendung** |
 | `deploy.ps1 -DbNeu -OhneRueckfrage` | dasselbe ohne Rückfrage (für Skripte) |
+| `deploy.ps1 -Pruefen` | bauen, hochladen und nur den Prüflauf zeigen: passt die neue Version zu den Datenbanken? Ändert nichts |
 | `deploy.ps1 -NurKit` | nur das Kit nach `/tmp/vibevhs-kit` hochladen (vor den Einrichtungsschritten oder nach Änderungen am Kit) |
 | `deploy.ps1 -NurBauen` | nur bauen (`deploy\ausgabe\vibevhs.tar.gz`), nichts hochladen – z. B. zum Prüfen des Builds |
 | `deploy.ps1 -Ziel benutzer@host` | anderer Zielserver (Standard `srvadmin@liebler.iui.hs-osnabrueck.de`) |

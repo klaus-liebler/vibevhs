@@ -135,6 +135,20 @@ if (hinterProxy)
 }
 
 var app = builder.Build();
+
+if (args.Contains("--datenbankstand"))
+{
+    // Vorabprüfung beim Ausrollen (ausrollen.sh): Was würde DIESE Version mit den vorhandenen Datenbanken tun? Ändert nichts.
+    // Eine Zeile je Datenbank „DATENBANKSTAND|Rolle|Datenbank|Stand|ist|soll|Hinweis“, Exitcode siehe Datenbankstand.Exitcode.
+    var zustaende = await Datenbankstand.PruefenAsync(app.Services);
+    foreach (var z in zustaende)
+    {
+        Console.WriteLine($"DATENBANKSTAND|{z.Rolle}|{z.Datenbank}|{z.Stand}|{z.Ist ?? "-"}|{z.Soll}|{z.Hinweis.ReplaceLineEndings(" ")}");
+    }
+
+    return Datenbankstand.Exitcode(zustaende);
+}
+
 foreach (var plugin in honorarPlugins)
 {
     app.Logger.LogInformation("Honorarmodell-Plugin geladen: {Plugin}", plugin);
