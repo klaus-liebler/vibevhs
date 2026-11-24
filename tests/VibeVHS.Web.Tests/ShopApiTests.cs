@@ -16,7 +16,7 @@ using static VibeVHS.Web.Tests.ShopTestHost;
 
 namespace VibeVHS.Web.Tests;
 
-/// <summary>Integrationstests der Buchungs-API über echtes HTTP (Kestrel im Testprozess, SQLite-Datei).</summary>
+/// <summary>Integrationstests der Buchungs-API über echtes HTTP (Kestrel im Testprozess, Wegwerf-Datenbank in PostgreSQL).</summary>
 public sealed class ShopApiTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

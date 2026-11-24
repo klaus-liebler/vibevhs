@@ -18,9 +18,6 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
     /// <summary>Anwendungsuhr: Bezugszeitpunkt („jetzt“) geladener Personen für ihre berechneten Eigenschaften.</summary>
     public TimeProvider Uhr { get; } = uhr ?? TimeProvider.System;
 
-    /// <summary>Für SQLite-Funktionen (Collation DIN5007_2) – registriert bei jeder Verbindung, auch bei von außen geöffneten.</summary>
-    private readonly bool _erweitert = SqliteErweiterungen.Registrieren(optionen);
-
     public DbSet<Person> Personen => Set<Person>();
 
     public DbSet<PersonName> PersonNamen => Set<PersonName>();
@@ -64,16 +61,11 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
 
     public DbSet<VibeVHS.Domain.Vorlagen.Textvorlage> Vorlagen => Set<VibeVHS.Domain.Vorlagen.Textvorlage>();
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionen)
-        => optionen.AddInterceptors(SqliteErweiterungenBeimOeffnen.Instanz);
-
     protected override void ConfigureConventions(ModelConfigurationBuilder konfiguration)
     {
-        // Speicherformate (siehe Speicherformate.cs): Ids 16 Byte (Big Endian, UUIDv7), Tage JJJJMMTT, Zeitpunkte und Termine UTC-Millisekunden.
-        konfiguration.Properties<Guid>().HaveConversion<IdAlsBytes>();
-        konfiguration.Properties<DateOnly>().HaveConversion<TagAlsZahl>();
-        konfiguration.Properties<DateTimeOffset>().HaveConversion<ZeitpunktAlsMillisekunden>();
-        konfiguration.Properties<DateTime>().HaveConversion<TerminAlsUtcMillisekunden>();
+        // Speicherformate (siehe Speicherformate.cs): Ids uuid (UUIDv7), Tage date, Zeitpunkte und Termine timestamptz (UTC, Millisekunden).
+        konfiguration.Properties<DateTimeOffset>().HaveConversion<ZeitpunktInUtc>();
+        konfiguration.Properties<DateTime>().HaveConversion<TerminInUtc>();
         konfiguration.Properties<Enum>().HaveConversion<string>().HaveMaxLength(40);
     }
 
@@ -89,15 +81,12 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.HasIndex(v => v.Am);
         });
 
-        modelBuilder.HasDbFunction(typeof(SqlFunktionen).GetMethod(nameof(SqlFunktionen.Ganzzahl))!)
-            .HasTranslation(a => new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlUnaryExpression(ExpressionType.Convert, a[0], typeof(long),
-                new Microsoft.EntityFrameworkCore.Storage.LongTypeMapping("INTEGER")));
-        modelBuilder.HasDbFunction(typeof(SqlFunktionen).GetMethod(nameof(SqlFunktionen.Suchtext))!)
-            .HasTranslation(a => new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFunctionExpression("suchtext", a, nullable: true,
-                argumentsPropagateNullability: [true], typeof(string), new Microsoft.EntityFrameworkCore.Storage.StringTypeMapping("TEXT", System.Data.DbType.String)));
-        modelBuilder.HasDbFunction(typeof(SqlFunktionen).GetMethod(nameof(SqlFunktionen.Hex))!)
-            .HasTranslation(a => new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFunctionExpression("hex", a, nullable: true,
-                argumentsPropagateNullability: [true], typeof(string), new Microsoft.EntityFrameworkCore.Storage.StringTypeMapping("TEXT", System.Data.DbType.String)));
+        // PostgreSQL: Erweiterungen (Trigramm-Suche, Akzente entfernen), Sortierung nach DIN 5007-2 über ICU („Telefonbuch“).
+        modelBuilder.HasPostgresExtension("pg_trgm");
+        modelBuilder.HasPostgresExtension("unaccent");
+        modelBuilder.HasPostgresExtension("fuzzystrmatch");
+        modelBuilder.HasCollation(Domain.Gemeinsam.Din5007.Collation, locale: "de-DE-u-co-phonebk", provider: "icu", deterministic: true);
+        SqlFunktionen.Registrieren(modelBuilder);
 
         modelBuilder.Entity<Person>(b =>
         {
@@ -142,8 +131,9 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Ignore(n => n.Sortierschluessel);
             b.Property(n => n.Vorsatz).HasMaxLength(30);
             b.Property(n => n.Zusatz).HasMaxLength(20);
-            // Sortierindex beginnt mit „nicht ersetzt“ (ErsetztDurchVorgangId IS NULL), damit SQLite filtern und in Namensfolge lesen kann.
-            b.HasIndex("ErsetztDurchVorgangId", nameof(PersonName.Nachname), nameof(PersonName.Vorname)).HasDatabaseName("IX_PersonNamen_Sortierung");
+            // Teilindex nur über gültige Wissensstände (ErsetztDurchVorgangId IS NULL) in Namensfolge: die Personenliste liest seitenweise daraus.
+            b.HasIndex(nameof(PersonName.Nachname), nameof(PersonName.Vorname)).HasFilter("\"ErsetztDurchVorgangId\" IS NULL")
+                .HasDatabaseName("IX_PersonNamen_Sortierung");
         });
         Version<PersonMerkmal>(modelBuilder, "PersonMerkmale", b => b.Property(m => m.Inhalt).HasMaxLength(200));
         Version<Postadresse>(modelBuilder, "PersonAdressen", b =>
@@ -333,7 +323,7 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.ToTable(tabelle);
             b.HasKey(v => v.Id);
             b.Property(v => v.Id).ValueGeneratedNever();
-            b.Property(v => v.GueltigBis).HasConversion(new OffenesEnde()); // offenes Ende = 99991231 statt NULL (NFA-15)
+            b.Property(v => v.GueltigBis).HasConversion(new OffenesEnde()); // offenes Ende = 9999-12-31 statt NULL (NFA-15)
             // Zeitpunkt, Person und Grund stehen im Änderungsvorgang (Tabelle Aenderungsvorgaenge), nicht in jeder Zeile.
             b.HasOne(v => v.ErfasstDurch).WithMany().HasForeignKey("ErfasstDurchVorgangId").IsRequired().OnDelete(DeleteBehavior.Restrict);
             b.HasOne(v => v.ErsetztDurch).WithMany().HasForeignKey("ErsetztDurchVorgangId").OnDelete(DeleteBehavior.Restrict);
@@ -343,9 +333,9 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
             b.Ignore(v => v.ErfasstVon);
             b.Ignore(v => v.ErsetztAm);
             b.Ignore(v => v.Grund);
-            // „Stand der Person(en) heute“: Person + nicht ersetzt + Gültigkeit in einem Index. Ohne ErsetztDurchVorgangId darin wählt SQLite
-            // den Index auf ErsetztDurchVorgangId (fast alle Zeilen NULL) und liest die ganze Tabelle (Personenliste 30.000: 16 ms statt 0,2 ms).
-            b.HasIndex(fremdschluessel, "ErsetztDurchVorgangId", nameof(BitemporaleVersion<T>.GueltigVon))
+            // „Stand der Person(en) heute“: Teilindex über die nicht ersetzten Versionen je Person und Gültigkeitsbeginn (ersetzte Versionen –
+            // die Historie – bleiben draußen, der Index bleibt klein).
+            b.HasIndex(fremdschluessel, nameof(BitemporaleVersion<T>.GueltigVon)).HasFilter("\"ErsetztDurchVorgangId\" IS NULL")
                 .HasDatabaseName($"IX_{tabelle}_{fremdschluessel}_Stand");
             weiter(b);
         });

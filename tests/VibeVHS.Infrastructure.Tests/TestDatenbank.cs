@@ -1,40 +1,41 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using Npgsql;
 using VibeVHS.Application.Protokoll;
 using VibeVHS.Application.Sicherheit;
 using VibeVHS.Infrastructure.Datenbank;
 using VibeVHS.Infrastructure.Startdaten;
+using VibeVHS.Tests.Gemeinsam;
 
 namespace VibeVHS.Infrastructure.Tests;
 
-/// <summary>SQLite im Arbeitsspeicher, Schema wie im Betrieb (EnsureCreated + Sichten); je Test frisch.</summary>
+/// <summary>
+/// Wegwerf-Datenbank je Test im lokalen PostgreSQL-Container (deploy/docker-compose.yml), Schema wie im Betrieb. Jede Datenbank ist eine
+/// Kopie der Vorlage <c>vibevhs_testvorlage_&lt;Schemaversion&gt;</c> (<c>CREATE DATABASE … TEMPLATE</c>, wenige Millisekunden), die
+/// Vorlage entsteht einmal je Schemaversion. Verbindung über VIBEVHS_TEST_DB, Standard ist der Entwicklungscontainer.
+/// </summary>
 internal sealed class TestDatenbank : IAsyncDisposable
 {
-    private readonly SqliteConnection _verbindung;
+    private TestDatenbank(string verbindung) => Verbindung = verbindung;
 
-    private TestDatenbank(string quelle = "Data Source=:memory:") => _verbindung = new SqliteConnection(quelle);
+    public string Verbindung { get; }
+
+    public string Name => new NpgsqlConnectionStringBuilder(Verbindung).Database!;
 
     public FakeTimeProvider Uhr { get; } = new(new DateTimeOffset(2026, 11, 15, 8, 0, 0, TimeSpan.FromHours(1)));
 
-    /// <param name="datei">Optional eine Datenbankdatei (für Messungen wie im Betrieb); sonst im Arbeitsspeicher.</param>
-    public static async Task<TestDatenbank> ErzeugenAsync(string? datei = null)
-    {
-        var t = datei is null ? new TestDatenbank() : new TestDatenbank($"Data Source={datei}");
-        await t._verbindung.OpenAsync();
-        await using var db = t.NeuerKontext();
-        await Schema.AnlegenOderPruefenAsync(db, datei ?? ":memory:");
-        return t;
-    }
+    /// <summary>Neue, leere Datenbank mit Schema (Kopie der Vorlage).</summary>
+    public static async Task<TestDatenbank> ErzeugenAsync()
+        => new(await Wegwerfdatenbanken.NeuAsync("vibevhs_test"));
 
     public VibeVhsDbContext NeuerKontext()
-        => new(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite(_verbindung, s => s.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)).Konfigurieren(streng: true).AddInterceptors(StichzeitBeimLaden.Instanz).Options, Uhr);
+        => new(Wegwerfdatenbanken.Optionen(Verbindung).Konfigurieren(streng: true).AddInterceptors(StichzeitBeimLaden.Instanz).Options, Uhr);
 
     public StartdatenLader Lader(VibeVhsDbContext db)
         => new(db, new AuditProtokoll(db, new Automatik(), Uhr), Uhr, NullLogger<StartdatenLader>.Instance);
 
-    public ValueTask DisposeAsync() => _verbindung.DisposeAsync();
+    public ValueTask DisposeAsync() => new(Wegwerfdatenbanken.LoeschenAsync(Verbindung));
 
     private sealed class Automatik : IAktuellerBenutzer
     {

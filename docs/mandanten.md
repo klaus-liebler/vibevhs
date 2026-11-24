@@ -8,10 +8,10 @@ dass weitere ohne Umbau des Datenmodells hinzukommen können.
 | | **Eigene Datenbank je VHS** (gewählt) | **Eine Datenbank, Spalte MandantId** |
 |---|---|---|
 | Datenschutz | strikte Trennung; ein Fehler in einer Abfrage kann keine fremden Daten zeigen; Löschen eines Mandanten = Datei löschen | jede Abfrage braucht den Filter; ein vergessener Filter zeigt fremde Personendaten (hohes Risiko, Architekturtests nötig) |
-| Sicherung / Wiederherstellung | je VHS einzeln (Online-Sicherung, Litestream je Datei); Rücksicherung betrifft nur eine VHS | nur gemeinsam; Rücksicherung einer VHS = aufwendiges Herauslösen |
+| Sicherung / Wiederherstellung | je VHS einzeln (pg_dump je Datenbank); Rücksicherung betrifft nur eine VHS | nur gemeinsam; Rücksicherung einer VHS = aufwendiges Herauslösen |
 | Updates / Migrationen | je Datenbank beim Start (oder nacheinander); eine fehlerhafte Migration trifft zunächst nur eine VHS | eine Migration für alle; kurzer, aber gemeinsamer Ausfall |
 | Auswertungen über Mandanten | nur über Export/Statistik-Schnittstelle (DIE, WbG) bzw. eine eigene Auswertungsdatenbank | einfach per Abfrage – aber datenschutzrechtlich ohnehin nur aggregiert erlaubt |
-| SQLite | passt gut: eine Datei je VHS, Schreibsperre je Datei – keine gegenseitige Blockade | eine Datei für alle: Schreibsperre trifft alle VHS, Datei wächst |
+| PostgreSQL | passt gut: eine Datenbank je VHS im selben Server, eigene Sicherung je Datenbank | eine Datenbank für alle: Rücksicherung trifft alle VHS |
 | Aufwand im Code | gering: Verbindung je Anfrage wählen, Hintergrundjobs je Mandant | hoch: jede Tabelle, jeder Index, jede Abfrage, jeder Test |
 | Betrieb | n Dateien überwachen (Größe, Sicherung) | eine Datei |
 

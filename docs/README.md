@@ -24,7 +24,7 @@ Alle geplanten Schnittstellen nach außen (Mail, Messaging, VHS-Systeme, Stadtve
 - .NET 11 SDK (`winget install --id Microsoft.DotNet.SDK.11 -e`)
 - Git
 
-Docker wird erst für die Bereitstellung benötigt (siehe `deploy/`).
+Docker (Docker Desktop) wird für die Datenbank gebraucht: PostgreSQL 17 läuft lokal als Container (`deploy/docker-compose.yml`).
 
 ## Starten
 
@@ -37,8 +37,10 @@ Dann im Browser <http://localhost:5189> öffnen und bei der **Testanmeldung** ei
 wechselt die aktive Rolle oben rechts (Leitung, Verwaltungsleitung, Fachbereichsleitung, Teilnehmerservice,
 Buchhaltung, Integrationskurs-Team, Systemverwaltung).
 
-Beim ersten Start wird die SQLite-Datenbank `src/VibeVHS.Web/data/vibevhs.db` neu aus dem Modell angelegt (WAL-Modus,
-lesbare Sichten `v_…`, Schemaversion; derzeit ohne Migrationen – bei geändertem Modell die Datei löschen, siehe docs/betrieb.md). Danach werden die **Startdaten** der Pilot-VHS geladen (idempotent, nur was fehlt):
+Voraussetzung ist PostgreSQL 17 im lokalen Container: `docker compose -f deploy/docker-compose.yml up -d` (Port 5441, Verbindung in
+`appsettings.Development.json`). Beim ersten Start wird die Datenbank `vibevhs` neu aus dem Modell angelegt (Suchfunktionen,
+Trigramm-Indizes, lesbare Sichten `v_…`, Schemaversion; derzeit ohne Migrationen – bei geändertem Modell legt die Entwicklung die alte
+Datenbank automatisch als `vibevhs_alt_…` beiseite, siehe docs/betrieb.md). Danach werden die **Startdaten** der Pilot-VHS geladen (idempotent, nur was fehlt):
 Briefkopf, Fachbereiche 1 bis 8 und die Benutzerkonten samt zugehöriger Person (Rolle Mitarbeitende).
 In der Entwicklungsumgebung kommen fünf fiktive Beispielpersonen dazu, darunter Anna Becker mit Namenshistorie.
 
@@ -74,7 +76,7 @@ den Sortierschlüssel, der die Id enthält). In Entwicklung und Tests bricht ein
 |---|---|
 | `src/VibeVHS.Domain` | Fachkern ohne Abhängigkeiten: bitemporale Versionen (`BitemporaleVersion`, `ZeitlicheHistorie.AlsStichtag`), `Geld` in Cent, GUID v7, `Person` mit versioniertem Namen |
 | `src/VibeVHS.Application` | Anwendungsfälle und Ports: Rollen, `Freigabe` (gesperrt immer mit Begründung), `NaechsterSchritt`, Postausgang (Outbox) mit Übersetzungslink, Audit-Protokoll, Personendienst |
-| `src/VibeVHS.Infrastructure` | EF Core + SQLite (WAL), Schema per EnsureCreated, Speicher, Quartz-Job für die Zustellung |
+| `src/VibeVHS.Infrastructure` | EF Core + PostgreSQL (Npgsql), Schema per EnsureCreated, Speicher, Quartz-Job für die Zustellung |
 | `src/VibeVHS.Adapters.Mocks` | Mock-Anmeldung (Konto + Rolle), simulierte Mail- und Schnittstellenkanäle |
 | `src/VibeVHS.Web` | Blazor Web App (Interactive Server, Radzen), deutsche Oberfläche |
 | `tests/*` | xUnit v3 + Shouldly |
@@ -94,7 +96,7 @@ den Sortierschlüssel, der die Id enthält). In Entwicklung und Tests bricht ein
 
 ## Bibliotheken
 
-Erlaubt: Radzen.Blazor, EF Core + SQLite, Serilog, Quartz.NET, xUnit, Shouldly, Bogus, Verify.
+Erlaubt: Radzen.Blazor, EF Core + PostgreSQL (Npgsql), Serilog, Quartz.NET, xUnit, Shouldly, Bogus, Verify.
 Nicht verwenden: QuestPDF, Nager.Date, MediatR, AutoMapper, FluentAssertions.
 Versionen zentral in `Directory.Packages.props`.
 
@@ -374,8 +376,8 @@ Fachbereichsleitung und Prüfung lesen).
 - **Statistik-Mock**: VHS-Statistik (DIE) je Programmbereich mit Geschlecht und Altersgruppen und WbG NRW je Sachbereich –
   nur aggregierte Zahlen; Übermittlung (Leitung/Verwaltungsleitung) als Mock über den Postausgang. Die Zuordnung
   Fachbereich → Programm-/Sachbereich ist mit der Statistikstelle abzustimmen.
-- **Sicherung** `/betrieb`: tägliche SQLite-Online-Sicherung mit SHA-256 und automatischem Wiederherstellungstest,
-  Aufbewahrung der letzten 14; Litestream-Vorlage für Linux. Details: `docs/betrieb.md`.
+- **Sicherung** `/betrieb`: tägliche Sicherung mit pg_dump, SHA-256 und automatischem Wiederherstellungstest (Zurückspielen in eine
+  Wegwerf-Datenbank), Aufbewahrung der letzten 14. Details: `docs/betrieb.md`.
 - **Sicherheit**: Sicherheitsheader, Rate-Limits für öffentliche Seiten, no-store für sensible Seiten; OWASP-Checkliste
   in `docs/sicherheit.md`.
 - **Lastmessung** (3.000 Personen, 500 Kurse, 6.000 Belegungen): alle gemessenen Abfragen unter 0,6 s (`docs/betrieb.md`).
@@ -426,7 +428,7 @@ Fachbereichsleitung und Prüfung lesen).
   bis dahin ein deutlich markierter Platzhalter.
 - **Dokumentation** `/dokumentation` (Leitung, Verwaltungsleitung, Systemverwaltung): Spezifikation und technische Doku aus
   `docs/` mit **Kommentaren je Abschnitt** (Antworten, offen/erledigt, Übersicht „Alle Kommentare“, Export
-  `/dokumentation/kommentare.md`). Kommentare liegen in `kommentare.db` und überstehen den Neuaufbau der Testdatenbank.
+  `/dokumentation/kommentare.md`). Kommentare liegen in der eigenen Datenbank `vibevhs_kommentare` und überstehen den Neuaufbau der Testdatenbank.
 - **Abnahme- und Schulungsmodus** (`Abnahmemodus:Aktiv`, in Entwicklung und Testsystem an): zwölf geführte Touren nach dem
   Abnahme-Drehbuch auf der Hilfeseite; Sprechblasen zeigen Klicks und Eingaben direkt an der Oberfläche, Kontowechsel
   inklusive. `node tests/Touren/tourpruefung.mjs http://localhost:5199` spielt alle Touren durch.

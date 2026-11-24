@@ -2,15 +2,18 @@
 # Neue VibeVHS-Version einspielen (von deploy.ps1 aufgerufen): vorige Version bleibt als /opt/vibevhs.vorher (Rückweg),
 # Datenbank-Sicherung vorher, Gesundheitsprüfung danach; bei Fehler automatisch zurück.
 # Aufruf: sudo bash /tmp/vibevhs-kit/schritte/ausrollen.sh [--db-neu] /tmp/vibevhs.tar.gz
-#   --db-neu  Datenbank (samt -wal/-shm) vor dem Start nach /var/lib/vibevhs/beiseite/ verschieben; die Anwendung baut
+#   --db-neu  Datenbank „vibevhs“ im Container vibevhs-db vor dem Start in „vibevhs_alt_<Zeitstempel>“ umbenennen; die Anwendung baut
 #             sie aus Start- und Demodaten neu auf. Nötig, solange es keine EF-Migrationen gibt und sich das Schema ändert
 #             („Datenbankschema veraltet“). Scheitert der Start, kommen vorige Version UND vorige Datenbank zurück.
+#             Die Kommentar-Datenbank „vibevhs_kommentare“ bleibt immer unberührt.
 # Rückweg von Hand: sudo bash /tmp/vibevhs-kit/schritte/ausrollen.sh --zurueck
 source "$(dirname "$0")/gemeinsam.sh"
 als_root
 
-DB=/var/lib/vibevhs/vibevhs.db
-BEISEITE=/var/lib/vibevhs/beiseite
+DBC=vibevhs-db            # PostgreSQL-Container (Schritt 09)
+DB=vibevhs                # Datenbank der Anwendung
+psql_admin() { docker exec "$DBC" psql -U vibevhs -d postgres -v ON_ERROR_STOP=1 -tAc "$1"; }
+db_vorhanden() { [[ "$(psql_admin "SELECT 1 FROM pg_database WHERE datname = '$1'")" == "1" ]]; }
 
 # Wartet auf /gesund; Erststart mit Demodaten (--db-neu) braucht deutlich länger (gemessen ~95 s)
 gesund() { local s="${1:-90}"; for i in $(seq 1 "$s"); do curl -fsS -o /dev/null http://127.0.0.1:5080/vibevhs/gesund && return 0; sleep 1; done; return 1; }
@@ -28,6 +31,7 @@ fi
 
 # Voraussetzungen aus Schritt 06 (Dienstbenutzer, Verzeichnisse, Unit) – sonst vor jeder Änderung abbrechen
 id vibevhs >/dev/null 2>&1 && [[ -f /etc/systemd/system/vibevhs.service && -d /var/lib/vibevhs && -d /var/backups/vibevhs ]]     || fehler "Schritt 06 fehlt (Dienstbenutzer vibevhs, /var/lib/vibevhs, vibevhs.service) – erst einrichten, dann erneut ausrollen. Nichts geändert."
+docker exec "$DBC" pg_isready -U vibevhs >/dev/null 2>&1     || fehler "Schritt 09 fehlt oder Container $DBC läuft nicht (PostgreSQL) – erst einrichten, dann erneut ausrollen. Nichts geändert."
 
 archiv="${1:?Pfad zum Archiv fehlt}"
 [[ -f "$archiv" ]] || fehler "Archiv $archiv fehlt"
@@ -40,32 +44,32 @@ find "$neu" -type d -exec chmod 755 {} +
 find "$neu" -type f -exec chmod 644 {} +
 chmod 755 "$neu/VibeVHS.Web"; [[ -f "$neu/createdump" ]] && chmod 755 "$neu/createdump"
 
-# Datenbank vor dem Update sichern (Online-Backup, konsistent auch bei laufendem Dienst)
-if [[ -f "$DB" ]]; then
-    ziel="/var/backups/vibevhs/vor-update-$(date +%Y%m%d-%H%M%S).db"
-    sqlite3 "$DB" ".backup '$ziel'" && chown vibevhs:vibevhs "$ziel" && ok "Datenbank gesichert: $ziel"
-fi
-# Kommentare zu Spezifikation/Doku (eigene Datei, wird von --db-neu nie angefasst) ebenfalls sichern
-if [[ -f /var/lib/vibevhs/kommentare.db ]]; then
-    ziel="/var/backups/vibevhs/vor-update-$(date +%Y%m%d-%H%M%S)-kommentare.db"
-    sqlite3 /var/lib/vibevhs/kommentare.db ".backup '$ziel'" && chown vibevhs:vibevhs "$ziel" && ok "Kommentare gesichert: $ziel"
-fi
+# Datenbanken vor dem Update sichern (pg_dump, konsistent auch bei laufendem Dienst)
+for d in "$DB" "${DB}_kommentare"; do
+    if db_vorhanden "$d"; then
+        ziel="/var/backups/vibevhs/vor-update-$(date +%Y%m%d-%H%M%S)-$d.dump"
+        docker exec "$DBC" pg_dump -U vibevhs -d "$d" --format=custom > "$ziel" && chown vibevhs:vibevhs "$ziel" && ok "Datenbank $d gesichert: $ziel"
+    fi
+done
+# Alte SQLite-Dateien (bis 11/2026) ebenfalls sichern, solange es sie gibt; kommentare.db übernimmt die Anwendung beim ersten Start
+for f in /var/lib/vibevhs/vibevhs.db /var/lib/vibevhs/kommentare.db; do
+    [[ -f "$f" ]] && cp -a "$f" "/var/backups/vibevhs/vor-update-$(date +%Y%m%d-%H%M%S)-$(basename "$f")" && ok "SQLite-Datei gesichert: $f"
+done
 
 systemctl stop vibevhs 2>/dev/null || true
 
-# --db-neu: Datei samt WAL beiseitelegen (nicht löschen); Ordner nur für den Dienstbenutzer lesbar
-beiseite=()
+# --db-neu: Datenbank umbenennen (nicht löschen); die Anwendung legt sie neu an
+beiseite=""
 if (( db_neu )); then
-    ts=$(date +%Y%m%d-%H%M%S)
-    install -d -o vibevhs -g vibevhs -m 0700 "$BEISEITE"
-    for f in "$DB" "$DB-wal" "$DB-shm"; do
-        if [[ -e "$f" ]]; then
-            mv "$f" "$BEISEITE/$(basename "$f").$ts"
-            beiseite+=("$f")
-            ok "beiseitegelegt: $f → $BEISEITE/$(basename "$f").$ts"
-        fi
-    done
-    (( ${#beiseite[@]} )) || info "--db-neu: keine Datenbank vorhanden, wird ohnehin neu angelegt"
+    ts=$(date +%Y%m%d_%H%M%S)
+    if db_vorhanden "$DB"; then
+        psql_admin "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DB'" >/dev/null
+        psql_admin "ALTER DATABASE \"$DB\" RENAME TO \"${DB}_alt_$ts\"" >/dev/null
+        beiseite="${DB}_alt_$ts"
+        ok "beiseitegelegt: Datenbank $DB → $beiseite"
+    else
+        info "--db-neu: keine Datenbank vorhanden, wird ohnehin neu angelegt"
+    fi
 fi
 
 rm -rf /opt/vibevhs.vorher
@@ -85,10 +89,10 @@ else
     schema_veraltet=0
     [[ "$startlog" == *"Datenbankschema veraltet"* ]] && schema_veraltet=1
     systemctl stop vibevhs
-    if (( ${#beiseite[@]} )); then
-        # neu angelegte Datei verwerfen, vorige Datenbank zurück (passt zur vorigen Version)
-        rm -f "$DB" "$DB-wal" "$DB-shm"
-        for f in "${beiseite[@]}"; do mv "$BEISEITE/$(basename "$f").$ts" "$f"; done
+    if [[ -n "$beiseite" ]]; then
+        # neu angelegte Datenbank verwerfen, vorige zurück (passt zur vorigen Version)
+        psql_admin "DROP DATABASE IF EXISTS \"$DB\" WITH (FORCE)" >/dev/null
+        psql_admin "ALTER DATABASE \"$beiseite\" RENAME TO \"$DB\"" >/dev/null
         ok "vorige Datenbank zurückgelegt"
     fi
     # Hinweis vor dem Rückweg ausgeben (scheitert der, endet das Skript dort)

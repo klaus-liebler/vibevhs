@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Text;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using VibeVHS.Application.Betrieb;
@@ -131,6 +130,14 @@ public class BetriebTests
         (await db.Postausgang.SingleAsync(ct)).Empfaenger.ShouldBe("WbG NRW (Mock)");
     }
 
+    /// <summary>Konfiguration der Sicherung für Tests: pg_dump/pg_restore im Entwicklungscontainer (deploy/docker-compose.yml).</summary>
+    private static Dictionary<string, string?> Sicherungskonfiguration(int behalten) => new()
+    {
+        ["Sicherung:Behalten"] = behalten.ToString(global::System.Globalization.CultureInfo.InvariantCulture),
+        ["Sicherung:Werkzeug"] = Environment.GetEnvironmentVariable("VIBEVHS_TEST_PGWERKZEUG") ?? "docker",
+        ["Sicherung:Container"] = Environment.GetEnvironmentVariable("VIBEVHS_TEST_PGCONTAINER") ?? "vibevhs-db-1",
+    };
+
     [Fact]
     public async Task Sicherung_nimmt_die_Kommentar_Datenbank_mit_und_raeumt_sie_mit_auf()
     {
@@ -138,44 +145,38 @@ public class BetriebTests
         var ordner = Path.Combine(Path.GetTempPath(), $"vibevhs-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(ordner);
         var uhr = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 11, 15, 1, 30, 0, TimeSpan.FromHours(1)));
+        await using var t = await TestDatenbank.ErzeugenAsync();
+        var kommentarDb = await VibeVHS.Tests.Gemeinsam.Wegwerfdatenbanken.LeerAsync("vibevhs_sk");
         try
         {
-            var cs = new SqliteConnectionStringBuilder { DataSource = Path.Combine(ordner, "vibevhs.db"), Pooling = false }.ToString();
-            await using var db = new VibeVhsDbContext(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite(cs).Konfigurieren(streng: true).Options);
-            await Schema.AnlegenOderPruefenAsync(db, cs, ct);
-            var kommentarDatei = Path.Combine(ordner, "kommentare.db");
+            await using var db = t.NeuerKontext();
             await using (var k = new VibeVHS.Infrastructure.Dokumentation.KommentarDbContext(new DbContextOptionsBuilder<VibeVHS.Infrastructure.Dokumentation.KommentarDbContext>()
-                             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = kommentarDatei, Pooling = false }.ToString()).Options))
+                             .UseNpgsql(kommentarDb).Options))
             {
                 await k.Database.EnsureCreatedAsync(ct);
                 k.Kommentare.Add(new VibeVHS.Domain.Dokumentation.Kommentar("hilfe", "", "", "gesichert?", "x", "X", null, uhr.GetUtcNow()));
                 await k.SaveChangesAsync(ct);
             }
 
-            var konfig = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Sicherung:Behalten"] = "1" }).Build();
+            var konfig = new ConfigurationBuilder().AddInMemoryCollection(Sicherungskonfiguration(1)).Build();
             var b = new TestBenutzer(System);
-            var sicherung = new SqliteSicherung(db, konfig, new AuditProtokoll(db, b, uhr), b, uhr,
-                new VibeVHS.Infrastructure.Dokumentation.KommentarDatenbankOrt($"Data Source={kommentarDatei}"));
+            var sicherung = new PostgresSicherung(db, konfig, new AuditProtokoll(db, b, uhr), b, uhr, new SicherungsOrt(Path.Combine(ordner, "sicherung")),
+                new VibeVHS.Infrastructure.Dokumentation.KommentarDatenbankOrt(kommentarDb));
 
             var erste = await sicherung.SichernAsync(ct);
-            var kopie = Path.Combine(ordner, "sicherung", SqliteSicherung.KommentarDatei(erste.Datei));
+            var kopie = Path.Combine(ordner, "sicherung", PostgresSicherung.KommentarDatei(erste.Datei));
             File.Exists(kopie).ShouldBeTrue();
-            await using (var pruef = new SqliteConnection($"Data Source={kopie};Pooling=False"))
-            {
-                await pruef.OpenAsync(ct);
-                await using var cmd = pruef.CreateCommand();
-                cmd.CommandText = "SELECT Text FROM Kommentare";
-                (await cmd.ExecuteScalarAsync(ct)).ShouldBe("gesichert?");
-            }
+            new FileInfo(kopie).Length.ShouldBeGreaterThan(0);
+            (await File.ReadAllBytesAsync(kopie, ct))[..5].ShouldBe("PGDMP"u8.ToArray()); // Archivformat von pg_dump
 
             uhr.Advance(TimeSpan.FromDays(1));
             var zweite = await sicherung.SichernAsync(ct);
             File.Exists(kopie).ShouldBeFalse(); // mit der alten Hauptsicherung aufgeräumt (Behalten = 1)
-            File.Exists(Path.Combine(ordner, "sicherung", SqliteSicherung.KommentarDatei(zweite.Datei))).ShouldBeTrue();
+            File.Exists(Path.Combine(ordner, "sicherung", PostgresSicherung.KommentarDatei(zweite.Datei))).ShouldBeTrue();
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            await VibeVHS.Tests.Gemeinsam.Wegwerfdatenbanken.LoeschenAsync(kommentarDb);
             try { Directory.Delete(ordner, true); } catch (IOException) { /* Temp räumt auf */ }
         }
     }
@@ -187,23 +188,24 @@ public class BetriebTests
         var ordner = Path.Combine(Path.GetTempPath(), $"vibevhs-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(ordner);
         var uhr = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(new DateTimeOffset(2026, 11, 15, 1, 30, 0, TimeSpan.FromHours(1)));
+        await using var t = await TestDatenbank.ErzeugenAsync();
         try
         {
-            var cs = new SqliteConnectionStringBuilder { DataSource = Path.Combine(ordner, "vibevhs.db"), Pooling = false }.ToString();
-            await using var db = new VibeVhsDbContext(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite(cs).Konfigurieren(streng: true).Options);
-            await Schema.AnlegenOderPruefenAsync(db, cs, ct);
+            await using var db = t.NeuerKontext();
             db.Personen.Add(Person.Anlegen("Anna", "Becker", new DateOnly(2025, 1, 1), uhr.GetLocalNow()));
             await db.SaveChangesAsync(ct);
-            var konfig = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Sicherung:Behalten"] = "2" }).Build();
+            var konfig = new ConfigurationBuilder().AddInMemoryCollection(Sicherungskonfiguration(2)).Build();
             var b = new TestBenutzer(System);
-            var sicherung = new SqliteSicherung(db, konfig, new AuditProtokoll(db, b, uhr), b, uhr);
+            var ort = new SicherungsOrt(Path.Combine(ordner, "sicherung"));
+            var sicherung = new PostgresSicherung(db, konfig, new AuditProtokoll(db, b, uhr), b, uhr, ort);
 
             var e = await sicherung.SichernAsync(ct);
+            e.Pruefergebnis.ShouldStartWith("ok");
             e.Wiederherstellbar.ShouldBe(true);
             e.Pruefergebnis!.ShouldContain("Personen 1");
             e.Migration.ShouldNotBeNull();
             e.Sha256.Length.ShouldBe(64);
-            await Should.ThrowAsync<InvalidOperationException>(() => new SqliteSicherung(db, konfig, new AuditProtokoll(db, new TestBenutzer(Tresen), uhr), new TestBenutzer(Tresen), uhr)
+            await Should.ThrowAsync<InvalidOperationException>(() => new PostgresSicherung(db, konfig, new AuditProtokoll(db, new TestBenutzer(Tresen), uhr), new TestBenutzer(Tresen), uhr, ort)
                 .SichernAsync(ct));
 
             // Manipulierte Sicherung fällt beim Wiederherstellungstest auf.
@@ -224,8 +226,7 @@ public class BetriebTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
-            Directory.Delete(ordner, true);
+            try { Directory.Delete(ordner, true); } catch (IOException) { /* Temp räumt auf */ }
         }
     }
 

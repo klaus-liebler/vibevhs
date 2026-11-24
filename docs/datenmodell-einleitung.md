@@ -55,30 +55,32 @@ Beide Fragen beantwortet dieselbe Abfrage mit zwei Parametern – Stichtag `:tag
 
 ```sql
 SELECT a.*
-FROM PersonAdressen a
-JOIN Aenderungsvorgaenge e ON e.Id = a.ErfasstDurchVorgangId
-LEFT JOIN Aenderungsvorgaenge r ON r.Id = a.ErsetztDurchVorgangId
-WHERE a.PersonId = :person
-  AND a.GueltigVon <= :tag AND (a.GueltigBis IS NULL OR a.GueltigBis > :tag)   -- galt am Stichtag
-  AND e.Am <= :bekannt AND (r.Id IS NULL OR r.Am > :bekannt);                 -- war zu diesem Zeitpunkt bekannt
--- „Wo wohnte sie am 10.07.?“                 :tag = 20260710, :bekannt = jetzt (UTC-Millisekunden)
--- „Wohin hätten wir am 10.07. geschrieben?“  :tag = 20260710, :bekannt = 10.07.2026 24:00 Ortszeit als UTC-Millisekunden
+FROM "PersonAdressen" a
+JOIN "Aenderungsvorgaenge" e ON e."Id" = a."ErfasstDurchVorgangId"
+LEFT JOIN "Aenderungsvorgaenge" r ON r."Id" = a."ErsetztDurchVorgangId"
+WHERE a."PersonId" = :person
+  AND a."GueltigVon" <= :tag AND a."GueltigBis" > :tag                 -- galt am Stichtag (offenes Ende = 9999-12-31)
+  AND e."Am" <= :bekannt AND (r."Id" IS NULL OR r."Am" > :bekannt);    -- war zu diesem Zeitpunkt bekannt
+-- „Wo wohnte sie am 10.07.?“                 :tag = DATE '2026-07-10', :bekannt = now()
+-- „Wohin hätten wir am 10.07. geschrieben?“  :tag = DATE '2026-07-10', :bekannt = TIMESTAMPTZ '2026-07-11 00:00 Europe/Berlin'
 ```
 
 Für den aktuellen Wissensstand genügt `a.ErsetztDurchVorgangId IS NULL`. Im Code übernimmt das `ZeitlicheHistorie.AlsStichtag(gueltigAm,
-bekanntAm)`; `Person.StandAm(tag, bekannt)` liefert den gesamten Stand. Speicherformate: Tage als Ganzzahl JJJJMMTT, Zeitpunkte als
-UTC-Millisekunden seit 1970, Ids als 16 Byte (UUIDv7, Big Endian); zum Lesen von Hand dienen die Sichten `v_…` (z. B. `v_PersonAdressen`).
+bekanntAm)`; `Person.StandAm(tag, bekannt)` liefert den gesamten Stand. Speicherformate: Tage als `date`, Zeitpunkte als
+`timestamptz` (UTC, Millisekunden), Ids als `uuid` (UUIDv7); zum Lesen von Hand dienen die Sichten `v_…` (z. B. `v_PersonAdressen`).
 
 ### Sortierung nach DIN 5007-2 (Collation `DIN5007_2`)
 
 Personen werden nach Nachname, dann Vorname sortiert, wie im Telefonbuch (DIN 5007-2): ä→ae, ö→oe, ü→ue, ß→ss, Akzente ohne Zeichen,
 Groß-/Kleinschreibung egal; der Namensvorsatz („von“) steht in einer eigenen Spalte und zählt für die Sortierung nicht. Dafür tragen die
-Spalten `PersonNamen.Nachname` und `PersonNamen.Vorname` die SQLite-Collation `DIN5007_2`; der Index `IX_PersonNamen_Sortierung`
-(Nachname, Vorname) liegt auf ihr, die Personenliste blättert per Keyset (Nachname, Vorname, Id) über diesen Index (geprüft mit
-`EXPLAIN QUERY PLAN`). Es gibt keine gespeicherte Sortierspalte.
+Spalten `PersonNamen.Nachname` und `PersonNamen.Vorname` die ICU-Collation `DIN5007_2` (`de-DE-u-co-phonebk`), die PostgreSQL selbst
+kennt; der Teilindex `IX_PersonNamen_Sortierung` (Nachname, Vorname, nur gültige Wissensstände) liegt auf ihr, die Personenliste blättert
+per Keyset (Nachname, Vorname, Id) über diesen Index (geprüft mit `EXPLAIN`, siehe `MessungTests`). Es gibt keine gespeicherte Sortierspalte.
+Jedes Werkzeug (psql, DBeaver, pgAdmin) sortiert deshalb gleich wie die Anwendung.
 
-Die Collation registriert die Anwendung bei jeder Verbindung (`SqliteErweiterungen`). **Werkzeuge ohne diese Collation** (z. B. „DB
-Browser for SQLite“, die sqlite3-Kommandozeile) können die Datenbank lesen, aber
-- nicht nach diesen Spalten sortieren oder vergleichen (`ORDER BY Nachname` → Fehler „no such collation sequence: DIN5007_2“),
-- keine Namensversionen schreiben (der Index braucht die Collation) und kein `PRAGMA integrity_check` ausführen.
+### Suche
+
+Gesucht wird direkt in den Versionstabellen über die SQL-Funktionen `suchtext(x)` (gleiche Normalisierung wie `Suchtext.Normalisieren`:
+klein, ä = ae = a, ß = ss, Akzente weg), `suchwoerter(x)` und `namensuchtext(vorname, vorsatz, nachname, zusatz)`. Auf diesen Ausdrücken
+liegen Trigramm-Indizes (`IX_…_Suche`, pg_trgm), sodass „Wortanfang enthält“ (`LIKE '% muell%'`) ohne Suchtabelle schnell bleibt.
 Zum Prüfen deshalb die lesbaren Sichten bzw. die Anwendung verwenden; Änderungen an den Daten nur über die Anwendung.

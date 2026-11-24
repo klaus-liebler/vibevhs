@@ -1,7 +1,7 @@
 # Laufzeitmessungen
 
 Messung mit `MessungTests` (Infrastruktur-Tests, nur auf Anforderung: `VIBEVHS_MESSUNG=3000` bzw. `=30000`). Datenbankdatei wie im
-Betrieb (SQLite, WAL), Massendaten aus `Testdaten.Massendaten`, dazu 500 bzw. 2000 Kurse mit je 10 Terminen und 12 Belegungen,
+Betrieb (bis 23.11.2026 SQLite mit WAL, seit 24.11.2026 PostgreSQL 17 – Werte mit PostgreSQL im Abschnitt „PostgreSQL“), Massendaten aus `Testdaten.Massendaten`, dazu 500 bzw. 2000 Kurse mit je 10 Terminen und 12 Belegungen,
 20 Räume. Je Messpunkt 8 Läufe, der erste zum Aufwärmen; angegeben ist der **Median** der übrigen 7. Entwicklungsrechner (Windows 11).
 
 ## Baseline vor der Normalisierung (16.11.2026, Stand c562cef)

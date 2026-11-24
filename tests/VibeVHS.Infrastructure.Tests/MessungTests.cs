@@ -14,7 +14,7 @@ using VibeVHS.Infrastructure.Programm;
 namespace VibeVHS.Infrastructure.Tests;
 
 /// <summary>
-/// Laufzeitmessungen für docs/messungen.md (Median aus 7 Läufen, Datenbankdatei wie im Betrieb). Nur auf Anforderung:
+/// Laufzeitmessungen für docs/messungen.md (Median aus 7 Läufen, PostgreSQL wie im Betrieb). Nur auf Anforderung:
 /// VIBEVHS_MESSUNG=3000 bzw. =30000 (Anzahl Personen). Ohne Variable ist der Test sofort grün.
 /// </summary>
 public sealed class MessungTests
@@ -33,8 +33,7 @@ public sealed class MessungTests
         }
 
         var ct = TestContext.Current.CancellationToken;
-        var datei = Path.Combine(Path.GetTempPath(), $"vibevhs-messung-{anzahl}-{Guid.NewGuid():N}.db");
-        await using var t = await TestDatenbank.ErzeugenAsync(datei);
+        await using var t = await TestDatenbank.ErzeugenAsync();
         var jetzt = t.Uhr.GetLocalNow();
         var heute = DateOnly.FromDateTime(jetzt.Date);
         var aufbau = Stopwatch.StartNew();
@@ -155,42 +154,48 @@ public sealed class MessungTests
         });
         // Startabgleich: Der Fortschreib-Job der Personen-Kopien entfällt mit der Normalisierung (keine Kopien mehr).
 
-        // Abfrageplan der Personenliste (erste Seite und Folgeseite): nutzt SQLite den Index IX_PersonNamen_Sortierung (Collation DIN5007_2)?
+        // Statistiken aktualisieren, wie es autovacuum im Betrieb nach dem Laden täte.
+        await using (var db = t.NeuerKontext())
+        {
+            await db.Database.ExecuteSqlRawAsync("ANALYZE", ct);
+        }
+
+        // Abfrageplan der Personenliste (erste Seite und Folgeseite) und der Suche: nutzt PostgreSQL den Teilindex IX_PersonNamen_Sortierung
+        // (Collation DIN5007_2) bzw. den Trigramm-Index IX_PersonNamen_Suche?
         var plaene = new List<string>();
         await using (var db = t.NeuerKontext())
         {
             await db.Database.OpenConnectionAsync(ct);
             var basis = db.Personen.Where(p => p.Status != Personenstatus.Zusammengefuehrt);
-            foreach (var (name, q) in new[]
+            foreach (var (name, q) in new (string, IQueryable)[]
                      {
                          ("erste Seite", db.MitSortierschluessel(basis, heute).Sortiert().Take(50)),
                          ("Folgeseite", db.MitSortierschluessel(basis, heute).Nach(weiter!.Nachname, weiter.Vorname, weiter.IdHex).Sortiert().Take(50)),
+                         ("Suche müller", db.Personen.Where(p => db.MitSuchwort("muller").Contains(p.Id)).Select(p => p.Id).Take(50)),
                      })
             {
                 await using var cmd = q.CreateDbCommand();
-                cmd.CommandText = "EXPLAIN QUERY PLAN " + cmd.CommandText;
+                cmd.CommandText = "EXPLAIN (COSTS OFF) " + cmd.CommandText;
                 await using var r = await cmd.ExecuteReaderAsync(ct);
                 var zeilenPlan = new List<string>();
                 while (await r.ReadAsync(ct))
                 {
-                    zeilenPlan.Add(r.GetString(3));
+                    zeilenPlan.Add(r.GetString(0).Trim());
                 }
 
                 plaene.Add($"{name}: {string.Join(" / ", zeilenPlan)}");
             }
         }
 
-        // Dateigröße nach Checkpoint (WAL in die Datei übernommen)
         await using (var db = t.NeuerKontext())
         {
-            await db.Database.ExecuteSqlRawAsync("PRAGMA wal_checkpoint(TRUNCATE)", ct);
+            var bytes = await db.Database.SqlQueryRaw<long>("SELECT pg_database_size(current_database()) AS \"Value\"").SingleAsync(ct);
+            ergebnisse.Add(("Datenbankgröße (MB)", bytes / 1024.0 / 1024.0));
         }
 
-        ergebnisse.Add(($"Dateigröße (MB, nach Checkpoint)", new FileInfo(datei).Length / 1024.0 / 1024.0));
-        var zeilen = string.Join("\n", ergebnisse.Select(e => $"| {e.Name} | {e.Median:0} {(e.Name.StartsWith("Dateigröße", StringComparison.Ordinal) ? "MB" : "ms")} |"));
+        var zeilen = string.Join("\n", ergebnisse.Select(e => $"| {e.Name} | {e.Median:0} {(e.Name.StartsWith("Datenbankgröße", StringComparison.Ordinal) ? "MB" : "ms")} |"));
         var bericht = $"MESSUNG {anzahl} Personen, {kurse} Kurse (Aufbau {aufbau.Elapsed.TotalSeconds:0} s)\n{zeilen}\nPLAN\n{string.Join("\n", plaene)}";
         File.WriteAllText(Path.Combine(Path.GetTempPath(), $"vibevhs-messung-{anzahl}.txt"), bericht);
         TestContext.Current.SendDiagnosticMessage(bericht);
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
     }
 }

@@ -22,7 +22,7 @@
 else
 {
     <section class="vhs-card">
-        <div class="vhs-head"><h2>Sicherungen</h2><span class="vhs-small vhs-muted">täglich 01:30 Uhr (SQLite-Online-Sicherung), die letzten 14 bleiben erhalten</span></div>
+        <div class="vhs-head"><h2>Sicherungen</h2><span class="vhs-small vhs-muted">täglich 01:30 Uhr (pg_dump mit Wiederherstellungstest in eine Wegwerf-Datenbank), die letzten 14 bleiben erhalten</span></div>
         <div class="vhs-tbl">
             <table>
                 <thead><tr><th>Datei</th><th>Zeit</th><th>Größe</th><th>SHA-256</th><th>Wiederherstellungstest</th><th></th></tr></thead>
@@ -41,7 +41,7 @@ else
                 </tbody>
             </table>
         </div>
-        <p class="vhs-small vhs-muted">Wiederherstellung im Notfall: Anwendung beenden, gewünschte Sicherung nach Prüfsummenvergleich als <code>vibevhs.db</code> einsetzen, starten (Anleitung in docs/betrieb.md). Für Linux ist eine Litestream-Konfiguration vorbereitet (<code>deploy/litestream.yml</code>).</p>
+        <p class="vhs-small vhs-muted">Wiederherstellung im Notfall: Anwendung beenden, gewünschte Sicherung nach Prüfsummenvergleich mit <code>pg_restore</code> in eine neue Datenbank zurückspielen, Verbindung umstellen, starten (Anleitung in docs/betrieb.md).</p>
     </section>
 
     <section class="vhs-card">

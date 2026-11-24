@@ -23,6 +23,8 @@ internal static class Demodaten
     {
         await AnlegenAsync(dienste);
         await MassendatenAnlegenAsync(dienste, massendaten);
+        // Nach dem Massenladen Planerstatistik sofort aktualisieren (autovacuum käme erst später): sonst plant PostgreSQL wie für leere Tabellen.
+        await DatenbankInitialisierung.StatistikAktualisierenAsync(dienste);
         await ProgrammDemodaten.AnlegenAsync(dienste);
         foreach (var (name, anlegen) in new (string, Func<IServiceProvider, Task>)[]
                  {

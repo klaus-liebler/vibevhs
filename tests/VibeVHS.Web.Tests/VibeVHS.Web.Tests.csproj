@@ -22,4 +22,8 @@
     <ProjectReference Include="..\..\src\VibeVHS.Web\VibeVHS.Web.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Gemeinsam\Wegwerfdatenbanken.cs" Link="Gemeinsam\Wegwerfdatenbanken.cs" />
+  </ItemGroup>
+
 </Project>

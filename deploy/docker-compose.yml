@@ -1,0 +1,26 @@
+# VibeVHS: PostgreSQL 17 für Entwicklung und Tests (architektur.md „Datenbank“).
+# Starten:  docker compose -f deploy/docker-compose.yml up -d
+# Eigener Port 5441 (SchoolCraft nutzt 5440), damit beide Projekte nebeneinander laufen; nur auf 127.0.0.1 erreichbar.
+# Erweiterungen pg_trgm (unscharfe Suche), unaccent (suchtext) und btree_gist legt die Anwendung beim Anlegen der Datenbank selbst an.
+name: vibevhs
+services:
+  db:
+    image: postgres:17
+    # Tests legen je Testklasse eine Wegwerf-Datenbank aus einer Vorlage an (viele Verbindungen gleichzeitig);
+    # fsync/synchronous_commit aus nur hier in der Entwicklung (schneller), nie auf dem Server.
+    command: ["postgres", "-c", "max_connections=300", "-c", "shared_buffers=256MB", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"]
+    environment:
+      POSTGRES_USER: vibevhs
+      # Nur für die lokale Entwicklung; der Server hat einen eigenen Zufallswert (deploy/server).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-entwicklung}
+      POSTGRES_DB: vibevhs
+    ports:
+      - "127.0.0.1:5441:5432"
+    volumes:
+      - vibevhs-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vibevhs"]
+      interval: 5s
+      retries: 20
+volumes:
+  vibevhs-db:

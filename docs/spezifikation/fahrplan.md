@@ -78,7 +78,7 @@ Jede Iteration endet mit etwas, das die Verwaltung anklicken kann. Die Dauer ist
 | I5 Aufgaben | Aufgabenregeln, Gruppenkörbe, Übernehmen und Zuweisen, Eskalation, Zeitplaner mit Mindestzahl, Erinnerungen und Wartelisten-Nachrücken | Startseite mit Aufgaben je Rolle | FA-07, QA-13, QA-30, QA-32, QA-40 bis QA-48 |
 | I6 Finanzen | Teilnehmerkonto, SEPA pain.008 und pain.001, camt-Einlesen, Mahnwesen mit Freigabe, Honorarabrechnung, Finanzsoftware-Mock, XRechnung, GoBD: festgeschriebene Belege mit Storno statt Änderung, lückenlose Nummernkreise, Hash-Kette im Protokoll, Aufbewahrungsfristen, Prüfer-Rolle mit Export | Mahnlauf und Lastschriftdatei im Postausgang, Rechnung stornieren statt ändern, Prüfer-Export | FA-30 bis FA-36, FA-126 bis FA-133, FA-139 bis FA-144 |
 | I7 Integrationskurse | Module, Berechtigungen, Kostenbefreiung, UE-Anwesenheit, Abrechnung, Fahrtkosten, Prüfungen, BAMF-Mock, Identitätsprüfung (Ausweisprüfung ohne Kopie, Lichtbild für Sichtvergleich beim Check-in, Aufgabe bei Zweifel) | Abrechnung eines Integrationskurses | FA-40 bis FA-44, FA-134 bis FA-137 |
-| I8 Betrieb und Daten | Dashboard, Auswertungen mit Export, Statistik-Mock, Litestream-Sicherung, Last- und Sicherheitstest, Import von Altdaten aus KuferSQL-Exporten | Pilotsystem mit übernommenen Daten | FA-50 bis FA-52, NFA-02 bis NFA-09 |
+| I8 Betrieb und Daten | Dashboard, Auswertungen mit Export, Statistik-Mock, tägliche Sicherung mit Wiederherstellungstest, Last- und Sicherheitstest, Import von Altdaten aus KuferSQL-Exporten | Pilotsystem mit übernommenen Daten | FA-50 bis FA-52, NFA-02 bis NFA-09 |
 | I9 Webshop | Öffentliche Buchungs-API (/api/v1/shop), TYPO3-Extension vibevhs\_shop mit Delta-Abgleich, Web-Komponente \<vhs-kurse>, Gastbuchung und Konto über OIDC; siehe Konzept „Buchungs-Shop-Plugin“ | Kurs auf einer TYPO3-Testseite finden und buchen, Bestätigung im Postausgang | Portal-Anforderungen (Endausbau), Buchungsrechte |
 | I10 Hilfe, Doku, Abnahmemodus | Hilfe zur Bedienung, Impressum (pflegbar), Spezifikation und Doku in der Anwendung mit Kommentaren je Abschnitt (eigene Datei), geführte Touren nach dem Abnahme-Drehbuch mit automatischer Tourprüfung; Ausrollen mit Neuaufbau der Testdatenbank (`deploy.ps1 -DbNeu`) | Abnahme-Aufgabe als Tour durchklicken, Kommentar zur Spezifikation schreiben und exportieren | FA-159, FA-160, QA-56, QA-57, NFA-26, NFA-27 |
 
@@ -92,7 +92,7 @@ c:\repos\vibevhs\
   src\
     VibeVHS.Domain\            Entitäten, Versionen, Regeln (keine Abhängigkeiten)
     VibeVHS.Application\       Use Cases, Buchungsprüfung, Aufgabenregeln, Ports
-    VibeVHS.Infrastructure\    EF Core + SQLite, Outbox, Zeitplaner, PDF, QR
+    VibeVHS.Infrastructure\    EF Core + PostgreSQL (Npgsql), Outbox, Zeitplaner, PDF, QR
     VibeVHS.Adapters.Mocks\    Mocks für alle 24 Schnittstellen
     VibeVHS.Web\               Blazor Server (Verwaltung) + REST-API
   tests\
@@ -132,7 +132,7 @@ Ein Arbeitspaket ist fertig, wenn es die Bedienregeln aus der Anforderungsanalys
 | --- | --- | --- |
 | Format der KuferSQL-Exporte unbekannt | Datenübernahme in I8 verzögert sich | Früh eine anonymisierte Exportprobe besorgen und den Import parallel vorbereiten |
 | BAMF-Webservices: Zugang und Spezifikation | Echte Anbindung nicht planbar | In Stufe 1 nur Mock; Spezifikation früh beim BAMF anfragen |
-| SQLite bei gleichzeitigen Schreibzugriffen | Wartezeiten bei Anmeldestart | WAL-Modus, kurze Transaktionen, Lasttest in I8; Wechsel zu PostgreSQL vorbereitet |
+| SQLite bei gleichzeitigen Schreibzugriffen | Wartezeiten bei Anmeldestart | **erledigt 24.11.2026:** Wechsel zu PostgreSQL 17 (Zeilensperren statt Dateisperre) |
 | Akzeptanz der Verwaltung | System wird nicht genutzt | Abnahme nach jeder Phase, Prototyp als Gesprächsgrundlage, Kolleginnen früh einbinden |
 | .NET 11 ist ein STS-Release (Support bis ca. November 2028) | Pflicht-Upgrade während des Betriebs | Upgrade auf .NET 12 (LTS) nach dessen Erscheinen einplanen |
 | Datenschutz beim Übersetzungsdienst | Einsatz nicht freigegeben | Adapter austauschbar, selbst gehostete Variante (LibreTranslate) als Rückfall |

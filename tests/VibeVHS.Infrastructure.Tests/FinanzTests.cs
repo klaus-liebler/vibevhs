@@ -240,7 +240,7 @@ public class FinanzTests
             (await db.Set<Finanzprotokolleintrag>().AnyAsync(e => e.Nachher!.Contains("Vorname"), ct)).ShouldBeFalse(); // nur Pseudonyme
 
             // Manipulation am Protokoll fällt auf.
-            await db.Database.ExecuteSqlAsync($"UPDATE Finanzprotokoll SET Nachher = 'geändert' WHERE Nr = 2", ct);
+            await db.Database.ExecuteSqlAsync($"UPDATE \"Finanzprotokoll\" SET \"Nachher\" = 'geändert' WHERE \"Nr\" = 2", ct);
             var gebrochen = await Erzeugen(t, db, Pruefer).Gobd.KettePruefenAsync(ct);
             gebrochen.Unversehrt.ShouldBeFalse();
             gebrochen.FehlerNr.ShouldBe(2);

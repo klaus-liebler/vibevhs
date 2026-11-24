@@ -34,8 +34,8 @@ public sealed class ZeitumstellungTests
         }
 
         await using var pruef = t.NeuerKontext();
-        var roh = await pruef.Database.SqlQuery<long>($"SELECT Beginn AS Value FROM Veranstaltungen ORDER BY Beginn").ToListAsync(ct);
-        roh.Select(ms => DateTimeOffset.FromUnixTimeMilliseconds(ms).UtcDateTime.Hour).ShouldBe([17, 16, 16, 17]); // UTC
+        var roh = await pruef.Database.SqlQuery<DateTimeOffset>($"SELECT \"Beginn\" AS \"Value\" FROM \"Veranstaltungen\" ORDER BY \"Beginn\"").ToListAsync(ct);
+        roh.Select(z => z.UtcDateTime.Hour).ShouldBe([17, 16, 16, 17]); // gespeichert als timestamptz in UTC
         var geladen = await pruef.Veranstaltungen.AsNoTracking().OrderBy(v => v.Beginn).ToListAsync(ct);
         geladen.ShouldAllBe(v => v.Beginn.Hour == 18 && v.Beginn.Minute == 0 && v.Ende.Hour == 19);
 

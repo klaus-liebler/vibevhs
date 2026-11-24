@@ -53,7 +53,7 @@ Protokoll enthalten keine Personendaten (Pseudonyme). Zugangsdaten nur als Umgeb
 | S-22 | **DMS / E-Akte** | Archivierung von Verträgen, Bescheinigungen, Briefen | aus | CMIS oder Hersteller-API | **konzeptionell** – internes Dokumentarchiv mit SHA-256 umgesetzt |
 | S-24 | **Gebäudetechnik und Raumanzeige** | Raumanzeige, Schließsystem, Heizung nach Belegung | aus | REST, Webseite | **konzeptionell** |
 | S-26 | **Virenscanner** | Prüfung hochgeladener Dateien (Dozierenden-Unterlagen, Nachweise) | aus | z. B. ClamAV (clamd) der Kommune | **Mock** (`IVirenpruefung`, erkennt EICAR) |
-| S-28 | **Datensicherung extern** | fortlaufende Kopie der Datenbank außerhalb des Servers | aus | Litestream → S3-kompatibler Speicher des Rechenzentrums | **vorbereitet** – Vorlage `deploy/server/litestream`; tägliche lokale Sicherung umgesetzt |
+| S-28 | **Datensicherung extern** | fortlaufende Kopie der Datenbank außerhalb des Servers | aus | WAL-Archivierung von PostgreSQL (z. B. pgBackRest) → S3-kompatibler Speicher des Rechenzentrums | offen; tägliche lokale Sicherung (pg_dump mit Wiederherstellungstest) umgesetzt |
 
 ## 4. Finanzen und Bank
 

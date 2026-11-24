@@ -1,19 +1,20 @@
 # Datenbank – Tabellenstrukturen
 
 Automatisch erzeugt aus dem EF-Modell (`DatenbankDokuTests`, Zwecktexte in `DatenmodellBeschreibung.cs`), nicht von Hand ändern.
-SQLite, angelegt beim ersten Start per `EnsureCreated` aus dem Modell (noch keine Migrationen, siehe docs/betrieb.md); die Schemaversion
-steht in der Tabelle `Schemainfo`. Speicherformate: Ids als 16-Byte-BLOB (UUIDv7, Big Endian), Kalendertage als Ganzzahl JJJJMMTT,
-Zeitpunkte (`DateTimeOffset`) und Termine als UTC-Millisekunden seit 1970, Aufzählungen als Text. Namen sortieren per Collation
-`DIN5007_2`. Keine Kopien: Namen, Anzeigetexte und Stände werden zur Laufzeit aus den Quellen gelesen. Keine JSON-Spalten: Listen
-stehen in eigenen Tabellen (je Eintrag eine Zeile).
+PostgreSQL 17, angelegt beim ersten Start per `EnsureCreated` aus dem Modell (noch keine Migrationen, siehe docs/betrieb.md); die
+Schemaversion steht in der Tabelle `Schemainfo`. Speicherformate: Ids als `uuid` (UUIDv7, zeitlich sortiert), Kalendertage als `date`
+(offenes Ende 9999-12-31), Zeitpunkte (`DateTimeOffset`) und Termine als `timestamptz` in UTC (Millisekunden), Aufzählungen als Text.
+Namen sortieren per ICU-Collation `DIN5007_2` (de-DE, Telefonbuch). Gesucht wird über die SQL-Funktionen `suchtext`, `suchwoerter` und
+`namensuchtext` mit Trigramm-Indizes (pg_trgm). Keine Kopien: Namen, Anzeigetexte und Stände werden zur Laufzeit aus den Quellen
+gelesen. Keine JSON-Spalten: Listen stehen in eigenen Tabellen (je Eintrag eine Zeile).
 
 **Bitemporale Versionstabellen** (Namen, Merkmale, Adressen, …): `GueltigVon`/`GueltigBis` = fachliche Zeit (halboffen);
 Wissenszeit, Person und Grund stehen im Änderungsvorgang (`ErfasstDurchVorgangId`, ersetzt durch `ErsetztDurchVorgangId` → Tabelle
 `Aenderungsvorgaenge`); `Erfassungsart` = Rolle der Zeile im Vorgang. „Einstufung“: F = führend, A = nur nach Anonymisierung
 (siehe `Spalteneinstufung.cs`).
 
-**Lesbare Sichten:** Zu jeder Tabelle gibt es eine Sicht `v_<Tabelle>` (Ids als GUID-Text, Tage als JJJJ-MM-TT, Zeitpunkte als
-UTC-Text; bei Versionstabellen zusätzlich `ErfasstAm`, `ErfasstVon`, `Grund`, `ErsetztAm` aus dem Vorgang) – zum Prüfen im DB-Browser.
+**Lesbare Sichten:** Zu jeder Tabelle gibt es eine Sicht `v_<Tabelle>` (offenes Ende als NULL; bei Versionstabellen zusätzlich
+`ErfasstAm`, `ErfasstVon`, `Grund`, `ErsetztAm` aus dem Vorgang) – zum Prüfen im DB-Werkzeug.
 
 ## Bitemporale Datenhaltung
 
@@ -72,32 +73,34 @@ Beide Fragen beantwortet dieselbe Abfrage mit zwei Parametern – Stichtag `:tag
 
 ```sql
 SELECT a.*
-FROM PersonAdressen a
-JOIN Aenderungsvorgaenge e ON e.Id = a.ErfasstDurchVorgangId
-LEFT JOIN Aenderungsvorgaenge r ON r.Id = a.ErsetztDurchVorgangId
-WHERE a.PersonId = :person
-  AND a.GueltigVon <= :tag AND (a.GueltigBis IS NULL OR a.GueltigBis > :tag)   -- galt am Stichtag
-  AND e.Am <= :bekannt AND (r.Id IS NULL OR r.Am > :bekannt);                 -- war zu diesem Zeitpunkt bekannt
--- „Wo wohnte sie am 10.07.?“                 :tag = 20260710, :bekannt = jetzt (UTC-Millisekunden)
--- „Wohin hätten wir am 10.07. geschrieben?“  :tag = 20260710, :bekannt = 10.07.2026 24:00 Ortszeit als UTC-Millisekunden
+FROM "PersonAdressen" a
+JOIN "Aenderungsvorgaenge" e ON e."Id" = a."ErfasstDurchVorgangId"
+LEFT JOIN "Aenderungsvorgaenge" r ON r."Id" = a."ErsetztDurchVorgangId"
+WHERE a."PersonId" = :person
+  AND a."GueltigVon" <= :tag AND a."GueltigBis" > :tag                 -- galt am Stichtag (offenes Ende = 9999-12-31)
+  AND e."Am" <= :bekannt AND (r."Id" IS NULL OR r."Am" > :bekannt);    -- war zu diesem Zeitpunkt bekannt
+-- „Wo wohnte sie am 10.07.?“                 :tag = DATE '2026-07-10', :bekannt = now()
+-- „Wohin hätten wir am 10.07. geschrieben?“  :tag = DATE '2026-07-10', :bekannt = TIMESTAMPTZ '2026-07-11 00:00 Europe/Berlin'
 ```
 
 Für den aktuellen Wissensstand genügt `a.ErsetztDurchVorgangId IS NULL`. Im Code übernimmt das `ZeitlicheHistorie.AlsStichtag(gueltigAm,
-bekanntAm)`; `Person.StandAm(tag, bekannt)` liefert den gesamten Stand. Speicherformate: Tage als Ganzzahl JJJJMMTT, Zeitpunkte als
-UTC-Millisekunden seit 1970, Ids als 16 Byte (UUIDv7, Big Endian); zum Lesen von Hand dienen die Sichten `v_…` (z. B. `v_PersonAdressen`).
+bekanntAm)`; `Person.StandAm(tag, bekannt)` liefert den gesamten Stand. Speicherformate: Tage als `date`, Zeitpunkte als
+`timestamptz` (UTC, Millisekunden), Ids als `uuid` (UUIDv7); zum Lesen von Hand dienen die Sichten `v_…` (z. B. `v_PersonAdressen`).
 
 ### Sortierung nach DIN 5007-2 (Collation `DIN5007_2`)
 
 Personen werden nach Nachname, dann Vorname sortiert, wie im Telefonbuch (DIN 5007-2): ä→ae, ö→oe, ü→ue, ß→ss, Akzente ohne Zeichen,
 Groß-/Kleinschreibung egal; der Namensvorsatz („von“) steht in einer eigenen Spalte und zählt für die Sortierung nicht. Dafür tragen die
-Spalten `PersonNamen.Nachname` und `PersonNamen.Vorname` die SQLite-Collation `DIN5007_2`; der Index `IX_PersonNamen_Sortierung`
-(Nachname, Vorname) liegt auf ihr, die Personenliste blättert per Keyset (Nachname, Vorname, Id) über diesen Index (geprüft mit
-`EXPLAIN QUERY PLAN`). Es gibt keine gespeicherte Sortierspalte.
+Spalten `PersonNamen.Nachname` und `PersonNamen.Vorname` die ICU-Collation `DIN5007_2` (`de-DE-u-co-phonebk`), die PostgreSQL selbst
+kennt; der Teilindex `IX_PersonNamen_Sortierung` (Nachname, Vorname, nur gültige Wissensstände) liegt auf ihr, die Personenliste blättert
+per Keyset (Nachname, Vorname, Id) über diesen Index (geprüft mit `EXPLAIN`, siehe `MessungTests`). Es gibt keine gespeicherte Sortierspalte.
+Jedes Werkzeug (psql, DBeaver, pgAdmin) sortiert deshalb gleich wie die Anwendung.
 
-Die Collation registriert die Anwendung bei jeder Verbindung (`SqliteErweiterungen`). **Werkzeuge ohne diese Collation** (z. B. „DB
-Browser for SQLite“, die sqlite3-Kommandozeile) können die Datenbank lesen, aber
-- nicht nach diesen Spalten sortieren oder vergleichen (`ORDER BY Nachname` → Fehler „no such collation sequence: DIN5007_2“),
-- keine Namensversionen schreiben (der Index braucht die Collation) und kein `PRAGMA integrity_check` ausführen.
+### Suche
+
+Gesucht wird direkt in den Versionstabellen über die SQL-Funktionen `suchtext(x)` (gleiche Normalisierung wie `Suchtext.Normalisieren`:
+klein, ä = ae = a, ß = ss, Akzente weg), `suchwoerter(x)` und `namensuchtext(vorname, vorsatz, nachname, zusatz)`. Auf diesen Ausdrücken
+liegen Trigramm-Indizes (`IX_…_Suche`, pg_trgm), sodass „Wortanfang enthält“ (`LIKE '% muell%'`) ohne Suchtabelle schnell bleibt.
 Zum Prüfen deshalb die lesbaren Sichten bzw. die Anwendung verwenden; Änderungen an den Daten nur über die Anwendung.
 
 ## Übersicht
@@ -721,10 +724,10 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Aenderungsvorgang`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Am | INTEGER | ja | Index |  |
-| Grund | TEXT(500) | ja |  |  |
-| Von | TEXT(200) | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Am | timestamp with time zone | ja | Index |  |
+| Grund | character varying(500) | ja |  |  |
+| Von | character varying(200) | ja |  |  |
 
 Indizes: `IX_Aenderungsvorgaenge_Am` (Am)
 
@@ -736,10 +739,10 @@ Klasse: `VibeVHS.Application.Personen.DublettenAusschluss`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| PersonA | BLOB | ja | PK |  |
-| PersonB | BLOB | ja | PK |  |
-| Am | INTEGER | ja |  |  |
-| Von | TEXT(200) | ja |  |  |
+| PersonA | uuid | ja | PK |  |
+| PersonB | uuid | ja | PK |  |
+| Am | timestamp with time zone | ja |  |  |
+| Von | character varying(200) | ja |  |  |
 
 ## Identitaetspruefungen
 
@@ -749,13 +752,13 @@ Klasse: `VibeVHS.Domain.Integration.Identitaetspruefung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Bemerkung | TEXT(500) |  |  |  |
-| Dokument | TEXT(40) | ja |  |  |
-| GeprueftAm | INTEGER | ja |  |  |
-| GeprueftVon | TEXT | ja |  |  |
-| PersonId | BLOB | ja | Index |  |
-| StimmtUeberein | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Bemerkung | character varying(500) |  |  |  |
+| Dokument | character varying(40) | ja |  |  |
+| GeprueftAm | timestamp with time zone | ja |  |  |
+| GeprueftVon | text | ja |  |  |
+| PersonId | uuid | ja | Index |  |
+| StimmtUeberein | boolean | ja |  |  |
 
 Indizes: `IX_Identitaetspruefungen_PersonId` (PersonId)
 
@@ -767,10 +770,10 @@ Klasse: `VibeVHS.Domain.Personen.Importzuordnung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Altnummer | TEXT | ja |  |  |
-| ImportlaufId | BLOB | ja | → Importlaeufe, Index |  |
-| PersonId | BLOB | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Altnummer | text | ja |  |  |
+| ImportlaufId | uuid | ja | → Importlaeufe, Index |  |
+| PersonId | uuid | ja |  |  |
 
 Indizes: `IX_ImportZuordnungen_ImportlaufId` (ImportlaufId)
 
@@ -782,16 +785,16 @@ Klasse: `VibeVHS.Domain.Personen.Importlauf`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Am | INTEGER | ja |  |  |
-| Angelegt | INTEGER | ja |  |  |
-| Art | TEXT | ja |  |  |
-| Datei | TEXT | ja |  |  |
-| Dubletten | INTEGER | ja |  |  |
-| Fehler | INTEGER | ja |  |  |
-| Sha256 | TEXT | ja | Index |  |
-| Von | TEXT | ja |  |  |
-| Zeilen | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Am | timestamp with time zone | ja |  |  |
+| Angelegt | integer | ja |  |  |
+| Art | text | ja |  |  |
+| Datei | text | ja |  |  |
+| Dubletten | integer | ja |  |  |
+| Fehler | integer | ja |  |  |
+| Sha256 | text | ja | Index |  |
+| Von | text | ja |  |  |
+| Zeilen | integer | ja |  |  |
 
 Indizes: `IX_Importlaeufe_Sha256` (Sha256)
 
@@ -803,15 +806,15 @@ Klasse: `VibeVHS.Domain.Integration.Lichtbild`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| AufgenommenAm | INTEGER | ja |  |  |
-| AufgenommenVon | TEXT | ja |  |  |
-| GeloeschtAm | INTEGER |  |  |  |
-| Inhalt | BLOB | ja |  |  |
-| KursId | BLOB | ja | Index |  |
-| LoeschenAb | INTEGER | ja |  |  |
-| PersonId | BLOB | ja | Index |  |
-| Typ | TEXT | ja |  |  |
+| Id | uuid | ja | PK |  |
+| AufgenommenAm | timestamp with time zone | ja |  |  |
+| AufgenommenVon | text | ja |  |  |
+| GeloeschtAm | timestamp with time zone |  |  |  |
+| Inhalt | bytea | ja |  |  |
+| KursId | uuid | ja | Index |  |
+| LoeschenAb | date | ja |  |  |
+| PersonId | uuid | ja | Index |  |
+| Typ | text | ja |  |  |
 
 Indizes: `IX_Lichtbilder_PersonId_KursId` (PersonId, KursId)
 
@@ -823,13 +826,13 @@ Klasse: `VibeVHS.Domain.Personen.Organisation`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK | F: Schlüssel |
-| Art | TEXT(40) | ja |  | F: Stammdatum Organisation |
-| LeitwegId | TEXT |  |  | F: XRechnung |
-| Name | TEXT(300) | ja |  | F: Stammdatum Organisation |
-| Ort | TEXT(200) |  |  | F: Stammdatum Organisation |
-| RechnungsEMail | TEXT |  |  | F: Stammdatum Organisation |
-| Rechnungsanschrift | TEXT |  |  | F: Belege frieren ihre Anschrift selbst ein (GoBD) |
+| Id | uuid | ja | PK | F: Schlüssel |
+| Art | character varying(40) | ja |  | F: Stammdatum Organisation |
+| LeitwegId | text |  |  | F: XRechnung |
+| Name | character varying(300) | ja |  | F: Stammdatum Organisation |
+| Ort | character varying(200) |  |  | F: Stammdatum Organisation |
+| RechnungsEMail | text |  |  | F: Stammdatum Organisation |
+| Rechnungsanschrift | text |  |  | F: Belege frieren ihre Anschrift selbst ein (GoBD) |
 
 ## PersonAdressKennzeichen
 
@@ -839,17 +842,17 @@ Klasse: `VibeVHS.Domain.Personen.AdressKennzeichen`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| AdressId | BLOB | ja |  |  |
-| Art | TEXT(40) | ja |  |  |
-| ErfasstDurchVorgangId | BLOB | ja | → Aenderungsvorgaenge, Index |  |
-| Erfassungsart | TEXT(40) | ja |  |  |
-| ErsetztDurchVorgangId | BLOB |  | → Aenderungsvorgaenge, Index |  |
-| GueltigBis | INTEGER |  |  |  |
-| GueltigVon | INTEGER | ja | Index |  |
-| PersonId | BLOB | ja | → Personen, Index |  |
+| Id | uuid | ja | PK |  |
+| AdressId | uuid | ja |  |  |
+| Art | character varying(40) | ja |  |  |
+| ErfasstDurchVorgangId | uuid | ja | → Aenderungsvorgaenge, Index |  |
+| Erfassungsart | character varying(40) | ja |  |  |
+| ErsetztDurchVorgangId | uuid |  | → Aenderungsvorgaenge, Index |  |
+| GueltigBis | date |  |  |  |
+| GueltigVon | date | ja | Index |  |
+| PersonId | uuid | ja | → Personen, Index |  |
 
-Indizes: `IX_PersonAdressKennzeichen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonAdressKennzeichen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonAdressKennzeichen_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
+Indizes: `IX_PersonAdressKennzeichen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonAdressKennzeichen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonAdressKennzeichen_PersonId_Stand` (PersonId, GueltigVon), nur "ErsetztDurchVorgangId" IS NULL
 
 ## PersonAdressen
 
@@ -859,21 +862,21 @@ Klasse: `VibeVHS.Domain.Personen.Postadresse`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| AdressId | BLOB | ja | Index |  |
-| ErfasstDurchVorgangId | BLOB | ja | → Aenderungsvorgaenge, Index |  |
-| Erfassungsart | TEXT(40) | ja |  |  |
-| ErsetztDurchVorgangId | BLOB |  | → Aenderungsvorgaenge, Index |  |
-| GueltigBis | INTEGER |  |  |  |
-| GueltigVon | INTEGER | ja | Index |  |
-| Land | TEXT(2) | ja |  |  |
-| Ort | TEXT(200) | ja |  |  |
-| PersonId | BLOB | ja | → Personen, Index |  |
-| Postleitzahl | TEXT(20) | ja |  |  |
-| Strasse | TEXT(200) | ja |  |  |
-| Zusatz | TEXT(200) |  |  |  |
+| Id | uuid | ja | PK |  |
+| AdressId | uuid | ja | Index |  |
+| ErfasstDurchVorgangId | uuid | ja | → Aenderungsvorgaenge, Index |  |
+| Erfassungsart | character varying(40) | ja |  |  |
+| ErsetztDurchVorgangId | uuid |  | → Aenderungsvorgaenge, Index |  |
+| GueltigBis | date |  |  |  |
+| GueltigVon | date | ja | Index |  |
+| Land | character varying(2) | ja |  |  |
+| Ort | character varying(200) | ja |  |  |
+| PersonId | uuid | ja | → Personen, Index |  |
+| Postleitzahl | character varying(20) | ja |  |  |
+| Strasse | character varying(200) | ja |  |  |
+| Zusatz | character varying(200) |  |  |  |
 
-Indizes: `IX_PersonAdressen_AdressId` (AdressId); `IX_PersonAdressen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonAdressen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonAdressen_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
+Indizes: `IX_PersonAdressen_AdressId` (AdressId); `IX_PersonAdressen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonAdressen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonAdressen_PersonId_Stand` (PersonId, GueltigVon), nur "ErsetztDurchVorgangId" IS NULL
 
 ## PersonEMails
 
@@ -883,19 +886,19 @@ Klasse: `VibeVHS.Domain.Personen.EMailAdresse`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| AdressId | BLOB | ja | Index |  |
-| Adresse | TEXT(320) | ja |  |  |
-| Art | TEXT(40) | ja |  |  |
-| Bevorzugt | INTEGER | ja |  |  |
-| ErfasstDurchVorgangId | BLOB | ja | → Aenderungsvorgaenge, Index |  |
-| Erfassungsart | TEXT(40) | ja |  |  |
-| ErsetztDurchVorgangId | BLOB |  | → Aenderungsvorgaenge, Index |  |
-| GueltigBis | INTEGER |  |  |  |
-| GueltigVon | INTEGER | ja | Index |  |
-| PersonId | BLOB | ja | → Personen, Index |  |
+| Id | uuid | ja | PK |  |
+| AdressId | uuid | ja | Index |  |
+| Adresse | character varying(320) | ja |  |  |
+| Art | character varying(40) | ja |  |  |
+| Bevorzugt | boolean | ja |  |  |
+| ErfasstDurchVorgangId | uuid | ja | → Aenderungsvorgaenge, Index |  |
+| Erfassungsart | character varying(40) | ja |  |  |
+| ErsetztDurchVorgangId | uuid |  | → Aenderungsvorgaenge, Index |  |
+| GueltigBis | date |  |  |  |
+| GueltigVon | date | ja | Index |  |
+| PersonId | uuid | ja | → Personen, Index |  |
 
-Indizes: `IX_PersonEMails_AdressId` (AdressId); `IX_PersonEMails_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonEMails_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonEMails_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
+Indizes: `IX_PersonEMails_AdressId` (AdressId); `IX_PersonEMails_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonEMails_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonEMails_PersonId_Stand` (PersonId, GueltigVon), nur "ErsetztDurchVorgangId" IS NULL
 
 ## PersonEinwilligungen
 
@@ -905,18 +908,18 @@ Klasse: `VibeVHS.Domain.Personen.Einwilligung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| ErfasstDurchVorgangId | BLOB | ja | → Aenderungsvorgaenge, Index |  |
-| Erfassungsart | TEXT(40) | ja |  |  |
-| ErsetztDurchVorgangId | BLOB |  | → Aenderungsvorgaenge, Index |  |
-| Erteilt | INTEGER | ja |  |  |
-| GueltigBis | INTEGER |  |  |  |
-| GueltigVon | INTEGER | ja | Index |  |
-| Kanal | TEXT(40) | ja |  |  |
-| PersonId | BLOB | ja | → Personen, Index |  |
-| Zweck | TEXT(40) | ja |  |  |
+| Id | uuid | ja | PK |  |
+| ErfasstDurchVorgangId | uuid | ja | → Aenderungsvorgaenge, Index |  |
+| Erfassungsart | character varying(40) | ja |  |  |
+| ErsetztDurchVorgangId | uuid |  | → Aenderungsvorgaenge, Index |  |
+| Erteilt | boolean | ja |  |  |
+| GueltigBis | date |  |  |  |
+| GueltigVon | date | ja | Index |  |
+| Kanal | character varying(40) | ja |  |  |
+| PersonId | uuid | ja | → Personen, Index |  |
+| Zweck | character varying(40) | ja |  |  |
 
-Indizes: `IX_PersonEinwilligungen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonEinwilligungen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonEinwilligungen_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
+Indizes: `IX_PersonEinwilligungen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonEinwilligungen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonEinwilligungen_PersonId_Stand` (PersonId, GueltigVon), nur "ErsetztDurchVorgangId" IS NULL
 
 ## PersonFachbereiche
 
@@ -926,9 +929,9 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Listenwert`1[[System.Int32, System.Private.Cor
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| PersonId | BLOB | ja | → Personen, Index |  |
-| Wert | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| PersonId | uuid | ja | → Personen, Index |  |
+| Wert | integer | ja |  |  |
 
 Indizes: `IX_PersonFachbereiche_PersonId` (PersonId)
 
@@ -940,17 +943,17 @@ Klasse: `VibeVHS.Domain.Personen.PersonMerkmal`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Art | TEXT(40) | ja |  |  |
-| ErfasstDurchVorgangId | BLOB | ja | → Aenderungsvorgaenge, Index |  |
-| Erfassungsart | TEXT(40) | ja |  |  |
-| ErsetztDurchVorgangId | BLOB |  | → Aenderungsvorgaenge, Index |  |
-| GueltigBis | INTEGER |  |  |  |
-| GueltigVon | INTEGER | ja | Index |  |
-| Inhalt | TEXT(200) | ja |  |  |
-| PersonId | BLOB | ja | → Personen, Index |  |
+| Id | uuid | ja | PK |  |
+| Art | character varying(40) | ja |  |  |
+| ErfasstDurchVorgangId | uuid | ja | → Aenderungsvorgaenge, Index |  |
+| Erfassungsart | character varying(40) | ja |  |  |
+| ErsetztDurchVorgangId | uuid |  | → Aenderungsvorgaenge, Index |  |
+| GueltigBis | date |  |  |  |
+| GueltigVon | date | ja | Index |  |
+| Inhalt | character varying(200) | ja |  |  |
+| PersonId | uuid | ja | → Personen, Index |  |
 
-Indizes: `IX_PersonMerkmale_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonMerkmale_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonMerkmale_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
+Indizes: `IX_PersonMerkmale_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonMerkmale_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonMerkmale_PersonId_Stand` (PersonId, GueltigVon), nur "ErsetztDurchVorgangId" IS NULL
 
 ## PersonNamen
 
@@ -960,19 +963,19 @@ Klasse: `VibeVHS.Domain.Personen.PersonName`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| ErfasstDurchVorgangId | BLOB | ja | → Aenderungsvorgaenge, Index |  |
-| Erfassungsart | TEXT(40) | ja |  |  |
-| ErsetztDurchVorgangId | BLOB |  | → Aenderungsvorgaenge, Index |  |
-| GueltigBis | INTEGER |  |  |  |
-| GueltigVon | INTEGER | ja | Index |  |
-| Nachname | TEXT(200) | ja | Index |  |
-| PersonId | BLOB | ja | → Personen, Index |  |
-| Vorname | TEXT(200) | ja | Index |  |
-| Vorsatz | TEXT(30) | ja |  |  |
-| Zusatz | TEXT(20) | ja |  |  |
+| Id | uuid | ja | PK |  |
+| ErfasstDurchVorgangId | uuid | ja | → Aenderungsvorgaenge, Index |  |
+| Erfassungsart | character varying(40) | ja |  |  |
+| ErsetztDurchVorgangId | uuid |  | → Aenderungsvorgaenge, Index |  |
+| GueltigBis | date |  |  |  |
+| GueltigVon | date | ja | Index |  |
+| Nachname | character varying(200) | ja | Index |  |
+| PersonId | uuid | ja | → Personen, Index |  |
+| Vorname | character varying(200) | ja | Index |  |
+| Vorsatz | character varying(30) | ja |  |  |
+| Zusatz | character varying(20) | ja |  |  |
 
-Indizes: `IX_PersonNamen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonNamen_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon); `IX_PersonNamen_Sortierung` (ErsetztDurchVorgangId, Nachname COLLATE DIN5007_2, Vorname COLLATE DIN5007_2)
+Indizes: `IX_PersonNamen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonNamen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonNamen_PersonId_Stand` (PersonId, GueltigVon), nur "ErsetztDurchVorgangId" IS NULL; `IX_PersonNamen_Sortierung` (Nachname COLLATE DIN5007_2, Vorname COLLATE DIN5007_2), nur "ErsetztDurchVorgangId" IS NULL
 
 ## PersonOrganisationen
 
@@ -982,17 +985,17 @@ Klasse: `VibeVHS.Domain.Personen.Organisationszugehoerigkeit`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| ErfasstDurchVorgangId | BLOB | ja | → Aenderungsvorgaenge, Index |  |
-| Erfassungsart | TEXT(40) | ja |  |  |
-| ErsetztDurchVorgangId | BLOB |  | → Aenderungsvorgaenge, Index |  |
-| Funktion | TEXT(200) |  |  |  |
-| GueltigBis | INTEGER |  |  |  |
-| GueltigVon | INTEGER | ja | Index |  |
-| OrganisationId | BLOB | ja | → Organisationen, Index |  |
-| PersonId | BLOB | ja | → Personen, Index |  |
+| Id | uuid | ja | PK |  |
+| ErfasstDurchVorgangId | uuid | ja | → Aenderungsvorgaenge, Index |  |
+| Erfassungsart | character varying(40) | ja |  |  |
+| ErsetztDurchVorgangId | uuid |  | → Aenderungsvorgaenge, Index |  |
+| Funktion | character varying(200) |  |  |  |
+| GueltigBis | date |  |  |  |
+| GueltigVon | date | ja | Index |  |
+| OrganisationId | uuid | ja | → Organisationen, Index |  |
+| PersonId | uuid | ja | → Personen, Index |  |
 
-Indizes: `IX_PersonOrganisationen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonOrganisationen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonOrganisationen_OrganisationId` (OrganisationId); `IX_PersonOrganisationen_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
+Indizes: `IX_PersonOrganisationen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonOrganisationen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonOrganisationen_OrganisationId` (OrganisationId); `IX_PersonOrganisationen_PersonId_Stand` (PersonId, GueltigVon), nur "ErsetztDurchVorgangId" IS NULL
 
 ## PersonQualifikationen
 
@@ -1002,20 +1005,20 @@ Klasse: `VibeVHS.Domain.Personen.PersonQualifikation`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| AusstellendeStelle | TEXT(200) |  |  |  |
-| Bezeichnung | TEXT(200) | ja |  |  |
-| ErfasstDurchVorgangId | BLOB | ja | → Aenderungsvorgaenge, Index |  |
-| Erfassungsart | TEXT(40) | ja |  |  |
-| ErsetztDurchVorgangId | BLOB |  | → Aenderungsvorgaenge, Index |  |
-| GueltigBis | INTEGER |  |  |  |
-| GueltigVon | INTEGER | ja | Index |  |
-| Nachweis | TEXT(500) |  |  |  |
-| PersonId | BLOB | ja | → Personen, Index |  |
-| Schluessel | TEXT(40) | ja |  |  |
-| WertText | TEXT(200) |  |  |  |
+| Id | uuid | ja | PK |  |
+| AusstellendeStelle | character varying(200) |  |  |  |
+| Bezeichnung | character varying(200) | ja |  |  |
+| ErfasstDurchVorgangId | uuid | ja | → Aenderungsvorgaenge, Index |  |
+| Erfassungsart | character varying(40) | ja |  |  |
+| ErsetztDurchVorgangId | uuid |  | → Aenderungsvorgaenge, Index |  |
+| GueltigBis | date |  |  |  |
+| GueltigVon | date | ja | Index |  |
+| Nachweis | character varying(500) |  |  |  |
+| PersonId | uuid | ja | → Personen, Index |  |
+| Schluessel | character varying(40) | ja |  |  |
+| WertText | character varying(200) |  |  |  |
 
-Indizes: `IX_PersonQualifikationen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonQualifikationen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonQualifikationen_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
+Indizes: `IX_PersonQualifikationen_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonQualifikationen_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonQualifikationen_PersonId_Stand` (PersonId, GueltigVon), nur "ErsetztDurchVorgangId" IS NULL
 
 ## PersonRufnummern
 
@@ -1025,21 +1028,21 @@ Klasse: `VibeVHS.Domain.Personen.Rufnummer`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Art | TEXT(40) | ja |  |  |
-| Bevorzugt | INTEGER | ja |  |  |
-| Dienste | INTEGER(40) | ja |  |  |
-| Einwilligung | INTEGER | ja |  |  |
-| ErfasstDurchVorgangId | BLOB | ja | → Aenderungsvorgaenge, Index |  |
-| Erfassungsart | TEXT(40) | ja |  |  |
-| ErsetztDurchVorgangId | BLOB |  | → Aenderungsvorgaenge, Index |  |
-| GueltigBis | INTEGER |  |  |  |
-| GueltigVon | INTEGER | ja | Index |  |
-| Nummer | TEXT(50) | ja |  |  |
-| NummerId | BLOB | ja | Index |  |
-| PersonId | BLOB | ja | → Personen, Index |  |
+| Id | uuid | ja | PK |  |
+| Art | character varying(40) | ja |  |  |
+| Bevorzugt | boolean | ja |  |  |
+| Dienste | integer | ja |  |  |
+| Einwilligung | boolean | ja |  |  |
+| ErfasstDurchVorgangId | uuid | ja | → Aenderungsvorgaenge, Index |  |
+| Erfassungsart | character varying(40) | ja |  |  |
+| ErsetztDurchVorgangId | uuid |  | → Aenderungsvorgaenge, Index |  |
+| GueltigBis | date |  |  |  |
+| GueltigVon | date | ja | Index |  |
+| Nummer | character varying(50) | ja |  |  |
+| NummerId | uuid | ja | Index |  |
+| PersonId | uuid | ja | → Personen, Index |  |
 
-Indizes: `IX_PersonRufnummern_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonRufnummern_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonRufnummern_NummerId` (NummerId); `IX_PersonRufnummern_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
+Indizes: `IX_PersonRufnummern_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonRufnummern_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonRufnummern_NummerId` (NummerId); `IX_PersonRufnummern_PersonId_Stand` (PersonId, GueltigVon), nur "ErsetztDurchVorgangId" IS NULL
 
 ## PersonVollmachten
 
@@ -1049,19 +1052,19 @@ Klasse: `VibeVHS.Domain.Personen.Buchungsvollmacht`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Art | TEXT(40) | ja |  |  |
-| BevollmaechtigterId | BLOB | ja | Index |  |
-| ErfasstDurchVorgangId | BLOB | ja | → Aenderungsvorgaenge, Index |  |
-| Erfassungsart | TEXT(40) | ja |  |  |
-| ErsetztDurchVorgangId | BLOB |  | → Aenderungsvorgaenge, Index |  |
-| GueltigBis | INTEGER |  |  |  |
-| GueltigVon | INTEGER | ja | Index |  |
-| Nachweis | TEXT(500) | ja |  |  |
-| PersonId | BLOB | ja | → Personen, Index |  |
-| VollmachtId | BLOB | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Art | character varying(40) | ja |  |  |
+| BevollmaechtigterId | uuid | ja | Index |  |
+| ErfasstDurchVorgangId | uuid | ja | → Aenderungsvorgaenge, Index |  |
+| Erfassungsart | character varying(40) | ja |  |  |
+| ErsetztDurchVorgangId | uuid |  | → Aenderungsvorgaenge, Index |  |
+| GueltigBis | date |  |  |  |
+| GueltigVon | date | ja | Index |  |
+| Nachweis | character varying(500) | ja |  |  |
+| PersonId | uuid | ja | → Personen, Index |  |
+| VollmachtId | uuid | ja |  |  |
 
-Indizes: `IX_PersonVollmachten_BevollmaechtigterId` (BevollmaechtigterId); `IX_PersonVollmachten_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonVollmachten_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonVollmachten_PersonId_Stand` (PersonId, ErsetztDurchVorgangId, GueltigVon)
+Indizes: `IX_PersonVollmachten_BevollmaechtigterId` (BevollmaechtigterId); `IX_PersonVollmachten_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_PersonVollmachten_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_PersonVollmachten_PersonId_Stand` (PersonId, GueltigVon), nur "ErsetztDurchVorgangId" IS NULL
 
 ## Personen
 
@@ -1071,18 +1074,18 @@ Klasse: `VibeVHS.Domain.Personen.Person`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK | F: Schlüssel |
-| AngelegtAm | INTEGER | ja |  | F: Zeitpunkt der Ersterfassung |
-| AnonymisiertAm | INTEGER |  |  | F: Anonymisierung (Prozess) |
-| AnonymisiertGebiet | TEXT(100) |  |  | A: Kreis/PLZ-Gebiet statt Adresse |
-| AnonymisiertGeburtskohorte | TEXT(20) |  |  | A: Geburtsjahr-Kohorte statt Geburtsdatum |
-| ArchiviertAm | INTEGER |  |  | F: Archivierung (Prozess) |
-| Datenschutz | TEXT(20) | ja | Index | F: Datenschutzstatus (aktiv, gesperrt, archiviert, anonymisiert) |
-| GesperrtAm | INTEGER |  |  | F: Sperre (Prozess) |
-| GesperrtBis | INTEGER |  |  | F: Sperre (Prozess) |
-| Sperrgrund | TEXT(2000) |  |  | F: Sperre (Prozess) |
-| Status | TEXT(30) | ja | Index | F: Prozesszustand (aktiv, ruhend, zusammengeführt …), Änderungen im Protokoll |
-| ZusammengefuehrtIn | BLOB |  |  | F: Dublettenzusammenführung (Prozess) |
+| Id | uuid | ja | PK | F: Schlüssel |
+| AngelegtAm | timestamp with time zone | ja |  | F: Zeitpunkt der Ersterfassung |
+| AnonymisiertAm | timestamp with time zone |  |  | F: Anonymisierung (Prozess) |
+| AnonymisiertGebiet | character varying(100) |  |  | A: Kreis/PLZ-Gebiet statt Adresse |
+| AnonymisiertGeburtskohorte | character varying(20) |  |  | A: Geburtsjahr-Kohorte statt Geburtsdatum |
+| ArchiviertAm | timestamp with time zone |  |  | F: Archivierung (Prozess) |
+| Datenschutz | character varying(20) | ja | Index | F: Datenschutzstatus (aktiv, gesperrt, archiviert, anonymisiert) |
+| GesperrtAm | timestamp with time zone |  |  | F: Sperre (Prozess) |
+| GesperrtBis | date |  |  | F: Sperre (Prozess) |
+| Sperrgrund | character varying(2000) |  |  | F: Sperre (Prozess) |
+| Status | character varying(30) | ja | Index | F: Prozesszustand (aktiv, ruhend, zusammengeführt …), Änderungen im Protokoll |
+| ZusammengefuehrtIn | uuid |  |  | F: Dublettenzusammenführung (Prozess) |
 
 Indizes: `IX_Personen_Datenschutz` (Datenschutz); `IX_Personen_Status` (Status)
 
@@ -1094,12 +1097,12 @@ Klasse: `VibeVHS.Domain.Programm.Ferienzeitraum`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Bis | INTEGER | ja |  |  |
-| Bundesland | TEXT(10) | ja |  |  |
-| Name | TEXT(100) | ja |  |  |
-| Quelle | TEXT |  |  |  |
-| Von | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Bis | date | ja |  |  |
+| Bundesland | character varying(10) | ja |  |  |
+| Name | character varying(100) | ja |  |  |
+| Quelle | text |  |  |  |
+| Von | date | ja |  |  |
 
 ## KursBuchungsrechte
 
@@ -1109,11 +1112,11 @@ Klasse: `VibeVHS.Domain.Programm.Buchungsrecht`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| DarfBuchen | INTEGER | ja |  |  |
-| DarfUeberbuchen | INTEGER | ja |  |  |
-| KursId | BLOB | ja | → Kurse, Index |  |
-| Weg | TEXT(40) | ja |  |  |
+| Id | uuid | ja | PK |  |
+| DarfBuchen | boolean | ja |  |  |
+| DarfUeberbuchen | boolean | ja |  |  |
+| KursId | uuid | ja | → Kurse, Index |  |
+| Weg | character varying(40) | ja |  |  |
 
 Indizes: `IX_KursBuchungsrechte_KursId` (KursId)
 
@@ -1125,17 +1128,17 @@ Klasse: `VibeVHS.Domain.Programm.KursEntgelt`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Cent | INTEGER | ja |  |  |
-| ErfasstDurchVorgangId | BLOB | ja | → Aenderungsvorgaenge, Index |  |
-| Erfassungsart | TEXT(40) | ja |  |  |
-| ErmaessigtCent | INTEGER |  |  |  |
-| ErsetztDurchVorgangId | BLOB |  | → Aenderungsvorgaenge, Index |  |
-| GueltigBis | INTEGER |  |  |  |
-| GueltigVon | INTEGER | ja | Index |  |
-| KursId | BLOB | ja | → Kurse, Index |  |
+| Id | uuid | ja | PK |  |
+| Cent | bigint | ja |  |  |
+| ErfasstDurchVorgangId | uuid | ja | → Aenderungsvorgaenge, Index |  |
+| Erfassungsart | character varying(40) | ja |  |  |
+| ErmaessigtCent | bigint |  |  |  |
+| ErsetztDurchVorgangId | uuid |  | → Aenderungsvorgaenge, Index |  |
+| GueltigBis | date |  |  |  |
+| GueltigVon | date | ja | Index |  |
+| KursId | uuid | ja | → Kurse, Index |  |
 
-Indizes: `IX_KursEntgelte_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_KursEntgelte_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_KursEntgelte_KursId_Stand` (KursId, ErsetztDurchVorgangId, GueltigVon)
+Indizes: `IX_KursEntgelte_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_KursEntgelte_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_KursEntgelte_KursId_Stand` (KursId, GueltigVon), nur "ErsetztDurchVorgangId" IS NULL
 
 ## KursLehranforderungen
 
@@ -1145,9 +1148,9 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Listenwert`1[[System.String, System.Private.Co
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| KursId | BLOB | ja | → Kurse, Index |  |
-| Wert | TEXT(100) |  |  |  |
+| Id | uuid | ja | PK |  |
+| KursId | uuid | ja | → Kurse, Index |  |
+| Wert | character varying(100) |  |  |  |
 
 Indizes: `IX_KursLehranforderungen_KursId` (KursId)
 
@@ -1159,9 +1162,9 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Listenwert`1[[System.String, System.Private.Co
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| KursId | BLOB | ja | → Kurse, Index |  |
-| Wert | TEXT(100) |  |  |  |
+| Id | uuid | ja | PK |  |
+| KursId | uuid | ja | → Kurse, Index |  |
+| Wert | character varying(100) |  |  |  |
 
 Indizes: `IX_KursRaumanforderungen_KursId` (KursId)
 
@@ -1173,9 +1176,9 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Listenwert`1[[System.Guid, System.Private.Core
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| KursId | BLOB | ja | → Kurse, Index |  |
-| Wert | BLOB | ja |  |  |
+| Id | uuid | ja | PK |  |
+| KursId | uuid | ja | → Kurse, Index |  |
+| Wert | uuid | ja |  |  |
 
 Indizes: `IX_KursSerieOrte_KursId` (KursId)
 
@@ -1187,9 +1190,9 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Listenwert`1[[System.DayOfWeek, System.Private
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| KursId | BLOB | ja | → Kurse, Index |  |
-| Wert | TEXT(40) | ja |  |  |
+| Id | uuid | ja | PK |  |
+| KursId | uuid | ja | → Kurse, Index |  |
+| Wert | character varying(40) | ja |  |  |
 
 Indizes: `IX_KursSerieWochentage_KursId` (KursId)
 
@@ -1201,10 +1204,10 @@ Klasse: `VibeVHS.Domain.Programm.KursDozent`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| KursId | BLOB | ja | → Kurse, Index |  |
-| Leitung | INTEGER | ja |  |  |
-| PersonId | BLOB | ja | Index |  |
+| Id | uuid | ja | PK |  |
+| KursId | uuid | ja | → Kurse, Index |  |
+| Leitung | boolean | ja |  |  |
+| PersonId | uuid | ja | Index |  |
 
 Indizes: `IX_KursTeam_KursId` (KursId); `IX_KursTeam_PersonId` (PersonId)
 
@@ -1216,11 +1219,11 @@ Klasse: `VibeVHS.Domain.Programm.Buchungsrecht`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| DarfBuchen | INTEGER | ja |  |  |
-| DarfUeberbuchen | INTEGER | ja |  |  |
-| KursartId | BLOB | ja | → Kursarten, Index |  |
-| Weg | TEXT(40) | ja |  |  |
+| Id | uuid | ja | PK |  |
+| DarfBuchen | boolean | ja |  |  |
+| DarfUeberbuchen | boolean | ja |  |  |
+| KursartId | uuid | ja | → Kursarten, Index |  |
+| Weg | character varying(40) | ja |  |  |
 
 Indizes: `IX_KursartBuchungsrechte_KursartId` (KursartId)
 
@@ -1232,9 +1235,9 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Listenwert`1[[System.String, System.Private.Co
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| KursartId | BLOB | ja | → Kursarten, Index |  |
-| Wert | TEXT(100) |  |  |  |
+| Id | uuid | ja | PK |  |
+| KursartId | uuid | ja | → Kursarten, Index |  |
+| Wert | character varying(100) |  |  |  |
 
 Indizes: `IX_KursartLehranforderungen_KursartId` (KursartId)
 
@@ -1246,9 +1249,9 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Listenwert`1[[System.String, System.Private.Co
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| KursartId | BLOB | ja | → Kursarten, Index |  |
-| Wert | TEXT(100) |  |  |  |
+| Id | uuid | ja | PK |  |
+| KursartId | uuid | ja | → Kursarten, Index |  |
+| Wert | character varying(100) |  |  |  |
 
 Indizes: `IX_KursartRaumanforderungen_KursartId` (KursartId)
 
@@ -1260,25 +1263,25 @@ Klasse: `VibeVHS.Domain.Programm.Kursart`, `VibeVHS.Domain.Programm.Buchungsrich
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| KursartId | BLOB | ja | PK, → Kursarten |  |
-| AustragefristStunden | INTEGER | ja |  |  |
-| BearbeitungsgebuehrCent | INTEGER | ja |  |  |
-| Belegung | TEXT(40) | ja |  |  |
-| EinbuchungsfristStunden | INTEGER | ja |  |  |
-| FerienAuslassen | INTEGER | ja |  |  |
-| KontingentAnzahl | INTEGER |  |  |  |
-| KontingentGueltigMonate | INTEGER |  |  |  |
-| NachrueckfristTage | INTEGER | ja |  |  |
-| Name | TEXT(200) | ja |  |  |
-| NichterscheinenZaehlt | INTEGER | ja |  |  |
-| Nutzungsart | TEXT(40) | ja |  |  |
-| SelbstCheckin | TEXT(40) | ja |  |  |
-| Sichtbarkeit | TEXT(40) | ja |  |  |
-| StornofristTage | INTEGER | ja |  |  |
-| UmbuchungsgebuehrCent | INTEGER | ja |  |  |
-| VorabEinbuchung | INTEGER | ja |  |  |
-| Warteliste | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| KursartId | uuid | ja | PK, → Kursarten |  |
+| AustragefristStunden | integer | ja |  |  |
+| BearbeitungsgebuehrCent | bigint | ja |  |  |
+| Belegung | character varying(40) | ja |  |  |
+| EinbuchungsfristStunden | integer | ja |  |  |
+| FerienAuslassen | boolean | ja |  |  |
+| KontingentAnzahl | integer |  |  |  |
+| KontingentGueltigMonate | integer |  |  |  |
+| NachrueckfristTage | integer | ja |  |  |
+| Name | character varying(200) | ja |  |  |
+| NichterscheinenZaehlt | boolean | ja |  |  |
+| Nutzungsart | character varying(40) | ja |  |  |
+| SelbstCheckin | character varying(40) | ja |  |  |
+| Sichtbarkeit | character varying(40) | ja |  |  |
+| StornofristTage | integer | ja |  |  |
+| UmbuchungsgebuehrCent | bigint | ja |  |  |
+| VorabEinbuchung | boolean | ja |  |  |
+| Warteliste | boolean | ja |  |  |
 
 ## Kurse
 
@@ -1288,44 +1291,44 @@ Klasse: `VibeVHS.Domain.Programm.Kurs`, `VibeVHS.Domain.Programm.Buchungsrichtli
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK | F: Schlüssel |
-| KursId | BLOB | ja | PK, → Kurse |  |
-| Anzahl | INTEGER |  |  |  |
-| ArchiviertAm | INTEGER |  |  | F: Archivierung (Prozess) |
-| AuftraggeberId | BLOB |  |  | F: Verweis auf die Organisation |
-| AustragefristStunden | INTEGER | ja |  |  |
-| BearbeitungsgebuehrCent | INTEGER | ja |  |  |
-| Beginn | TEXT | ja |  |  |
-| Belegung | TEXT(40) | ja |  |  |
-| Beschreibung | TEXT |  |  | F: Planungsdatum |
-| Bildungsurlaub | TEXT(100) |  |  | F: Anerkennung |
-| DauerMinuten | INTEGER | ja |  |  |
-| DozentId | BLOB |  |  |  |
-| EinbuchungsfristStunden | INTEGER | ja |  |  |
-| Ende | INTEGER |  |  |  |
-| ErzeugtBis | INTEGER |  |  | F: Prozesszustand: wie weit die Termine einer unbefristeten Serie erzeugt sind |
-| Fachbereich | INTEGER | ja |  | F: Planungsdatum |
-| FerienAuslassen | INTEGER | ja |  |  |
-| IntervallWochen | INTEGER | ja |  |  |
-| KontingentAnzahl | INTEGER |  |  |  |
-| KontingentGueltigMonate | INTEGER |  |  |  |
-| KursartId | BLOB | ja |  | F: Planungsdatum |
-| Kursnummer | TEXT(30) | ja | eindeutig | F: Planungsdatum |
-| MaxTeilnehmende | INTEGER | ja |  | F: Planungsdatum |
-| MinTeilnehmende | INTEGER | ja |  | F: Planungsdatum |
-| NachrueckfristTage | INTEGER | ja |  |  |
-| NichterscheinenZaehlt | INTEGER | ja |  |  |
-| SelbstCheckin | TEXT(40) | ja |  |  |
-| SemesterId | BLOB | ja | Index | F: Planungsdatum |
-| Sichtbarkeit | TEXT(40) | ja |  | F: Planungsdatum |
-| Start | INTEGER | ja |  |  |
-| Status | TEXT(40) | ja |  | F: Prozesszustand |
-| StornofristTage | INTEGER | ja |  |  |
-| Titel | TEXT(300) | ja |  | F: Planungsdatum |
-| UmbuchungsgebuehrCent | INTEGER | ja |  |  |
-| Umfang | TEXT(40) | ja |  | F: Planungsdatum |
-| VorabEinbuchung | INTEGER | ja |  |  |
-| Warteliste | INTEGER | ja |  |  |
+| Id | uuid | ja | PK | F: Schlüssel |
+| KursId | uuid | ja | PK, → Kurse |  |
+| Anzahl | integer |  |  |  |
+| ArchiviertAm | timestamp with time zone |  |  | F: Archivierung (Prozess) |
+| AuftraggeberId | uuid |  |  | F: Verweis auf die Organisation |
+| AustragefristStunden | integer | ja |  |  |
+| BearbeitungsgebuehrCent | bigint | ja |  |  |
+| Beginn | time without time zone | ja |  |  |
+| Belegung | character varying(40) | ja |  |  |
+| Beschreibung | text |  |  | F: Planungsdatum |
+| Bildungsurlaub | character varying(100) |  |  | F: Anerkennung |
+| DauerMinuten | integer | ja |  |  |
+| DozentId | uuid |  |  |  |
+| EinbuchungsfristStunden | integer | ja |  |  |
+| Ende | date |  |  |  |
+| ErzeugtBis | date |  |  | F: Prozesszustand: wie weit die Termine einer unbefristeten Serie erzeugt sind |
+| Fachbereich | integer | ja |  | F: Planungsdatum |
+| FerienAuslassen | boolean | ja |  |  |
+| IntervallWochen | integer | ja |  |  |
+| KontingentAnzahl | integer |  |  |  |
+| KontingentGueltigMonate | integer |  |  |  |
+| KursartId | uuid | ja |  | F: Planungsdatum |
+| Kursnummer | character varying(30) | ja | eindeutig | F: Planungsdatum |
+| MaxTeilnehmende | integer | ja |  | F: Planungsdatum |
+| MinTeilnehmende | integer | ja |  | F: Planungsdatum |
+| NachrueckfristTage | integer | ja |  |  |
+| NichterscheinenZaehlt | boolean | ja |  |  |
+| SelbstCheckin | character varying(40) | ja |  |  |
+| SemesterId | uuid | ja | Index | F: Planungsdatum |
+| Sichtbarkeit | character varying(40) | ja |  | F: Planungsdatum |
+| Start | date | ja |  |  |
+| Status | character varying(40) | ja |  | F: Prozesszustand |
+| StornofristTage | integer | ja |  |  |
+| Titel | character varying(300) | ja |  | F: Planungsdatum |
+| UmbuchungsgebuehrCent | bigint | ja |  |  |
+| Umfang | character varying(40) | ja |  | F: Planungsdatum |
+| VorabEinbuchung | boolean | ja |  |  |
+| Warteliste | boolean | ja |  |  |
 
 Indizes: `IX_Kurse_Kursnummer` (Kursnummer), eindeutig; `IX_Kurse_SemesterId` (SemesterId)
 
@@ -1337,16 +1340,16 @@ Klasse: `VibeVHS.Domain.Portal.Kursunterlage`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Abrufe | INTEGER | ja |  |  |
-| DateiId | BLOB | ja |  |  |
-| GueltigBis | INTEGER | ja |  |  |
-| HochgeladenAm | INTEGER | ja |  |  |
-| HochgeladenVon | BLOB | ja |  |  |
-| KursId | BLOB | ja | Index |  |
-| Titel | TEXT | ja |  |  |
-| TokenHash | TEXT | ja | eindeutig |  |
-| ZurueckgezogenAm | INTEGER |  |  |  |
+| Id | uuid | ja | PK |  |
+| Abrufe | integer | ja |  |  |
+| DateiId | uuid | ja |  |  |
+| GueltigBis | timestamp with time zone | ja |  |  |
+| HochgeladenAm | timestamp with time zone | ja |  |  |
+| HochgeladenVon | uuid | ja |  |  |
+| KursId | uuid | ja | Index |  |
+| Titel | text | ja |  |  |
+| TokenHash | text | ja | eindeutig |  |
+| ZurueckgezogenAm | timestamp with time zone |  |  |  |
 
 Indizes: `IX_Kursunterlagen_KursId` (KursId); `IX_Kursunterlagen_TokenHash` (TokenHash), eindeutig
 
@@ -1358,9 +1361,9 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Listenwert`1[[System.String, System.Private.Co
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| MerkmalSchluessel | TEXT(200) | ja | → Merkmale, Index |  |
-| Wert | TEXT(200) |  |  |  |
+| Id | uuid | ja | PK |  |
+| MerkmalSchluessel | character varying(200) | ja | → Merkmale, Index |  |
+| Wert | character varying(200) |  |  |  |
 
 Indizes: `IX_MerkmalInaktiveWerte_MerkmalSchluessel` (MerkmalSchluessel)
 
@@ -1372,9 +1375,9 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Listenwert`1[[System.String, System.Private.Co
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| MerkmalSchluessel | TEXT(200) | ja | → Merkmale, Index |  |
-| Wert | TEXT(200) |  |  |  |
+| Id | uuid | ja | PK |  |
+| MerkmalSchluessel | character varying(200) | ja | → Merkmale, Index |  |
+| Wert | character varying(200) |  |  |  |
 
 Indizes: `IX_MerkmalWerte_MerkmalSchluessel` (MerkmalSchluessel)
 
@@ -1386,20 +1389,20 @@ Klasse: `VibeVHS.Domain.Programm.Merkmal`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Schluessel | TEXT(40) | ja | PK |  |
-| Ausschlussgruppe | TEXT(60) |  |  |  |
-| Bezug | TEXT(20) | ja |  |  |
-| Einheit | TEXT(30) |  |  |  |
-| Gesetzlich | INTEGER | ja |  |  |
-| Gruppe | TEXT(60) | ja |  |  |
-| Max | INTEGER |  |  |  |
-| Mehrfach | INTEGER | ja |  |  |
-| Min | INTEGER |  |  |  |
-| NachweisPflicht | INTEGER | ja |  |  |
-| Name | TEXT(200) | ja |  |  |
-| Typ | TEXT(20) | ja |  |  |
-| Vererbbar | INTEGER | ja |  |  |
-| VorlaufTage | INTEGER | ja |  |  |
+| Schluessel | character varying(40) | ja | PK |  |
+| Ausschlussgruppe | character varying(60) |  |  |  |
+| Bezug | character varying(20) | ja |  |  |
+| Einheit | character varying(30) |  |  |  |
+| Gesetzlich | boolean | ja |  |  |
+| Gruppe | character varying(60) | ja |  |  |
+| Max | integer |  |  |  |
+| Mehrfach | boolean | ja |  |  |
+| Min | integer |  |  |  |
+| NachweisPflicht | boolean | ja |  |  |
+| Name | character varying(200) | ja |  |  |
+| Typ | character varying(20) | ja |  |  |
+| Vererbbar | boolean | ja |  |  |
+| VorlaufTage | integer | ja |  |  |
 
 ## OrtKapazitaeten
 
@@ -1409,10 +1412,10 @@ Klasse: `VibeVHS.Domain.Programm.OrtKapazitaet`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Nutzungsart | TEXT(40) | ja |  |  |
-| OrtId | BLOB | ja | → Orte, Index |  |
-| Plaetze | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Nutzungsart | character varying(40) | ja |  |  |
+| OrtId | uuid | ja | → Orte, Index |  |
+| Plaetze | integer | ja |  |  |
 
 Indizes: `IX_OrtKapazitaeten_OrtId` (OrtId)
 
@@ -1424,18 +1427,18 @@ Klasse: `VibeVHS.Domain.Programm.OrtMerkmal`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| ErfasstDurchVorgangId | BLOB | ja | → Aenderungsvorgaenge, Index |  |
-| Erfassungsart | TEXT(40) | ja |  |  |
-| ErsetztDurchVorgangId | BLOB |  | → Aenderungsvorgaenge, Index |  |
-| GueltigBis | INTEGER |  |  |  |
-| GueltigVon | INTEGER | ja | Index |  |
-| Nachweis | TEXT |  |  |  |
-| OrtId | BLOB | ja | → Orte, Index |  |
-| Schluessel | TEXT(40) | ja |  |  |
-| WertText | TEXT |  |  |  |
+| Id | uuid | ja | PK |  |
+| ErfasstDurchVorgangId | uuid | ja | → Aenderungsvorgaenge, Index |  |
+| Erfassungsart | character varying(40) | ja |  |  |
+| ErsetztDurchVorgangId | uuid |  | → Aenderungsvorgaenge, Index |  |
+| GueltigBis | date |  |  |  |
+| GueltigVon | date | ja | Index |  |
+| Nachweis | text |  |  |  |
+| OrtId | uuid | ja | → Orte, Index |  |
+| Schluessel | character varying(40) | ja |  |  |
+| WertText | text |  |  |  |
 
-Indizes: `IX_OrtMerkmale_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_OrtMerkmale_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_OrtMerkmale_OrtId_Stand` (OrtId, ErsetztDurchVorgangId, GueltigVon)
+Indizes: `IX_OrtMerkmale_ErfasstDurchVorgangId` (ErfasstDurchVorgangId); `IX_OrtMerkmale_ErsetztDurchVorgangId` (ErsetztDurchVorgangId); `IX_OrtMerkmale_OrtId_Stand` (OrtId, GueltigVon), nur "ErsetztDurchVorgangId" IS NULL
 
 ## Orte
 
@@ -1445,19 +1448,19 @@ Klasse: `VibeVHS.Domain.Programm.Ort`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK | F: Schlüssel |
-| Aktiv | INTEGER | ja |  | F: Prozesszustand |
-| Art | TEXT(40) | ja |  | F: Stammdatum Ort |
-| Breitengrad | REAL |  |  | F: Geo |
-| ElternId | BLOB |  | Index | F: Hierarchie |
-| Kurzname | TEXT(40) |  |  | F: Stammdatum Ort |
-| Laengengrad | REAL |  |  | F: Geo |
-| Lage | TEXT(1000) |  |  | F: Wegbeschreibung |
-| Name | TEXT(200) | ja |  | F: Stammdatum Ort |
-| Postleitzahl | TEXT(10) |  |  | F: Adresse des Orts |
-| Stadt | TEXT(100) |  |  | F: Adresse des Orts |
-| Strasse | TEXT(200) |  |  | F: Adresse des Orts (nicht personenbezogen) |
-| Zugang | TEXT(500) |  |  | F: Zugangshinweis |
+| Id | uuid | ja | PK | F: Schlüssel |
+| Aktiv | boolean | ja |  | F: Prozesszustand |
+| Art | character varying(40) | ja |  | F: Stammdatum Ort |
+| Breitengrad | double precision |  |  | F: Geo |
+| ElternId | uuid |  | Index | F: Hierarchie |
+| Kurzname | character varying(40) |  |  | F: Stammdatum Ort |
+| Laengengrad | double precision |  |  | F: Geo |
+| Lage | character varying(1000) |  |  | F: Wegbeschreibung |
+| Name | character varying(200) | ja |  | F: Stammdatum Ort |
+| Postleitzahl | character varying(10) |  |  | F: Adresse des Orts |
+| Stadt | character varying(100) |  |  | F: Adresse des Orts |
+| Strasse | character varying(200) |  |  | F: Adresse des Orts (nicht personenbezogen) |
+| Zugang | character varying(500) |  |  | F: Zugangshinweis |
 
 Indizes: `IX_Orte_ElternId` (ElternId)
 
@@ -1469,13 +1472,13 @@ Klasse: `VibeVHS.Domain.Programm.Qualifikationsausnahme`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Begruendung | TEXT(1000) | ja |  |  |
-| ErteiltAm | INTEGER | ja |  |  |
-| ErteiltVon | TEXT(200) | ja |  |  |
-| KursId | BLOB | ja | Index |  |
-| PersonId | BLOB | ja |  |  |
-| Schluessel | TEXT(40) | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Begruendung | character varying(1000) | ja |  |  |
+| ErteiltAm | timestamp with time zone | ja |  |  |
+| ErteiltVon | character varying(200) | ja |  |  |
+| KursId | uuid | ja | Index |  |
+| PersonId | uuid | ja |  |  |
+| Schluessel | character varying(40) | ja |  |  |
 
 Indizes: `IX_Qualifikationsausnahmen_KursId` (KursId)
 
@@ -1487,12 +1490,12 @@ Klasse: `VibeVHS.Domain.Programm.Semester`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| ArchiviertAm | INTEGER |  |  |  |
-| Beginn | INTEGER | ja |  |  |
-| Ende | INTEGER | ja |  |  |
-| Kuerzel | TEXT(10) | ja |  |  |
-| Name | TEXT(100) | ja |  |  |
+| Id | uuid | ja | PK |  |
+| ArchiviertAm | timestamp with time zone |  |  |  |
+| Beginn | date | ja |  |  |
+| Ende | date | ja |  |  |
+| Kuerzel | character varying(10) | ja |  |  |
+| Name | character varying(100) | ja |  |  |
 
 ## VeranstaltungOrte
 
@@ -1502,10 +1505,10 @@ Klasse: `VibeVHS.Domain.Programm.VeranstaltungsOrt`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Hoechstzahl | INTEGER |  |  |  |
-| OrtId | BLOB | ja | Index |  |
-| VeranstaltungId | BLOB | ja | → Veranstaltungen, Index |  |
+| Id | uuid | ja | PK |  |
+| Hoechstzahl | integer |  |  |  |
+| OrtId | uuid | ja | Index |  |
+| VeranstaltungId | uuid | ja | → Veranstaltungen, Index |  |
 
 Indizes: `IX_VeranstaltungOrte_OrtId` (OrtId); `IX_VeranstaltungOrte_VeranstaltungId` (VeranstaltungId)
 
@@ -1517,17 +1520,17 @@ Klasse: `VibeVHS.Domain.Programm.Veranstaltung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| AusSerie | INTEGER | ja |  |  |
-| Ausgefallen | INTEGER | ja |  |  |
-| AusgefallenAm | INTEGER |  |  |  |
-| Ausnahme | INTEGER | ja |  |  |
-| Beginn | INTEGER | ja | Index |  |
-| Bemerkung | TEXT(500) |  |  |  |
-| DozentId | BLOB |  | Index |  |
-| Ende | INTEGER | ja |  |  |
-| KursId | BLOB | ja | → Kurse, Index |  |
-| Nummer | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| AusSerie | boolean | ja |  |  |
+| Ausgefallen | boolean | ja |  |  |
+| AusgefallenAm | timestamp with time zone |  |  |  |
+| Ausnahme | boolean | ja |  |  |
+| Beginn | timestamp with time zone | ja | Index |  |
+| Bemerkung | character varying(500) |  |  |  |
+| DozentId | uuid |  | Index |  |
+| Ende | timestamp with time zone | ja |  |  |
+| KursId | uuid | ja | → Kurse, Index |  |
+| Nummer | integer | ja |  |  |
 
 Indizes: `IX_Veranstaltungen_Beginn` (Beginn); `IX_Veranstaltungen_DozentId` (DozentId); `IX_Veranstaltungen_KursId` (KursId)
 
@@ -1539,22 +1542,22 @@ Klasse: `VibeVHS.Domain.Durchfuehrung.Anwesenheit`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| BelegungId | BLOB | ja | eindeutig |  |
-| Bemerkung | TEXT(500) |  |  |  |
-| Datum | INTEGER | ja |  |  |
-| ErfasstAm | INTEGER | ja |  |  |
-| ErfasstVon | TEXT(200) | ja |  |  |
-| ErstErfasstAm | INTEGER | ja |  |  |
-| KursId | BLOB | ja | Index |  |
-| Minuten | INTEGER | ja |  |  |
-| OrtId | BLOB |  |  |  |
-| PersonId | BLOB | ja | Index |  |
-| Status | TEXT(40) | ja |  |  |
-| VeranstaltungId | BLOB | ja | eindeutig |  |
-| Vorlaeufig | INTEGER | ja |  |  |
-| VorlaeufigGrund | TEXT |  |  |  |
-| Weg | TEXT(40) | ja |  |  |
+| Id | uuid | ja | PK |  |
+| BelegungId | uuid | ja | eindeutig |  |
+| Bemerkung | character varying(500) |  |  |  |
+| Datum | date | ja |  |  |
+| ErfasstAm | timestamp with time zone | ja |  |  |
+| ErfasstVon | character varying(200) | ja |  |  |
+| ErstErfasstAm | timestamp with time zone | ja |  |  |
+| KursId | uuid | ja | Index |  |
+| Minuten | integer | ja |  |  |
+| OrtId | uuid |  |  |  |
+| PersonId | uuid | ja | Index |  |
+| Status | character varying(40) | ja |  |  |
+| VeranstaltungId | uuid | ja | eindeutig |  |
+| Vorlaeufig | boolean | ja |  |  |
+| VorlaeufigGrund | text |  |  |  |
+| Weg | character varying(40) | ja |  |  |
 
 Indizes: `IX_Anwesenheiten_KursId` (KursId); `IX_Anwesenheiten_PersonId` (PersonId); `IX_Anwesenheiten_VeranstaltungId_BelegungId` (VeranstaltungId, BelegungId), eindeutig
 
@@ -1566,34 +1569,34 @@ Klasse: `VibeVHS.Domain.Anmeldung.Belegung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| AngebotBis | INTEGER |  | Index |  |
-| Belegungsart | TEXT(40) | ja |  |  |
-| BevollmaechtigterId | BLOB |  | Index |  |
-| EntgeltCent | INTEGER | ja |  |  |
-| ErinnertAm | INTEGER |  |  |  |
-| Ermaessigt | INTEGER | ja |  |  |
-| ErmaessigungNachweis | TEXT(500) |  |  |  |
-| GebuchtAm | INTEGER | ja |  |  |
-| GebuchtInRolle | TEXT(50) |  |  |  |
-| GebuchtVon | TEXT(200) | ja |  |  |
-| GebuchtVonKennung | TEXT(100) |  |  |  |
-| GebuehrCent | INTEGER |  |  |  |
-| KontingentAnzahl | INTEGER |  |  |  |
-| KontingentGueltigBis | INTEGER |  |  |  |
-| KursId | BLOB | ja | Index |  |
-| Kursnummer | TEXT(30) | ja |  |  |
-| PersonId | BLOB | ja | Index |  |
-| Status | TEXT(40) | ja | Index |  |
-| StorniertAm | INTEGER |  |  |  |
-| StorniertVon | TEXT(200) |  |  |  |
-| StornoGrund | TEXT(500) |  |  |  |
-| UmgebuchtNachId | BLOB |  |  |  |
-| UmgebuchtVonId | BLOB |  |  |  |
-| VollmachtId | BLOB |  |  |  |
-| WartelisteSeit | INTEGER |  |  |  |
-| Weg | TEXT(40) | ja |  |  |
-| Zahlart | TEXT(40) | ja |  |  |
+| Id | uuid | ja | PK |  |
+| AngebotBis | timestamp with time zone |  | Index |  |
+| Belegungsart | character varying(40) | ja |  |  |
+| BevollmaechtigterId | uuid |  | Index |  |
+| EntgeltCent | bigint | ja |  |  |
+| ErinnertAm | timestamp with time zone |  |  |  |
+| Ermaessigt | boolean | ja |  |  |
+| ErmaessigungNachweis | character varying(500) |  |  |  |
+| GebuchtAm | timestamp with time zone | ja |  |  |
+| GebuchtInRolle | character varying(50) |  |  |  |
+| GebuchtVon | character varying(200) | ja |  |  |
+| GebuchtVonKennung | character varying(100) |  |  |  |
+| GebuehrCent | bigint |  |  |  |
+| KontingentAnzahl | integer |  |  |  |
+| KontingentGueltigBis | date |  |  |  |
+| KursId | uuid | ja | Index |  |
+| Kursnummer | character varying(30) | ja |  |  |
+| PersonId | uuid | ja | Index |  |
+| Status | character varying(40) | ja | Index |  |
+| StorniertAm | timestamp with time zone |  |  |  |
+| StorniertVon | character varying(200) |  |  |  |
+| StornoGrund | character varying(500) |  |  |  |
+| UmgebuchtNachId | uuid |  |  |  |
+| UmgebuchtVonId | uuid |  |  |  |
+| VollmachtId | uuid |  |  |  |
+| WartelisteSeit | timestamp with time zone |  |  |  |
+| Weg | character varying(40) | ja |  |  |
+| Zahlart | character varying(40) | ja |  |  |
 
 Indizes: `IX_Belegungen_BevollmaechtigterId` (BevollmaechtigterId); `IX_Belegungen_KursId` (KursId); `IX_Belegungen_PersonId` (PersonId); `IX_Belegungen_Status_AngebotBis` (Status, AngebotBis)
 
@@ -1605,24 +1608,24 @@ Klasse: `VibeVHS.Domain.Dokumente.Dokument`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| AnonymisiertAm | INTEGER |  |  |  |
-| Art | TEXT(40) | ja |  |  |
-| BelegungId | BLOB |  | Index |  |
-| DatenJson | TEXT | ja |  |  |
-| ErsetztDurch | BLOB |  |  |  |
-| ErstelltAm | INTEGER | ja |  |  |
-| ErstelltVon | TEXT(200) | ja |  |  |
-| Klartext | TEXT | ja |  |  |
-| KursId | BLOB |  | Index |  |
-| NeuausstellungGrund | TEXT(500) |  |  |  |
-| NeuausstellungVon | BLOB |  |  |  |
-| Pdf | BLOB | ja |  |  |
-| PersonId | BLOB | ja | Index |  |
-| Sha256 | TEXT(64) | ja |  |  |
-| Titel | TEXT(300) | ja |  |  |
-| UebersetzbarBis | INTEGER | ja |  |  |
-| UebersetzungsToken | TEXT(64) | ja | eindeutig |  |
+| Id | uuid | ja | PK |  |
+| AnonymisiertAm | timestamp with time zone |  |  |  |
+| Art | character varying(40) | ja |  |  |
+| BelegungId | uuid |  | Index |  |
+| DatenJson | text | ja |  |  |
+| ErsetztDurch | uuid |  |  |  |
+| ErstelltAm | timestamp with time zone | ja |  |  |
+| ErstelltVon | character varying(200) | ja |  |  |
+| Klartext | text | ja |  |  |
+| KursId | uuid |  | Index |  |
+| NeuausstellungGrund | character varying(500) |  |  |  |
+| NeuausstellungVon | uuid |  |  |  |
+| Pdf | bytea | ja |  |  |
+| PersonId | uuid | ja | Index |  |
+| Sha256 | character varying(64) | ja |  |  |
+| Titel | character varying(300) | ja |  |  |
+| UebersetzbarBis | timestamp with time zone | ja |  |  |
+| UebersetzungsToken | character varying(64) | ja | eindeutig |  |
 
 Indizes: `IX_Dokumente_BelegungId` (BelegungId); `IX_Dokumente_KursId` (KursId); `IX_Dokumente_PersonId` (PersonId); `IX_Dokumente_UebersetzungsToken` (UebersetzungsToken), eindeutig
 
@@ -1634,14 +1637,14 @@ Klasse: `VibeVHS.Domain.Anmeldung.Ermaessigung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Art | TEXT(100) | ja |  |  |
-| ErfasstAm | INTEGER | ja |  |  |
-| ErfasstVon | TEXT(200) | ja |  |  |
-| GueltigBis | INTEGER | ja |  |  |
-| GueltigVon | INTEGER | ja |  |  |
-| Nachweis | TEXT(500) | ja |  |  |
-| PersonId | BLOB | ja | Index |  |
+| Id | uuid | ja | PK |  |
+| Art | character varying(100) | ja |  |  |
+| ErfasstAm | timestamp with time zone | ja |  |  |
+| ErfasstVon | character varying(200) | ja |  |  |
+| GueltigBis | date | ja |  |  |
+| GueltigVon | date | ja |  |  |
+| Nachweis | character varying(500) | ja |  |  |
+| PersonId | uuid | ja | Index |  |
 
 Indizes: `IX_Ermaessigungen_PersonId` (PersonId)
 
@@ -1653,16 +1656,16 @@ Klasse: `VibeVHS.Domain.Anmeldung.KontingentEreignis`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Anzahl | INTEGER | ja |  |  |
-| Art | TEXT(40) | ja |  |  |
-| BelegungId | BLOB | ja | → Belegungen, eindeutig |  |
-| Bemerkung | TEXT(300) |  |  |  |
-| Laufnummer | INTEGER | ja | eindeutig |  |
-| OrtId | BLOB |  |  |  |
-| VeranstaltungId | BLOB |  | Index |  |
-| Von | TEXT(200) | ja |  |  |
-| Zeitpunkt | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Anzahl | integer | ja |  |  |
+| Art | character varying(40) | ja |  |  |
+| BelegungId | uuid | ja | → Belegungen, eindeutig |  |
+| Bemerkung | character varying(300) |  |  |  |
+| Laufnummer | integer | ja | eindeutig |  |
+| OrtId | uuid |  |  |  |
+| VeranstaltungId | uuid |  | Index |  |
+| Von | character varying(200) | ja |  |  |
+| Zeitpunkt | timestamp with time zone | ja |  |  |
 
 Indizes: `IX_KontingentEreignisse_BelegungId_Laufnummer` (BelegungId, Laufnummer), eindeutig; `IX_KontingentEreignisse_VeranstaltungId` (VeranstaltungId)
 
@@ -1674,10 +1677,10 @@ Klasse: `VibeVHS.Domain.Durchfuehrung.Listenabschluss`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| VeranstaltungId | BLOB | ja | PK |  |
-| Am | INTEGER | ja |  |  |
-| KursId | BLOB | ja |  |  |
-| Von | TEXT(200) | ja |  |  |
+| VeranstaltungId | uuid | ja | PK |  |
+| Am | timestamp with time zone | ja |  |  |
+| KursId | uuid | ja |  |  |
+| Von | character varying(200) | ja |  |  |
 
 ## Termincodes
 
@@ -1687,12 +1690,12 @@ Klasse: `VibeVHS.Domain.Durchfuehrung.Termincode`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Code | TEXT(40) | ja | PK |  |
-| ErstelltAm | INTEGER | ja |  |  |
-| GueltigBis | INTEGER | ja |  |  |
-| GueltigVon | INTEGER | ja |  |  |
-| OrtId | BLOB | ja | Index |  |
-| VeranstaltungId | BLOB | ja | Index |  |
+| Code | character varying(40) | ja | PK |  |
+| ErstelltAm | timestamp with time zone | ja |  |  |
+| GueltigBis | timestamp with time zone | ja |  |  |
+| GueltigVon | timestamp with time zone | ja |  |  |
+| OrtId | uuid | ja | Index |  |
+| VeranstaltungId | uuid | ja | Index |  |
 
 Indizes: `IX_Termincodes_VeranstaltungId_OrtId` (VeranstaltungId, OrtId)
 
@@ -1704,10 +1707,10 @@ Klasse: `VibeVHS.Domain.Finanzen.Bankverbindung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| PersonId | BLOB | ja | PK |  |
-| Bic | TEXT(11) |  |  |  |
-| Iban | TEXT(34) | ja |  |  |
-| Kontoinhaber | TEXT(200) | ja |  |  |
+| PersonId | uuid | ja | PK |  |
+| Bic | character varying(11) |  |  |  |
+| Iban | character varying(34) | ja |  |  |
+| Kontoinhaber | character varying(200) | ja |  |  |
 
 ## Belege
 
@@ -1717,31 +1720,31 @@ Klasse: `VibeVHS.Domain.Finanzen.Beleg`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| AnonymisiertAm | INTEGER |  |  |  |
-| Art | TEXT(40) | ja |  |  |
-| Belegdatum | INTEGER | ja |  |  |
-| BetragCent | INTEGER | ja |  |  |
-| BezugBelegId | BLOB |  | Index |  |
-| DokumentId | BLOB |  |  |  |
-| EmpfaengerAnschrift | TEXT(1000) |  |  |  |
-| EmpfaengerName | TEXT(300) | ja |  |  |
-| ErfasstAm | INTEGER | ja |  |  |
-| ErfasstVon | TEXT(200) | ja |  |  |
-| Faellig | INTEGER |  |  |  |
-| FestgeschriebenAm | INTEGER |  |  |  |
-| FestgeschriebenVon | TEXT(200) |  |  |  |
-| Grundlage | TEXT |  |  |  |
-| Jahr | INTEGER |  |  |  |
-| Laufnummer | INTEGER |  |  |  |
-| Nummer | TEXT(30) |  | eindeutig |  |
-| OrganisationId | BLOB |  | Index |  |
-| PersonId | BLOB |  | Index |  |
-| Sha256 | TEXT(64) |  |  |  |
-| StorniertDurchId | BLOB |  |  |  |
-| Text | TEXT(2000) |  |  |  |
-| UebergabeId | BLOB |  |  |  |
-| Xml | TEXT |  |  |  |
+| Id | uuid | ja | PK |  |
+| AnonymisiertAm | timestamp with time zone |  |  |  |
+| Art | character varying(40) | ja |  |  |
+| Belegdatum | date | ja |  |  |
+| BetragCent | bigint | ja |  |  |
+| BezugBelegId | uuid |  | Index |  |
+| DokumentId | uuid |  |  |  |
+| EmpfaengerAnschrift | character varying(1000) |  |  |  |
+| EmpfaengerName | character varying(300) | ja |  |  |
+| ErfasstAm | timestamp with time zone | ja |  |  |
+| ErfasstVon | character varying(200) | ja |  |  |
+| Faellig | date |  |  |  |
+| FestgeschriebenAm | timestamp with time zone |  |  |  |
+| FestgeschriebenVon | character varying(200) |  |  |  |
+| Grundlage | text |  |  |  |
+| Jahr | integer |  |  |  |
+| Laufnummer | integer |  |  |  |
+| Nummer | character varying(30) |  | eindeutig |  |
+| OrganisationId | uuid |  | Index |  |
+| PersonId | uuid |  | Index |  |
+| Sha256 | character varying(64) |  |  |  |
+| StorniertDurchId | uuid |  |  |  |
+| Text | character varying(2000) |  |  |  |
+| UebergabeId | uuid |  |  |  |
+| Xml | text |  |  |  |
 
 Indizes: `IX_Belege_BezugBelegId` (BezugBelegId); `IX_Belege_Nummer` (Nummer), eindeutig; `IX_Belege_OrganisationId` (OrganisationId); `IX_Belege_PersonId` (PersonId)
 
@@ -1753,16 +1756,16 @@ Klasse: `VibeVHS.Domain.Finanzen.Belegposition`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| BelegId | BLOB | ja | PK, → Belege |  |
-| Nr | INTEGER | ja | PK |  |
-| Art | TEXT(40) | ja |  |  |
-| BelegungId | BLOB |  | Index |  |
-| BetragCent | INTEGER | ja |  |  |
-| EinzelCent | INTEGER | ja |  |  |
-| KursId | BLOB |  |  |  |
-| Menge | TEXT | ja |  |  |
-| Text | TEXT(500) | ja |  |  |
-| VeranstaltungId | BLOB |  | Index |  |
+| BelegId | uuid | ja | PK, → Belege |  |
+| Nr | integer | ja | PK |  |
+| Art | character varying(40) | ja |  |  |
+| BelegungId | uuid |  | Index |  |
+| BetragCent | bigint | ja |  |  |
+| EinzelCent | bigint | ja |  |  |
+| KursId | uuid |  |  |  |
+| Menge | numeric | ja |  |  |
+| Text | character varying(500) | ja |  |  |
+| VeranstaltungId | uuid |  | Index |  |
 
 Indizes: `IX_Belegpositionen_BelegungId` (BelegungId); `IX_Belegpositionen_VeranstaltungId` (VeranstaltungId)
 
@@ -1774,18 +1777,18 @@ Klasse: `VibeVHS.Domain.Finanzen.Finanzeinstellungen`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | INTEGER | ja | PK |  |
-| Anschrift | TEXT | ja |  |  |
-| Bic | TEXT |  |  |  |
-| GlaeubigerId | TEXT | ja |  |  |
-| Iban | TEXT | ja |  |  |
-| Kontoinhaber | TEXT | ja |  |  |
-| RuecklastschriftGebuehrCent | INTEGER | ja |  |  |
-| Steuerhinweis | TEXT | ja |  |  |
-| Steuernummer | TEXT |  |  |  |
-| UstId | TEXT |  |  |  |
-| VorabankuendigungTage | INTEGER | ja |  |  |
-| ZahlungszielTage | INTEGER | ja |  |  |
+| Id | integer | ja | PK |  |
+| Anschrift | text | ja |  |  |
+| Bic | text |  |  |  |
+| GlaeubigerId | text | ja |  |  |
+| Iban | text | ja |  |  |
+| Kontoinhaber | text | ja |  |  |
+| RuecklastschriftGebuehrCent | bigint | ja |  |  |
+| Steuerhinweis | text | ja |  |  |
+| Steuernummer | text |  |  |  |
+| UstId | text |  |  |  |
+| VorabankuendigungTage | integer | ja |  |  |
+| ZahlungszielTage | integer | ja |  |  |
 
 ## Finanzprotokoll
 
@@ -1795,16 +1798,16 @@ Klasse: `VibeVHS.Domain.Finanzen.Finanzprotokolleintrag`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Nr | INTEGER | ja | PK |  |
-| Aktion | TEXT(60) | ja |  |  |
-| BenutzerKennung | TEXT(100) | ja |  |  |
-| Hash | TEXT(64) | ja |  |  |
-| Nachher | TEXT |  |  |  |
-| ObjektId | BLOB |  |  |  |
-| ObjektTyp | TEXT(60) | ja |  |  |
-| Vorher | TEXT |  |  |  |
-| VorigerHash | TEXT(64) | ja |  |  |
-| Zeitpunkt | INTEGER | ja |  |  |
+| Nr | bigint | ja | PK |  |
+| Aktion | character varying(60) | ja |  |  |
+| BenutzerKennung | character varying(100) | ja |  |  |
+| Hash | character varying(64) | ja |  |  |
+| Nachher | text |  |  |  |
+| ObjektId | uuid |  |  |  |
+| ObjektTyp | character varying(60) | ja |  |  |
+| Vorher | text |  |  |  |
+| VorigerHash | character varying(64) | ja |  |  |
+| Zeitpunkt | timestamp with time zone | ja |  |  |
 
 ## Honorarvertraege
 
@@ -1814,15 +1817,15 @@ Klasse: `VibeVHS.Domain.Finanzen.Honorarvertrag`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Bezeichnung | TEXT | ja |  |  |
-| ErfasstAm | INTEGER | ja |  |  |
-| ErfasstVon | TEXT |  |  |  |
-| GueltigAb | INTEGER | ja |  |  |
-| GueltigBis | INTEGER |  |  |  |
-| KursId | BLOB |  |  |  |
-| Modell | TEXT(60) | ja |  |  |
-| PersonId | BLOB | ja | Index |  |
+| Id | uuid | ja | PK |  |
+| Bezeichnung | text | ja |  |  |
+| ErfasstAm | timestamp with time zone | ja |  |  |
+| ErfasstVon | text |  |  |  |
+| GueltigAb | date | ja |  |  |
+| GueltigBis | date |  |  |  |
+| KursId | uuid |  |  |  |
+| Modell | character varying(60) | ja |  |  |
+| PersonId | uuid | ja | Index |  |
 
 Indizes: `IX_Honorarvertraege_PersonId` (PersonId)
 
@@ -1834,10 +1837,10 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Eintrag`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| HonorarvertragId | BLOB | ja | → Honorarvertraege, Index |  |
-| Schluessel | TEXT(200) | ja |  |  |
-| Wert | TEXT(200) | ja |  |  |
+| Id | uuid | ja | PK |  |
+| HonorarvertragId | uuid | ja | → Honorarvertraege, Index |  |
+| Schluessel | character varying(200) | ja |  |  |
+| Wert | character varying(200) | ja |  |  |
 
 Indizes: `IX_HonorarvertragParameter_HonorarvertragId` (HonorarvertragId)
 
@@ -1849,16 +1852,16 @@ Klasse: `VibeVHS.Domain.Finanzen.Kontoauszug`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| AuszugId | TEXT | ja | Index |  |
-| Bis | INTEGER |  |  |  |
-| Datei | TEXT | ja |  |  |
-| EingelesenAm | INTEGER | ja |  |  |
-| EingelesenVon | TEXT | ja |  |  |
-| EndsaldoCent | INTEGER |  |  |  |
-| Iban | TEXT |  |  |  |
-| Sha256 | TEXT | ja | eindeutig |  |
-| Von | INTEGER |  |  |  |
+| Id | uuid | ja | PK |  |
+| AuszugId | text | ja | Index |  |
+| Bis | date |  |  |  |
+| Datei | text | ja |  |  |
+| EingelesenAm | timestamp with time zone | ja |  |  |
+| EingelesenVon | text | ja |  |  |
+| EndsaldoCent | bigint |  |  |  |
+| Iban | text |  |  |  |
+| Sha256 | text | ja | eindeutig |  |
+| Von | date |  |  |  |
 
 Indizes: `IX_Kontoauszuege_AuszugId` (AuszugId); `IX_Kontoauszuege_Sha256` (Sha256), eindeutig
 
@@ -1870,12 +1873,12 @@ Klasse: `VibeVHS.Domain.Finanzen.Mahnlauf`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| ErstelltAm | INTEGER | ja |  |  |
-| ErstelltVon | TEXT | ja |  |  |
-| FreigegebenAm | INTEGER |  |  |  |
-| FreigegebenVon | TEXT |  |  |  |
-| Status | TEXT(40) | ja |  |  |
+| Id | uuid | ja | PK |  |
+| ErstelltAm | timestamp with time zone | ja |  |  |
+| ErstelltVon | text | ja |  |  |
+| FreigegebenAm | timestamp with time zone |  |  |  |
+| FreigegebenVon | text |  |  |  |
+| Status | character varying(40) | ja |  |  |
 
 ## Mahnposten
 
@@ -1885,20 +1888,20 @@ Klasse: `VibeVHS.Domain.Finanzen.Mahnposten`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Ausgeschlossen | INTEGER | ja |  |  |
-| Faellig | INTEGER | ja |  |  |
-| GebuehrCent | INTEGER | ja |  |  |
-| MahnlaufId | BLOB | ja | → Mahnlaeufe, Index |  |
-| MahnungId | BLOB |  |  |  |
-| Name | TEXT | ja |  |  |
-| OffenCent | INTEGER | ja |  |  |
-| OrganisationId | BLOB |  |  |  |
-| PersonId | BLOB |  |  |  |
-| RechnungId | BLOB | ja |  |  |
-| RechnungNummer | TEXT | ja |  |  |
-| Stufe | INTEGER | ja |  |  |
-| Stufenname | TEXT | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Ausgeschlossen | boolean | ja |  |  |
+| Faellig | date | ja |  |  |
+| GebuehrCent | bigint | ja |  |  |
+| MahnlaufId | uuid | ja | → Mahnlaeufe, Index |  |
+| MahnungId | uuid |  |  |  |
+| Name | text | ja |  |  |
+| OffenCent | bigint | ja |  |  |
+| OrganisationId | uuid |  |  |  |
+| PersonId | uuid |  |  |  |
+| RechnungId | uuid | ja |  |  |
+| RechnungNummer | text | ja |  |  |
+| Stufe | integer | ja |  |  |
+| Stufenname | text | ja |  |  |
 
 Indizes: `IX_Mahnposten_MahnlaufId` (MahnlaufId)
 
@@ -1910,12 +1913,12 @@ Klasse: `VibeVHS.Domain.Finanzen.Mahnstufe`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Bezeichnung | TEXT | ja |  |  |
-| FinanzeinstellungenId | INTEGER | ja | → Finanzeinstellungen, Index |  |
-| GebuehrCent | INTEGER | ja |  |  |
-| Stufe | INTEGER | ja |  |  |
-| TageNachVorstufe | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Bezeichnung | text | ja |  |  |
+| FinanzeinstellungenId | integer | ja | → Finanzeinstellungen, Index |  |
+| GebuehrCent | bigint | ja |  |  |
+| Stufe | integer | ja |  |  |
+| TageNachVorstufe | integer | ja |  |  |
 
 Indizes: `IX_Mahnstufen_FinanzeinstellungenId` (FinanzeinstellungenId)
 
@@ -1927,10 +1930,10 @@ Klasse: `VibeVHS.Domain.Finanzen.Nummernkreis`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Art | TEXT(40) | ja | PK |  |
-| Jahr | INTEGER | ja | PK |  |
-| Letzte | INTEGER | ja |  |  |
-| Version | BLOB | ja |  |  |
+| Art | character varying(40) | ja | PK |  |
+| Jahr | integer | ja | PK |  |
+| Letzte | integer | ja |  |  |
+| Version | uuid | ja |  |  |
 
 ## SepaMandate
 
@@ -1940,18 +1943,18 @@ Klasse: `VibeVHS.Domain.Finanzen.SepaMandat`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Bic | TEXT(11) |  |  |  |
-| ErfasstAm | INTEGER | ja |  |  |
-| ErsteNutzungAm | INTEGER |  |  |  |
-| Iban | TEXT(34) | ja |  |  |
-| Kontoinhaber | TEXT(200) | ja |  |  |
-| LetzteNutzungAm | INTEGER |  |  |  |
-| PersonId | BLOB | ja | Index |  |
-| Referenz | TEXT(35) | ja | eindeutig |  |
-| Status | TEXT(40) | ja |  |  |
-| UnterschriebenAm | INTEGER | ja |  |  |
-| WiderrufenAm | INTEGER |  |  |  |
+| Id | uuid | ja | PK |  |
+| Bic | character varying(11) |  |  |  |
+| ErfasstAm | timestamp with time zone | ja |  |  |
+| ErsteNutzungAm | date |  |  |  |
+| Iban | character varying(34) | ja |  |  |
+| Kontoinhaber | character varying(200) | ja |  |  |
+| LetzteNutzungAm | date |  |  |  |
+| PersonId | uuid | ja | Index |  |
+| Referenz | character varying(35) | ja | eindeutig |  |
+| Status | character varying(40) | ja |  |  |
+| UnterschriebenAm | date | ja |  |  |
+| WiderrufenAm | date |  |  |  |
 
 Indizes: `IX_SepaMandate_PersonId` (PersonId); `IX_SepaMandate_Referenz` (Referenz), eindeutig
 
@@ -1963,14 +1966,14 @@ Klasse: `VibeVHS.Domain.Finanzen.Uebergabe`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Am | INTEGER | ja |  |  |
-| Anzahl | INTEGER | ja |  |  |
-| Datei | TEXT | ja |  |  |
-| Inhalt | TEXT | ja |  |  |
-| Sha256 | TEXT | ja |  |  |
-| SummeCent | INTEGER | ja |  |  |
-| Von | TEXT | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Am | timestamp with time zone | ja |  |  |
+| Anzahl | integer | ja |  |  |
+| Datei | text | ja |  |  |
+| Inhalt | text | ja |  |  |
+| Sha256 | text | ja |  |  |
+| SummeCent | bigint | ja |  |  |
+| Von | text | ja |  |  |
 
 ## Umsaetze
 
@@ -1980,25 +1983,25 @@ Klasse: `VibeVHS.Domain.Finanzen.Umsatz`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| BetragCent | INTEGER | ja |  |  |
-| Buchungstag | INTEGER | ja |  |  |
-| EndToEndId | TEXT |  | Index |  |
-| ErzeugterBelegId | BLOB |  |  |  |
-| GegenIban | TEXT |  |  |  |
-| GegenName | TEXT |  |  |  |
-| KontoauszugId | BLOB | ja | Index |  |
-| Nr | INTEGER | ja |  |  |
-| Rueckgabegrund | TEXT |  |  |  |
-| Sicherheit | TEXT(40) | ja |  |  |
-| Status | TEXT(40) | ja |  |  |
-| Valuta | INTEGER |  |  |  |
-| Verwendungszweck | TEXT(500) | ja |  |  |
-| VorschlagBelegId | BLOB |  |  |  |
-| VorschlagText | TEXT |  |  |  |
-| ZugeordnetAm | INTEGER |  |  |  |
-| ZugeordnetBelegId | BLOB |  |  |  |
-| ZugeordnetVon | TEXT |  |  |  |
+| Id | uuid | ja | PK |  |
+| BetragCent | bigint | ja |  |  |
+| Buchungstag | date | ja |  |  |
+| EndToEndId | text |  | Index |  |
+| ErzeugterBelegId | uuid |  |  |  |
+| GegenIban | text |  |  |  |
+| GegenName | text |  |  |  |
+| KontoauszugId | uuid | ja | Index |  |
+| Nr | integer | ja |  |  |
+| Rueckgabegrund | text |  |  |  |
+| Sicherheit | character varying(40) | ja |  |  |
+| Status | character varying(40) | ja |  |  |
+| Valuta | date |  |  |  |
+| Verwendungszweck | character varying(500) | ja |  |  |
+| VorschlagBelegId | uuid |  |  |  |
+| VorschlagText | text |  |  |  |
+| ZugeordnetAm | timestamp with time zone |  |  |  |
+| ZugeordnetBelegId | uuid |  |  |  |
+| ZugeordnetVon | text |  |  |  |
 
 Indizes: `IX_Umsaetze_EndToEndId` (EndToEndId); `IX_Umsaetze_KontoauszugId` (KontoauszugId)
 
@@ -2010,17 +2013,17 @@ Klasse: `VibeVHS.Domain.Finanzen.Zahlungslauf`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Art | TEXT(40) | ja |  |  |
-| Ausfuehrung | INTEGER | ja |  |  |
-| ErstelltAm | INTEGER | ja |  |  |
-| ErstelltVon | TEXT | ja |  |  |
-| ExportiertAm | INTEGER |  |  |  |
-| FreigegebenAm | INTEGER |  |  |  |
-| FreigegebenVon | TEXT |  |  |  |
-| NachrichtId | TEXT(35) | ja |  |  |
-| Status | TEXT(40) | ja |  |  |
-| Xml | TEXT |  |  |  |
+| Id | uuid | ja | PK |  |
+| Art | character varying(40) | ja |  |  |
+| Ausfuehrung | date | ja |  |  |
+| ErstelltAm | timestamp with time zone | ja |  |  |
+| ErstelltVon | text | ja |  |  |
+| ExportiertAm | timestamp with time zone |  |  |  |
+| FreigegebenAm | timestamp with time zone |  |  |  |
+| FreigegebenVon | text |  |  |  |
+| NachrichtId | character varying(35) | ja |  |  |
+| Status | character varying(40) | ja |  |  |
+| Xml | text |  |  |  |
 
 ## Zahlungsposten
 
@@ -2030,22 +2033,22 @@ Klasse: `VibeVHS.Domain.Finanzen.Zahlungsposten`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Ausgeschlossen | INTEGER | ja |  |  |
-| BelegId | BLOB | ja |  |  |
-| BelegNummer | TEXT | ja |  |  |
-| BetragCent | INTEGER | ja |  |  |
-| Bic | TEXT |  |  |  |
-| EndToEndId | TEXT | ja |  |  |
-| Iban | TEXT | ja |  |  |
-| MandatDatum | INTEGER |  |  |  |
-| MandatId | BLOB |  |  |  |
-| MandatReferenz | TEXT |  |  |  |
-| Name | TEXT | ja |  |  |
-| PersonId | BLOB | ja |  |  |
-| Sequenz | TEXT |  |  |  |
-| Verwendungszweck | TEXT | ja |  |  |
-| ZahlungslaufId | BLOB | ja | → Zahlungslaeufe, Index |  |
+| Id | uuid | ja | PK |  |
+| Ausgeschlossen | boolean | ja |  |  |
+| BelegId | uuid | ja |  |  |
+| BelegNummer | text | ja |  |  |
+| BetragCent | bigint | ja |  |  |
+| Bic | text |  |  |  |
+| EndToEndId | text | ja |  |  |
+| Iban | text | ja |  |  |
+| MandatDatum | date |  |  |  |
+| MandatId | uuid |  |  |  |
+| MandatReferenz | text |  |  |  |
+| Name | text | ja |  |  |
+| PersonId | uuid | ja |  |  |
+| Sequenz | text |  |  |  |
+| Verwendungszweck | text | ja |  |  |
+| ZahlungslaufId | uuid | ja | → Zahlungslaeufe, Index |  |
 
 Indizes: `IX_Zahlungsposten_ZahlungslaufId` (ZahlungslaufId)
 
@@ -2057,17 +2060,17 @@ Klasse: `VibeVHS.Domain.Integration.IkFahrtkosten`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| BeantragtAm | INTEGER | ja |  |  |
-| Begruendung | TEXT | ja |  |  |
-| BetragCent | INTEGER | ja |  |  |
-| EntfernungKm | TEXT | ja |  |  |
-| GutschriftId | BLOB |  |  |  |
-| Jahr | INTEGER | ja |  |  |
-| KursId | BLOB | ja | Index |  |
-| Monat | INTEGER | ja |  |  |
-| PersonId | BLOB | ja |  |  |
-| Status | TEXT(40) | ja |  |  |
+| Id | uuid | ja | PK |  |
+| BeantragtAm | timestamp with time zone | ja |  |  |
+| Begruendung | text | ja |  |  |
+| BetragCent | bigint | ja |  |  |
+| EntfernungKm | numeric | ja |  |  |
+| GutschriftId | uuid |  |  |  |
+| Jahr | integer | ja |  |  |
+| KursId | uuid | ja | Index |  |
+| Monat | integer | ja |  |  |
+| PersonId | uuid | ja |  |  |
+| Status | character varying(40) | ja |  |  |
 
 Indizes: `IX_IkFahrtkosten_KursId` (KursId)
 
@@ -2079,12 +2082,12 @@ Klasse: `VibeVHS.Domain.Integration.Abschnittsabrechnung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Am | INTEGER | ja |  |  |
-| BelegId | BLOB | ja |  |  |
-| IntegrationskursId | BLOB | ja | → Integrationskurse, Index |  |
-| Nr | INTEGER | ja |  |  |
-| Vorgang | TEXT | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Am | timestamp with time zone | ja |  |  |
+| BelegId | uuid | ja |  |  |
+| IntegrationskursId | uuid | ja | → Integrationskurse, Index |  |
+| Nr | integer | ja |  |  |
+| Vorgang | text | ja |  |  |
 
 Indizes: `IX_IntegrationskursAbrechnungen_IntegrationskursId` (IntegrationskursId)
 
@@ -2096,11 +2099,11 @@ Klasse: `VibeVHS.Domain.Integration.Kursabschnitt`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Bezeichnung | TEXT | ja |  |  |
-| IntegrationskursId | BLOB | ja | → Integrationskurse, Index |  |
-| Nr | INTEGER | ja |  |  |
-| Ue | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Bezeichnung | text | ja |  |  |
+| IntegrationskursId | uuid | ja | → Integrationskurse, Index |  |
+| Nr | integer | ja |  |  |
+| Ue | integer | ja |  |  |
 
 Indizes: `IX_IntegrationskursAbschnitte_IntegrationskursId` (IntegrationskursId)
 
@@ -2112,13 +2115,13 @@ Klasse: `VibeVHS.Domain.Integration.Integrationskursdaten`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| KursId | BLOB | ja | PK |  |
-| Art | TEXT(40) | ja |  |  |
-| BamfKursnummer | TEXT(40) | ja |  |  |
-| KostenbeitragCentJeUe | INTEGER | ja |  |  |
-| KostenerstattungCentJeUe | INTEGER | ja |  |  |
-| KursbeginnGemeldetAm | INTEGER |  |  |  |
-| KursbeginnVorgang | TEXT |  |  |  |
+| KursId | uuid | ja | PK |  |
+| Art | character varying(40) | ja |  |  |
+| BamfKursnummer | character varying(40) | ja |  |  |
+| KostenbeitragCentJeUe | bigint | ja |  |  |
+| KostenerstattungCentJeUe | bigint | ja |  |  |
+| KursbeginnGemeldetAm | timestamp with time zone |  |  |  |
+| KursbeginnVorgang | text |  |  |  |
 
 ## Pruefungsanmeldungen
 
@@ -2128,12 +2131,12 @@ Klasse: `VibeVHS.Domain.Integration.Pruefungsanmeldung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| AngemeldetAm | INTEGER | ja |  |  |
-| Ergebnis | TEXT(40) | ja |  |  |
-| PersonId | BLOB | ja | Index |  |
-| PruefungId | BLOB | ja | Index |  |
-| Punkte | INTEGER |  |  |  |
+| Id | uuid | ja | PK |  |
+| AngemeldetAm | timestamp with time zone | ja |  |  |
+| Ergebnis | character varying(40) | ja |  |  |
+| PersonId | uuid | ja | Index |  |
+| PruefungId | uuid | ja | Index |  |
+| Punkte | integer |  |  |  |
 
 Indizes: `IX_Pruefungsanmeldungen_PersonId` (PersonId); `IX_Pruefungsanmeldungen_PruefungId` (PruefungId)
 
@@ -2145,12 +2148,12 @@ Klasse: `VibeVHS.Domain.Integration.Pruefungstermin`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Art | TEXT(40) | ja |  |  |
-| Beginn | INTEGER | ja |  |  |
-| GemeldetAm | INTEGER |  |  |  |
-| KursId | BLOB |  |  |  |
-| Ort | TEXT | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Art | character varying(40) | ja |  |  |
+| Beginn | timestamp with time zone | ja |  |  |
+| GemeldetAm | timestamp with time zone |  |  |  |
+| KursId | uuid |  |  |  |
+| Ort | text | ja |  |  |
 
 ## Teilnahmeberechtigungen
 
@@ -2160,19 +2163,19 @@ Klasse: `VibeVHS.Domain.Integration.Teilnahmeberechtigung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Aktenzeichen | TEXT(60) | ja |  |  |
-| Art | TEXT(40) | ja |  |  |
-| Ausgestellt | INTEGER | ja |  |  |
-| Befreiungsgrund | TEXT |  |  |  |
-| ErfasstAm | INTEGER | ja |  |  |
-| ErfasstVon | TEXT | ja |  |  |
-| Fahrtkosten | INTEGER | ja |  |  |
-| GueltigBis | INTEGER |  |  |  |
-| Kostenbefreit | INTEGER | ja |  |  |
-| PersonId | BLOB | ja | Index |  |
-| Stelle | TEXT(200) | ja |  |  |
-| UeUmfang | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Aktenzeichen | character varying(60) | ja |  |  |
+| Art | character varying(40) | ja |  |  |
+| Ausgestellt | date | ja |  |  |
+| Befreiungsgrund | text |  |  |  |
+| ErfasstAm | timestamp with time zone | ja |  |  |
+| ErfasstVon | text | ja |  |  |
+| Fahrtkosten | boolean | ja |  |  |
+| GueltigBis | date |  |  |  |
+| Kostenbefreit | boolean | ja |  |  |
+| PersonId | uuid | ja | Index |  |
+| Stelle | character varying(200) | ja |  |  |
+| UeUmfang | integer | ja |  |  |
 
 Indizes: `IX_Teilnahmeberechtigungen_PersonId` (PersonId)
 
@@ -2184,15 +2187,15 @@ Klasse: `VibeVHS.Domain.Aufgaben.Abwesenheit`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| BeendetAm | INTEGER |  |  |  |
-| Bis | INTEGER | ja |  |  |
-| ErfasstAm | INTEGER | ja |  |  |
-| ErfasstVon | TEXT | ja |  |  |
-| Grund | TEXT |  |  |  |
-| Login | TEXT | ja | Index |  |
-| VertretungLogin | TEXT |  |  |  |
-| Von | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| BeendetAm | timestamp with time zone |  |  |  |
+| Bis | date | ja |  |  |
+| ErfasstAm | timestamp with time zone | ja |  |  |
+| ErfasstVon | text | ja |  |  |
+| Grund | text |  |  |  |
+| Login | text | ja | Index |  |
+| VertretungLogin | text |  |  |  |
+| Von | date | ja |  |  |
 
 Indizes: `IX_Abwesenheiten_Login` (Login)
 
@@ -2204,24 +2207,24 @@ Klasse: `VibeVHS.Domain.Aufgaben.Aufgabe`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| AngelegtAm | INTEGER | ja |  |  |
-| BearbeiterKennung | TEXT(100) |  |  |  |
-| Beschreibung | TEXT |  |  |  |
-| Dringlichkeit | TEXT(40) | ja |  |  |
-| ErledigtAm | INTEGER |  |  |  |
-| ErledigtVon | TEXT(200) |  |  |  |
-| EskaliertAm | INTEGER |  |  |  |
-| Fachbereich | INTEGER |  |  |  |
-| Faellig | INTEGER | ja |  |  |
-| Gruppe | TEXT(60) | ja | Index |  |
-| Schluessel | TEXT(200) | ja | eindeutig |  |
-| Status | TEXT(40) | ja | Index |  |
-| Titel | TEXT(300) | ja |  |  |
-| Typ | TEXT(60) | ja |  |  |
-| UebernommenAm | INTEGER |  |  |  |
-| Vermerk | TEXT(1000) |  |  |  |
-| Ziel | TEXT(300) |  |  |  |
+| Id | uuid | ja | PK |  |
+| AngelegtAm | timestamp with time zone | ja |  |  |
+| BearbeiterKennung | character varying(100) |  |  |  |
+| Beschreibung | text |  |  |  |
+| Dringlichkeit | character varying(40) | ja |  |  |
+| ErledigtAm | timestamp with time zone |  |  |  |
+| ErledigtVon | character varying(200) |  |  |  |
+| EskaliertAm | timestamp with time zone |  |  |  |
+| Fachbereich | integer |  |  |  |
+| Faellig | date | ja |  |  |
+| Gruppe | character varying(60) | ja | Index |  |
+| Schluessel | character varying(200) | ja | eindeutig |  |
+| Status | character varying(40) | ja | Index |  |
+| Titel | character varying(300) | ja |  |  |
+| Typ | character varying(60) | ja |  |  |
+| UebernommenAm | timestamp with time zone |  |  |  |
+| Vermerk | character varying(1000) |  |  |  |
+| Ziel | character varying(300) |  |  |  |
 
 Indizes: `IX_Aufgaben_Schluessel` (Schluessel), eindeutig; `IX_Aufgaben_Status_Gruppe` (Status, Gruppe)
 
@@ -2233,15 +2236,15 @@ Klasse: `VibeVHS.Domain.Aufgaben.Aufgabentyp`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Schluessel | TEXT(60) | ja | PK |  |
-| Beschreibung | TEXT |  |  |  |
-| EskalationNachTagen | INTEGER | ja |  |  |
-| FestePerson | TEXT(100) |  |  |  |
-| JeFachbereich | INTEGER | ja |  |  |
-| MenschGibtFrei | INTEGER |  |  |  |
-| Name | TEXT(200) | ja |  |  |
-| Rolle | TEXT(60) | ja |  |  |
-| VorlaufTage | INTEGER |  |  |  |
+| Schluessel | character varying(60) | ja | PK |  |
+| Beschreibung | text |  |  |  |
+| EskalationNachTagen | integer | ja |  |  |
+| FestePerson | character varying(100) |  |  |  |
+| JeFachbereich | boolean | ja |  |  |
+| MenschGibtFrei | boolean |  |  |  |
+| Name | character varying(200) | ja |  |  |
+| Rolle | character varying(60) | ja |  |  |
+| VorlaufTage | integer |  |  |  |
 
 ## Kursstaende
 
@@ -2251,11 +2254,11 @@ Klasse: `VibeVHS.Domain.Shop.Kursstand`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| KursId | BLOB | ja | PK |  |
-| Entfernt | INTEGER | ja |  |  |
-| GeaendertAm | INTEGER | ja |  |  |
-| Hash | TEXT | ja |  |  |
-| Kursnummer | TEXT | ja |  |  |
+| KursId | uuid | ja | PK |  |
+| Entfernt | boolean | ja |  |  |
+| GeaendertAm | timestamp with time zone | ja |  |  |
+| Hash | text | ja |  |  |
+| Kursnummer | text | ja |  |  |
 
 ## Portalanliegen
 
@@ -2265,19 +2268,19 @@ Klasse: `VibeVHS.Domain.Portal.Portalantrag`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Art | TEXT(40) | ja |  |  |
-| BezugId | BLOB |  |  |  |
-| DateiId | BLOB |  |  |  |
-| EingereichtAm | INTEGER | ja |  |  |
-| EntschiedenAm | INTEGER |  |  |  |
-| EntschiedenVon | TEXT |  |  |  |
-| Fachbereich | INTEGER |  |  |  |
-| PersonId | BLOB | ja | Index |  |
-| Status | TEXT(40) | ja | Index |  |
-| Text | TEXT | ja |  |  |
-| Titel | TEXT | ja |  |  |
-| Vermerk | TEXT |  |  |  |
+| Id | uuid | ja | PK |  |
+| Art | character varying(40) | ja |  |  |
+| BezugId | uuid |  |  |  |
+| DateiId | uuid |  |  |  |
+| EingereichtAm | timestamp with time zone | ja |  |  |
+| EntschiedenAm | timestamp with time zone |  |  |  |
+| EntschiedenVon | text |  |  |  |
+| Fachbereich | integer |  |  |  |
+| PersonId | uuid | ja | Index |  |
+| Status | character varying(40) | ja | Index |  |
+| Text | text | ja |  |  |
+| Titel | text | ja |  |  |
+| Vermerk | text |  |  |  |
 
 Indizes: `IX_Portalanliegen_PersonId` (PersonId); `IX_Portalanliegen_Status` (Status)
 
@@ -2289,10 +2292,10 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Eintrag`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| PortalanliegenId | BLOB | ja | → Portalanliegen, Index |  |
-| Schluessel | TEXT(1000) | ja |  |  |
-| Wert | TEXT(1000) | ja |  |  |
+| Id | uuid | ja | PK |  |
+| PortalanliegenId | uuid | ja | → Portalanliegen, Index |  |
+| Schluessel | character varying(1000) | ja |  |  |
+| Wert | character varying(1000) | ja |  |  |
 
 Indizes: `IX_PortalanliegenAngaben_PortalanliegenId` (PortalanliegenId)
 
@@ -2304,12 +2307,12 @@ Klasse: `VibeVHS.Domain.Shop.Einwilligungsnachweis`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Art | TEXT | ja |  |  |
-| Erteilt | INTEGER | ja |  |  |
-| SchnellanmeldungId | BLOB | ja | → Schnellanmeldungen, Index |  |
-| Version | TEXT | ja |  |  |
-| Zeitpunkt | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Art | text | ja |  |  |
+| Erteilt | boolean | ja |  |  |
+| SchnellanmeldungId | uuid | ja | → Schnellanmeldungen, Index |  |
+| Version | text | ja |  |  |
+| Zeitpunkt | timestamp with time zone | ja |  |  |
 
 Indizes: `IX_SchnellanmeldungEinwilligungen_SchnellanmeldungId` (SchnellanmeldungId)
 
@@ -2321,15 +2324,15 @@ Klasse: `VibeVHS.Domain.Shop.Schnellanmeldung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| BelegungId | BLOB | ja |  |  |
-| KostenfreiBis | INTEGER | ja |  |  |
-| Kursnummer | TEXT | ja |  |  |
-| PersonId | BLOB | ja | Index |  |
-| StorniertAm | INTEGER |  |  |  |
-| StornoHash | TEXT | ja | eindeutig |  |
-| Weg | TEXT | ja |  |  |
-| Zeitpunkt | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| BelegungId | uuid | ja |  |  |
+| KostenfreiBis | timestamp with time zone | ja |  |  |
+| Kursnummer | text | ja |  |  |
+| PersonId | uuid | ja | Index |  |
+| StorniertAm | timestamp with time zone |  |  |  |
+| StornoHash | text | ja | eindeutig |  |
+| Weg | text | ja |  |  |
+| Zeitpunkt | timestamp with time zone | ja |  |  |
 
 Indizes: `IX_Schnellanmeldungen_PersonId` (PersonId); `IX_Schnellanmeldungen_StornoHash` (StornoHash), eindeutig
 
@@ -2341,12 +2344,12 @@ Klasse: `VibeVHS.Domain.Shop.Einwilligungsnachweis`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Art | TEXT | ja |  |  |
-| Erteilt | INTEGER | ja |  |  |
-| ShopbuchungId | BLOB | ja | → Shopbuchungen, Index |  |
-| Version | TEXT | ja |  |  |
-| Zeitpunkt | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Art | text | ja |  |  |
+| Erteilt | boolean | ja |  |  |
+| ShopbuchungId | uuid | ja | → Shopbuchungen, Index |  |
+| Version | text | ja |  |  |
+| Zeitpunkt | timestamp with time zone | ja |  |  |
 
 Indizes: `IX_ShopbuchungEinwilligungen_ShopbuchungId` (ShopbuchungId)
 
@@ -2358,12 +2361,12 @@ Klasse: `VibeVHS.Domain.Shop.Buchungsposition`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| BelegungId | BLOB |  |  |  |
-| Hinweis | TEXT |  |  |  |
-| Kursnummer | TEXT | ja |  |  |
-| ShopbuchungId | BLOB | ja | → Shopbuchungen, Index |  |
-| Status | TEXT | ja |  |  |
+| Id | uuid | ja | PK |  |
+| BelegungId | uuid |  |  |  |
+| Hinweis | text |  |  |  |
+| Kursnummer | text | ja |  |  |
+| ShopbuchungId | uuid | ja | → Shopbuchungen, Index |  |
+| Status | text | ja |  |  |
 
 Indizes: `IX_ShopbuchungPositionen_ShopbuchungId` (ShopbuchungId)
 
@@ -2375,15 +2378,15 @@ Klasse: `VibeVHS.Domain.Shop.Shopbuchung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| AnfrageHash | TEXT | ja |  |  |
-| Idempotenzschluessel | TEXT | ja | eindeutig |  |
-| KontoId | BLOB |  |  |  |
-| MandatId | BLOB |  |  |  |
-| PersonId | BLOB | ja |  |  |
-| WarenkorbId | BLOB | ja | Index |  |
-| Zahlart | TEXT | ja |  |  |
-| Zeitpunkt | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| AnfrageHash | text | ja |  |  |
+| Idempotenzschluessel | text | ja | eindeutig |  |
+| KontoId | uuid |  |  |  |
+| MandatId | uuid |  |  |  |
+| PersonId | uuid | ja |  |  |
+| WarenkorbId | uuid | ja | Index |  |
+| Zahlart | text | ja |  |  |
+| Zeitpunkt | timestamp with time zone | ja |  |  |
 
 Indizes: `IX_Shopbuchungen_Idempotenzschluessel` (Idempotenzschluessel), eindeutig; `IX_Shopbuchungen_WarenkorbId` (WarenkorbId)
 
@@ -2395,18 +2398,18 @@ Klasse: `VibeVHS.Domain.Shop.Shopkonto`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| BestaetigtAm | INTEGER |  |  |  |
-| EMail | TEXT | ja | eindeutig |  |
-| ErstelltAm | INTEGER | ja |  |  |
-| Geburtsdatum | INTEGER |  |  |  |
-| Nachname | TEXT | ja |  |  |
-| PersonId | BLOB |  |  |  |
-| Sprache | TEXT | ja |  |  |
-| Status | TEXT(40) | ja |  |  |
-| TokenGueltigBis | INTEGER | ja |  |  |
-| TokenHash | TEXT | ja | Index |  |
-| Vorname | TEXT | ja |  |  |
+| Id | uuid | ja | PK |  |
+| BestaetigtAm | timestamp with time zone |  |  |  |
+| EMail | text | ja | eindeutig |  |
+| ErstelltAm | timestamp with time zone | ja |  |  |
+| Geburtsdatum | date |  |  |  |
+| Nachname | text | ja |  |  |
+| PersonId | uuid |  |  |  |
+| Sprache | text | ja |  |  |
+| Status | character varying(40) | ja |  |  |
+| TokenGueltigBis | timestamp with time zone | ja |  |  |
+| TokenHash | text | ja | Index |  |
+| Vorname | text | ja |  |  |
 
 Indizes: `IX_Shopkonten_EMail` (EMail), eindeutig; `IX_Shopkonten_TokenHash` (TokenHash)
 
@@ -2418,12 +2421,12 @@ Klasse: `VibeVHS.Domain.Shop.Warenkorb`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| AbgeschlossenAm | INTEGER |  |  |  |
-| ErstelltAm | INTEGER | ja |  |  |
-| KontoId | BLOB |  |  |  |
-| ReserviertBis | INTEGER | ja |  |  |
-| Status | TEXT(40) | ja | Index |  |
+| Id | uuid | ja | PK |  |
+| AbgeschlossenAm | timestamp with time zone |  |  |  |
+| ErstelltAm | timestamp with time zone | ja |  |  |
+| KontoId | uuid |  |  |  |
+| ReserviertBis | timestamp with time zone | ja |  |  |
+| Status | character varying(40) | ja | Index |  |
 
 Indizes: `IX_Warenkoerbe_Status` (Status)
 
@@ -2435,11 +2438,11 @@ Klasse: `VibeVHS.Domain.Shop.Warenkorbposition`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| KursId | BLOB | ja |  |  |
-| Kursnummer | TEXT | ja |  |  |
-| WarenkorbId | BLOB | ja | → Warenkoerbe, Index |  |
-| Warteliste | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| KursId | uuid | ja |  |  |
+| Kursnummer | text | ja |  |  |
+| WarenkorbId | uuid | ja | → Warenkoerbe, Index |  |
+| Warteliste | boolean | ja |  |  |
 
 Indizes: `IX_WarenkorbPositionen_WarenkorbId` (WarenkorbId)
 
@@ -2451,15 +2454,15 @@ Klasse: `VibeVHS.Domain.Durchfuehrung.Zugangstoken`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Art | TEXT(40) | ja |  |  |
-| ErstelltAm | INTEGER | ja |  |  |
-| Hash | TEXT(64) | ja | eindeutig |  |
-| PersonId | BLOB | ja | Index |  |
-| Ursprung | BLOB |  |  |  |
-| WiderrufGrund | TEXT(300) |  |  |  |
-| WiderrufenAm | INTEGER |  |  |  |
-| ZuletztGenutzt | INTEGER |  |  |  |
+| Id | uuid | ja | PK |  |
+| Art | character varying(40) | ja |  |  |
+| ErstelltAm | timestamp with time zone | ja |  |  |
+| Hash | character varying(64) | ja | eindeutig |  |
+| PersonId | uuid | ja | Index |  |
+| Ursprung | uuid |  |  |  |
+| WiderrufGrund | character varying(300) |  |  |  |
+| WiderrufenAm | timestamp with time zone |  |  |  |
+| ZuletztGenutzt | timestamp with time zone |  |  |  |
 
 Indizes: `IX_Zugangstokens_Hash` (Hash), eindeutig; `IX_Zugangstokens_PersonId` (PersonId)
 
@@ -2471,12 +2474,12 @@ Klasse: `VibeVHS.Domain.Datenschutz.Aufbewahrungsfrist`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Schluessel | TEXT(40) | ja | PK |  |
-| AbJahresende | INTEGER | ja |  |  |
-| Bezeichnung | TEXT(200) | ja |  |  |
-| Hinweis | TEXT(500) |  |  |  |
-| Jahre | INTEGER | ja |  |  |
-| Rechtsgrundlage | TEXT(300) | ja |  |  |
+| Schluessel | character varying(40) | ja | PK |  |
+| AbJahresende | boolean | ja |  |  |
+| Bezeichnung | character varying(200) | ja |  |  |
+| Hinweis | character varying(500) |  |  |  |
+| Jahre | integer | ja |  |  |
+| Rechtsgrundlage | character varying(300) | ja |  |  |
 
 ## Benutzerkonten
 
@@ -2486,13 +2489,13 @@ Klasse: `VibeVHS.Application.Sicherheit.Benutzerkonto`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK | F: Schlüssel |
-| Aktiv | INTEGER | ja |  | F: Prozesszustand |
-| Funktion | TEXT(300) |  |  | F: Funktionsbezeichnung |
-| Hinweis | TEXT(500) |  |  | F: Notiz |
-| Login | TEXT(100) | ja | eindeutig | F: Anmeldename |
-| Name | TEXT(200) |  |  | F: Name nur bei Funktionskonten ohne Person (sonst leer, der Name kommt aus der Person) |
-| PersonId | BLOB |  |  | F: einzige Verknüpfung Konto ↔ Person |
+| Id | uuid | ja | PK | F: Schlüssel |
+| Aktiv | boolean | ja |  | F: Prozesszustand |
+| Funktion | character varying(300) |  |  | F: Funktionsbezeichnung |
+| Hinweis | character varying(500) |  |  | F: Notiz |
+| Login | character varying(100) | ja | eindeutig | F: Anmeldename |
+| Name | character varying(200) |  |  | F: Name nur bei Funktionskonten ohne Person (sonst leer, der Name kommt aus der Person) |
+| PersonId | uuid |  |  | F: einzige Verknüpfung Konto ↔ Person |
 
 Indizes: `IX_Benutzerkonten_Login` (Login), eindeutig
 
@@ -2504,9 +2507,9 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Listenwert`1[[System.Int32, System.Private.Cor
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| BenutzerkontoId | BLOB | ja | → Benutzerkonten, Index |  |
-| Wert | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| BenutzerkontoId | uuid | ja | → Benutzerkonten, Index |  |
+| Wert | integer | ja |  |  |
 
 Indizes: `IX_BenutzerkontoFachbereiche_BenutzerkontoId` (BenutzerkontoId)
 
@@ -2518,9 +2521,9 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Listenwert`1[[VibeVHS.Application.Sicherheit.R
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| BenutzerkontoId | BLOB | ja | → Benutzerkonten, Index |  |
-| Wert | TEXT(40) | ja |  |  |
+| Id | uuid | ja | PK |  |
+| BenutzerkontoId | uuid | ja | → Benutzerkonten, Index |  |
+| Wert | character varying(40) | ja |  |  |
 
 Indizes: `IX_BenutzerkontoRollen_BenutzerkontoId` (BenutzerkontoId)
 
@@ -2532,13 +2535,13 @@ Klasse: `VibeVHS.Domain.Portal.Datei`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| ErstelltAm | INTEGER | ja |  |  |
-| Groesse | INTEGER | ja |  |  |
-| Inhalt | BLOB | ja |  |  |
-| Name | TEXT | ja |  |  |
-| Sha256 | TEXT | ja |  |  |
-| Typ | TEXT | ja |  |  |
+| Id | uuid | ja | PK |  |
+| ErstelltAm | timestamp with time zone | ja |  |  |
+| Groesse | bigint | ja |  |  |
+| Inhalt | bytea | ja |  |  |
+| Name | text | ja |  |  |
+| Sha256 | text | ja |  |  |
+| Typ | text | ja |  |  |
 
 ## Einrichtung
 
@@ -2548,13 +2551,13 @@ Klasse: `VibeVHS.Domain.Stammdaten.Einrichtung`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | INTEGER | ja | PK |  |
-| Bundesland | TEXT(50) | ja |  |  |
-| Impressum | TEXT(8000) |  |  |  |
-| Kurzname | TEXT(50) | ja |  |  |
-| Logo | BLOB |  |  |  |
-| Name | TEXT(200) | ja |  |  |
-| Website | TEXT(200) |  |  |  |
+| Id | integer | ja | PK |  |
+| Bundesland | character varying(50) | ja |  |  |
+| Impressum | character varying(8000) |  |  |  |
+| Kurzname | character varying(50) | ja |  |  |
+| Logo | bytea |  |  |  |
+| Name | character varying(200) | ja |  |  |
+| Website | character varying(200) |  |  |  |
 
 ## EinrichtungOrte
 
@@ -2564,9 +2567,9 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Listenwert`1[[System.String, System.Private.Co
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| EinrichtungId | INTEGER | ja | → Einrichtung, Index |  |
-| Wert | TEXT(100) |  |  |  |
+| Id | uuid | ja | PK |  |
+| EinrichtungId | integer | ja | → Einrichtung, Index |  |
+| Wert | character varying(100) |  |  |  |
 
 Indizes: `IX_EinrichtungOrte_EinrichtungId` (EinrichtungId)
 
@@ -2578,8 +2581,8 @@ Klasse: `VibeVHS.Domain.Stammdaten.Fachbereich`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Nr | INTEGER | ja | PK |  |
-| Name | TEXT(200) | ja |  |  |
+| Nr | integer | ja | PK |  |
+| Name | character varying(200) | ja |  |  |
 
 ## Loeschlaeufe
 
@@ -2589,23 +2592,23 @@ Klasse: `VibeVHS.Domain.Datenschutz.Loeschlauf`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Anonymisiert | INTEGER | ja |  |  |
-| AusgefuehrtAm | INTEGER |  |  |  |
-| ErstelltAm | INTEGER | ja |  |  |
-| ErstelltVon | TEXT(200) | ja |  |  |
-| Freigabe1Am | INTEGER |  |  |  |
-| Freigabe1Kennung | TEXT(100) |  |  |  |
-| Freigabe1Name | TEXT(200) |  |  |  |
-| Freigabe2Am | INTEGER |  |  |  |
-| Freigabe2Kennung | TEXT(100) |  |  |  |
-| Freigabe2Name | TEXT(200) |  |  |  |
-| Gesperrt | INTEGER | ja |  |  |
-| Regel | TEXT(300) | ja |  |  |
-| Status | TEXT(40) | ja |  |  |
-| Uebersprungen | INTEGER | ja |  |  |
-| ZuAnonymisieren | INTEGER | ja |  |  |
-| ZuSperren | INTEGER | ja |  |  |
+| Id | uuid | ja | PK |  |
+| Anonymisiert | integer | ja |  |  |
+| AusgefuehrtAm | timestamp with time zone |  |  |  |
+| ErstelltAm | timestamp with time zone | ja |  |  |
+| ErstelltVon | character varying(200) | ja |  |  |
+| Freigabe1Am | timestamp with time zone |  |  |  |
+| Freigabe1Kennung | character varying(100) |  |  |  |
+| Freigabe1Name | character varying(200) |  |  |  |
+| Freigabe2Am | timestamp with time zone |  |  |  |
+| Freigabe2Kennung | character varying(100) |  |  |  |
+| Freigabe2Name | character varying(200) |  |  |  |
+| Gesperrt | integer | ja |  |  |
+| Regel | character varying(300) | ja |  |  |
+| Status | character varying(40) | ja |  |  |
+| Uebersprungen | integer | ja |  |  |
+| ZuAnonymisieren | integer | ja |  |  |
+| ZuSperren | integer | ja |  |  |
 
 ## LoeschlaufPersonen
 
@@ -2615,9 +2618,9 @@ Klasse: `VibeVHS.Domain.Gemeinsam.Listenwert`1[[System.Guid, System.Private.Core
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| LoeschlaufId | BLOB | ja | → Loeschlaeufe, Index |  |
-| Wert | BLOB | ja |  |  |
+| Id | uuid | ja | PK |  |
+| LoeschlaufId | uuid | ja | → Loeschlaeufe, Index |  |
+| Wert | uuid | ja |  |  |
 
 Indizes: `IX_LoeschlaufPersonen_LoeschlaufId` (LoeschlaufId)
 
@@ -2629,26 +2632,26 @@ Klasse: `VibeVHS.Application.Postausgang.AusgehendeNachricht`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| AnhangInhalt | TEXT |  |  |  |
-| AnhangName | TEXT(200) |  |  |  |
-| AnhangTyp | TEXT(100) |  |  |  |
-| AusgeloestVon | TEXT(200) | ja |  |  |
-| Betreff | TEXT(500) | ja |  |  |
-| Empfaenger | TEXT(320) | ja |  |  |
-| EmpfaengerAnzeige | TEXT(200) |  |  |  |
-| ErstelltAm | INTEGER | ja | Index |  |
-| Fehler | TEXT |  |  |  |
-| Inhalt | TEXT | ja |  |  |
-| Kanal | TEXT(40) | ja |  |  |
-| PersonId | BLOB |  | Index |  |
-| Rueckmeldung | TEXT |  |  |  |
-| Sprache | TEXT(10) | ja |  |  |
-| Status | TEXT(40) | ja | Index |  |
-| Uebersetzungslink | TEXT |  |  |  |
-| Versuche | INTEGER | ja |  |  |
-| WeitereAnhaenge | TEXT | ja |  | JSON |
-| ZugestelltAm | INTEGER |  |  |  |
+| Id | uuid | ja | PK |  |
+| AnhangInhalt | text |  |  |  |
+| AnhangName | character varying(200) |  |  |  |
+| AnhangTyp | character varying(100) |  |  |  |
+| AusgeloestVon | character varying(200) | ja |  |  |
+| Betreff | character varying(500) | ja |  |  |
+| Empfaenger | character varying(320) | ja |  |  |
+| EmpfaengerAnzeige | character varying(200) |  |  |  |
+| ErstelltAm | timestamp with time zone | ja | Index |  |
+| Fehler | text |  |  |  |
+| Inhalt | text | ja |  |  |
+| Kanal | character varying(40) | ja |  |  |
+| PersonId | uuid |  | Index |  |
+| Rueckmeldung | text |  |  |  |
+| Sprache | character varying(10) | ja |  |  |
+| Status | character varying(40) | ja | Index |  |
+| Uebersetzungslink | text |  |  |  |
+| Versuche | integer | ja |  |  |
+| WeitereAnhaenge | text | ja |  | JSON |
+| ZugestelltAm | timestamp with time zone |  |  |  |
 
 Indizes: `IX_Postausgang_PersonId` (PersonId); `IX_Postausgang_Status_ErstelltAm` (Status, ErstelltAm)
 
@@ -2660,16 +2663,16 @@ Klasse: `VibeVHS.Application.Protokoll.AuditEintrag`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Id | BLOB | ja | PK |  |
-| Aktion | TEXT(100) | ja |  |  |
-| Benutzer | TEXT(200) | ja |  |  |
-| BenutzerKennung | TEXT(100) | ja |  |  |
-| Beschreibung | TEXT | ja |  |  |
-| Erfolgreich | INTEGER | ja |  |  |
-| ObjektId | BLOB |  | Index |  |
-| ObjektTyp | TEXT(100) |  | Index |  |
-| Rolle | TEXT(50) |  |  |  |
-| Zeitpunkt | INTEGER | ja | Index |  |
+| Id | uuid | ja | PK |  |
+| Aktion | character varying(100) | ja |  |  |
+| Benutzer | character varying(200) | ja |  |  |
+| BenutzerKennung | character varying(100) | ja |  |  |
+| Beschreibung | text | ja |  |  |
+| Erfolgreich | boolean | ja |  |  |
+| ObjektId | uuid |  | Index |  |
+| ObjektTyp | character varying(100) |  | Index |  |
+| Rolle | character varying(50) |  |  |  |
+| Zeitpunkt | timestamp with time zone | ja | Index |  |
 
 Indizes: `IX_Protokoll_ObjektTyp_ObjektId` (ObjektTyp, ObjektId); `IX_Protokoll_Zeitpunkt` (Zeitpunkt)
 
@@ -2681,10 +2684,10 @@ Klasse: `VibeVHS.Domain.Vorlagen.Textvorlage`
 
 | Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
 |---|---|---|---|---|
-| Schluessel | TEXT(60) | ja | PK |  |
-| Anredestil | TEXT(20) | ja |  |  |
-| Betreff | TEXT(300) | ja |  |  |
-| Bezeichnung | TEXT(200) | ja |  |  |
-| GeaendertAm | INTEGER | ja |  |  |
-| GeaendertVon | TEXT(200) | ja |  |  |
-| Text | TEXT(8000) | ja |  |  |
+| Schluessel | character varying(60) | ja | PK |  |
+| Anredestil | character varying(20) | ja |  |  |
+| Betreff | character varying(300) | ja |  |  |
+| Bezeichnung | character varying(200) | ja |  |  |
+| GeaendertAm | timestamp with time zone | ja |  |  |
+| GeaendertVon | character varying(200) | ja |  |  |
+| Text | character varying(8000) | ja |  |  |

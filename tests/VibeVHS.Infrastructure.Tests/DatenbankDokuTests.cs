@@ -1,5 +1,4 @@
 using System.Text;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using VibeVHS.Infrastructure.Datenbank;
@@ -14,24 +13,25 @@ public sealed class DatenbankDokuTests
 {
     private static string Erzeugen()
     {
-        using var db = new VibeVhsDbContext(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite(new SqliteConnection("Data Source=:memory:")).Options);
+        using var db = new VibeVhsDbContext(new DbContextOptionsBuilder<VibeVhsDbContext>().UseNpgsql("Host=modell;Database=modell").Options);
         var sb = new StringBuilder();
         sb.AppendLine("# Datenbank – Tabellenstrukturen");
         sb.AppendLine();
         sb.AppendLine("Automatisch erzeugt aus dem EF-Modell (`DatenbankDokuTests`, Zwecktexte in `DatenmodellBeschreibung.cs`), nicht von Hand ändern.");
-        sb.AppendLine("SQLite, angelegt beim ersten Start per `EnsureCreated` aus dem Modell (noch keine Migrationen, siehe docs/betrieb.md); die Schemaversion");
-        sb.AppendLine("steht in der Tabelle `Schemainfo`. Speicherformate: Ids als 16-Byte-BLOB (UUIDv7, Big Endian), Kalendertage als Ganzzahl JJJJMMTT,");
-        sb.AppendLine("Zeitpunkte (`DateTimeOffset`) und Termine als UTC-Millisekunden seit 1970, Aufzählungen als Text. Namen sortieren per Collation");
-        sb.AppendLine("`DIN5007_2`. Keine Kopien: Namen, Anzeigetexte und Stände werden zur Laufzeit aus den Quellen gelesen. Keine JSON-Spalten: Listen");
-        sb.AppendLine("stehen in eigenen Tabellen (je Eintrag eine Zeile).");
+        sb.AppendLine("PostgreSQL 17, angelegt beim ersten Start per `EnsureCreated` aus dem Modell (noch keine Migrationen, siehe docs/betrieb.md); die");
+        sb.AppendLine("Schemaversion steht in der Tabelle `Schemainfo`. Speicherformate: Ids als `uuid` (UUIDv7, zeitlich sortiert), Kalendertage als `date`");
+        sb.AppendLine("(offenes Ende 9999-12-31), Zeitpunkte (`DateTimeOffset`) und Termine als `timestamptz` in UTC (Millisekunden), Aufzählungen als Text.");
+        sb.AppendLine("Namen sortieren per ICU-Collation `DIN5007_2` (de-DE, Telefonbuch). Gesucht wird über die SQL-Funktionen `suchtext`, `suchwoerter` und");
+        sb.AppendLine("`namensuchtext` mit Trigramm-Indizes (pg_trgm). Keine Kopien: Namen, Anzeigetexte und Stände werden zur Laufzeit aus den Quellen");
+        sb.AppendLine("gelesen. Keine JSON-Spalten: Listen stehen in eigenen Tabellen (je Eintrag eine Zeile).");
         sb.AppendLine();
         sb.AppendLine("**Bitemporale Versionstabellen** (Namen, Merkmale, Adressen, …): `GueltigVon`/`GueltigBis` = fachliche Zeit (halboffen);");
         sb.AppendLine("Wissenszeit, Person und Grund stehen im Änderungsvorgang (`ErfasstDurchVorgangId`, ersetzt durch `ErsetztDurchVorgangId` → Tabelle");
         sb.AppendLine("`Aenderungsvorgaenge`); `Erfassungsart` = Rolle der Zeile im Vorgang. „Einstufung“: F = führend, A = nur nach Anonymisierung");
         sb.AppendLine("(siehe `Spalteneinstufung.cs`).");
         sb.AppendLine();
-        sb.AppendLine("**Lesbare Sichten:** Zu jeder Tabelle gibt es eine Sicht `v_<Tabelle>` (Ids als GUID-Text, Tage als JJJJ-MM-TT, Zeitpunkte als");
-        sb.AppendLine("UTC-Text; bei Versionstabellen zusätzlich `ErfasstAm`, `ErfasstVon`, `Grund`, `ErsetztAm` aus dem Vorgang) – zum Prüfen im DB-Browser.");
+        sb.AppendLine("**Lesbare Sichten:** Zu jeder Tabelle gibt es eine Sicht `v_<Tabelle>` (offenes Ende als NULL; bei Versionstabellen zusätzlich");
+        sb.AppendLine("`ErfasstAm`, `ErfasstVon`, `Grund`, `ErsetztAm` aus dem Vorgang) – zum Prüfen im DB-Werkzeug.");
         sb.AppendLine();
         // Fest geschriebene Einleitung (bleibt bei jedem Neuerzeugen erhalten).
         sb.Append(File.ReadAllText(Path.Combine(Path.GetDirectoryName(Pfad())!, "datenmodell-einleitung.md")).Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd());
@@ -115,7 +115,7 @@ public sealed class DatenbankDokuTests
                 .OrderBy(p => p.IsPrimaryKey() ? 0 : 1).ThenBy(p => p.GetColumnName(), StringComparer.Ordinal);
             foreach (var p in props)
             {
-                var typ = p.GetColumnType() + (p.GetMaxLength() is { } m ? $"({m})" : "");
+                var typ = p.GetColumnType();
                 var schluessel = new List<string>();
                 if (p.IsPrimaryKey())
                 {
@@ -144,7 +144,7 @@ public sealed class DatenbankDokuTests
 
                 var konverter = p.GetValueConverter()?.GetType().Name ?? "";
                 if (konverter.Contains("Json", StringComparison.OrdinalIgnoreCase) || p.IsPrimitiveCollection
-                    || (p.ClrType != typeof(string) && typ.StartsWith("TEXT", StringComparison.Ordinal) && p.ClrType.IsClass))
+                    || (p.ClrType != typeof(string) && typ.StartsWith("text", StringComparison.Ordinal) && p.ClrType.IsClass))
                 {
                     hinweis.Add("JSON");
                 }
@@ -152,7 +152,7 @@ public sealed class DatenbankDokuTests
                 sb.AppendLine($"| {p.GetColumnName()} | {typ} | {(p.IsNullable ? "" : "ja")} | {string.Join(", ", schluessel)} | {string.Join("; ", hinweis)} |");
             }
 
-            var indizes = g.SelectMany(e => e.GetIndexes()).Select(i => $"`{i.GetDatabaseName()}` ({string.Join(", ", i.Properties.OfType<Microsoft.EntityFrameworkCore.Metadata.IProperty>().Select(x => x.GetColumnName() + (x.GetCollation() is { } c ? $" COLLATE {c}" : "")))}){(i.IsUnique ? ", eindeutig" : "")}")
+            var indizes = g.SelectMany(e => e.GetIndexes()).Select(i => $"`{i.GetDatabaseName()}` ({string.Join(", ", i.Properties.OfType<Microsoft.EntityFrameworkCore.Metadata.IProperty>().Select(x => x.GetColumnName() + (x.GetCollation() is { } c ? $" COLLATE {c}" : "")))}){(i.IsUnique ? ", eindeutig" : "")}{(i.GetFilter() is { } f ? $", nur {f}" : "")}")
                 .Distinct().Order(StringComparer.Ordinal).ToList();
             if (indizes.Count > 0)
             {

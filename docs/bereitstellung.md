@@ -23,7 +23,8 @@ flowchart LR
         T1 --> O
         N[nginx :443<br/>TLS + Zugangspasswort] -->|http://127.0.0.1:5080/vibevhs| S[vibevhs.service<br/>Kestrel]
         O --- S
-        S --> D[(/var/lib/vibevhs<br/>vibevhs.db, kommentare.db,<br/>dokumente, schluessel)]
+        S --> P[(Container vibevhs-db<br/>PostgreSQL 17, 127.0.0.1:5441<br/>vibevhs, vibevhs_kommentare)]
+        S --> D[(/var/lib/vibevhs<br/>dokumente, schluessel)]
         S --> B[/var/backups/vibevhs/]
         S --> L[/var/log/vibevhs/]
     end
@@ -64,12 +65,13 @@ Kernpunkte:
 |---|---|
 | Ubuntu (getestet: 26.04.1 LTS, x86_64, 2 CPU, 3,8 GiB RAM) | vorhanden |
 | Benutzer `srvadmin` mit sudo | vorhanden |
-| Pakete `nginx`, `ufw`, `apache2-utils` (htpasswd), `at`, `sqlite3`, `curl`, `ca-certificates`, `openssl`, `libicuNN` | Schritt 02 |
+| Pakete `nginx`, `ufw`, `apache2-utils` (htpasswd), `at`, `curl`, `ca-certificates`, `openssl`, `libicuNN` | Schritt 02 |
+| Docker (snap) mit Container `vibevhs-db` (`postgres:17`), `postgresql-client-17` (pg_dump/pg_restore) | Schritt 09 |
 | Hochschulzertifikat (GEANT TCS/HARICA) mit Kette und Schlüssel | Hochschul-IT; Schritt 03 legt es nach `/etc/ssl/liebler` |
 | Systemzeitzone `Europe/Berlin` | ist gesetzt (sonst zeigt VibeVHS UTC-Uhrzeiten, siehe Abschnitt 8) |
 
-`libicu` ist nötig, weil .NET die deutsche Kultur (Datumsformate, Sortierung) aus ICU bezieht. **sqlite3** braucht das
-Ausrollskript für die konsistente Datenbanksicherung vor jedem Update.
+`libicu` ist nötig, weil .NET die deutsche Kultur (Datumsformate, Sortierung) aus ICU bezieht. **pg_dump/pg_restore 17** auf dem Host
+braucht die Anwendung für die nächtliche Sicherung mit Wiederherstellungstest (als Dienstbenutzer, ohne Docker-Rechte).
 
 ---
 
@@ -106,13 +108,13 @@ deshalb die Einträge anderer Anwendungen nicht.
 | `/opt/vibevhs/` | root:root, 755/644 | Programm (Binärdatei `VibeVHS.Web`, Laufzeit, `appsettings*.json`, `wwwroot`, `Startdaten/`) | **komplett ersetzt** |
 | `/opt/vibevhs.vorher/` | root | vorige Programmversion | wird zur Rückweg-Kopie |
 | `/opt/vibevhs.defekt/` | root | nach einem Rückweg: die verworfene Version (zur Analyse) | beim nächsten Rückweg überschrieben |
-| `/var/lib/vibevhs/vibevhs.db` (+`-wal`, `-shm`) | vibevhs, 0750-Ordner | **Hauptdatenbank** (SQLite) | bleibt (außer `-DbNeu`) |
-| `/var/lib/vibevhs/kommentare.db` | vibevhs | Kommentare zu Spezifikation und Doku | bleibt **immer** |
+| Container `vibevhs-db`, Volume `vibevhs-db` | root (Docker) | PostgreSQL 17: Datenbanken `vibevhs` (**Hauptdatenbank**) und `vibevhs_kommentare` (Kommentare zu Spezifikation und Doku) | `vibevhs` bleibt (außer `-DbNeu`: umbenannt in `vibevhs_alt_<Zeit>`), Kommentare bleiben **immer** |
+| `/etc/vibevhs/postgres.env` | root, 0600 | Passwort der Datenbank (Schritt 09) | bleibt |
+| `/var/lib/vibevhs/vibevhs.db`, `kommentare.db.uebernommen` | vibevhs | Altdateien aus der SQLite-Zeit (bis 23.11.2026) | können nach Prüfung weg |
 | `/var/lib/vibevhs/dokumente/` | vibevhs | Dokumentarchiv (Briefe, Bescheinigungen, Uploads) | bleibt |
 | `/var/lib/vibevhs/schluessel/` | vibevhs | ASP.NET-Data-Protection-Schlüssel (Anmelde-Cookies, Tokens) | bleibt – **nicht löschen**, sonst sind alle abgemeldet (und ggf. geschützte Links ungültig) |
-| `/var/lib/vibevhs/beiseite/` | vibevhs, 0700 | mit `-DbNeu` beiseitegelegte Datenbanken | bleibt, **von Hand aufräumen** |
 | `/var/log/vibevhs/vibevhs-JJJJMMTT.log` | vibevhs | Anwendungslog (Serilog), täglich neue Datei, 30 Tage | bleibt |
-| `/var/backups/vibevhs/` | vibevhs | nächtliche Sicherungen `vibevhs-*.db` + `.json` + `kommentare-*.db`; vor jedem Update `vor-update-*.db` | bleibt |
+| `/var/backups/vibevhs/` | vibevhs | nächtliche Sicherungen `vibevhs-*.dump` + `.json` + `kommentare-*.dump`; vor jedem Update `vor-update-*-vibevhs.dump` und `…-vibevhs_kommentare.dump` | bleibt |
 | `/etc/vibevhs/vibevhs.env` | root:vibevhs, 0640 | Geheimnisse und Abweichungen (Umgebungsvariablen) | bleibt |
 | `/etc/systemd/system/vibevhs.service` | root | systemd-Unit | aus dem Kit nur in Schritt 06 |
 | `/etc/nginx/liebler.conf`, `/etc/nginx/liebler.d/vibevhs.conf` | root | Server-Grundgerüst, Pfad `/vibevhs` | nur in Schritt 03 |
@@ -154,8 +156,10 @@ ist **nur eine Vorlage** für den späteren Echtbetrieb und wird von `deploy.ps1
 |---|---|---|---|
 | `ASPNETCORE_ENVIRONMENT` | `Testsystem` | Unit | wählt `appsettings.Testsystem.json` |
 | `ASPNETCORE_URLS` | `http://127.0.0.1:5080` | Unit | nur lokal; nginx leitet weiter |
-| `ConnectionStrings__VibeVHS` | `Data Source=/var/lib/vibevhs/vibevhs.db` | Unit | Hauptdatenbank |
-| `ConnectionStrings__Kommentare` | (leer → `kommentare.db` neben der Hauptdatenbank) | – | Kommentar-Datenbank |
+| `ConnectionStrings__VibeVHS` | `Host=127.0.0.1;Port=5441;Database=vibevhs;Username=vibevhs;Password=…` | `vibevhs.env` (**Geheimnis**, Schritt 09) | Hauptdatenbank |
+| `ConnectionStrings__Kommentare` | (leer → Datenbank `vibevhs_kommentare` auf demselben Server) | – | Kommentar-Datenbank |
+| `Kommentare__Altdatei` | `/var/lib/vibevhs/kommentare.db` | Unit | alte Kommentare beim ersten Start einmal übernehmen |
+| `Sicherung__PgBin` | `/usr/lib/postgresql/17/bin` | Unit | pg_dump/pg_restore für Sicherung und Wiederherstellungstest |
 | `Speicher__Dokumente` | `/var/lib/vibevhs/dokumente` | Unit | Dokumentarchiv |
 | `Speicher__Schluessel` | `/var/lib/vibevhs/schluessel` | Unit | Data-Protection-Schlüssel |
 | `Speicher__Logs` | `/var/log/vibevhs` | Unit | Logdateien |
@@ -173,7 +177,7 @@ ist **nur eine Vorlage** für den späteren Echtbetrieb und wird von `deploy.ps1
 | `Zeitzone` | (leer → Systemzeitzone `Europe/Berlin`) | optional `vibevhs.env` | Anzeige- und Eingabezeitzone |
 | `Startdaten__Datei` | (leer → `Startdaten/testbenutzer-vhs-egs.json` im Programm) | – | Briefkopf, Fachbereiche, Benutzerkonten der vhs EGS |
 
-**Geheimnisse** (Zugangscode, später SMTP-Passwort, S3-Schlüssel für Litestream …) gehören ausschließlich in
+**Geheimnisse** (Datenbankpasswort, Zugangscode, später SMTP-Passwort …) gehören ausschließlich in
 `/etc/vibevhs/vibevhs.env` (root:vibevhs, 0640). Die Datei legt Schritt 06 aus `vibevhs.env.beispiel` an, falls sie fehlt; danach
 wird sie nie wieder überschrieben.
 
@@ -209,10 +213,10 @@ Ein Update ist dasselbe wie das erste Ausrollen. Auf dem Entwicklungsrechner, im
 1. **Voraussetzungen prüfen** (Dienstbenutzer, Unit, Verzeichnisse aus Schritt 06). Fehlt etwas: Abbruch, nichts geändert.
 2. Archiv in einen temporären Ordner `/opt/vibevhs.neu.XXXX` entpacken, Rechte festlegen (root:root, 755/644, Programm ausführbar –
    unter Windows gebaute Archive haben keine Unix-Rechte).
-3. **Datenbanken sichern** mit `sqlite3 .backup` (konsistent, auch bei laufendem Dienst):
-   `/var/backups/vibevhs/vor-update-<Zeit>.db` und `vor-update-<Zeit>-kommentare.db`.
+3. **Datenbanken sichern** mit `pg_dump` im Container (konsistent, auch bei laufendem Dienst):
+   `/var/backups/vibevhs/vor-update-<Zeit>-vibevhs.dump` und `vor-update-<Zeit>-vibevhs_kommentare.dump`.
 4. Dienst stoppen.
-5. Nur mit `-DbNeu`: `vibevhs.db` samt `-wal`/`-shm` nach `/var/lib/vibevhs/beiseite/<datei>.<Zeit>` verschieben.
+5. Nur mit `-DbNeu`: Datenbank `vibevhs` in `vibevhs_alt_<Zeit>` umbenennen (offene Verbindungen werden beendet).
 6. **Tauschen:** altes `/opt/vibevhs.vorher` löschen, `/opt/vibevhs` → `/opt/vibevhs.vorher`, neuer Ordner → `/opt/vibevhs`.
 7. Dienst starten und `http://127.0.0.1:5080/vibevhs/gesund` abfragen (bis 90 s, mit `-DbNeu` bis 5 min).
 8. **Antwortet die Anwendung:** fertig, Archiv in `/tmp` gelöscht.
@@ -269,30 +273,30 @@ Daraus folgt:
 |---|---|
 | ohne Modelländerung, `deploy.ps1` | bleiben erhalten |
 | mit Modelländerung, `deploy.ps1` | Update wird abgewiesen, alte Version läuft weiter, Daten unverändert |
-| mit Modelländerung, `deploy.ps1 -DbNeu` | Datenbank wird **neu aus Start- und Demodaten** aufgebaut; die alte Datei liegt in `/var/lib/vibevhs/beiseite/` und in `vor-update-*.db`, ist aber **nicht mehr in der Anwendung** |
+| mit Modelländerung, `deploy.ps1 -DbNeu` | Datenbank wird **neu aus Start- und Demodaten** aufgebaut; die alte Datenbank liegt als `vibevhs_alt_<Zeit>` und in `vor-update-*.dump`, ist aber **nicht mehr in der Anwendung** |
 
 Ob ein Stand das Schema ändert, sieht man vor dem Ausrollen am einfachsten an Änderungen in `docs/datenmodell.md` (wird automatisch aus
 dem Modell erzeugt, ein Test schlägt bei veralteter Doku fehl) oder am Commit. Im Zweifel einfach `deploy.ps1` ohne `-DbNeu` – der
 Rückweg ist automatisch.
 
-**Ausnahme `kommentare.db`:** Die Kommentar-Datenbank wird von `-DbNeu` **nie** angefasst. Sie hat eine eigene Schemaversion
-(`PRAGMA user_version`); passt sie nicht, bricht der Start ebenfalls ab – dann muss die Datei per Skript angepasst werden,
+**Ausnahme Kommentar-Datenbank `vibevhs_kommentare`:** Sie wird von `-DbNeu` **nie** angefasst. Sie hat eine eigene Schemaversion
+(Tabelle `Schemainfo`); passt sie nicht, bricht der Start ebenfalls ab – dann muss sie per Skript angepasst werden,
 sie wird nicht neu angelegt.
 
 ### Was mit `-DbNeu` verloren geht und was nicht
 
 - Verloren (in der Anwendung): alles, was auf dem Testsystem erfasst wurde – Personen, Kurse, Anmeldungen, Rechnungen, Protokoll,
   Aufgaben, Postausgang, geänderte Einstellungen (z. B. Logo, Website, Benutzer aus Einstellungen → Benutzer).
-- Erhalten: Kommentare (`kommentare.db`), Dokumentarchiv-Dateien in `dokumente/` (verwaist, ohne Verweis aus der neuen Datenbank),
+- Erhalten: Kommentare (`vibevhs_kommentare`), Dokumentarchiv-Dateien in `dokumente/` (verwaist, ohne Verweis aus der neuen Datenbank),
   Anmelde-Schlüssel, Logs, alle Sicherungen.
-- Die alte Datei bleibt lesbar (`sqlite3 /var/lib/vibevhs/beiseite/vibevhs.db.<Zeit>` bzw. DB-Browser über die Sichten `v_…`),
-  lässt sich aber nicht mit der neuen Version weiterverwenden.
+- Die alte Datenbank bleibt lesbar (`docker exec -it vibevhs-db psql -U vibevhs -d vibevhs_alt_<Zeit>`, am besten über die Sichten `v_…`),
+  lässt sich aber nicht mit der neuen Version weiterverwenden. Gelegentlich löschen (`DROP DATABASE "vibevhs_alt_…"`).
 
 ### Später: Echtbetrieb
 
 **Vor dem ersten Produktivbetrieb werden wieder EF-Migrationen eingeführt** (Anfangsmigration aus dem dann aktuellen Modell, Sichten
 und Collation-Index per SQL in der Migration). Ab dann gilt: Die Anwendung bringt die Datenbank beim Start selbst auf den neuen
-Stand, Daten bleiben erhalten, `-DbNeu` ist für den Echtbetrieb tabu. Die Sicherung `vor-update-*.db` bleibt der Rückweg, falls eine
+Stand, Daten bleiben erhalten, `-DbNeu` ist für den Echtbetrieb tabu. Die Sicherung `vor-update-*.dump` bleibt der Rückweg, falls eine
 Migration fehlschlägt (Version **und** Datenbank zurück). Siehe `docs/betrieb.md`.
 
 ---
@@ -326,23 +330,22 @@ Logs und Protokoll enthalten **keine Personendaten** (Pseudonyme) – so bleibt 
 
 ### Datensicherung und Wiederherstellung
 
-- **Täglich 01:30** sichert die Anwendung beide Datenbanken online nach `/var/backups/vibevhs` (`vibevhs-<Zeit>.db`, `.json` mit
-  SHA-256, `kommentare-<Zeit>.db`) und **testet die Wiederherstellung** sofort (Prüfsumme, `integrity_check`, Schemaversion,
+- **Täglich 01:30** sichert die Anwendung beide Datenbanken mit `pg_dump` nach `/var/backups/vibevhs` (`vibevhs-<Zeit>.dump`, `.json` mit
+  SHA-256, `kommentare-<Zeit>.dump`) und **testet die Wiederherstellung** sofort (Prüfsumme, Zurückspielen in eine Wegwerf-Datenbank, Schemaversion,
   Zeilenzahlen). Es bleiben die letzten 14.
-- **Vor jedem Update** zusätzlich `vor-update-*.db` – diese räumt **niemand automatisch auf**, ebenso wenig `beiseite/` und
-  `/root/vibevhs-sicherung/`. Plattenplatz gelegentlich prüfen (`df -h /var`, `du -sh /var/backups/vibevhs /var/lib/vibevhs/beiseite`).
+- **Vor jedem Update** zusätzlich `vor-update-*.dump` – diese räumt **niemand automatisch auf**, ebenso wenig beiseitegelegte
+  Datenbanken `vibevhs_alt_…` und `/root/vibevhs-sicherung/`. Plattenplatz gelegentlich prüfen (`df -h /var`, `du -sh /var/backups/vibevhs`,
+  `docker system df -v`).
 - Der Sicherungsordner liegt **auf demselben Datenträger**. Für echten Schutz braucht es eine Kopie außerhalb: Dateisicherung des
   Rechenzentrums für `/var/backups/vibevhs` (und `/var/lib/vibevhs/dokumente`, `/var/lib/vibevhs/schluessel`, `/etc/vibevhs`) oder
-  **Litestream** (fortlaufende Replikation, Vorlage `deploy/server/litestream/litestream.yml`; heute nicht eingerichtet).
+  WAL-Archivierung von PostgreSQL (z. B. pgBackRest, heute nicht eingerichtet).
 - **Rücksicherung:**
 
   ```bash
   sudo systemctl stop vibevhs
-  cd /var/lib/vibevhs
-  sudo -u vibevhs mkdir -p beiseite
-  sudo mv vibevhs.db beiseite/vibevhs.db.$(date +%Y%m%d-%H%M%S)          # ebenso -wal und -shm, falls vorhanden
-  sudo cp /var/backups/vibevhs/vibevhs-<Zeit>.db vibevhs.db
-  sudo chown vibevhs:vibevhs vibevhs.db
+  docker exec vibevhs-db psql -U vibevhs -d postgres -c "ALTER DATABASE vibevhs RENAME TO vibevhs_vor_ruecksicherung_$(date +%Y%m%d_%H%M%S)"
+  docker exec vibevhs-db createdb -U vibevhs vibevhs
+  sudo cat /var/backups/vibevhs/vibevhs-<Zeit>.dump | docker exec -i vibevhs-db pg_restore -U vibevhs -d vibevhs --no-owner
   sudo systemctl start vibevhs && curl -s http://127.0.0.1:5080/vibevhs/gesund
   ```
 
@@ -396,7 +399,7 @@ veröffentlicht Ports an ufw vorbei. Davor filtert zusätzlich die Hochschul-Fir
 | Umgebung | `Testsystem` | `Production` mit `appsettings.Production.json` (Vorlage im Kit), keine Demodaten, kein Banner |
 | Anmeldung | Testanmeldung (Mock) hinter Zugangspasswort | echte Anmeldung (Verfahren offen) |
 | Mail, Übersetzer, Virenprüfung, BAMF | Mocks / Postausgang | echte Anbindungen, Zugangsdaten in `vibevhs.env` |
-| Sicherung | täglich, gleicher Datenträger | zusätzlich außerhalb (Rechenzentrum, Litestream) |
+| Sicherung | täglich, gleicher Datenträger | zusätzlich außerhalb (Rechenzentrum, WAL-Archivierung) |
 | Zertifikat | Hand-Tausch, Warnung nur im Journal | Mail-Relay oder Monitoring-Check; ggf. ACME mit EAB bei HARICA |
 | HSTS | aus | in `liebler.conf` einschalten |
 

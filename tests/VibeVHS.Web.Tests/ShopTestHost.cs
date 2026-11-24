@@ -18,11 +18,12 @@ using VibeVHS.Infrastructure;
 using VibeVHS.Infrastructure.Datenbank;
 using VibeVHS.Web.Shop;
 using VibeVHS.Web.Sicherheit;
+using VibeVHS.Tests.Gemeinsam;
 
 namespace VibeVHS.Web.Tests;
 
 /// <summary>
-/// Startet die Buchungs-API in diesem Prozess auf einem freien Port (Kestrel, echte HTTP-Aufrufe) mit eigener SQLite-Datei
+/// Startet die Buchungs-API in diesem Prozess auf einem freien Port (Kestrel, echte HTTP-Aufrufe) mit eigener Wegwerf-Datenbank (PostgreSQL)
 /// und steuerbarer Uhr. Hintergrundjobs laufen nicht; Tests rufen die Routinen direkt auf.
 /// </summary>
 internal sealed class ShopTestHost : IAsyncDisposable
@@ -31,8 +32,11 @@ internal sealed class ShopTestHost : IAsyncDisposable
 
     private readonly string _ordner;
 
-    private ShopTestHost(WebApplication app, FakeTimeProvider uhr, string ordner, Uri adresse)
+    private readonly string[] _datenbanken;
+
+    private ShopTestHost(WebApplication app, FakeTimeProvider uhr, string ordner, Uri adresse, params string[] datenbanken)
     {
+        _datenbanken = datenbanken;
         App = app;
         Uhr = uhr;
         _ordner = ordner;
@@ -50,12 +54,15 @@ internal sealed class ShopTestHost : IAsyncDisposable
     {
         var ordner = Path.Combine(Path.GetTempPath(), "vibevhs-shoptest-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(ordner);
+        var haupt = await Wegwerfdatenbanken.NeuAsync("vibevhs_shop");
+        var kommentare = await Wegwerfdatenbanken.LeerAsync("vibevhs_shopk");
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development", ContentRootPath = AppContext.BaseDirectory });
         builder.Logging.ClearProviders();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         var werte = new Dictionary<string, string?>
         {
-            ["ConnectionStrings:VibeVHS"] = $"Data Source={Path.Combine(ordner, "shop.db")}",
+            ["ConnectionStrings:VibeVHS"] = haupt,
+            ["ConnectionStrings:Kommentare"] = kommentare,
             ["Shop:PowBits"] = "4",
             ["Shop:MockIdp"] = "true",
             ["Shop:ErlaubteOrigins:0"] = "https://www.vhs-test.example",
@@ -91,7 +98,7 @@ internal sealed class ShopTestHost : IAsyncDisposable
         app.UseRateLimiter();
         app.MapShopApi();
         await app.StartAsync();
-        return new ShopTestHost(app, uhr, ordner, new Uri(app.Urls.First()));
+        return new ShopTestHost(app, uhr, ordner, new Uri(app.Urls.First()), haupt, kommentare);
     }
 
     /// <summary>Veröffentlichter Kurs mit 6 Terminen ab in 30 Tagen.</summary>
@@ -176,7 +183,11 @@ internal sealed class ShopTestHost : IAsyncDisposable
         Http.Dispose();
         await App.StopAsync();
         await App.DisposeAsync();
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        foreach (var d in _datenbanken)
+        {
+            await Wegwerfdatenbanken.LoeschenAsync(d);
+        }
+
         try
         {
             Directory.Delete(_ordner, true);

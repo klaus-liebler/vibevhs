@@ -19,6 +19,8 @@ public class PersonenAbfrageTests
         db.Organisationen.AddRange(daten.Organisationen);
         db.Personen.AddRange(daten.Personen);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        // Statistiken wie nach dem automatischen ANALYZE im Betrieb (autovacuum), sonst plant PostgreSQL für leere Tabellen.
+        await db.Database.ExecuteSqlRawAsync("ANALYZE", TestContext.Current.CancellationToken);
         return (t, daten);
     }
 
@@ -238,6 +240,13 @@ public class PersonenAbfrageTests
         TestContext.Current.SendDiagnosticMessage(
             $"Ladezeit {daten.Personen.Count} Personen: erste Seite {tErste:F1} ms, Seite ab Position 2.000 Ø {tTief:F1} ms, Suche 'yil' {tSuche:F1} ms ({suche.Count} Treffer), Filterzahlen {tZahlen:F1} ms");
         Console.WriteLine($"MESSUNG erste={tErste:F1} tief={tTief:F1} suche={tSuche:F1} zahlen={tZahlen:F1} personen={zahlen.Gesamt}");
+
+        if (tErste >= 500)
+        {
+            var sql = db.MitSortierschluessel(db.Personen.Where(p => p.Status != Personenstatus.Zusammengefuehrt), DateOnly.FromDateTime(DateTime.Today)).Sortiert().Take(50).ToQueryString();
+            TestContext.Current.SendDiagnosticMessage("SQL erste Seite: " + sql);
+            Console.WriteLine("SQL erste Seite: " + sql);
+        }
 
         erste.Count.ShouldBe(50);
         tErste.ShouldBeLessThan(500);

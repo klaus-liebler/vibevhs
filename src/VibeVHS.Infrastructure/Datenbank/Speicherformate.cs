@@ -4,47 +4,46 @@ using VibeVHS.Domain.Gemeinsam;
 namespace VibeVHS.Infrastructure.Datenbank;
 
 /// <summary>
-/// Speicherformate (global für alle Spalten, siehe <see cref="VibeVhsDbContext"/>):
-/// Ids als 16-Byte-BLOB in Big-Endian-Reihenfolge (UUIDv7 sortiert damit zeitlich), Kalendertage als Ganzzahl JJJJMMTT,
-/// Zeitpunkte als Millisekunden seit 1970 (UTC), Termin-Uhrzeiten (Ortszeit) ebenfalls als UTC-Millisekunden.
+/// Speicherformate in PostgreSQL (global für alle Spalten, siehe <see cref="VibeVhsDbContext"/>): Ids als <c>uuid</c> (UUIDv7, damit zeitlich
+/// sortiert), Kalendertage als <c>date</c>, Zeitpunkte und Termine als <c>timestamptz</c> in UTC, auf Millisekunden gekürzt (gleiche Werte nach
+/// dem Lesen, unabhängig davon, ob ein Wert aus der Datenbank oder aus dem Arbeitsspeicher kommt). Termine sind Ortszeiten (DateTime ohne
+/// Zone); gespeichert wird der eindeutige UTC-Zeitpunkt, gelesen wieder die Ortszeit (Einstellung „Zeitzone“).
 /// </summary>
 public static class Speicherformate
 {
-    public static byte[] IdBytes(Guid id) => id.ToByteArray(bigEndian: true);
-
     /// <summary>Gespeicherter Wert für „offenes Ende“ (NFA-15).</summary>
-    public const int Offen = 99991231;
+    public static readonly DateOnly Offen = new(9999, 12, 31);
 
-    public static int Tag(DateOnly d) => (d.Year * 10000) + (d.Month * 100) + d.Day;
+    public static DateTimeOffset Utc(DateTimeOffset z)
+    {
+        var ticks = z.UtcTicks - (z.UtcTicks % TimeSpan.TicksPerMillisecond);
+        return new DateTimeOffset(ticks, TimeSpan.Zero);
+    }
 
-    public static DateOnly Tag(int z) => new(z / 10000, z / 100 % 100, z % 100);
+    public static DateTimeOffset Zeitpunkt(DateTimeOffset utc) => Zeitzone.Ortszeit(utc);
 
-    public static long Millisekunden(DateTimeOffset z) => z.ToUnixTimeMilliseconds();
+    public static DateTime Termin(DateTime ortszeit)
+    {
+        var utc = Zeitzone.NachUtc(ortszeit);
+        return new DateTime(utc.Ticks - (utc.Ticks % TimeSpan.TicksPerMillisecond), DateTimeKind.Utc);
+    }
 
-    public static DateTimeOffset Zeitpunkt(long ms) => Zeitzone.Ortszeit(DateTimeOffset.FromUnixTimeMilliseconds(ms));
-
-    public static long Termin(DateTime ortszeit) => new DateTimeOffset(Zeitzone.NachUtc(ortszeit), TimeSpan.Zero).ToUnixTimeMilliseconds();
-
-    public static DateTime Termin(long ms) => Zeitzone.AusUtc(DateTimeOffset.FromUnixTimeMilliseconds(ms).UtcDateTime);
+    public static DateTime TerminAusUtc(DateTime utc) => Zeitzone.AusUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc));
 }
 
-internal sealed class IdAlsBytes() : ValueConverter<Guid, byte[]>(g => Speicherformate.IdBytes(g), b => new Guid(b, true));
-
 /// <summary>
-/// Ende einer Gültigkeit (NFA-15): offenes Ende als 99991231 statt NULL. Abfragen „gilt am Tag“ werden so zu <c>GueltigBis &gt; tag</c>
+/// Ende einer Gültigkeit (NFA-15): offenes Ende als 9999-12-31 statt NULL. Abfragen „gilt am Tag“ werden so zu <c>GueltigBis &gt; tag</c>
 /// ohne <c>OR … IS NULL</c> (indexfreundlich); in der Fachklasse bleibt das offene Ende <c>null</c>.
 /// </summary>
 // EF1001: Konverter, die NULL umwandeln („convertsNulls“), kennzeichnet EF Core als nicht stabile API. Bewusst genutzt (NFA-15), durch die
 // Versions- und Zeitumstellungstests abgesichert.
 #pragma warning disable EF1001
-internal sealed class OffenesEnde() : ValueConverter<DateOnly?, int>(
-    d => d == null ? Speicherformate.Offen : Speicherformate.Tag(d.Value),
-    z => z == Speicherformate.Offen ? null : Speicherformate.Tag(z),
+internal sealed class OffenesEnde() : ValueConverter<DateOnly?, DateOnly>(
+    d => d == null ? Speicherformate.Offen : d.Value,
+    z => z == Speicherformate.Offen ? null : z,
     convertsNulls: true);
 #pragma warning restore EF1001
 
-internal sealed class TagAlsZahl() : ValueConverter<DateOnly, int>(d => Speicherformate.Tag(d), z => Speicherformate.Tag(z));
+internal sealed class ZeitpunktInUtc() : ValueConverter<DateTimeOffset, DateTimeOffset>(z => Speicherformate.Utc(z), z => Speicherformate.Zeitpunkt(z));
 
-internal sealed class ZeitpunktAlsMillisekunden() : ValueConverter<DateTimeOffset, long>(z => Speicherformate.Millisekunden(z), ms => Speicherformate.Zeitpunkt(ms));
-
-internal sealed class TerminAlsUtcMillisekunden() : ValueConverter<DateTime, long>(d => Speicherformate.Termin(d), ms => Speicherformate.Termin(ms));
+internal sealed class TerminInUtc() : ValueConverter<DateTime, DateTime>(d => Speicherformate.Termin(d), u => Speicherformate.TerminAusUtc(u));

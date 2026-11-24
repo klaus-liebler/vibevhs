@@ -7,7 +7,7 @@ Stand: 17.11.2026
 VibeVHS soll die Verwaltungsmitarbeitenden einer Volkshochschule im Tagesgeschäft spürbar entlasten: weniger Klicks, weniger Doppelerfassung, nachvollziehbare Automatisierung. Dieses Dokument ist Schritt 1 von 4 und bildet die Grundlage für Datenmodell, Konzepte und den klickbaren Prototyp.
 
 - **Zielgruppe für die Überzeugungsarbeit:** Verwaltungsmitarbeitende (Programmplanung, Teilnehmerservice, Kasse/Buchhaltung, Integrationskurs-Team).
-- **Technik:** ASP.NET Core, SQLite, Docker-Image, Anmeldung über die kommunale Infrastruktur (OIDC/SAML, Active Directory).
+- **Technik:** ASP.NET Core, PostgreSQL (seit 24.11.2026, vorher SQLite), Docker-Image, Anmeldung über die kommunale Infrastruktur (OIDC/SAML, Active Directory).
 - **Schnittstellen:** in dieser Phase nur als Mocks mit realistischem Datenformat.
 - **Quellen:** ausschließlich öffentlich zugängliche Informationen (Herstellerseiten, Handbuch-Auszüge, Verbandsinformationen, BAMF-Vorgaben). Es lagen keine Unterlagen der Hersteller vor.
 - **Zentrale Datenregel:** Stammdaten sind zeitlich versioniert. Ein Dokument zu einem vergangenen Vorgang zeigt immer den damals gültigen Stand, etwa den früheren Nachnamen einer Dozentin.
@@ -441,7 +441,7 @@ Die Verwaltung sucht meist gezielt. Listen starten deshalb mit Suche und Filtern
 | S-25 | Messenger (Signal, WhatsApp) | Kurzfristige Hinweise an Teilnehmende ohne Mailroutine (z. B. Integrationskurse) | aus | Business-API des Dienstes; Auftragsverarbeitung vorher klären | konzeptionell |
 | S-26 | Virenscanner der Kommune | Prüfung hochgeladener Dateien (Unterlagen, Nachweise) | aus | z. B. ClamAV (clamd) | Mock |
 | S-27 | Geokodierung | Entfernung Wohnort–Kursort (BAMF-Fahrtkosten), Wegbeschreibung | aus | Geodienst (Anbieter offen) | Mock |
-| S-28 | Externe Datensicherung | Fortlaufende Kopie der Datenbank außerhalb des Servers | aus | Litestream → S3-Speicher des Rechenzentrums | konzeptionell |
+| S-28 | Externe Datensicherung | Fortlaufende Kopie der Datenbank außerhalb des Servers | aus | WAL-Archivierung von PostgreSQL (z. B. pgBackRest) → S3-Speicher des Rechenzentrums | konzeptionell |
 
 Eine eigene dokumentierte REST-API (OpenAPI) bildet die Grundlage für alle Portale und Partneranbindungen.
 
@@ -451,14 +451,14 @@ Das System läuft als ein Docker-Image im kommunalen Rechenzentrum und hält all
 
 | ID | Bereich | Anforderung |
 | --- | --- | --- |
-| NFA-01 | Betrieb | Ein Docker-Image (ASP.NET Core, Linux), Konfiguration über Umgebungsvariablen, SQLite-Datei auf einem Volume |
+| NFA-01 | Betrieb | Ein Docker-Image (ASP.NET Core, Linux), Konfiguration über Umgebungsvariablen, PostgreSQL 17 als eigener Container mit Volume |
 | NFA-02 | Mengen | Bis 3.000 Kurse und 40.000 Belegungen pro Jahr, 30 gleichzeitige Verwaltungsnutzer, 500 gleichzeitige Web-Besucher bei Anmeldestart |
 | NFA-03 | Antwortzeit | Masken der Verwaltung unter 1 s (95 %), Suche unter 0,5 s |
 | NFA-04 | Anmeldung | OIDC oder SAML gegen die kommunale Anmeldung (AD, Keycloak, ADFS); Rollen aus Gruppen; Zwei-Faktor für Admin und Buchhaltung |
 | NFA-05 | Externe Konten | Teilnehmende und Dozierende melden sich ohne AD an (E-Mail-Login mit Magic Link oder Passwort und 2FA) |
 | NFA-06 | DSGVO | Verzeichnis der Verarbeitungstätigkeiten unterstützen, Löschfristen je Datenart, Anonymisierung, Auskunft nach Art. 15, Einwilligungsnachweise |
 | NFA-07 | Sicherheit | OWASP ASVS Stufe 2 als Ziel, TLS überall, Verschlüsselung sensibler Felder (IBAN, Aufenthaltsdaten) |
-| NFA-08 | Datensicherung | Tägliche konsistente Sicherung der SQLite-Datenbank (Online-Backup bzw. Litestream), Wiederherstellung getestet |
+| NFA-08 | Datensicherung | Tägliche konsistente Sicherung der Datenbank (pg_dump), Wiederherstellung bei jeder Sicherung in eine Wegwerf-Datenbank getestet |
 | NFA-09 | Nachvollziehbarkeit | Audit-Log manipulationsgeschützt (verkettete Hashes), Aufbewahrung nach Fristen (Buchungsbelege 10 Jahre, § 147 AO) |
 | NFA-10 | Schnittstellen | Alle Schnittstellen hinter Adaptern; Mock und echte Implementierung austauschbar per Konfiguration |
 | NFA-11 | Sprache | Oberfläche Deutsch, Teilnehmerportal mehrsprachig vorbereitet |
@@ -486,9 +486,11 @@ Das System läuft als ein Docker-Image im kommunalen Rechenzentrum und hält all
 | NFA-23 | Ids sind GUIDs, gespeichert als 16-Byte-Binärwert und zeitlich sortiert erzeugt (UUIDv7). | Muss |
 | NFA-24 | Namen werden nach DIN 5007-2 sortiert (ä = ae, ß = ss, Namensvorsatz zählt nicht), über eine Sortierregel der Datenbank statt einer gespeicherten Hilfsspalte. | Muss |
 | NFA-25 | Je Mandant (vhs) gibt es eine eigene Datenbank. | Muss |
-| NFA-26 | Kommentare zur Spezifikation liegen in einer eigenen Datenbankdatei mit eigener Schemaversion; sie überstehen den Neuaufbau der Hauptdatenbank und werden mit ihr gesichert. | Muss |
+| NFA-26 | Kommentare zur Spezifikation liegen in einer eigenen Datenbank mit eigener Schemaversion; sie überstehen den Neuaufbau der Hauptdatenbank und werden mit ihr gesichert. | Muss |
 | NFA-27 | Solange es keine Migrationen gibt (Entwicklungsphase), legt das Ausrollen bei einer Schemaänderung die alte Datenbank beiseite, statt sie zu löschen; scheitert der Start, kommen vorige Version und vorige Datenbank automatisch zurück. Vor dem ersten Produktivbetrieb werden Migrationen eingeführt. | Muss |
 | NFA-28 | Kurzformen einer Id (Pseudonym „Person #…“ im Protokoll, Platzhalter nach Anonymisierung) stammen aus dem zufälligen Teil der UUIDv7, nicht aus dem Zeitstempel – sonst sehen alle Personen eines Imports gleich aus. Eindeutige Schlüssel wie Logins der Portal-Konten werden aus der vollen Id gebildet. | Muss |
+| NFA-29 | Die Suche nach Personen bleibt auch bei vielen Personen schnell, ohne eigene Suchtabelle und ohne Kopien: Trigramm-Indizes auf den normalisierten Suchausdrücken der Versionstabellen (PostgreSQL pg_trgm). | Muss |
+| NFA-30 | Tests laufen gegen dieselbe Datenbank wie der Betrieb (PostgreSQL); je Test eine Wegwerf-Datenbank als Kopie einer Vorlage, damit Tests unabhängig und schnell bleiben. | Muss |
 
 ## Entscheidungen
 
@@ -499,7 +501,7 @@ Die offenen Fragen sind am 14.11.2026 geklärt. Die Annahmen gelten als Vorgabe.
 | Kommunale Anmeldung | OIDC; in Stufe 1 Mock-Login |
 | Finanzsoftware | CSV-Mock, echte Anbindung später |
 | Bundesland | NRW, in Stufe 1 fest hinterlegt; konzeptionell austauschbar (NFA-13) |
-| Datenbank | SQLite; PostgreSQL später über dieselbe Datenzugriffsschicht möglich |
+| Datenbank | PostgreSQL 17 (Entscheidung Klaus, 24.11.2026: „mit PostgreSQL im Docker so einfach“); bis dahin SQLite über dieselbe Datenzugriffsschicht |
 | Übersetzung | Austauschbarer Adapter, in Stufe 1 Mock |
 | Selbstregistrierung | Erlaubt; selbstregistrierte Teilnehmende buchen nur öffentliche Kurse (FA-60 bis FA-68) |
 | Umfang | Analyse und Datenmodell für den Endausbau mit Portalen; Implementierung zuerst nur Verwaltung |

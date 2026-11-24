@@ -1,4 +1,3 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using VibeVHS.Application.Personen;
 using VibeVHS.Application.Programm;
@@ -20,8 +19,8 @@ public sealed class ArchitekturTests
 {
     private static VibeVhsDbContext ModellKontext()
     {
-        var verbindung = new SqliteConnection("Data Source=:memory:");
-        return new VibeVhsDbContext(new DbContextOptionsBuilder<VibeVhsDbContext>().UseSqlite(verbindung).Options);
+        // Nur das Modell wird gebraucht, keine Verbindung.
+        return new VibeVhsDbContext(new DbContextOptionsBuilder<VibeVhsDbContext>().UseNpgsql("Host=modell;Database=modell").Options);
     }
 
     private static Dictionary<string, List<string>> SpaltenJeTabelle(VibeVhsDbContext db)

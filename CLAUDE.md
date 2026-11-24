@@ -15,7 +15,7 @@ Shop VsQFogXRz3dzQYZajLgoMm, Prototyp KR88btCTssLuRhCTYFGnbx unter https://claud
 
 ## Stack und Struktur
 
-.NET 11, ASP.NET Core **Blazor Server** (SSR + InteractiveServer) mit **Radzen**, **EF Core + SQLite**, Serilog, Quartz.NET.
+.NET 11, ASP.NET Core **Blazor Server** (SSR + InteractiveServer) mit **Radzen**, **EF Core + PostgreSQL 17** (Npgsql, seit 24.11.2026; vorher SQLite), Serilog, Quartz.NET.
 Tests: xUnit v3 (Microsoft.Testing.Platform), Shouldly, Bogus, Verify. Weitere erlaubte Bibliotheken: ClosedXML,
 PDFsharp/MigraDoc, QRCoder, html5-qrcode. **Nicht verwenden:** QuestPDF, Nager.Date, MediatR, AutoMapper, FluentAssertions
 (neue Pakete nur nach Rückfrage; Microsoft.AspNetCore.OpenApi steht nicht auf der Liste).
@@ -26,7 +26,7 @@ src/VibeVHS.Application     Dienste/Anwendungsfälle, Ports (I…Speicher), Rech
 src/VibeVHS.Infrastructure  EF Core (VibeVhsDbContext, Schema per EnsureCreated – derzeit keine Migrationen), Quartz-Jobs, PDF, Startdaten
 src/VibeVHS.Adapters.Mocks  Testanmeldung, Mail/Schnittstellen, Übersetzer, Virenprüfung, Geokodierer, BAMF (Mocks)
 src/VibeVHS.Web             Blazor-Seiten (Components/Pages, Bausteine, Layout), Shop-API, Portale, Demodaten (Entwicklung/)
-tests/…                     Domain, Application, Infrastructure (SQLite in-memory, Schema wie im Betrieb), Web (ShopTestHost), Shop.Komponente (Headless-Edge)
+tests/…                     Domain, Application, Infrastructure (Wegwerf-Datenbank je Test aus Vorlage, Schema wie im Betrieb), Web (ShopTestHost), Shop.Komponente (Headless-Edge)
 tools/Testdaten             Startdaten vhs EGS (testbenutzer-vhs-egs.json, logo), Beispiel-CSV für Importe
 deploy/server               Bereitstellungs-Kit (Runbook, Schritt-Skripte, deploy.ps1)
 ```
@@ -34,6 +34,7 @@ deploy/server               Bereitstellungs-Kit (Runbook, Schritt-Skripte, deplo
 ## Befehle
 
 ```powershell
+docker compose -f deploy/docker-compose.yml up -d            # PostgreSQL 17 für Entwicklung und Tests (127.0.0.1:5441)
 dotnet build VibeVHS.slnx                                    # TreatWarningsAsErrors
 dotnet test --project tests/VibeVHS.Web.Tests [--filter-class "*Name*"]
 node tests/Shop.Komponente/komponententest.mjs http://localhost:5199
@@ -41,7 +42,8 @@ node tests/Touren/tourpruefung.mjs http://localhost:5199 [tour-id …]   # gefü
 ```
 
 Läuft Klaus' Instanz (sperrt `src/VibeVHS.Web/bin`), mit eigenem Ausgabeordner bauen/testen: `--artifacts-path <temp>`.
-Eigene Testinstanz: Port **5199**, eigene Datenbank (`ConnectionStrings__VibeVHS`, `Speicher__*` auf ein Temp-Verzeichnis),
+Eigene Testinstanz: Port **5199**, eigene Datenbank (`ConnectionStrings__VibeVHS=Host=127.0.0.1;Port=5441;Database=vibevhs_p5199;Username=vibevhs;Password=entwicklung`,
+`Speicher__*` auf ein Temp-Verzeichnis),
 `ASPNETCORE_ENVIRONMENT=Development`, `Sicherung__Aktiv=false`. Browserprüfung per Headless-Edge (CDP), bei mobilen Seiten 390 px.
 
 ## Regeln für die Zusammenarbeit
@@ -69,13 +71,17 @@ Eigene Testinstanz: Port **5199**, eigene Datenbank (`ConnectionStrings__VibeVHS
 - **Gesperrte Aktionen erklären:** `BegruendeterButton` mit `Freigabe` (Nein + Grund als Tooltip), z. B. „Bitte zuerst …“.
 - **Folgeschritte anbieten:** nach jeder Aktion `NaechsteSchritte` (Hauptschritt markiert); Anker brauchen den Seitenpfad (`personen/{id}#…`).
 - **Bitemporal:** Stammdaten, Rollen, Merkmale, Adressen … nie überschreiben – „Änderung ab Datum“ vs. „Korrektur“, mit Grund; Datenhistorie zeigt alles.
-- **Datenbank ohne Migrationen (Entwicklungsphase, nur Testdaten):** Schema per `EnsureCreated` aus dem Modell, danach Sichten `v_…` und
-  Schemaversion (`Schemainfo`, Prüfsumme). Passt eine vorhandene Datei nicht zum Modell, bricht der Start mit „Datenbankschema veraltet –
-  Datei löschen oder beiseitelegen“ ab. **Vor dem ersten Produktivbetrieb werden wieder EF-Migrationen eingeführt.**
+- **Datenbank ohne Migrationen (Entwicklungsphase, nur Testdaten):** Schema per `EnsureCreated` aus dem Modell, danach `Zusatzschema`
+  (SQL-Funktionen `suchtext`/`suchwoerter`/`namensuchtext`/`idhex`, Trigramm-Indizes, Sichten `v_…`) und Schemaversion (`Schemainfo`, Prüfsumme).
+  Passt eine vorhandene Datenbank nicht zum Modell, bricht der Start mit „Datenbankschema veraltet“ ab; `Datenbank:BeiAbweichung=Beiseitelegen`
+  (Entwicklung) bzw. `deploy.ps1 -DbNeu` (Testsystem) benennt sie in `…_alt_<Zeit>` um. Kommentare liegen in der eigenen Datenbank
+  `<haupt>_kommentare`. **Vor dem ersten Produktivbetrieb werden wieder EF-Migrationen eingeführt.**
 - **Normalisiert (11/2026):** keine Kopien (Namen, Anzeigetexte, Stände werden zur Laufzeit gelesen: `INamensquelle`, `Personensicht`),
   keine JSON-Spalten (Listen als eigene Tabellen, `Wertlisten`/`Listenwert<T>`), Erfassungsangaben im `Aenderungsvorgang`. Speicherformate:
-  Ids 16 Byte (UUIDv7 über `Ids.Neu`), Tage JJJJMMTT, Zeitpunkte/Termine UTC-ms (Anzeige über `Zeitzone`). Namen sortieren per Collation
-  `DIN5007_2` (registriert in `SqliteErweiterungen`, ebenso `suchtext()`); Suche direkt in den Versionen (kein Suchindex).
+  Ids `uuid` (UUIDv7 über `Ids.Neu`), Tage `date` (offenes Ende 9999-12-31), Zeitpunkte/Termine `timestamptz` in UTC, auf ms gekürzt
+  (Anzeige über `Zeitzone`). Namen sortieren per ICU-Collation `DIN5007_2` (de-DE Telefonbuch); Suche direkt in den Versionen über
+  `SqlFunktionen` + Trigramm-Indizes (pg_trgm), keine Suchtabelle. Rohes SQL: Bezeichner immer in Anführungszeichen (`"Personen"`).
+  Nach Massenladen `DatenbankInitialisierung.StatistikAktualisierenAsync` (ANALYZE).
 - **Stammdaten-Spalten (Grundreinigung 11/2026):** neue Personenangabe = versioniertes Merkmal (`MerkmalArt`, `AngabeAendern`), nie eine
   überschreibbare Spalte. Spalten der Stammdatentabellen stehen mit Einstufung in `Infrastructure/Datenbank/Spalteneinstufung.cs`
   (Führend / Anonymisierungsrest – Lese-Caches gibt es nicht mehr). Statistik rechnet zur Laufzeit (Geschlecht zum Kursdatum, Alter zum 31.12.).
@@ -97,7 +103,7 @@ Anmeldung, Durchführung (Anwesenheit, Check-in per QR, Bescheinigungen, Briefe)
 Finanzen/GoBD (Rechnungen, SEPA, Mahnwesen, Honorare, XRechnung), Integrationskurse (BAMF), Betrieb (Sicherung, Import, Auswertungen),
 Webshop (API, Web-Komponente, TYPO3), Kurs-QR/Schnellanmeldung, Dozierenden- und Teilnehmendenportal.
 
-Zuletzt (17.11.2026): Hilfe, Impressum, Dokumentation mit Kommentaren (`kommentare.db`), Abnahme-/Schulungsmodus mit Touren
+Zuletzt (17.11.2026): Hilfe, Impressum, Dokumentation mit Kommentaren (eigene Datenbank, früher `kommentare.db`), Abnahme-/Schulungsmodus mit Touren
 (`wwwroot/touren/abnahme.json`, `tour.js`), `deploy.ps1 -DbNeu`, Schnittstellenübersicht `docs/schnittstellen.md`.
 
 Davor (Funde aus Klaus' Test):

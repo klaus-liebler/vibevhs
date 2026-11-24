@@ -23,6 +23,6 @@ Anforderungstexte, keine eigene Nummerierung. Neue NFA zuerst dort anlegen, dann
 | NFA-21 | `ArchitekturTests` A/B/C (`tests/VibeVHS.Infrastructure.Tests`) verhindern Kopien und JSON-Spalten; Einstufung jeder Stammdatenspalte in `Infrastructure/Datenbank/Spalteneinstufung.cs`; Ausnahmen (Belege, Mahn- und Zahlungsposten, Postausgang, Anonymisierungsreste) in [`datenmodell.md`](datenmodell.md). |
 | NFA-22 | Tabelle `Aenderungsvorgaenge`; `BitemporaleVersion` verweist über `ErfasstDurch`/`ErsetztDurch` darauf (`Domain`, Abbildung in `VibeVhsDbContext.Version<T>`). |
 | NFA-23 | Konverter `IdAlsBytes` (16 Byte, big-endian) und `Ids.Neu` (monoton steigende UUIDv7). |
-| NFA-24 | Collation `DIN5007_2` (registriert in `SqliteErweiterungen`), Index `IX_PersonNamen_Sortierung`; Messung in [`messungen.md`](messungen.md). |
+| NFA-24 | ICU-Collation `DIN5007_2` (de-DE-u-co-phonebk, in PostgreSQL angelegt), Index `IX_PersonNamen_Sortierung`; Messung in [`messungen.md`](messungen.md). |
 | NFA-25 | Entscheidung „Eigene Datenbank je VHS“ in [`mandanten.md`](mandanten.md); Umsetzung der Mandantenauflösung dort als Plan beschrieben. |
 | NFA-28 | `Pseudonym.Kurz` nimmt die letzten acht Hex-Zeichen (Zufallsteil); Portal-Logins über `Benutzerkonto.PortalLogin` („doz-“/„tn-“ + volle Id). Tests: `PseudonymTests` (Domain), `Anmeldelink_legt_fuer_jede_Kursleitung_ein_eigenes_Konto_an` und `Anmeldelink_legt_fuer_jede_Person_ein_eigenes_Konto_an` (Web). |

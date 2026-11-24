@@ -6,7 +6,7 @@ Dieses Dokument ist Schritt 2 von 4. Es setzt die [Anforderungsanalyse](https://
 
 ## Architektur
 
-VibeVHS ist ein modularer Monolith: eine Anwendung, ein Docker-Image, eine SQLite-Datei. Das passt zu einer einzelnen VHS und zum kommunalen Betrieb, und die Fachmodule bleiben trotzdem sauber getrennt.
+VibeVHS ist ein modularer Monolith: eine Anwendung, ein Docker-Image, eine PostgreSQL-Datenbank (seit 24.11.2026, vorher SQLite). Das passt zu einer einzelnen VHS und zum kommunalen Betrieb, und die Fachmodule bleiben trotzdem sauber getrennt.
 
 ```mermaid
 ---
@@ -27,7 +27,7 @@ flowchart LR
         M["<b>Fachmodule</b><br/>Programm · Anmeldung · Teilnahme<br/>Finanzen · Integrationskurse · Auswertung"]
         D["<b>Domäne</b><br/>Entitäten, zeitliche Versionen, Regeln"]
         I["<b>Infrastruktur</b><br/>EF Core, Outbox, Jobs, PDF und QR<br/>Adapter je Schnittstelle: Mock oder echt"]
-        S[("SQLite-Datei und Dokumentarchiv")]
+        S[("PostgreSQL 17 und Dokumentarchiv")]
         W --> A --> M --> D
         I --> S
     end
@@ -50,8 +50,8 @@ Die Verwaltung arbeitet mit einer Blazor-Oberfläche. Die REST-API entsteht von 
 - **Abhängigkeiten zeigen nach innen:** Die Domäne kennt weder Datenbank noch Oberfläche; dadurch ist die Fachlogik ohne Infrastruktur testbar.
 - **Fachmodule** haben eigene Ordner, eigene Tabellen-Präfixe und sprechen nur über definierte Schnittstellen miteinander.
 - **Hintergrunddienste** (Outbox, zeitgesteuerte Abläufe) laufen im selben Prozess, das hält den Betrieb einfach.
-- **Betrieb:** Der Container läuft hinter dem Reverse-Proxy der Kommune, die SQLite-Datei und das Dokumentarchiv liegen auf einem Volume und werden laufend gesichert.
-- **Wachstum:** Reicht SQLite nicht mehr, wird nur der Datenbankanbieter in EF Core gewechselt (PostgreSQL); die Anwendung bleibt gleich.
+- **Betrieb:** Der Container läuft hinter dem Reverse-Proxy der Kommune, PostgreSQL läuft als eigener Container (`postgres:17`) mit Volume, das Dokumentarchiv liegt auf einem Volume; beides wird täglich gesichert (pg_dump mit Wiederherstellungstest).
+- **Wachstum:** PostgreSQL trägt auch mehrere VHS (je Mandant eine Datenbank) und gleichzeitige Schreibzugriffe zum Anmeldestart; der Wechsel von SQLite (24.11.2026) betraf nur die Infrastrukturschicht.
 
 ### Blazor-Betriebsart je Kanal
 
@@ -256,7 +256,7 @@ Beim Erzeugen speichert das System das PDF, die aufgelösten Daten als JSON und 
 
 - Bei einer Änderung fragt die Maske „Korrektur (war schon immer so)“ oder „Änderung ab Datum“; Standard ist Änderung ab heute.
 - Historisierte Felder zeigen ein kleines Uhr-Symbol; ein Klick öffnet die Zeitleiste der Versionen.
-- Technisch: eine generische Basis für Versionen, ein Abfrage-Helfer `AlsStichtag(gueltigAm, bekanntAm)` für EF Core, Indizes auf (Id, GueltigVon). SQLite kennt keine temporalen Tabellen, das Muster wird daher in der Anwendung umgesetzt.
+- Technisch: eine generische Basis für Versionen, ein Abfrage-Helfer `AlsStichtag(gueltigAm, bekanntAm)` für EF Core, Indizes auf (Id, GueltigVon). Das Muster wird in der Anwendung umgesetzt (keine temporalen Tabellen der Datenbank); Teilindizes über die nicht ersetzten Versionen halten die Abfragen „Stand heute“ klein.
 
 ## Buchungsrechte
 
@@ -323,7 +323,7 @@ Die Regeln laufen nach jedem relevanten Ereignis (z. B. neue Belegung) und zusä
 | --- | --- |
 | Oberfläche | Blazor-Komponente `Virtualize` mit `ItemsProvider` bzw. Radzen DataGrid mit Virtualisierung: Es werden nur die sichtbaren Zeilen plus Puffer gezeichnet; fehlende Abschnitte lädt die Komponente beim Scrollen nach und zeigt solange Platzhalterzeilen. |
 | Abfrage | Abschnitte à 50 Zeilen über Keyset-Pagination („nach Name X, Id Y“) statt OFFSET, damit auch tiefe Positionen schnell bleiben; die Gesamtzahl kommt aus einer separaten COUNT-Abfrage. |
-| Suche | SQLite FTS5-Volltextindex über Namen, E-Mail, Kursnummer und Titel; zusätzlich eine normalisierte Suchspalte (Yılmaz → yilmaz, ä → ae), damit Schreibvarianten gefunden werden. |
+| Suche | Direkt in den Versionstabellen über die SQL-Funktionen `suchtext`/`suchwoerter`/`namensuchtext` (Yılmaz → yilmaz, ä = ae = a, ß = ss) mit Trigramm-Indizes (pg_trgm); unscharfe Suche mit `word_similarity` und Levenshtein (fuzzystrmatch). Keine Suchtabelle, keine Kopien. |
 | Filter | Facettenzählungen je Filterwert über gruppierte Abfragen auf indizierten Spalten; bei Bedarf zwischengespeichert. |
 | Sammelaktionen | Arbeiten auf der Filterdefinition, nicht auf geladenen Zeilen; große Mengen laufen als Hintergrundauftrag mit Protokoll. |
 
@@ -391,7 +391,7 @@ Jede der 28 Schnittstellen aus der Anforderungsanalyse (S-01 bis S-28) ist ein P
 ### Bausteine
 
 - **Port und Adapter:** Die Anwendung kennt nur Schnittstellen wie `IFinanzUebergabe`, `IBamfMeldung`, `IUebersetzung`, `IMailVersand`, `ISepaDatei`. Welche Implementierung läuft (Mock oder echt), steht in der Konfiguration.
-- **Outbox:** Die fachliche Änderung und der Versandauftrag werden in derselben SQLite-Transaktion gespeichert. Ein Hintergrunddienst versendet, wiederholt bei Fehlern mit wachsendem Abstand und setzt den Status.
+- **Outbox:** Die fachliche Änderung und der Versandauftrag werden in derselben Datenbanktransaktion gespeichert. Ein Hintergrunddienst versendet, wiederholt bei Fehlern mit wachsendem Abstand und setzt den Status.
 - **Inbox für Eingangsdateien:** Kontoauszüge (camt) und Rückmeldungen werden eingelesen, gegen doppelte Verarbeitung gesichert und zugeordnet; nicht zuordenbare Posten landen in einer Klärungsliste.
 - **Protokoll am Vorgang:** Jeder Versand und Empfang erscheint am Kurs, an der Person oder an der Rechnung, mit Inhalt, Zeitpunkt und Ergebnis.
 - **Vertragstests:** Mock und echte Implementierung bestehen dieselbe Testreihe, damit der Wechsel später keine Überraschungen bringt.
@@ -421,8 +421,8 @@ Hilfe (`docs/hilfe.md`), Spezifikation und technische Doku werden beim Bauen aus
 Markdown dargestellt (Markdig, HTML im Text abgeschaltet, Links nur http(s), mailto, Anker und Seiten der Anwendung). Jedes
 Dokument ist an den Überschriften in Abschnitte zerlegt; daran hängen Inhaltsverzeichnis und Kommentare (FA-160).
 
-- **Kommentare** liegen in einer eigenen SQLite-Datei `kommentare.db` neben der Hauptdatenbank, mit eigener Schemaversion
-  (`PRAGMA user_version`) statt Neuaufbau: Die Hauptdatenbank darf in der Entwicklungsphase beim Ausrollen neu entstehen
+- **Kommentare** liegen in einer eigenen Datenbank `<haupt>_kommentare` neben der Hauptdatenbank, mit eigener Schemaversion
+  (Tabelle `Schemainfo`) statt Neuaufbau (eine alte `kommentare.db` aus der SQLite-Zeit wird beim ersten Start einmal übernommen): Die Hauptdatenbank darf in der Entwicklungsphase beim Ausrollen neu entstehen
   (NFA-27), die Kommentare nicht (NFA-26). Verfasser und Abschnittstitel stehen als Text darin, weil sich Benutzer-Ids und
   Überschriften ändern können. Die tägliche Sicherung und das Ausrollen sichern die Datei mit.
 - **Impressum** ist ein Feld der Einrichtung (Markdown), öffentlich unter `/impressum` (FA-159).
@@ -438,7 +438,7 @@ Die meisten Tests prüfen die Fachlogik schnell und ohne Oberfläche; wenige End
 | Ebene | Was wird geprüft | Werkzeug | Wann |
 | --- | --- | --- | --- |
 | Unit | Zeitliche Gültigkeit, Buchungsprüfung, Entgelte und Ermäßigungen, Stornofristen, Mahnstufen, UE-Berechnung | xUnit, Shouldly | jeder Build |
-| Integration | Datenzugriff mit echter SQLite-Datei, Migrationen, API-Endpunkte, Outbox | WebApplicationFactory, Testcontainers bei Bedarf | jeder Build |
+| Integration | Datenzugriff mit echter PostgreSQL-Datenbank (Wegwerf-Datenbank je Test als Kopie einer Vorlage, `CREATE DATABASE … TEMPLATE`), API-Endpunkte, Outbox | Kestrel im Testprozess, lokaler Container (deploy/docker-compose.yml) | jeder Build |
 | Vertrag | Mock und echter Adapter verhalten sich gleich; Dateiformate gegen XSD (SEPA, XRechnung) | xUnit, Schemaprüfung | jeder Build |
 | Dokumente | PDF- und Mailinhalte bleiben stabil (Namen, Stichtage, QR-Code vorhanden) | Verify (Snapshot) | jeder Build |
 | End-to-End | Kernabläufe: Kurs anlegen, Anmeldung am Tresen, QR-Check-in, Bescheinigung, Mahnlauf | Playwright für .NET | täglich |
@@ -464,7 +464,8 @@ Alle vorgeschlagenen Bibliotheken sind frei für eine Kommune nutzbar (MIT, Apac
 | Bibliothek | Zweck | Lizenz |
 | --- | --- | --- |
 | .NET 11 (erschienen am 10.11.2026), ASP.NET Core, Blazor | Laufzeit, Web, interaktive Oberfläche | MIT |
-| Entity Framework Core + Microsoft.Data.Sqlite | Datenzugriff, Migrationen | MIT |
+| Entity Framework Core + Npgsql | Datenzugriff (PostgreSQL) | MIT / PostgreSQL |
+| Microsoft.Data.Sqlite | nur einmalige Übernahme alter `kommentare.db` | MIT |
 | [Radzen.Blazor](https://github.com/radzenhq/radzen-blazor) | Tabellen, Formulare, Terminplaner (Scheduler), Diagramme | MIT |
 | Microsoft.AspNetCore.Authentication.OpenIdConnect | Kommunale Anmeldung | MIT |
 | FluentValidation | Eingabeprüfung mit verständlichen Meldungen | Apache 2.0 |
@@ -477,7 +478,7 @@ Alle vorgeschlagenen Bibliotheken sind frei für eine Kommune nutzbar (MIT, Apac
 | Quartz.NET | Zeitgesteuerte Abläufe | Apache 2.0 |
 | Serilog | Strukturiertes Logging | Apache 2.0 |
 | Microsoft.AspNetCore.OpenApi + Scalar | API-Beschreibung und Dokumentation | MIT |
-| Litestream | Laufende Sicherung der SQLite-Datei | Apache 2.0 |
+| PostgreSQL 17 (Container `postgres:17`) | Datenbank, pg_dump/pg_restore für die Sicherung | PostgreSQL-Lizenz |
 | xUnit, Shouldly, Verify, Bogus | Tests, Snapshot-Tests, Testdaten | Apache 2.0 / BSD / MIT / MIT |
 | Playwright für .NET, axe-core | End-to-End- und Barrierefreiheitstests | Apache 2.0 / MPL 2.0 |
 | Mailpit | Mail-Postfach für Entwicklung und Mocks | MIT |

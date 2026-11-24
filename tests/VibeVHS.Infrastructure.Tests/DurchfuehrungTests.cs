@@ -396,7 +396,7 @@ public class DurchfuehrungTests
         {
             var verfaelscht = (byte[])dok.Pdf.Clone();
             verfaelscht[^20] ^= 0xFF;
-            await db.Database.ExecuteSqlAsync($"UPDATE Dokumente SET Pdf = {verfaelscht} WHERE Id = {VibeVHS.Infrastructure.Datenbank.Speicherformate.IdBytes(dok.Id)}", ct);
+            await db.Database.ExecuteSqlAsync($"UPDATE \"Dokumente\" SET \"Pdf\" = {verfaelscht} WHERE \"Id\" = {dok.Id}", ct);
         }
 
         await using (var db = t.NeuerKontext())

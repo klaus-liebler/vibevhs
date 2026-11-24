@@ -3,7 +3,7 @@
 # Geheimnisse (z. B. Anmeldung__Zugangscode) stehen nur in /etc/vibevhs/vibevhs.env (root, 0640), nie im Repository.
 [Unit]
 Description=VibeVHS Verwaltung (Testsystem)
-After=network-online.target
+After=network-online.target snap.docker.dockerd.service
 Wants=network-online.target
 
 [Service]
@@ -21,8 +21,10 @@ Environment=ASPNETCORE_ENVIRONMENT=Testsystem
 Environment=ASPNETCORE_URLS=http://127.0.0.1:5080
 Environment=DOTNET_NOLOGO=1
 Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
-# Wert mit Leerzeichen: ganze Zuweisung in Anführungszeichen, sonst trennt systemd bei „Data Source“
-Environment="ConnectionStrings__VibeVHS=Data Source=/var/lib/vibevhs/vibevhs.db"
+# Datenbank: PostgreSQL im Container vibevhs-db (Schritt 09); die Verbindung mit Passwort steht nur in /etc/vibevhs/vibevhs.env.
+# Sicherung mit pg_dump/pg_restore 17 vom Host (Paket postgresql-client-17), alte kommentare.db wird beim ersten Start übernommen.
+Environment=Sicherung__PgBin=/usr/lib/postgresql/17/bin
+Environment=Kommentare__Altdatei=/var/lib/vibevhs/kommentare.db
 Environment=Speicher__Dokumente=/var/lib/vibevhs/dokumente
 Environment=Speicher__Schluessel=/var/lib/vibevhs/schluessel
 Environment=Speicher__Logs=/var/log/vibevhs

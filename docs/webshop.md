@@ -28,7 +28,7 @@ ein Test prüft, dass jede Route darin beschrieben ist). Versioniert über den P
 **Reservierung:** Offene Warenkörbe zählen gegen die Kapazität – auch am Tresen (`IPlatzreservierungen` in
 `AnmeldungDienst`). Der `ShopJob` (jede Minute) gibt abgelaufene Reservierungen frei und protokolliert das,
 löscht unbestätigte Registrierungen nach `Shop:DoiStunden` (48) und aktualisiert den Veröffentlichungsstand.
-Reservieren und Buchen laufen nacheinander (eine Sperre im Prozess; SQLite, eine Instanz) – parallele Anfragen überbuchen nicht.
+Reservieren und Buchen laufen nacheinander (eine Sperre im Prozess, eine Instanz je Datenbank) – parallele Anfragen überbuchen nicht.
 
 **Buchen** ist alles-oder-nichts (Datenbanktransaktion). Gleicher Schlüssel + gleiche Anfrage → dieselbe Antwort (200,
 `wiederholt: true`, ohne neuen Arbeitsnachweis); gleicher Schlüssel + andere Anfrage → 422 `idempotenz-konflikt`.

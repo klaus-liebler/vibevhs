@@ -88,7 +88,7 @@ befristet (danach `sudo rm /etc/sudoers.d/srvadmin`).
 
 `ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/02-pakete.sh"`
 
-nginx, ufw, apache2-utils (htpasswd), at, sqlite3, curl, openssl und die passende `libicuNN` für .NET (kein certbot). nginx wird **nicht**
+nginx, ufw, apache2-utils (htpasswd), at, sqlite3 (nur noch für Altdateien), curl, openssl und die passende `libicuNN` für .NET (kein certbot). nginx wird **nicht**
 gestartet (Apache belegt 80/443 noch). **Prüfen:** Ausgabe zeigt Versionen und „Apache läuft weiter“. Rückweg: nicht nötig.
 
 VibeVHS braucht **kein .NET auf dem Server**: `deploy.ps1` baut self-contained für linux-x64 (für Ubuntu 26.04 gibt es noch
@@ -189,10 +189,11 @@ Start mit „Datenbankschema veraltet“ ab, die vorige Version kommt zurück, u
 .\deploy\server\deploy.ps1 -DbNeu            # mit Rückfrage; -OhneRueckfrage für Skripte
 ```
 
-`-DbNeu` verschiebt `vibevhs.db` samt `-wal`/`-shm` nach `/var/lib/vibevhs/beiseite/<datei>.<zeitstempel>` (Ordner 0700,
-Dienstbenutzer; nichts wird gelöscht), die Anwendung baut die Datenbank aus Start- und Demodaten neu auf (Erststart
-~1,5 min, das Skript wartet bis 5 min). Scheitert der Start, kommen vorige Version **und** vorige Datenbank zurück.
-Alte Dateien in `beiseite/` gelegentlich von Hand löschen. (Vorfall dazu: `protokoll/2026-11-17-diagnose-502.md`.)
+`-DbNeu` benennt die Datenbank `vibevhs` im Container `vibevhs-db` in `vibevhs_alt_<zeitstempel>` um (nichts wird gelöscht), die
+Anwendung baut die Datenbank aus Start- und Demodaten neu auf (Erststart ~1 min, das Skript wartet bis 5 min). Scheitert der Start,
+kommen vorige Version **und** vorige Datenbank zurück. Die Kommentar-Datenbank `vibevhs_kommentare` bleibt immer unberührt. Alte
+Datenbanken gelegentlich löschen: `docker exec vibevhs-db psql -U vibevhs -d postgres -c 'DROP DATABASE "vibevhs_alt_…"'`.
+(Vorfall dazu: `protokoll/2026-11-17-diagnose-502.md`.)
 
 **Prüfen:** `https://liebler.iui.hs-osnabrueck.de/vibevhs/` fragt nach dem Zugangspasswort (Benutzer `vhs-test`), danach
 die Testanmeldung mit dem Banner „Testsystem“.
@@ -208,12 +209,29 @@ die Testanmeldung mit dem Banner „Testsystem“.
 | `…/brief/`, `…/uebersetzen/` | Passwort | freigeben, wenn echte Briefe/Mails mit Übersetzungslink verschickt werden |
 | `…/portal/` | Passwort | freigeben, wenn echte Teilnehmende/Kursleitungen die Portale nutzen |
 
-**Sicherung:** täglich 01:30 Uhr Online-Sicherung nach `/var/backups/vibevhs` mit Wiederherstellungstest (Seite *Betrieb*),
-dazu vor jedem Update `vor-update-*.db`. **Optional Litestream** (fortlaufende Replikation, Vorlage `litestream/litestream.yml`):
-`apt install litestream` bzw. Paket von litestream.io, Konfiguration nach `/etc/litestream.yml`, `systemctl enable --now litestream`.
+**Sicherung:** täglich 01:30 Uhr `pg_dump` nach `/var/backups/vibevhs` mit echtem Wiederherstellungstest (Zurückspielen in eine
+Wegwerf-Datenbank, Seite *Betrieb*), dazu vor jedem Update `vor-update-*-vibevhs.dump` und `…-vibevhs_kommentare.dump`.
 
-**Rücksicherung:** `sudo systemctl stop vibevhs` → gewünschte Sicherung als `/var/lib/vibevhs/vibevhs.db` einsetzen
-(vorher `-wal`/`-shm` beiseitelegen, Besitzer `vibevhs`) → `sudo systemctl start vibevhs`. Details: `docs/betrieb.md`.
+**Rücksicherung:** `sudo systemctl stop vibevhs` →
+`docker exec vibevhs-db psql -U vibevhs -d postgres -c 'ALTER DATABASE vibevhs RENAME TO vibevhs_defekt'` →
+`docker exec vibevhs-db createdb -U vibevhs vibevhs` →
+`docker exec -i vibevhs-db pg_restore -U vibevhs -d vibevhs --no-owner < /var/backups/vibevhs/<sicherung>.dump` →
+`sudo systemctl start vibevhs`. Details: `docs/betrieb.md`.
+
+---
+
+## 09 · PostgreSQL (Umstellung von SQLite, 24.11.2026)
+
+`ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/09-postgresql.sh"` – **vor** dem ersten Ausrollen einer Version mit PostgreSQL,
+danach `.\deploy\server\deploy.ps1 -DbNeu`.
+
+- Container `vibevhs-db` (`postgres:17`, `--restart unless-stopped`), nur `127.0.0.1:5441`, Daten im Docker-Volume `vibevhs-db`.
+- Zufälliges Passwort in `/etc/vibevhs/postgres.env` (root, 0600); die Verbindungszeichenfolge trägt das Skript in `/etc/vibevhs/vibevhs.env` ein.
+- `pg_dump`/`pg_restore` 17 auf dem Host (`postgresql-client-17`, notfalls aus apt.postgresql.org ⚑ prüfen), damit die Anwendung als
+  Benutzer `vibevhs` ohne Docker-Rechte sichern kann; das Skript prüft das zum Schluss mit einer Probe-Sicherung.
+- Beim ersten Start übernimmt die Anwendung die Kommentare aus `/var/lib/vibevhs/kommentare.db` in die Datenbank `vibevhs_kommentare`
+  und benennt die Datei in `kommentare.db.uebernommen` um. Die alte `vibevhs.db` bleibt liegen (nur Testdaten) und kann später weg.
+- Rückweg: `09-zurueck.sh` hält den Container an; eine ältere SQLite-Version mit `ausrollen.sh --zurueck` zurückholen.
 
 ---
 

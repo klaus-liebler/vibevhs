@@ -1,7 +1,7 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Quartz;
 using VibeVHS.Application.Personen;
 using VibeVHS.Application.Postausgang;
@@ -17,55 +17,78 @@ namespace VibeVHS.Infrastructure;
 
 public static class Registrierung
 {
+    /// <summary>Verbindung der lokalen Entwicklungsdatenbank (deploy/docker-compose.yml); nur in appsettings.Development.json eingetragen.</summary>
+    public const string Entwicklungsverbindung = "Host=127.0.0.1;Port=5441;Database=vibevhs;Username=vibevhs;Password=entwicklung";
+
     /// <summary>
-    /// Liest die Verbindungszeichenfolge (ConnectionStrings:VibeVHS bzw. ConnectionStrings__VibeVHS) und löst relative Pfade auf.
-    /// Fehlt sie, gilt „Data Source=data/vibevhs.db“; ist sie ungültig, bricht der Start mit einer verständlichen Meldung ab.
+    /// Liest die Verbindungszeichenfolge (ConnectionStrings:VibeVHS bzw. ConnectionStrings__VibeVHS) zu PostgreSQL. Fehlt sie oder nennt sie
+    /// keinen Server oder keine Datenbank, bricht der Start mit einer verständlichen Meldung ab.
     /// </summary>
-    public static SqliteConnectionStringBuilder Datenbankverbindung(string? wert, string basisVerzeichnis)
+    public static NpgsqlConnectionStringBuilder Datenbankverbindung(string? wert)
     {
-        const string hinweis = "Erwartet z. B. „Data Source=/var/lib/vibevhs/vibevhs.db“. In einer systemd-Unit die ganze Zuweisung " +
-                               "in Anführungszeichen setzen: Environment=\"ConnectionStrings__VibeVHS=Data Source=…\" (sonst trennt systemd am Leerzeichen).";
-        SqliteConnectionStringBuilder verbindung;
+        const string hinweis = "Erwartet z. B. „Host=127.0.0.1;Port=5432;Database=vibevhs;Username=vibevhs;Password=…“. In einer systemd-Unit die ganze " +
+                               "Zuweisung in Anführungszeichen setzen: Environment=\"ConnectionStrings__VibeVHS=Host=…\" (sonst trennt systemd am Leerzeichen). " +
+                               "Für die Entwicklung: docker compose -f deploy/docker-compose.yml up -d.";
+        if (string.IsNullOrWhiteSpace(wert))
+        {
+            throw new InvalidOperationException($"Keine Datenbank-Verbindungszeichenfolge ConnectionStrings:VibeVHS. {hinweis}");
+        }
+
+        NpgsqlConnectionStringBuilder verbindung;
         try
         {
-            verbindung = new SqliteConnectionStringBuilder(string.IsNullOrWhiteSpace(wert) ? "Data Source=data/vibevhs.db" : wert);
+            verbindung = new NpgsqlConnectionStringBuilder(wert);
         }
         catch (ArgumentException ex)
         {
-            throw new InvalidOperationException($"Ungültige Datenbank-Verbindungszeichenfolge ConnectionStrings:VibeVHS = „{wert}“. {hinweis}", ex);
+            throw new InvalidOperationException($"Ungültige Datenbank-Verbindungszeichenfolge ConnectionStrings:VibeVHS = „{Ohne(wert)}“. {hinweis}", ex);
         }
 
-        if (string.IsNullOrWhiteSpace(verbindung.DataSource))
+        if (string.IsNullOrWhiteSpace(verbindung.Host) || string.IsNullOrWhiteSpace(verbindung.Database))
         {
-            throw new InvalidOperationException($"Datenbank-Verbindungszeichenfolge ConnectionStrings:VibeVHS = „{wert}“ nennt keine Datei (Data Source fehlt). {hinweis}");
-        }
-
-        if (!Path.IsPathRooted(verbindung.DataSource) && verbindung.DataSource != ":memory:")
-        {
-            verbindung.DataSource = Path.GetFullPath(Path.Combine(basisVerzeichnis, verbindung.DataSource));
+            throw new InvalidOperationException(
+                $"Datenbank-Verbindungszeichenfolge ConnectionStrings:VibeVHS = „{Ohne(wert)}“ nennt keinen Server (Host) oder keine Datenbank (Database). {hinweis}");
         }
 
         return verbindung;
     }
 
+    /// <summary>Verbindungszeichenfolge ohne Passwort (für Meldungen).</summary>
+    private static string Ohne(string wert)
+    {
+        try
+        {
+            var b = new NpgsqlConnectionStringBuilder(wert);
+            if (!string.IsNullOrEmpty(b.Password))
+            {
+                b.Password = "***";
+            }
+
+            return b.ConnectionString;
+        }
+        catch (ArgumentException)
+        {
+            return wert.Contains("Password", StringComparison.OrdinalIgnoreCase) ? "(nicht lesbar, enthält ein Passwort)" : wert;
+        }
+    }
+
     /// <summary>
-    /// Verbindung der Kommentar-Datenbank: ConnectionStrings:Kommentare, sonst „kommentare.db“ im Verzeichnis der (ersten)
-    /// Hauptdatenbank; liegt diese im Arbeitsspeicher, unter data/ im Basisverzeichnis.
+    /// Verbindung der Kommentar-Datenbank: ConnectionStrings:Kommentare, sonst dieselbe Verbindung wie die (erste) Hauptdatenbank mit der
+    /// Datenbank „&lt;name&gt;_kommentare“ – eine eigene Datenbank, die das Beiseitelegen der Hauptdatenbank übersteht.
     /// </summary>
-    public static string KommentarVerbindung(IConfiguration konfiguration, string hauptverbindung, string basisVerzeichnis)
+    public static string KommentarVerbindung(IConfiguration konfiguration, string hauptverbindung)
     {
         if (konfiguration.GetConnectionString("Kommentare") is { Length: > 0 } eigene)
         {
-            return Datenbankverbindung(eigene, basisVerzeichnis).ToString();
+            return Datenbankverbindung(eigene).ConnectionString;
         }
 
-        var haupt = new SqliteConnectionStringBuilder(hauptverbindung).DataSource;
-        var verzeichnis = haupt == ":memory:" ? Path.Combine(basisVerzeichnis, "data") : Path.GetDirectoryName(Path.GetFullPath(haupt))!;
-        return new SqliteConnectionStringBuilder { DataSource = Path.Combine(verzeichnis, "kommentare.db") }.ToString();
+        var haupt = new NpgsqlConnectionStringBuilder(hauptverbindung);
+        return new NpgsqlConnectionStringBuilder(hauptverbindung) { Database = haupt.Database + "_kommentare" }.ConnectionString;
     }
 
     /// <param name="strengeAbfragepruefung">Abfragen ohne eindeutige Sortierung brechen ab (Entwicklung, Tests) statt nur protokolliert zu werden.</param>
-    /// <param name="basisVerzeichnis">Relative Datenbankpfade werden hierzu aufgelöst (Inhaltsverzeichnis der Anwendung).</param>
+    /// <param name="basisVerzeichnis">Inhaltsverzeichnis der Anwendung (relative Pfade, z. B. eine alte Kommentar-Datei zur Übernahme).</param>
     public static IServiceCollection AddVibeVhsInfrastruktur(this IServiceCollection dienste, IConfiguration konfiguration,
         string basisVerzeichnis, bool strengeAbfragepruefung = false)
     {
@@ -74,23 +97,26 @@ public static class Registrierung
 
         // Mandanten (Vorbereitung „eine Datenbank je VHS“): Mandanten:<Kennung>:Datenbank / :Host; ohne Eintrag genau ein Mandant „standard“.
         var mandanten = konfiguration.GetSection("Mandanten").GetChildren()
-            .Select(m => new Application.Betrieb.Mandant(m.Key, Datenbankverbindung(m["Datenbank"], basisVerzeichnis).ToString(), m["Host"]))
+            .Select(m => new Application.Betrieb.Mandant(m.Key, Datenbankverbindung(m["Datenbank"]).ConnectionString, m["Host"]))
             .ToList();
         if (mandanten.Count == 0)
         {
-            mandanten.Add(new Application.Betrieb.Mandant("standard", Datenbankverbindung(konfiguration.GetConnectionString("VibeVHS"), basisVerzeichnis).ToString()));
+            mandanten.Add(new Application.Betrieb.Mandant("standard", Datenbankverbindung(konfiguration.GetConnectionString("VibeVHS")).ConnectionString));
         }
 
         dienste.AddSingleton(new Application.Betrieb.Mandanten(mandanten));
         dienste.AddScoped<Application.Betrieb.Mandantenkontext>();
-        dienste.AddDbContext<VibeVhsDbContext>((d, o) => o.UseSqlite(d.GetRequiredService<Application.Betrieb.Mandantenkontext>().Aktuell.Verbindung,
+        dienste.AddDbContext<VibeVhsDbContext>((d, o) => o.UseNpgsql(d.GetRequiredService<Application.Betrieb.Mandantenkontext>().Aktuell.Verbindung,
             s => s.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)).Konfigurieren(strengeAbfragepruefung)
             .AddInterceptors(StichzeitBeimLaden.Instanz));
 
-        // Kommentare zu Spezifikation/Doku: eigene Datei (Standard: kommentare.db neben der Hauptdatenbank), übersteht deren Neuanlage.
-        var kommentarOrt = new Dokumentation.KommentarDatenbankOrt(KommentarVerbindung(konfiguration, mandanten[0].Verbindung, basisVerzeichnis));
+        // Kommentare zu Spezifikation/Doku: eigene Datenbank (Standard: <haupt>_kommentare), übersteht das Beiseitelegen der Hauptdatenbank.
+        // Eine alte Kommentar-Datei aus der SQLite-Zeit (Kommentare:Altdatei) wird beim ersten Start einmal übernommen.
+        var altdatei = konfiguration["Kommentare:Altdatei"];
+        var kommentarOrt = new Dokumentation.KommentarDatenbankOrt(KommentarVerbindung(konfiguration, mandanten[0].Verbindung),
+            string.IsNullOrWhiteSpace(altdatei) ? null : Path.GetFullPath(Path.Combine(basisVerzeichnis, altdatei)));
         dienste.AddSingleton(kommentarOrt);
-        dienste.AddDbContext<Dokumentation.KommentarDbContext>(o => o.UseSqlite(kommentarOrt.Verbindung).Konfigurieren(strengeAbfragepruefung));
+        dienste.AddDbContext<Dokumentation.KommentarDbContext>(o => o.UseNpgsql(kommentarOrt.Verbindung).Konfigurieren(strengeAbfragepruefung));
         dienste.AddScoped<Application.Dokumentation.IKommentarSpeicher, Dokumentation.KommentarSpeicher>();
 
         dienste.AddScoped<IPersonenSpeicher, PersonenSpeicher>();
@@ -125,7 +151,8 @@ public static class Registrierung
         dienste.AddScoped<Application.Integration.IIntegrationSpeicher, Integration.IntegrationSpeicher>();
         dienste.AddScoped<Application.Betrieb.IAuswertungsquelle, Betrieb.Auswertungsquelle>();
         dienste.AddSingleton<Application.Betrieb.ITabellenExport, Betrieb.TabellenExport>();
-        dienste.AddScoped<Application.Betrieb.ISicherung, Betrieb.SqliteSicherung>();
+        dienste.AddSingleton(new Betrieb.SicherungsOrt(Path.GetFullPath(Path.Combine(basisVerzeichnis, konfiguration["Sicherung:Ordner"] ?? "data/sicherung"))));
+        dienste.AddScoped<Application.Betrieb.ISicherung, Betrieb.PostgresSicherung>();
         dienste.AddScoped<Application.Betrieb.IImportSpeicher, Betrieb.ImportSpeicher>();
         dienste.AddScoped<Application.Finanzen.IFinanzprotokoll, Finanzen.Finanzprotokoll>();
         dienste.AddScoped<Application.Portal.IPortalSpeicher, Portal.PortalSpeicher>();

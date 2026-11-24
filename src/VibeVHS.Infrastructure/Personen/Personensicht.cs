@@ -73,17 +73,18 @@ public static class Personensicht
     /// <summary>
     /// Personen, auf die ein Suchwort passt (Wortanfang, normalisiert), direkt in den Versionstabellen – ohne eigene Suchtabelle und ohne
     /// Kopie. Durchsucht werden alle Versionen (auch frühere Namen und Adressen): Name, Titel, Geburtsdatum (TT.MM.JJJJ), Wohnort, E-Mail.
+    /// Die Suchausdrücke tragen Trigramm-Indizes (<see cref="Zusatzschema"/>), „LIKE '% wort%'“ wird damit zum Indexzugriff.
     /// </summary>
     public static IQueryable<Guid> MitSuchwort(this VibeVhsDbContext db, string wort)
     {
-        var muster = " " + wort;
+        var muster = "% " + Suchmuster(wort) + "%";
         var namen = db.Set<PersonName>()
-            .Where(n => (" " + SqlFunktionen.Suchtext(n.Vorname + " " + n.Vorsatz + " " + n.Nachname + " " + n.Zusatz)).Contains(muster))
+            .Where(n => EF.Functions.Like(SqlFunktionen.Namensuche(n.Vorname, n.Vorsatz, n.Nachname, n.Zusatz), muster))
             .Select(n => EF.Property<Guid>(n, "PersonId"));
-        var titel = db.Set<PersonMerkmal>().Where(m => m.Art == MerkmalArt.Titel && (" " + SqlFunktionen.Suchtext(m.Inhalt)).Contains(muster))
+        var titel = db.Set<PersonMerkmal>().Where(m => m.Art == MerkmalArt.Titel && EF.Functions.Like(SqlFunktionen.Suchwoerter(m.Inhalt), muster))
             .Select(m => EF.Property<Guid>(m, "PersonId"));
-        var orte = db.Set<Postadresse>().Where(a => (" " + SqlFunktionen.Suchtext(a.Ort)).Contains(muster)).Select(a => EF.Property<Guid>(a, "PersonId"));
-        var mails = db.Set<EMailAdresse>().Where(e => (" " + SqlFunktionen.Suchtext(e.Adresse)).Contains(muster)).Select(e => EF.Property<Guid>(e, "PersonId"));
+        var orte = db.Set<Postadresse>().Where(a => EF.Functions.Like(SqlFunktionen.Suchwoerter(a.Ort), muster)).Select(a => EF.Property<Guid>(a, "PersonId"));
+        var mails = db.Set<EMailAdresse>().Where(e => EF.Functions.Like(SqlFunktionen.Suchwoerter(e.Adresse), muster)).Select(e => EF.Property<Guid>(e, "PersonId"));
         var treffer = namen.Union(titel).Union(orte).Union(mails);
         if (DateOnly.TryParseExact(wort, "dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var datum))
         {
@@ -92,6 +93,9 @@ public static class Personensicht
 
         return treffer;
     }
+
+    /// <summary>Suchwort für LIKE: normalisiert – enthält danach nur Buchstaben, Ziffern, „@“, „.“ und Leerzeichen, also keine Platzhalter.</summary>
+    public static string Suchmuster(string wort) => Domain.Gemeinsam.Suchtext.Normalisieren(wort);
 
     /// <summary>Anzeigenamen (Titel + Name) zum Stichtag für viele Personen in zwei Abfragen.</summary>
     public static async Task<Dictionary<Guid, string>> AnzeigenamenAsync(this VibeVhsDbContext db, IReadOnlyCollection<Guid> ids, DateOnly tag,
@@ -130,15 +134,45 @@ public sealed class PersonMitSchluessel
     public required string IdHex { get; init; }
 }
 
-/// <summary>SQL-Funktionen für Abfragen auf Textspalten (in <see cref="VibeVhsDbContext"/> registriert).</summary>
+/// <summary>SQL-Funktionen für Abfragen (in <see cref="VibeVhsDbContext"/> registriert, angelegt in <see cref="Zusatzschema"/>).</summary>
 public static class SqlFunktionen
 {
-    /// <summary>CAST(text AS INTEGER) – z. B. die Rollen-Bitmaske im Merkmal Rollen.</summary>
+    /// <summary>CAST(text AS bigint) – z. B. die Rollen-Bitmaske im Merkmal Rollen.</summary>
     public static long Ganzzahl(string text) => throw new InvalidOperationException("Nur in Datenbankabfragen verwendbar.");
 
-    /// <summary>suchtext(x) – normalisierte Schreibweise (siehe <see cref="Domain.Gemeinsam.Suchtext"/>), als SQLite-Funktion registriert.</summary>
+    /// <summary>suchtext(x) – normalisierte Schreibweise (siehe <see cref="Domain.Gemeinsam.Suchtext"/>).</summary>
     public static string Suchtext(string? text) => throw new InvalidOperationException("Nur in Datenbankabfragen verwendbar.");
 
-    /// <summary>hex(id) – die 16 Bytes der Id als Großbuchstaben-Hex (Speicherreihenfolge), z. B. für Seitenschlüssel.</summary>
+    /// <summary>suchwoerter(x) – „ “ + suchtext(x), für die Suche nach Wortanfängen (Trigramm-Index).</summary>
+    public static string Suchwoerter(string? text) => throw new InvalidOperationException("Nur in Datenbankabfragen verwendbar.");
+
+    /// <summary>namensuchtext(vorname, vorsatz, nachname, zusatz) – „ “ + suchtext des ganzen Namens (Trigramm-Index).</summary>
+    public static string Namensuche(string? vorname, string? vorsatz, string? nachname, string? zusatz)
+        => throw new InvalidOperationException("Nur in Datenbankabfragen verwendbar.");
+
+    /// <summary>idhex(id) – die Id als Großbuchstaben-Hex ohne Bindestriche (gleiche Reihenfolge wie die uuid), z. B. für Seitenschlüssel.</summary>
     public static string Hex(Guid id) => throw new InvalidOperationException("Nur in Datenbankabfragen verwendbar.");
+
+    /// <summary>word_similarity(eingabe, text) aus pg_trgm: 0 bis 1, wie gut die Eingabe zu einem Wortabschnitt des Textes passt.</summary>
+    public static double WortAehnlichkeit(string eingabe, string? text) => throw new InvalidOperationException("Nur in Datenbankabfragen verwendbar.");
+
+    internal static void Registrieren(ModelBuilder modell)
+    {
+        var text = new Microsoft.EntityFrameworkCore.Storage.StringTypeMapping("text", System.Data.DbType.String);
+        Funktion(modell, nameof(Suchtext), "suchtext", text);
+        Funktion(modell, nameof(Suchwoerter), "suchwoerter", text);
+        Funktion(modell, nameof(Namensuche), "namensuchtext", text);
+        Funktion(modell, nameof(Hex), "idhex", text);
+        Funktion(modell, nameof(WortAehnlichkeit), "word_similarity", new Microsoft.EntityFrameworkCore.Storage.DoubleTypeMapping("double precision"), schema: null);
+        modell.HasDbFunction(typeof(SqlFunktionen).GetMethod(nameof(Ganzzahl))!)
+            .HasTranslation(a => new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlUnaryExpression(System.Linq.Expressions.ExpressionType.Convert, a[0], typeof(long),
+                new Microsoft.EntityFrameworkCore.Storage.LongTypeMapping("bigint")));
+    }
+
+    private static void Funktion(ModelBuilder modell, string methode, string name, Microsoft.EntityFrameworkCore.Storage.RelationalTypeMapping typ, string? schema = "public")
+    {
+        var m = typeof(SqlFunktionen).GetMethod(methode)!;
+        modell.HasDbFunction(m).HasTranslation(a => new Microsoft.EntityFrameworkCore.Query.SqlExpressions.SqlFunctionExpression(schema, name, a, nullable: true,
+            argumentsPropagateNullability: a.Select(_ => false), m.ReturnType, typ));
+    }
 }

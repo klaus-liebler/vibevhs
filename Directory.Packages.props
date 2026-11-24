@@ -3,10 +3,12 @@
     <!-- Transitive Abhängigkeiten (z. B. von PDFsharp) auf die hier genannten, sicheren Versionen heben. -->
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
-  <!-- Zentrale Paketversionen. Erlaubt: Radzen.Blazor, EF Core + SQLite, Serilog, Quartz.NET, xUnit, Shouldly, Bogus, Verify, ClosedXML.
+  <!-- Zentrale Paketversionen. Erlaubt: Radzen.Blazor, EF Core + PostgreSQL (Npgsql), Serilog, Quartz.NET, xUnit, Shouldly, Bogus, Verify, ClosedXML.
        Nicht verwenden: QuestPDF, Nager.Date, MediatR, AutoMapper, FluentAssertions. -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="11.0.0" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="11.0.0" />
+    <!-- nur für die einmalige Übernahme alter Kommentar-Dateien (kommentare.db) nach PostgreSQL -->
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="11.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="11.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="11.0.0" />
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="11.0.0" />

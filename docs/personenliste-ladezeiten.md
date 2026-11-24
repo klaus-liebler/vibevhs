@@ -1,6 +1,6 @@
 # Personenliste: Aufbau und Ladezeiten
 
-Stand 15.11.2026, Iteration I1. Messrechner: Entwicklungs-PC (Windows 11, .NET 11, SQLite im WAL-Modus).
+Stand 15.11.2026, Iteration I1 (historisch: damals SQLite; seit 24.11.2026 PostgreSQL, aktuelle Werte in `messungen.md`). Messrechner: Entwicklungs-PC (Windows 11, .NET 11, SQLite im WAL-Modus).
 
 ## Aufbau
 

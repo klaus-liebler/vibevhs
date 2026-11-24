@@ -1,5 +1,5 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -8,32 +8,41 @@ namespace VibeVHS.Infrastructure.Datenbank;
 public static class DatenbankInitialisierung
 {
     /// <summary>
-    /// Legt das Datenverzeichnis an, legt die Datenbank bei Bedarf neu an (bzw. prüft die Schemaversion, siehe <see cref="Schema"/>) und
-    /// schaltet SQLite in den WAL-Modus
-    /// (paralleles Lesen während geschrieben wird; die Einstellung bleibt in der Datei gespeichert).
+    /// Legt die Datenbanken aller Mandanten bei Bedarf neu an bzw. prüft ihre Schemaversion (siehe <see cref="Schema"/>), danach die
+    /// Kommentar-Datenbank. <c>Datenbank:BeiAbweichung = Beiseitelegen</c> benennt eine veraltete Datenbank um und legt sie neu an (NFA-27);
+    /// Standard ist „Abbrechen“ mit klarer Meldung.
     /// </summary>
     public static async Task InitialisierenAsync(IServiceProvider dienste, CancellationToken abbruch = default)
     {
-        await using var scope = dienste.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<VibeVhsDbContext>();
-        var log = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(DatenbankInitialisierung));
-
-        var verbindung = new SqliteConnectionStringBuilder(db.Database.GetConnectionString());
-        var datei = Path.GetFullPath(verbindung.DataSource);
-        var verzeichnis = Path.GetDirectoryName(datei);
-        if (!string.IsNullOrEmpty(verzeichnis))
+        var konfiguration = dienste.GetRequiredService<IConfiguration>();
+        var beiseitelegen = string.Equals(konfiguration["Datenbank:BeiAbweichung"], "Beiseitelegen", StringComparison.OrdinalIgnoreCase);
+        foreach (var mandant in dienste.GetRequiredService<Application.Betrieb.Mandanten>().Alle)
         {
-            Directory.CreateDirectory(verzeichnis);
+            await using var scope = dienste.CreateAsyncScope();
+            scope.ServiceProvider.GetRequiredService<Application.Betrieb.Mandantenkontext>().Setzen(mandant);
+            var db = scope.ServiceProvider.GetRequiredService<VibeVhsDbContext>();
+            var log = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(DatenbankInitialisierung));
+            var name = new Npgsql.NpgsqlConnectionStringBuilder(db.Database.GetConnectionString()).Database;
+            if (await Schema.AnlegenOderPruefenAsync(db, beiseitelegen, abbruch))
+            {
+                log.LogInformation("Datenbank {Datenbank} (Mandant {Mandant}) neu angelegt (Schemaversion {Version})", name, mandant.Kennung, Schema.Version(db));
+            }
+            else
+            {
+                log.LogInformation("Datenbank {Datenbank} (Mandant {Mandant}) bereit", name, mandant.Kennung);
+            }
         }
-
-        if (await Schema.AnlegenOderPruefenAsync(db, datei, abbruch))
-        {
-            log.LogInformation("Datenbank {Datei} neu angelegt (Schemaversion {Version})", datei, Schema.Version(db));
-        }
-
-        var modus = await db.Database.SqlQueryRaw<string>("PRAGMA journal_mode=WAL").ToListAsync(abbruch);
-        log.LogInformation("Datenbank {Datei} bereit, Journal-Modus {Modus}", datei, modus.FirstOrDefault());
 
         await Dokumentation.KommentarDbContext.InitialisierenAsync(dienste, abbruch);
+    }
+
+    /// <summary>
+    /// Aktualisiert die Planerstatistik (ANALYZE) der Datenbank des aktuellen Mandanten – nach Massenladen (Demodaten, Import), damit
+    /// PostgreSQL nicht wie für leere Tabellen plant, bis autovacuum nachzieht.
+    /// </summary>
+    public static async Task StatistikAktualisierenAsync(IServiceProvider dienste, CancellationToken abbruch = default)
+    {
+        await using var scope = dienste.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<VibeVhsDbContext>().Database.ExecuteSqlRawAsync("ANALYZE", abbruch);
     }
 }

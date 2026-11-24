@@ -28,4 +28,8 @@
     <None Include="..\..\tools\Testdaten\kufer-export-beispiel.csv" Link="kufer-export-beispiel.csv" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Gemeinsam\Wegwerfdatenbanken.cs" Link="Gemeinsam\Wegwerfdatenbanken.cs" />
+  </ItemGroup>
+
 </Project>
