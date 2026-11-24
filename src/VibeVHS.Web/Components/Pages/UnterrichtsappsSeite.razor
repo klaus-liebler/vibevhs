@@ -1,0 +1,105 @@
+@page "/unterrichts-apps"
+@using VibeVHS.Application.Durchfuehrung
+@using VibeVHS.Domain.Durchfuehrung
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+
+@* Unterrichts-Apps (QA-69): Katalog der vhs, eingebaut (Daten bleiben bei der vhs) oder angebunden (mit Freigabe). *@
+
+<PageTitle>Unterrichts-Apps · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Unterrichts-Apps</h1>
+        <p class="vhs-sub">Was Kursleitungen im Unterricht digital einsetzen: Quiz und Abstimmung, Übungen, Zeichenfläche, Lern-Apps. Eingebaute Apps laufen auf dem
+            Server der vhs und sind sofort nutzbar; angebundene gehören einem externen Anbieter und brauchen vorher die Freigabe der vhs. Die Kursleitung setzt
+            eine App im Dozierendenportal für ihren Kurs ein, die Teilnehmenden finden sie im Teilnehmendenportal.</p>
+    </div>
+    <Hinzufuegen Objekt="App" Titel="Unterrichts-App aufnehmen" Erlaubt="@pflege" OkText="Aufnehmen" Speichern="AnlegenAsync"
+                 Bereit="@(string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(adresse) ? Freigabe.Nein("Bitte Name und Adresse angeben.") : string.IsNullOrWhiteSpace(datenhinweis) ? Freigabe.Nein("Bitte angeben, wohin Daten gehen.") : Freigabe.Ja)">
+        <div class="vhs-fields">
+            <RadzenFormField Text="Name *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="name" Immediate="true" /></RadzenFormField>
+            <RadzenFormField Text="Einbindung" Variant="Variant.Outlined">
+                <RadzenDropDown TValue="Einbindung" @bind-Value="einbindung" Data="@Einbindungen" TextProperty="Text" ValueProperty="Wert" />
+            </RadzenFormField>
+            <RadzenFormField Text="Adresse (https://…) *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="adresse" Immediate="true" /></RadzenFormField>
+        </div>
+        <RadzenFormField Text="Wofür?" Variant="Variant.Outlined" Style="width:100%"><RadzenTextBox @bind-Value="beschreibung" Immediate="true" /></RadzenFormField>
+        <RadzenFormField Text="Wohin gehen Daten? *" Variant="Variant.Outlined" Style="width:100%"><RadzenTextBox @bind-Value="datenhinweis" Immediate="true" Placeholder="z. B. Anbieter in der EU, nur Vorname" /></RadzenFormField>
+    </Hinzufuegen>
+</div>
+
+@foreach (var (titel, eingebaut) in new[] { ("In VibeVHS eingebaut (Server der vhs)", true), ("Angebunden (externe Anbieter)", false) })
+{
+    <section class="vhs-card">
+        <h2>@titel</h2>
+        <div class="vhs-list">
+            @if (!katalog.Any(a => a.Eingebaut == eingebaut))
+            {
+                <div class="vhs-muted">Noch keine.</div>
+            }
+            @foreach (var a in katalog.Where(a => a.Eingebaut == eingebaut))
+            {
+                <div>
+                    <span class="vhs-grow"><b>@a.Name</b> · <a href="@a.Adresse" target="_blank" rel="noopener">@a.Adresse</a><br />
+                        <span class="vhs-small">@a.Beschreibung</span><br /><span class="vhs-small vhs-muted">Daten: @a.Datenhinweis</span></span>
+                    @if (a.Eingebaut)
+                    {
+                        <StatusPille Stil="gut">sofort nutzbar</StatusPille>
+                    }
+                    else if (a.FreigegebenAm is { } am)
+                    {
+                        <StatusPille Stil="gut">freigegeben @am.ToLocalTime().ToString("dd.MM.yyyy")</StatusPille>
+                        <BegruendeterButton Text="Freigabe zurücknehmen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@freigabe"
+                                            Rueckfrage="@($"„{a.Name}“ kann danach nicht mehr neu eingesetzt werden; laufende Einsätze bleiben sichtbar.")" RueckfrageJa="Zurücknehmen"
+                                            Click="@(() => FreigebenAsync(a, false))" />
+                    }
+                    else
+                    {
+                        <StatusPille Stil="warn">nicht freigegeben</StatusPille>
+                        <BegruendeterButton Text="Freigeben" Size="ButtonSize.Small" Freigabe="@freigabe" Click="@(() => FreigebenAsync(a, true))" />
+                    }
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private static readonly object[] Einbindungen =
+    [
+        new { Text = "Podium (eingebaut)", Wert = Einbindung.Podium },
+        new { Text = "selbst gehostet (eingebaut)", Wert = Einbindung.SelbstGehostet },
+        new { Text = "Link zu externem Anbieter (angebunden)", Wert = Einbindung.Link },
+    ];
+
+    private IReadOnlyList<Unterrichtsapp> katalog = [];
+    private Freigabe pflege = Freigabe.Ja, freigabe = Freigabe.Ja;
+    private string? name, adresse, beschreibung, datenhinweis;
+    private Einbindung einbindung = Einbindung.Link;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var rolle = (await Vorgang.BenutzerAsync()).Rolle;
+        pflege = Freigabe.NurFuer(rolle, UnterrichtsappDienst.PflegeRollen);
+        freigabe = Freigabe.NurFuer(rolle, UnterrichtsappDienst.FreigabeRollen);
+        await LadenAsync();
+    }
+
+    private async Task LadenAsync() => katalog = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<UnterrichtsappDienst>().KatalogAsync());
+
+    private async Task<bool> AnlegenAsync()
+    {
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<UnterrichtsappDienst>().AnlegenAsync(name!, einbindung, adresse!, beschreibung ?? string.Empty, datenhinweis!));
+        name = adresse = beschreibung = datenhinweis = null;
+        await LadenAsync();
+        return true;
+    }
+
+    private async Task FreigebenAsync(Unterrichtsapp a, bool frei)
+    {
+        await Vorgang.AusfuehrenAsync(async d => { await d.GetRequiredService<UnterrichtsappDienst>().FreigebenAsync(a.Id, frei); return 0; });
+        Hinweise.Notify(NotificationSeverity.Success, frei ? "Freigegeben" : "Freigabe zurückgenommen", a.Name);
+        await LadenAsync();
+    }
+}

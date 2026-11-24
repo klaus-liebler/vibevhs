@@ -1,0 +1,58 @@
+@using VibeVHS.Application.Betrieb
+@using VibeVHS.Infrastructure.Betrieb
+@implements IDisposable
+@inject IServiceProvider Dienste
+@inject NavigationManager Navigation
+
+@* Spielzeitleiste im Schulungsbetrieb (QA-68): Instanz, Spielzeit, Tempo; nach einem Sprung lädt die Seite selbst neu. *@
+@if (betrieb is not null)
+{
+    var s = betrieb.Stand;
+    <div class="vhs-spielzeit" role="status" aria-live="polite">
+        <span>Schulung <b>@s.Instanz</b></span>
+        <span class="vhs-mono">@betrieb.Uhr.GetLocalNow().ToString("ddd dd.MM. HH:mm:ss")</span>
+        <span>@(s.Tempo == 0 ? "angehalten" : s.Tempo == 1 ? "läuft" : $"Tempo {s.Tempo:0.##}×")</span>
+        @if (s.Marke is not null) { <span class="vhs-small">ab Marke „@(Schulungswoche.Marke(s.Marke)?.Titel ?? s.Marke)“</span> }
+        <a href="spielzeit">Spielzeit steuern</a>
+    </div>
+}
+
+@code {
+    private Schulungsbetrieb? betrieb;
+    private long weltstand;
+    private Timer? takt;
+
+    protected override void OnInitialized()
+    {
+        betrieb = Dienste.GetService<Schulungsbetrieb>();
+        if (betrieb is null)
+        {
+            return;
+        }
+
+        weltstand = betrieb.Uhr.Weltstand;
+        betrieb.Uhr.Geaendert += Geaendert;
+        takt = new Timer(_ => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    private void Geaendert()
+    {
+        if (betrieb!.Uhr.Weltstand != weltstand && !betrieb.Uhr.Wartung)
+        {
+            weltstand = betrieb.Uhr.Weltstand;
+            _ = InvokeAsync(() => Navigation.Refresh(forceReload: true));
+            return;
+        }
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        takt?.Dispose();
+        if (betrieb is not null)
+        {
+            betrieb.Uhr.Geaendert -= Geaendert;
+        }
+    }
+}

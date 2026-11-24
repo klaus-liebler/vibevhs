@@ -2,6 +2,7 @@
 @using VibeVHS.Domain.Programm
 @inject Vorgang Vorgang
 @inject NotificationService Hinweise
+@inject DialogService Dialoge
 
 @* Was jede Kursart vom Ort verlangt: Ja/Nein-Merkmal vorhanden, Auswahlwert, Ganzzahl mindestens n. Textmerkmale sind keine Bedingung. *@
 
@@ -22,7 +23,7 @@
                                     @if (Recht.Erlaubt)
                                     {
                                         <button class="vhs-linkbutton" title="Bedingung entfernen" aria-label="@($"{Anforderung.Anzeige(b, katalog)} entfernen")"
-                                                @onclick="@(() => SetzenAsync(art, art.BenoetigteMerkmale.Where(x => x != b).ToList()))">×</button>
+                                                @onclick="@(() => EntfernenAsync(art, b))">×</button>
                                     }
                                 </span>
                             }
@@ -99,6 +100,15 @@
             _ => m.Schluessel,
         };
         return SetzenAsync(art, [.. art.BenoetigteMerkmale, neu]);
+    }
+
+    private async Task EntfernenAsync(Kursart art, string bedingung)
+    {
+        if (await Dialoge.BestaetigenAsync($"Die Raumbedingung „{Anforderung.Anzeige(bedingung, katalog)}“ gilt danach nicht mehr für die Kursart {art.Name}; " +
+                                           "die Raumprüfung neuer Termine berücksichtigt sie nicht mehr.", "Raumbedingung entfernen?", "Entfernen"))
+        {
+            await SetzenAsync(art, art.BenoetigteMerkmale.Where(x => x != bedingung).ToList());
+        }
     }
 
     private async Task SetzenAsync(Kursart art, IReadOnlyList<string> bedingungen)

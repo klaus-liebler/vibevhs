@@ -52,6 +52,17 @@ internal static class AnmeldungMapping
             b.HasIndex(x => x.PersonId);
         });
 
+        mb.Entity<GesendetesRundschreiben>(b =>
+        {
+            b.ToTable("Rundschreiben");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Id).ValueGeneratedNever();
+            b.Property(x => x.Betreff).HasMaxLength(300);
+            b.Property(x => x.Zielgruppe).HasMaxLength(500);
+            b.Property(x => x.GesendetVon).HasMaxLength(200);
+            b.HasIndex(x => x.GesendetAm);
+        });
+
         mb.Entity<Textvorlage>(b =>
         {
             b.ToTable("Vorlagen");

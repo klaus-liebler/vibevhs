@@ -241,7 +241,7 @@ public sealed class QualifikationsDienst(
             return [];
         }
 
-        var treffer = await abfrage.SeiteAsync(new PersonenFilter(suche, Personenrolle.Dozierende), null, 8, abbruch);
+        var treffer = await abfrage.VorschlaegeAsync(suche, new PersonenFilter(Rolle: Personenrolle.Dozierende), 8, abbruch);
         var katalog = await speicher.KatalogAsync(abbruch);
         var ausnahmen = kursId is { } k ? await speicher.AusnahmenAsync(k, abbruch) : [];
         var liste = new List<DozentOption>();

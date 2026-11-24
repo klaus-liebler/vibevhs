@@ -77,12 +77,20 @@ public enum Treffertyp
     Person,
     Kurs,
     Ort,
+    Beleg,
+    Funktion,
 }
 
-public sealed record Suchtreffer(Treffertyp Typ, string Titel, string? Zusatz, string Ziel);
+public sealed record Suchtreffer(Treffertyp Typ, string Titel, string? Zusatz, string Ziel, Guid? Id = null);
 
-/// <summary>Globale Suche in der Kopfzeile: Personen, Kurse, Orte.</summary>
+/// <summary>
+/// Alles-Suche in der Kopfzeile (QA-12, QA-55, QA-61): Personen (fehlertolerant), Kurse, Orte, Belege und Funktionen – streng nur, was die
+/// aktive Rolle auch öffnen darf (gleiche Rechte wie beim Öffnen; Gesperrtes erscheint weder als Treffer noch als Anzahl).
+/// </summary>
 public interface IGlobaleSuche
 {
     Task<IReadOnlyList<Suchtreffer>> SuchenAsync(string text, int jeTyp = 5, CancellationToken abbruch = default);
+
+    /// <summary>Nur Kurse (Kursnummer, Titel), neueste zuerst – für Eingabehilfen wie die Schnellauswahl.</summary>
+    Task<IReadOnlyList<Suchtreffer>> KurseAsync(string text, int anzahl = 8, CancellationToken abbruch = default);
 }

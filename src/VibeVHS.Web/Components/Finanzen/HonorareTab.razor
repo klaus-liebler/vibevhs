@@ -37,6 +37,7 @@
                 <BegruendeterButton Text="Freigeben (festschreiben, Brief und Mail)" Size="ButtonSize.Small" Freigabe="@Buchen" IsBusy="@Beschaeftigt"
                                     Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<HonorarDienst>().FreigebenAsync(b.Id); return "Festgeschrieben."; }, b.EmpfaengerName))" />
                 <BegruendeterButton Text="Verwerfen" Size="ButtonSize.Small" Variant="Variant.Text" Freigabe="@Buchen"
+                                    Rueckfrage="@($"Der Honorarentwurf für {b.EmpfaengerName} wird gelöscht.")"
                                     Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<FinanzDienst>().EntwurfVerwerfenAsync(b.Id); return "Entwurf verworfen."; }, b.EmpfaengerName))" />
             </div>
         </details>

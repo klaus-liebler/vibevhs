@@ -9,8 +9,13 @@ public sealed record PersonenFilter(
     Personenstatus? Status = null,
     int? Fachbereich = null,
     bool NurDublettenHinweise = false,
-    Domain.Datenschutz.Datenschutzstatus? Datenschutz = null)
+    Domain.Datenschutz.Datenschutzstatus? Datenschutz = null,
+    bool Unscharf = false)
 {
+    /// <summary>
+    /// <see cref="Unscharf"/>: Suchwörter finden auch ähnliche Schreibweisen (Tippfehler, „Schmitt“/„Schmidt“, QA-60); die Personenliste schaltet
+    /// das ein, wenn die genaue Suche nichts findet.
+    /// </summary>
     public bool IstLeer => string.IsNullOrWhiteSpace(Suche) && Rolle is null && Status is null && Fachbereich is null && !NurDublettenHinweise && Datenschutz is null;
 }
 
@@ -65,6 +70,12 @@ public interface IPersonenAbfrage
     Task<IReadOnlyList<PersonZeile>> SeiteAsync(PersonenFilter filter, Seitenschluessel? nach, int anzahl, CancellationToken abbruch = default);
 
     Task<Filterzahlen> ZaehlenAsync(PersonenFilter filter, CancellationToken abbruch = default);
+
+    /// <summary>
+    /// Vorschläge für Eingabehilfen (Personenauswahl, Schnellsuche, QA-60): fehlertolerant (Tippfehler, Umlaute, Wortanfänge), beste Treffer
+    /// zuerst; nur im angegebenen Kreis (Filter, z. B. Rolle Dozierende).
+    /// </summary>
+    Task<IReadOnlyList<PersonZeile>> VorschlaegeAsync(string eingabe, PersonenFilter kreis, int anzahl = 8, CancellationToken abbruch = default);
 
     /// <summary>Alle Treffer (für Export und Massenaktionen), in Listenreihenfolge.</summary>
     IAsyncEnumerable<PersonZeile> AlleAsync(PersonenFilter filter, CancellationToken abbruch = default);

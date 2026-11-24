@@ -78,6 +78,7 @@
                 <div class="vhs-row">
                     <RadzenTextBox @bind-Value="stornogrund" Placeholder="Begründung für das Storno" Style="min-width:280px" aria-label="Stornobegründung" />
                     <BegruendeterButton Text="Stornieren" Icon="undo" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" IsBusy="@Beschaeftigt"
+                                        Rueckfrage="@($"Zu Beleg {b.Nummer} wird ein Stornobeleg erstellt und festgeschrieben. Das lässt sich nicht zurücknehmen.")"
                                         Freigabe="@(Buchen.Und(() => b.Art == Belegart.Storno ? Freigabe.Nein("Ein Storno wird nicht storniert – bitte einen neuen Beleg erstellen.")
                                             : b.Storniert ? Freigabe.Nein("Der Beleg ist bereits storniert.")
                                             : string.IsNullOrWhiteSpace(stornogrund) ? Freigabe.Nein("Bitte zuerst die Begründung eintragen (GoBD: Storno nur mit Begründung).") : Freigabe.Ja))"
@@ -87,7 +88,8 @@
             }
             else
             {
-                <BegruendeterButton Text="Entwurf verwerfen" Icon="delete" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Freigabe="@Buchen"
+                <BegruendeterButton Text="Entwurf verwerfen" Icon="delete" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Freigabe="@Buchen" RueckfrageJa="Verwerfen"
+                                    Rueckfrage="Der Entwurf wird gelöscht (er hat noch keine Belegnummer)."
                                     Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<FinanzDienst>().EntwurfVerwerfenAsync(b.Id); ausgewaehlt = null; return "Entwurf verworfen (hatte noch keine Nummer)."; }, "Entwurf"))" />
             }
         }

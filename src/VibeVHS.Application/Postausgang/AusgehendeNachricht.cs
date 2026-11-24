@@ -105,6 +105,15 @@ public sealed class AusgehendeNachricht
         return this;
     }
 
+    /// <summary>HTML-Teil der Mail (Rundschreiben mit Gestaltung, QA-66); <see cref="Inhalt"/> bleibt der Textteil.</summary>
+    public string? InhaltHtml { get; private set; }
+
+    public AusgehendeNachricht MitHtml(string html)
+    {
+        InhaltHtml = html;
+        return this;
+    }
+
     public AusgehendeNachricht MitAnhang(string name, string typ, string inhalt)
     {
         AnhangName = name;

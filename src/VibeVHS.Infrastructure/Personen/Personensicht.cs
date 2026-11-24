@@ -94,6 +94,40 @@ public static class Personensicht
         return treffer;
     }
 
+    /// <summary>Schwelle der Wortähnlichkeit (pg_trgm) für die unscharfe Suche; siehe <see cref="SchwelleSetzenAsync"/>.</summary>
+    public const double Aehnlichkeitsschwelle = 0.45;
+
+    /// <summary>
+    /// Wie <see cref="MitSuchwort"/>, zusätzlich Namen mit ähnlicher Schreibweise (QA-60): Wortähnlichkeit über den Trigramm-Index
+    /// (<c>wort &lt;% namensuchtext(…)</c>), ab drei Buchstaben. Die Schwelle gilt je Verbindung (<see cref="SchwelleSetzenAsync"/>);
+    /// die genaue Reihenfolge bestimmt danach <see cref="Domain.Gemeinsam.Unscharf"/>.
+    /// </summary>
+    public static IQueryable<Guid> MitSuchwortUnscharf(this VibeVhsDbContext db, string wort)
+    {
+        var genau = db.MitSuchwort(wort);
+        var muster = Suchmuster(wort);
+        if (muster.Length < 3)
+        {
+            return genau;
+        }
+
+        var aehnlich = db.Set<PersonName>()
+            .Where(n => EF.Functions.TrigramsAreWordSimilar(muster, SqlFunktionen.Namensuche(n.Vorname, n.Vorsatz, n.Nachname, n.Zusatz)))
+            .Select(n => EF.Property<Guid>(n, "PersonId"));
+        return genau.Union(aehnlich);
+    }
+
+    /// <summary>
+    /// Setzt die Schwelle der Wortähnlichkeit für die geöffnete Verbindung (die Voreinstellung 0,6 von pg_trgm findet „Brnner“ nicht).
+    /// Die Verbindung muss offen bleiben, solange die Abfrage läuft; Npgsql setzt sie beim Zurückgeben in den Pool zurück.
+    /// </summary>
+    public static async Task SchwelleSetzenAsync(this VibeVhsDbContext db, CancellationToken abbruch = default)
+    {
+        await db.Database.OpenConnectionAsync(abbruch);
+        var schwelle = Aehnlichkeitsschwelle.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        await db.Database.ExecuteSqlAsync($"SELECT set_config('pg_trgm.word_similarity_threshold', {schwelle}, false)", abbruch);
+    }
+
     /// <summary>Suchwort für LIKE: normalisiert – enthält danach nur Buchstaben, Ziffern, „@“, „.“ und Leerzeichen, also keine Platzhalter.</summary>
     public static string Suchmuster(string wort) => Domain.Gemeinsam.Suchtext.Normalisieren(wort);
 

@@ -152,6 +152,45 @@ public sealed class AufgabenDienst(
         return new(neu, geschlossen, wieder);
     }
 
+    /// <summary>Wer am Tresen oder Telefon Rückrufbitten aufnimmt (Schnellauswahl, QA-62).</summary>
+    public static readonly Rolle[] RueckrufRollen =
+        [Rolle.Teilnehmerservice, Rolle.IntegrationskursTeam, Rolle.Fachbereichsleitung, Rolle.Verwaltungsleitung, Rolle.Leitung, Rolle.Buchhaltung];
+
+    /// <summary>
+    /// Rückrufbitte als Aufgabe (Schnellauswahl am Tresen, QA-62): in den Korb des Teilnehmerservice (bzw. der eingestellten Zuständigkeit),
+    /// fällig heute, mit Verweis auf die Person, wenn sie bekannt ist. Im Protokoll steht nur ein Pseudonym.
+    /// </summary>
+    public async Task<Aufgabe> RueckrufAnlegenAsync(Guid? personId, string anrufer, string? telefon, string anliegen, CancellationToken abbruch = default)
+    {
+        var wer = await benutzer.ErmittelnAsync(abbruch);
+        if (!wer.IstAutomatik && (wer.Rolle is not { } r || !RueckrufRollen.Contains(r)))
+        {
+            throw new InvalidOperationException(Oberflaeche.Freigabe.NurFuer(wer.Rolle, RueckrufRollen).Begruendung);
+        }
+
+        if (string.IsNullOrWhiteSpace(anrufer) && personId is null)
+        {
+            throw new ArgumentException("Bitte angeben, wer angerufen hat.", nameof(anrufer));
+        }
+
+        if (string.IsNullOrWhiteSpace(anliegen))
+        {
+            throw new ArgumentException("Bitte das Anliegen kurz beschreiben.", nameof(anliegen));
+        }
+
+        var typ = await TypAsync(Aufgabentypen.Rueckruf, abbruch);
+        var jetzt = uhr.GetLocalNow();
+        var titel = $"Rückruf: {anrufer.Trim()}{(string.IsNullOrWhiteSpace(telefon) ? "" : $" ({telefon.Trim()})")}";
+        var beschreibung = $"{anliegen.Trim()}{System.Environment.NewLine}Aufgenommen von {wer.Name} am {jetzt:dd.MM.yyyy HH:mm}.";
+        var aufgabe = new Aufgabe(typ.Schluessel, $"{Aufgabentypen.Rueckruf}:{Domain.Gemeinsam.Ids.Neu():N}", titel, beschreibung, Heute, typ.Fuer(null),
+            personId is { } p ? $"personen/{p}" : null, jetzt, Dringlichkeit.Hoch);
+        speicher.Hinzufuegen(aufgabe);
+        await protokoll.ProtokollierenAsync("Aufgabe.Rueckruf",
+            $"Rückrufbitte aufgenommen ({Korb(aufgabe)}){(personId is { } id ? $" für {Domain.Datenschutz.Pseudonym.Person(id)}" : "")}", Objekt, aufgabe.Id, abbruch: abbruch);
+        await speicher.SpeichernAsync(abbruch);
+        return aufgabe;
+    }
+
     /// <summary>Überfällige Aufgaben nach der eingestellten Zeit an die Leitung eskalieren.</summary>
     public async Task<int> EskalierenAsync(CancellationToken abbruch = default)
     {

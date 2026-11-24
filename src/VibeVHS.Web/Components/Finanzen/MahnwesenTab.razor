@@ -40,6 +40,7 @@
                                 Freigabe="@(Buchen.Und(() => vorschlag.Aktiv.Any() ? Freigabe.Ja : Freigabe.Nein("Alle Posten sind ausgeschlossen – dann bitte verwerfen.")))"
                                 Click="@(() => AusfuehrenAsync(async d => $"{await d.GetRequiredService<MahnDienst>().FreigebenAsync(vorschlag.Id)} Mahnungen festgeschrieben und verschickt (Brief mit Übersetzungs-QR, Mail mit Übersetzungslink).", "Mahnlauf"))" />
             <BegruendeterButton Text="Verwerfen" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" Freigabe="@Buchen"
+                                Rueckfrage="Der Mahnvorschlag wird verworfen; es geht keine Mahnung hinaus."
                                 Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<MahnDienst>().VerwerfenAsync(vorschlag.Id); return "Verworfen."; }, "Mahnlauf"))" />
         </div>
     }

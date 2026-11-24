@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using VibeVHS.Application.Personen;
 using VibeVHS.Application.Protokoll;
 using VibeVHS.Domain.Personen;
@@ -40,6 +41,9 @@ builder.Services.AddSerilog((dienste, log) => log
     .WriteTo.File(Path.Combine(builder.Environment.ContentRootPath, builder.Configuration["Speicher:Logs"] ?? "logs", "vibevhs-.log"),
         rollingInterval: RollingInterval.Day, retainedFileCountLimit: 30, formatProvider: deutsch));
 
+// Schulungsbetrieb (QA-68): eigene Instanz mit Spielzeit, Sprungmarken und Vorlagen; arbeitet nur mit erfundenen Daten.
+var schulung = VibeVHS.Infrastructure.Betrieb.Schulungsoptionen.Aus(builder.Configuration);
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddRadzenComponents();
@@ -50,7 +54,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     {
         o.LoginPath = "/anmelden";
         o.AccessDeniedPath = "/anmelden";
-        o.Cookie.Name = "vibevhs.anmeldung";
+        o.Cookie.Name = schulung.Aktiv ? $"vibevhs.anmeldung.{schulung.Instanz}" : "vibevhs.anmeldung";
+        o.TimeProvider = TimeProvider.System; // Anmeldung läuft in Realzeit, auch im Schulungsbetrieb (Spielzeit)
         o.ExpireTimeSpan = TimeSpan.FromHours(10);
         o.SlidingExpiration = true;
         // Dozierendenportal: eigene, schlanke Anmeldeseite (Link per Mail oder Testanmeldung).
@@ -82,6 +87,15 @@ builder.Services
     .AddVibeVhsAnwendung(oeffentlicheAdresse)
     .AddVibeVhsInfrastruktur(builder.Configuration, builder.Environment.ContentRootPath, builder.Environment.IsDevelopment())
     .AddVibeVhsMocks(builder.Configuration);
+
+if (schulung.Aktiv)
+{
+    var spielzeit = new VibeVHS.Application.Betrieb.Spielzeit(DateTimeOffset.Now, 0, zone: VibeVHS.Domain.Gemeinsam.Zeitzone.Aktuell);
+    builder.Services.AddSingleton(spielzeit);
+    builder.Services.Replace(ServiceDescriptor.Singleton<TimeProvider>(spielzeit));
+    builder.Services.AddSingleton(schulung);
+    builder.Services.AddSingleton<VibeVHS.Infrastructure.Betrieb.Schulungsbetrieb>();
+}
 
 VibeVHS.Web.Sicherheit.Sicherheitsheader.AddRateLimits(builder.Services, builder.Configuration);
 // Öffentliche Buchungs-API (Webshop, TYPO3): CORS, Proof-of-Work, Rate-Limits, Test-Identitätsdienst.
@@ -126,8 +140,20 @@ foreach (var plugin in honorarPlugins)
     app.Logger.LogInformation("Honorarmodell-Plugin geladen: {Plugin}", plugin);
 }
 
+if (schulung.Aktiv && schulung.VorlagenBauen)
+{
+    // Schulungsbetrieb: Vorlagen aller Sprungmarken bauen und beenden (tools/instanzen.ps1 vorlagen).
+    await app.Services.GetRequiredService<VibeVHS.Infrastructure.Betrieb.Schulungsbetrieb>().VorlagenBauenAsync(_ => DatenFuellenAsync(app));
+    return 0;
+}
+
 try
 {
+    if (schulung.Aktiv)
+    {
+        await app.Services.GetRequiredService<VibeVHS.Infrastructure.Betrieb.Schulungsbetrieb>().VorbereitenAsync();
+    }
+
     await DatenbankInitialisierung.InitialisierenAsync(app.Services);
 }
 catch (DatenbankschemaVeraltetException fehler)
@@ -144,38 +170,7 @@ catch (VibeVHS.Infrastructure.Dokumentation.KommentarSchemaException fehler)
     return 2;
 }
 
-// Startdaten der VHS (Briefkopf, Fachbereiche, Benutzerkonten). Idempotent: lädt nur, was noch fehlt.
-var startdaten = app.Configuration["Startdaten:Datei"] ?? Path.Combine("Startdaten", "testbenutzer-vhs-egs.json");
-startdaten = Path.IsPathRooted(startdaten) ? startdaten : Path.Combine(AppContext.BaseDirectory, startdaten);
-if (File.Exists(startdaten))
-{
-    await using var bereich = app.Services.CreateAsyncScope();
-    await bereich.ServiceProvider.GetRequiredService<StartdatenLader>().AusDateiLadenAsync(startdaten);
-}
-else
-{
-    app.Logger.LogWarning("Startdaten {Datei} nicht gefunden; es gibt keine Benutzerkonten", startdaten);
-}
-
-// Logo und Website für Briefe und Aushänge (Einstellungen → Einrichtung).
-await using (var bereich = app.Services.CreateAsyncScope())
-{
-    app.Services.GetRequiredService<VibeVHS.Application.Stammdaten.Briefkopf>()
-        .Uebernehmen(await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Stammdaten.IStammdaten>().EinrichtungAsync());
-}
-
-// Aufbewahrungsfristen (Vorschläge) anlegen, falls die Tabelle leer ist.
-await using (var bereich = app.Services.CreateAsyncScope())
-{
-    await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Datenschutz.DatenschutzDienst>().GrundeinstellungenAsync();
-    await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Anmeldung.VorlagenDienst>().GrundeinstellungenAsync();
-    await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Programm.QualifikationsDienst>().GrundeinstellungenAsync();
-}
-
-if (app.Configuration.GetValue("Demodaten:Anlegen", false))
-{
-    await Demodaten.AllesAnlegenAsync(app.Services, app.Configuration.GetValue("Demodaten:Massendaten", 0), app.Logger);
-}
+await DatenFuellenAsync(app);
 
 if (hinterProxy)
 {
@@ -196,6 +191,7 @@ if (!app.Environment.IsDevelopment())
 VibeVHS.Web.Sicherheit.Sicherheitsheader.UseSicherheitsheader(app);
 app.UseCors();
 app.UseRateLimiter();
+VibeVHS.Web.Betrieb.SchulungApi.UseSchulungWartung(app);
 
 app.UseSerilogRequestLogging();
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
@@ -383,9 +379,48 @@ app.MapGet("/personen/export", async (string? suche, string? rolle, string? stat
         $"personen-{uhr.GetLocalNow():yyyy-MM-dd-HHmm}.xlsx");
 }).RequireAuthorization();
 app.MapShopApi();
+VibeVHS.Web.Betrieb.SchulungApi.MapSchulungApi(app);
 VibeVHS.Web.Portal.PortalApi.MapPortalApi(app);
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 await app.RunAsync();
 return 0;
+
+// Start- und Grunddaten, im Entwicklungs- und Testsystem Demodaten (auch für den Vorlagenbau des Schulungsbetriebs).
+static async Task DatenFuellenAsync(WebApplication app)
+{
+    // Startdaten der VHS (Briefkopf, Fachbereiche, Benutzerkonten). Idempotent: lädt nur, was noch fehlt.
+    var startdaten = app.Configuration["Startdaten:Datei"] ?? Path.Combine("Startdaten", "testbenutzer-vhs-egs.json");
+    startdaten = Path.IsPathRooted(startdaten) ? startdaten : Path.Combine(AppContext.BaseDirectory, startdaten);
+    if (File.Exists(startdaten))
+    {
+        await using var bereich = app.Services.CreateAsyncScope();
+        await bereich.ServiceProvider.GetRequiredService<StartdatenLader>().AusDateiLadenAsync(startdaten);
+    }
+    else
+    {
+        app.Logger.LogWarning("Startdaten {Datei} nicht gefunden; es gibt keine Benutzerkonten", startdaten);
+    }
+
+    // Logo und Website für Briefe und Aushänge (Einstellungen → Einrichtung).
+    await using (var bereich = app.Services.CreateAsyncScope())
+    {
+        app.Services.GetRequiredService<VibeVHS.Application.Stammdaten.Briefkopf>()
+            .Uebernehmen(await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Stammdaten.IStammdaten>().EinrichtungAsync());
+    }
+
+    // Aufbewahrungsfristen (Vorschläge) anlegen, falls die Tabelle leer ist.
+    await using (var bereich = app.Services.CreateAsyncScope())
+    {
+        await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Datenschutz.DatenschutzDienst>().GrundeinstellungenAsync();
+        await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Anmeldung.VorlagenDienst>().GrundeinstellungenAsync();
+        await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Programm.QualifikationsDienst>().GrundeinstellungenAsync();
+        await bereich.ServiceProvider.GetRequiredService<VibeVHS.Application.Durchfuehrung.UnterrichtsappDienst>().GrundeinstellungenAsync();
+    }
+
+    if (app.Configuration.GetValue("Demodaten:Anlegen", false))
+    {
+        await Demodaten.AllesAnlegenAsync(app.Services, app.Configuration.GetValue("Demodaten:Massendaten", 0), app.Logger);
+    }
+}

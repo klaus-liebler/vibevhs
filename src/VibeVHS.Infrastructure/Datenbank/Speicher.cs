@@ -49,6 +49,12 @@ internal sealed class PersonenSpeicher(VibeVhsDbContext db) : IPersonenSpeicher
 
 internal sealed class NachrichtenSpeicher(VibeVhsDbContext db) : INachrichtenSpeicher
 {
+    public async Task<IReadOnlyList<Domain.Vorlagen.GesendetesRundschreiben>> RundschreibenAsync(int anzahl, CancellationToken abbruch = default)
+        => await db.Set<Domain.Vorlagen.GesendetesRundschreiben>().AsNoTracking().OrderByDescending(r => r.GesendetAm).ThenByDescending(r => r.Id).Take(anzahl)
+            .ToListAsync(abbruch);
+
+    public void RundschreibenArchivieren(Domain.Vorlagen.GesendetesRundschreiben rundschreiben) => db.Add(rundschreiben);
+
     public void Hinzufuegen(AusgehendeNachricht nachricht) => db.Postausgang.Add(nachricht);
 
     public Task<AusgehendeNachricht?> LadenAsync(Guid id, CancellationToken abbruch = default)

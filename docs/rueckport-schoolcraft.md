@@ -1,6 +1,10 @@
 # Rückport aus SchoolCraft: priorisierte Kandidaten
 
-Stand: 24.11.2026 · Vergleich SchoolCraft `main` (73315f2) mit VibeVHS `main` (c16a334) · **Entscheidungsvorlage für Klaus – noch nichts umgesetzt**
+Stand: 24.11.2026 · Vergleich SchoolCraft `main` (73315f2) mit VibeVHS `main` (c16a334)
+
+> **Umgesetzt am 24.11.2026 (Auftrag Klaus: zuerst PostgreSQL, dann Nr. 1 bis 12):** VibeVHS läuft jetzt auf PostgreSQL 17; Nr. 1–12 sind als
+> QA-58 bis QA-69 in `spezifikation/anforderungen.md` beschrieben (Schulungsbetrieb: `schulungsbetrieb.md`). Die Abschnitte unten sind die
+> ursprüngliche Entscheidungsvorlage (Annahmen zu SQLite sind durch die Umstellung überholt).
 
 SchoolCraft hat die Bedien- und Datenregeln von VibeVHS übernommen und in den letzten Tagen eigene Konzepte ergänzt. Diese Liste
 sagt je Konzept, was eine Volkshochschule davon hat, wie viel Arbeit der Rückport ist und was für VibeVHS anders sein muss

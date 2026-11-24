@@ -137,6 +137,9 @@ public static class Registrierung
         dienste.AddScoped<IOrganisationen, OrganisationenSpeicher>();
         dienste.AddScoped<Application.Programm.IProgrammSpeicher, Programm.ProgrammSpeicher>();
         dienste.AddScoped<Application.Programm.IGlobaleSuche, Programm.GlobaleSuche>();
+        dienste.AddScoped<Application.Programm.IInfomonitorSpeicher, Programm.InfomonitorSpeicher>();
+        dienste.AddScoped<Application.Programm.ISchluesselSpeicher, Programm.SchluesselSpeicher>();
+        dienste.AddScoped<Application.Durchfuehrung.IUnterrichtsappSpeicher, Durchfuehrung.UnterrichtsappSpeicher>();
         dienste.AddScoped<Application.Programm.IQualifikationsSpeicher, Programm.QualifikationsSpeicher>();
         dienste.AddScoped<Application.Durchfuehrung.IDurchfuehrungSpeicher, Durchfuehrung.DurchfuehrungSpeicher>();
         dienste.AddScoped<Application.Dokumente.IDokumentSpeicher, Durchfuehrung.DokumentSpeicher>();
@@ -164,6 +167,13 @@ public static class Registrierung
         dienste.AddScoped<Application.Anmeldung.IVorlagenSpeicher>(d => d.GetRequiredService<Anmeldung.AnmeldungSpeicher>());
 
         var takt = konfiguration.GetValue("Postausgang:TaktSekunden", 15);
+        var schulung = konfiguration.GetValue("Schulung:Aktiv", false);
+        if (schulung)
+        {
+            dienste.AddHostedService<Spielzeitplaner>();
+            dienste.AddSingleton<Betrieb.Schulungsdatenbanken>();
+        }
+
         dienste.AddQuartz(q =>
         {
             q.AddJob<PostausgangJob>(j => j.WithIdentity(PostausgangJob.Schluessel));
@@ -173,28 +183,18 @@ public static class Registrierung
                 .StartNow()
                 .WithSimpleSchedule(s => s.WithInterval(TimeSpan.FromSeconds(takt)).RepeatForever()));
 
-            // Täglich nachts; einmal nach dem Start in fester Reihenfolge über den StartabgleichDienst.
-            q.AddJob<TermineFortschreibenJob>(j => j.WithIdentity(TermineFortschreibenJob.Schluessel));
-            q.AddJob<MerkmalAblaufJob>(j => j.WithIdentity(MerkmalAblaufJob.Schluessel));
-            q.AddJob<LoeschlaufJob>(j => j.WithIdentity(LoeschlaufJob.Schluessel));
-            q.AddTrigger(t => t.ForJob(LoeschlaufJob.Schluessel).WithIdentity("loeschlauf-monatlich", "automatik").WithCronSchedule("0 0 3 1 * ?"));
-            q.AddJob<AnmeldungJob>(j => j.WithIdentity(AnmeldungJob.Schluessel));
-            q.AddTrigger(t => t.ForJob(AnmeldungJob.Schluessel).WithIdentity("anmeldung-stuendlich", "automatik").WithCronSchedule("0 5 * * * ?"));
-            q.AddJob<QualifikationJob>(j => j.WithIdentity(QualifikationJob.Schluessel));
-            q.AddJob<AnwesenheitJob>(j => j.WithIdentity(AnwesenheitJob.Schluessel));
-            foreach (var schluessel in new[] { TermineFortschreibenJob.Schluessel, MerkmalAblaufJob.Schluessel, QualifikationJob.Schluessel, AnwesenheitJob.Schluessel })
+            // Zeitgesteuerte Läufe (Zeitplan.Eintraege): nachts, stündlich, morgens; einmal nach dem Start in fester Reihenfolge über den
+            // StartabgleichDienst. Im Schulungsbetrieb (Spielzeit) starten nicht die Cron-Auslöser, sondern der Spielzeitplaner.
+            foreach (var e in Zeitplan.Eintraege)
             {
-                q.AddTrigger(t => t.ForJob(schluessel).WithIdentity(schluessel.Name + "-nacht", "automatik").WithCronSchedule("0 15 2 * * ?"));
+                q.AddJob(e.Job, j => j.WithIdentity(e.Schluessel).StoreDurably());
+                if (!schulung)
+                {
+                    q.AddTrigger(t => t.ForJob(e.Schluessel).WithIdentity(e.Name, "automatik").WithCronSchedule(e.Cron));
+                }
             }
 
-            // Aufgaben-Routinen stündlich (nach dem Start als letzter Schritt des Startabgleichs), Erinnerungen morgens.
-            q.AddJob<AufgabenJob>(j => j.WithIdentity(AufgabenJob.Schluessel));
-            q.AddTrigger(t => t.ForJob(AufgabenJob.Schluessel).WithIdentity("aufgaben-stuendlich", "automatik").WithCronSchedule("0 10 * * * ?"));
-            q.AddJob<ErinnerungJob>(j => j.WithIdentity(ErinnerungJob.Schluessel));
-            q.AddTrigger(t => t.ForJob(ErinnerungJob.Schluessel).WithIdentity("erinnerung-morgens", "automatik").WithCronSchedule("0 0 7 * * ?"));
-            q.AddJob<IntegrationJob>(j => j.WithIdentity(IntegrationJob.Schluessel));
-            q.AddTrigger(t => t.ForJob(IntegrationJob.Schluessel).WithIdentity("integration-nachts", "automatik").WithCronSchedule("0 45 2 * * ?"));
-            if (konfiguration.GetValue("Sicherung:Aktiv", true))
+            if (konfiguration.GetValue("Sicherung:Aktiv", true) && !schulung)
             {
                 q.AddJob<SicherungJob>(j => j.WithIdentity(SicherungJob.Schluessel));
                 q.AddTrigger(t => t.ForJob(SicherungJob.Schluessel).WithIdentity("sicherung-nachts", "automatik").WithCronSchedule(konfiguration["Sicherung:Zeitplan"] ?? "0 30 1 * * ?"));
@@ -204,8 +204,6 @@ public static class Registrierung
             q.AddTrigger(t => t.ForJob(Shop.ShopJob.Schluessel).WithIdentity("shop-minuetlich", "automatik").StartAt(DateTimeOffset.UtcNow.AddSeconds(30))
                 .WithSimpleSchedule(s => s.WithInterval(TimeSpan.FromMinutes(1)).RepeatForever()));
 
-            q.AddJob<FinanzJob>(j => j.WithIdentity(FinanzJob.Schluessel));
-            q.AddTrigger(t => t.ForJob(FinanzJob.Schluessel).WithIdentity("finanzen-morgens", "automatik").WithCronSchedule("0 30 6 * * ?"));
         });
         dienste.AddQuartzHostedService(o => o.WaitForJobsToComplete = true);
         dienste.AddSingleton(d => new Application.Betrieb.Startabgleich(d.GetRequiredService<TimeProvider>(),

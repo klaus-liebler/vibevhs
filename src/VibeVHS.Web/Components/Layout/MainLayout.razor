@@ -4,11 +4,13 @@
 @inject NavigationManager Navigation
 @inject Vorgang Vorgang
 @inject IConfiguration Konfiguration
+@inject DialogService Dialoge
 
 <RadzenComponents />
 
 <div class="vhs-app">
     <Testsystemhinweis />
+    <Spielzeitleiste />
     <aside class="vhs-side">
         <div class="vhs-brand" title="@einrichtung?.Name"><b>VibeVHS</b><span>@(einrichtung?.Kurzname ?? "Volkshochschule")</span></div>
         <nav class="vhs-nav" aria-label="Hauptnavigation">
@@ -33,6 +35,8 @@
     <div class="vhs-main">
         <header class="vhs-top">
             <GlobaleSuche />
+            <button type="button" class="vhs-btn vhs-btn-schnell" data-schnellauswahl @onclick="SchnellauswahlAsync"
+                    title="Schnellauswahl für Anrufe und Anliegen am Tresen (auch mit F8)">⚡ Schnell <kbd>F8</kbd></button>
             <AuthorizeView>
                 <Authorized>
                     @{
@@ -97,11 +101,14 @@
         new("Programm", "Kurse", "kurse"),
         new("Programm", "Raumplan", "raumplan"),
         new("Programm", "Orte", "orte"),
+        new("Programm", "Info-Monitore", "monitore"),
+        new("Programm", "Schlüssel", "schluessel"),
         new("Programm", "Qualifikationen", "qualifikationen"),
         new("Programm", "Ferien und Feiertage", "ferien"),
         new("Teilnahme", "Anmeldung", "anmeldung"),
         new("Teilnahme", "Personen", "personen"),
         new("Teilnahme", "Anwesenheit", "anwesenheit"),
+        new("Teilnahme", "Unterrichts-Apps", "unterrichts-apps"),
         new("Teilnahme", "Integrationskurse", "integration"),
         new("Teilnahme", "Anliegen Kursleitungen", "portal-anliegen"),
         new("Verwaltung", "Finanzen", "finanzen"),
@@ -124,6 +131,9 @@
         => punkt.Ziel == "dokumentation" && !dokuRecht.Erlaubt ? dokuRecht.Begruendung : null;
 
     private string AktuellerPfad => Navigation.ToBaseRelativePath(Navigation.Uri);
+
+    private Task SchnellauswahlAsync()
+        => Dialoge.OpenAsync<SchnellauswahlDialog>("⚡ Schnellauswahl", options: new DialogOptions { Width = "620px", CloseDialogOnEsc = true, CloseDialogOnOverlayClick = true });
 
     protected override async Task OnInitializedAsync()
     {

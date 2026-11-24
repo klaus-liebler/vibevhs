@@ -73,3 +73,16 @@ internal sealed class SicherungJob(VibeVHS.Application.Betrieb.ISicherung sicher
         log.LogInformation("Sicherung {Datei}: {Ergebnis}", e.Datei, e.Pruefergebnis);
     }
 }
+
+/// <summary>Nachts: Aufgaben „Schlüssel zurückfordern“ (QA-67).</summary>
+[DisallowConcurrentExecution]
+internal sealed class SchluesselJob(Application.Programm.SchluesselDienst schluessel, ILogger<SchluesselJob> log) : IJob
+{
+    public static readonly JobKey Schluessel = new("schluessel-rueckgabe", "automatik");
+
+    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken)
+    {
+        var ergebnis = await schluessel.RueckgabeAufgabenAsync(cancellationToken);
+        log.LogInformation("Schlüssel zurückfordern: {Ergebnis}", ergebnis);
+    }
+}

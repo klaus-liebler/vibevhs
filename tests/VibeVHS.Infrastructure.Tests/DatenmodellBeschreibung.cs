@@ -51,6 +51,12 @@ internal static class DatenmodellBeschreibung
         ["MerkmalWerte"] = ("Kurse, Termine und Orte", "Auswahlwerte eines Merkmals."),
         ["MerkmalInaktiveWerte"] = ("Kurse, Termine und Orte", "Nicht mehr wählbare Auswahlwerte eines Merkmals."),
         ["Ferien"] = ("Kurse, Termine und Orte", "Schulferien und Feiertage (Serien lassen sie aus)."),
+        ["Rundschreiben"] = ("System", "Archiv gesendeter Rundschreiben: Betreff, Text mit Platzhaltern, Gestaltung, Zielgruppe, Zahlen – Vorlage für neue."),
+        ["Schluessel"] = ("Kurse, Termine und Orte", "Schlüssel und Transponder je Kursort (Nummer, Bezeichnung, außer Betrieb)."),
+        ["Schluesselausgaben"] = ("Kurse, Termine und Orte", "Ausgabe eines Schlüssels an Kursleitung oder Mitarbeitende mit Rückgabe; höchstens eine offene je Schlüssel."),
+        ["Unterrichtsapps"] = ("Anmeldung und Teilnahme", "Katalog der Unterrichts-Apps (eingebaut wie Podium oder angebunden mit Freigabe) mit Hinweis, wohin Daten gehen."),
+        ["Appeinsaetze"] = ("Anmeldung und Teilnahme", "Einsatz einer Unterrichts-App in einem Kurs durch die Kursleitung (Titel, Auftrag), für Teilnehmende im Portal sichtbar."),
+        ["Infomonitore"] = ("Kurse, Termine und Orte", "Bildschirme im Foyer („Heute im Haus“): Standort, Prüfwert der geheimen Adresse, Vorschau, Sperre."),
         ["Qualifikationsausnahmen"] = ("Kurse, Termine und Orte", "Begründete Ausnahmen bei fehlender Qualifikation einer Lehrkraft."),
         ["Kursunterlagen"] = ("Kurse, Termine und Orte", "Unterlagen zu Kursen (Datei, Freigabe, Sichtbarkeit)."),
         // Anmeldung und Teilnahme

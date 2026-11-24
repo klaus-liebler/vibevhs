@@ -6,6 +6,7 @@
 @using VibeVHS.Application.Finanzen
 @using VibeVHS.Domain.Gemeinsam
 @inject TeilnehmendenportalDienst Portal
+@inject VibeVHS.Application.Durchfuehrung.UnterrichtsappDienst Apps
 
 <PageTitle>Unterlagen und Rechnungen · Meine vhs</PageTitle>
 
@@ -31,6 +32,21 @@ else
             </div>
         }
     </section>
+
+    @if (apps.Count > 0)
+    {
+        <section class="vhs-portal-karte">
+            <h2 style="font-size:18px">Apps aus Ihren Kursen</h2>
+            @foreach (var z in apps)
+            {
+                <div style="padding:6px 0;border-bottom:1px solid var(--vhs-line)">
+                    <a href="@z.App.Adresse" target="_blank" rel="noopener"><b>@z.Einsatz.Titel</b></a> · @z.App.Name<br />
+                    @if (z.Einsatz.Auftrag is { } auftrag) { <span class="vhs-small">@auftrag</span><br /> }
+                    <span class="vhs-small vhs-muted">@z.App.Datenhinweis</span>
+                </div>
+            }
+        </section>
+    }
 
     <section class="vhs-portal-karte">
         <h2 style="font-size:18px">Mein Konto bei der vhs</h2>
@@ -78,6 +94,7 @@ else
     private HttpContext HttpContext { get; set; } = default!;
 
     private IReadOnlyList<(Guid Id, string Kurs, string Titel, string Datei, long Groesse, DateTimeOffset Am)> unterlagen = [];
+    private IReadOnlyList<VibeVHS.Application.Durchfuehrung.Appeinsatzzeile> apps = [];
     private IReadOnlyList<TnDokument> dokumente = [];
     private Personenkonto? konto;
     private string? fehler;
@@ -87,6 +104,7 @@ else
         try
         {
             unterlagen = await Portal.UnterlagenAsync();
+            apps = await Apps.EinsaetzeAsync(await Portal.KursIdsAsync());
             dokumente = await Portal.DokumenteAsync();
             konto = await Portal.KontoAsync();
         }

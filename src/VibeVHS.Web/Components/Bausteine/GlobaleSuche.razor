@@ -3,25 +3,39 @@
 @inject Vorgang Vorgang
 @inject NavigationManager Navigation
 
-@* Globale Suche in der Kopfzeile: Personen, Kurse und Orte. *@
+@*
+    Alles-Suche in der Kopfzeile (QA-12, QA-55, QA-61): Personen (fehlertolerant), Kurse, Orte, Belege und Funktionen – nur, was die aktive
+    Rolle öffnen darf. <kbd>Strg</kbd>+<kbd>K</kbd> setzt den Fokus (verhalten.js), ↑ ↓ wählen, Enter öffnet, Esc schließt.
+*@
 <div class="vhs-search" @onfocusout="ZuklappenSpaeter">
     <RadzenIcon Icon="search" />
-    <input type="search" @bind="text" @bind:event="oninput" @bind:after="SuchenVerzoegert" @onkeydown="TasteAsync"
-           placeholder="Person, Kurs, Kursnummer oder Ort suchen" aria-label="Suche nach Personen, Kursen und Orten" autocomplete="off" />
+    <input id="vhs-allessuche" type="search" @bind="text" @bind:event="oninput" @bind:after="SuchenVerzoegert" @onkeydown="TasteAsync"
+           @onkeydown:preventDefault="@abfangen" role="combobox" aria-expanded="@(offen ? "true" : "false")" aria-controls="vhs-allessuche-liste"
+           aria-activedescendant="@(gewaehlt >= 0 ? $"vhs-treffer-{gewaehlt}" : null)"
+           placeholder="Person, Kurs, Rechnung, Raum oder Funktion suchen" aria-label="Alles-Suche: Personen, Kurse, Rechnungen, Räume und Funktionen" autocomplete="off" />
+    <span class="vhs-search-kuerzel" title="Schnellsuche von überall öffnen"><kbd>Strg</kbd>+<kbd>K</kbd></span>
     @if (offen && treffer.Count > 0)
     {
-        <div class="vhs-ergebnisse" role="listbox">
+        var i = 0;
+        <div class="vhs-ergebnisse" role="listbox" id="vhs-allessuche-liste">
             @foreach (var gruppe in treffer.GroupBy(t => t.Typ))
             {
-                <div class="vhs-ergebnis-gruppe">@(gruppe.Key switch { Treffertyp.Person => "Personen", Treffertyp.Kurs => "Kurse", _ => "Orte" })</div>
+                <div class="vhs-ergebnis-gruppe">@Gruppe(gruppe.Key)</div>
                 @foreach (var t in gruppe)
                 {
-                    <a href="@t.Ziel" role="option" @onclick="@(() => offen = false)">
-                        <RadzenIcon Icon="@(t.Typ switch { Treffertyp.Person => "person", Treffertyp.Kurs => "school", _ => "place" })" />
+                    var nr = i++;
+                    <a href="@t.Ziel" id="@($"vhs-treffer-{nr}")" role="option" aria-selected="@(nr == gewaehlt ? "true" : "false")"
+                       class="@(nr == gewaehlt ? "gewaehlt" : null)" @onclick="@(() => offen = false)">
+                        <RadzenIcon Icon="@Symbol(t.Typ)" />
                         <span>@t.Titel</span><small>@t.Zusatz</small>
                     </a>
                 }
             }
+            @if (treffer.Any(t => t.Typ == Treffertyp.Person))
+            {
+                <a class="vhs-ergebnis-alle" href="@($"personen?q={Uri.EscapeDataString(text ?? "")}")" @onclick="@(() => offen = false)">Alle Personen-Treffer anzeigen</a>
+            }
+            <div class="vhs-ergebnis-hinweis"><kbd>↑</kbd> <kbd>↓</kbd> wählen · <kbd>Enter</kbd> öffnen · <kbd>Esc</kbd> schließen</div>
         </div>
     }
     else if (offen && !string.IsNullOrWhiteSpace(text) && fertig)
@@ -32,9 +46,31 @@
 
 @code {
     private string? text;
-    private bool offen, fertig;
+    private bool offen, fertig, abfangen;
+    private int gewaehlt = -1;
     private IReadOnlyList<Suchtreffer> treffer = [];
     private CancellationTokenSource? verzoegerung;
+
+    private static string Gruppe(Treffertyp typ) => typ switch
+    {
+        Treffertyp.Person => "Personen",
+        Treffertyp.Kurs => "Kurse",
+        Treffertyp.Ort => "Orte",
+        Treffertyp.Beleg => "Belege",
+        _ => "Funktionen",
+    };
+
+    private static string Symbol(Treffertyp typ) => typ switch
+    {
+        Treffertyp.Person => "person",
+        Treffertyp.Kurs => "school",
+        Treffertyp.Ort => "place",
+        Treffertyp.Beleg => "receipt_long",
+        _ => "arrow_forward",
+    };
+
+    /// <summary>Treffer in Anzeigereihenfolge (gruppiert), damit die Pfeiltasten der Liste folgen.</summary>
+    private IReadOnlyList<Suchtreffer> Reihenfolge => treffer.GroupBy(t => t.Typ).SelectMany(g => g).ToList();
 
     private async Task SuchenVerzoegert()
     {
@@ -44,8 +80,9 @@
         fertig = false;
         try
         {
-            await Task.Delay(250, token);
+            await Task.Delay(200, token);
             treffer = string.IsNullOrWhiteSpace(text) ? [] : await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IGlobaleSuche>().SuchenAsync(text!));
+            gewaehlt = treffer.Count > 0 ? 0 : -1;
             offen = true;
             fertig = true;
         }
@@ -57,14 +94,25 @@
 
     private void TasteAsync(KeyboardEventArgs e)
     {
-        if (e.Key == "Escape")
+        var liste = Reihenfolge;
+        abfangen = e.Key is "ArrowDown" or "ArrowUp" && offen && liste.Count > 0;
+        switch (e.Key)
         {
-            offen = false;
-        }
-        else if (e.Key == "Enter" && treffer.Count > 0)
-        {
-            offen = false;
-            Navigation.NavigateTo(treffer[0].Ziel);
+            case "Escape":
+                offen = false;
+                break;
+            case "ArrowDown" when liste.Count > 0:
+                offen = true;
+                gewaehlt = (gewaehlt + 1) % liste.Count;
+                break;
+            case "ArrowUp" when liste.Count > 0:
+                offen = true;
+                gewaehlt = gewaehlt <= 0 ? liste.Count - 1 : gewaehlt - 1;
+                break;
+            case "Enter" when liste.Count > 0:
+                offen = false;
+                Navigation.NavigateTo(liste[Math.Max(0, gewaehlt)].Ziel);
+                break;
         }
     }
 

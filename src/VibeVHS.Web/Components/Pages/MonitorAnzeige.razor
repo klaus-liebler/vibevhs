@@ -1,0 +1,75 @@
+@page "/monitor/{Geheimnis}"
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@layout MonitorLayout
+@using VibeVHS.Application.Programm
+@inject IServiceScopeFactory Bereiche
+
+@* Bildschirm im Foyer (QA-65): „Heute im Haus“ – lädt jede Minute neu, zeigt nie Teilnehmende. Geheime Adresse statt Anmeldung. *@
+
+<PageTitle>@(inhalt?.Ueberschrift ?? "Info-Monitor")</PageTitle>
+<HeadContent><meta http-equiv="refresh" content="60" /><meta name="robots" content="noindex" /></HeadContent>
+
+@if (inhalt is null)
+{
+    <div class="vhs-monitor vhs-monitor-leer">
+        <h1>Dieser Bildschirm ist nicht (mehr) freigeschaltet.</h1>
+        <p>Die Verwaltung kann unter „Info-Monitore“ eine neue Adresse erzeugen.</p>
+    </div>
+}
+else
+{
+    <div class="vhs-monitor">
+        @if (inhalt.Vorschau)
+        {
+            <div class="vhs-monitor-vorschau">Vorschau – so sieht der Bildschirm gerade aus (Adresse gilt 30 Minuten)</div>
+        }
+        <header>
+            <h1>@inhalt.Ueberschrift</h1>
+            <div class="vhs-monitor-kopf"><span>@inhalt.Ort</span><span>@inhalt.Stand.ToString("dddd, dd.MM.yyyy · HH:mm", Deutsch) Uhr</span></div>
+        </header>
+        @if (inhalt.Jetzt.Count == 0 && inhalt.Spaeter.Count == 0)
+        {
+            <p class="vhs-monitor-hinweis">Heute finden hier keine weiteren Kurse statt.</p>
+        }
+        @if (inhalt.Jetzt.Count > 0)
+        {
+            <h2>Jetzt</h2>
+            @Tabelle(inhalt.Jetzt)
+        }
+        @if (inhalt.Spaeter.Count > 0)
+        {
+            <h2>Heute noch</h2>
+            @Tabelle(inhalt.Spaeter)
+        }
+    </div>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo Deutsch = System.Globalization.CultureInfo.GetCultureInfo("de-DE");
+
+    [Parameter]
+    public string Geheimnis { get; set; } = string.Empty;
+
+    private Monitorinhalt? inhalt;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await using var bereich = Bereiche.CreateAsyncScope();
+        inhalt = await bereich.ServiceProvider.GetRequiredService<InfomonitorDienst>().InhaltAsync(Geheimnis);
+    }
+
+    private static RenderFragment Tabelle(IReadOnlyList<Monitorzeile> zeilen) => @<table class="vhs-monitor-tabelle">
+        <thead><tr><th>Zeit</th><th>Kurs</th><th>Raum</th></tr></thead>
+        <tbody>
+            @foreach (var z in zeilen)
+            {
+                <tr class="@(z.Ausgefallen ? "faellt-aus" : null)">
+                    <td class="vhs-mono">@z.Beginn.ToString("HH:mm")–@z.Ende.ToString("HH:mm")</td>
+                    <td><b>@z.Titel</b> <span class="vhs-monitor-nr">@z.Kursnummer</span>@if (z.Ausgefallen) { <span class="vhs-monitor-aus">fällt heute aus</span> }</td>
+                    <td>@z.Raum</td>
+                </tr>
+            }
+        </tbody>
+    </table>;
+}

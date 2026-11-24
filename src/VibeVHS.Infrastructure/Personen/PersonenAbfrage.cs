@@ -23,14 +23,17 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
         CancellationToken abbruch = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(anzahl, 1);
-        var sortiert = db.MitSortierschluessel(await BasisAsync(filter, abbruch), Heute);
-        if (nach is not null)
+        return await MitSchwelleAsync(filter, async () =>
         {
-            sortiert = sortiert.Nach(nach.Nachname, nach.Vorname, nach.IdHex);
-        }
+            var sortiert = db.MitSortierschluessel(await BasisAsync(filter, abbruch), Heute);
+            if (nach is not null)
+            {
+                sortiert = sortiert.Nach(nach.Nachname, nach.Vorname, nach.IdHex);
+            }
 
-        var seite = await sortiert.Sortiert().Take(anzahl).ToListAsync(abbruch);
-        return await ZeilenAsync(seite, abbruch);
+            var seite = await sortiert.Sortiert().Take(anzahl).ToListAsync(abbruch);
+            return await ZeilenAsync(seite, abbruch);
+        }, abbruch);
     }
 
     /// <summary>
@@ -101,7 +104,11 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
         return zeilen;
     }
 
-    public async Task<RundschreibenVorschau> RundschreibenZaehlenAsync(PersonenFilter filter, Kontaktzweck zweck, CancellationToken abbruch = default)
+    // Rundschreiben und Export erreichen genau die Personen der Liste – auch bei unscharfer Suche (gleiche Trigramm-Schwelle).
+    public Task<RundschreibenVorschau> RundschreibenZaehlenAsync(PersonenFilter filter, Kontaktzweck zweck, CancellationToken abbruch = default)
+        => MitSchwelleAsync(filter, () => RundschreibenZaehlenOhneSchwelleAsync(filter, zweck, abbruch), abbruch);
+
+    private async Task<RundschreibenVorschau> RundschreibenZaehlenOhneSchwelleAsync(PersonenFilter filter, Kontaktzweck zweck, CancellationToken abbruch)
     {
         var basis = await BasisAsync(filter, abbruch);
         var treffer = await basis.CountAsync(abbruch);
@@ -114,9 +121,12 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
     public async IAsyncEnumerable<Person> RundschreibenEmpfaengerAsync(PersonenFilter filter, Kontaktzweck zweck,
         [EnumeratorCancellation] CancellationToken abbruch = default)
     {
-        var mitMail = MitEMail(await BasisAsync(filter, abbruch));
-        var empfaenger = zweck == Kontaktzweck.Kursorganisation ? mitMail : MitEinwilligung(mitMail, zweck);
-        var ids = await empfaenger.Select(p => p.Id).OrderBy(id => id).ToListAsync(abbruch);
+        var ids = await MitSchwelleAsync(filter, async () =>
+        {
+            var mitMail = MitEMail(await BasisAsync(filter, abbruch));
+            var empfaenger = zweck == Kontaktzweck.Kursorganisation ? mitMail : MitEinwilligung(mitMail, zweck);
+            return await empfaenger.Select(p => p.Id).OrderBy(id => id).ToListAsync(abbruch);
+        }, abbruch);
         var jetzt = Jetzt;
         foreach (var paket in ids.Chunk(500))
         {
@@ -152,7 +162,8 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
     /// <summary>Für Rundschreiben und Export: alle Treffer mit vollständig geladener Person, paketweise (500).</summary>
     public async IAsyncEnumerable<Person> PersonenAsync(PersonenFilter filter, [EnumeratorCancellation] CancellationToken abbruch = default)
     {
-        var ids = await db.MitSortierschluessel(await BasisAsync(filter, abbruch), Heute).Sortiert().Select(x => x.Id).ToListAsync(abbruch);
+        var ids = await MitSchwelleAsync(filter, async () =>
+            await db.MitSortierschluessel(await BasisAsync(filter, abbruch), Heute).Sortiert().Select(x => x.Id).ToListAsync(abbruch), abbruch);
         var jetzt = Jetzt;
         foreach (var paket in ids.Chunk(500))
         {
@@ -168,7 +179,42 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
         }
     }
 
-    public async Task<Filterzahlen> ZaehlenAsync(PersonenFilter filter, CancellationToken abbruch = default)
+    public async Task<IReadOnlyList<PersonZeile>> VorschlaegeAsync(string eingabe, PersonenFilter kreis, int anzahl = 8, CancellationToken abbruch = default)
+    {
+        ArgumentNullException.ThrowIfNull(kreis);
+        if (Domain.Gemeinsam.Suchtext.Woerter(eingabe).Count == 0)
+        {
+            return [];
+        }
+
+        // Kandidaten aus der Datenbank (genau und ähnlich, Trigramm-Index), Reihenfolge nach Bewertung (Unscharf) statt nach Name.
+        var kandidaten = await SeiteAsync(kreis with { Suche = eingabe, Unscharf = true }, null, 200, abbruch);
+        return Domain.Gemeinsam.Unscharf.Ordnen(eingabe, kandidaten, z => z.Anzeigename, anzahl);
+    }
+
+    public Task<Filterzahlen> ZaehlenAsync(PersonenFilter filter, CancellationToken abbruch = default)
+        => MitSchwelleAsync(filter, () => ZaehlenOhneSchwelleAsync(filter, abbruch), abbruch);
+
+    /// <summary>Unscharfe Suche: Ähnlichkeitsschwelle für die Dauer der Abfragen auf der (dafür offen gehaltenen) Verbindung.</summary>
+    private async Task<T> MitSchwelleAsync<T>(PersonenFilter filter, Func<Task<T>> abfrage, CancellationToken abbruch)
+    {
+        if (!filter.Unscharf || string.IsNullOrWhiteSpace(filter.Suche))
+        {
+            return await abfrage();
+        }
+
+        await db.SchwelleSetzenAsync(abbruch);
+        try
+        {
+            return await abfrage();
+        }
+        finally
+        {
+            await db.Database.CloseConnectionAsync();
+        }
+    }
+
+    private async Task<Filterzahlen> ZaehlenOhneSchwelleAsync(PersonenFilter filter, CancellationToken abbruch)
     {
         var gesamt = await (await BasisAsync(filter, abbruch)).CountAsync(abbruch);
 
@@ -281,10 +327,10 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
             q = q.Where(p => EF.Property<List<Domain.Gemeinsam.Listenwert<int>>>(p, "_fachbereiche").Any(f => f.Wert == fb));
         }
 
-        // Suche direkt in den Versionen (kein Suchindex, keine Kopie): jedes Wort muss als Wortanfang vorkommen.
+        // Suche direkt in den Versionen (keine Suchtabelle, keine Kopie): jedes Wort muss als Wortanfang vorkommen, unscharf auch ähnlich.
         foreach (var wort in Domain.Gemeinsam.Suchtext.Woerter(filter.Suche))
         {
-            var treffer = db.MitSuchwort(wort);
+            var treffer = filter.Unscharf ? db.MitSuchwortUnscharf(wort) : db.MitSuchwort(wort);
             q = q.Where(p => treffer.Contains(p.Id));
         }
 

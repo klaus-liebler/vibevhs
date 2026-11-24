@@ -49,7 +49,8 @@ else
                 <label class="vhs-btn vhs-btn-light" for="logo-datei">Logo hochladen …</label>
                 <InputFile id="logo-datei" accept="image/png,image/jpeg" OnChange="LogoHochladenAsync" style="position:absolute;left:-9999px" />
             }
-            <BegruendeterButton Text="Logo entfernen" Icon="delete" ButtonStyle="ButtonStyle.Light"
+            <BegruendeterButton Text="Logo entfernen" Icon="delete" ButtonStyle="ButtonStyle.Light" RueckfrageJa="Entfernen"
+                                Rueckfrage="Das Logo wird entfernt. Briefe, Bescheinigungen und der Kurs-QR-Bogen erscheinen danach ohne Logo."
                                 Freigabe="@(recht.Und(() => einrichtung.Logo is null ? Freigabe.Nein("Es ist kein Logo hinterlegt.") : Freigabe.Ja))"
                                 Click="@(() => SpeichernAsync(d => d.LogoSetzenAsync(null), "Logo entfernt"))" />
             @if (!recht.Erlaubt)

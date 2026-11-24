@@ -51,6 +51,8 @@ public sealed class VibeVhsDbContext(DbContextOptions<VibeVhsDbContext> optionen
 
     public DbSet<VibeVHS.Domain.Programm.Ferienzeitraum> Ferien => Set<VibeVHS.Domain.Programm.Ferienzeitraum>();
 
+    public DbSet<VibeVHS.Domain.Programm.Infomonitor> Infomonitore => Set<VibeVHS.Domain.Programm.Infomonitor>();
+
     public DbSet<VibeVHS.Domain.Aufgaben.Aufgabe> Aufgaben => Set<VibeVHS.Domain.Aufgaben.Aufgabe>();
 
     public DbSet<VibeVHS.Domain.Anmeldung.Belegung> Belegungen => Set<VibeVHS.Domain.Anmeldung.Belegung>();

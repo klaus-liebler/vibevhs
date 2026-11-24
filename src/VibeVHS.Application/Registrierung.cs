@@ -19,6 +19,9 @@ public static class Registrierung
         dienste.AddScoped<Personen.Stammdatenaenderung>();
         dienste.AddScoped<Rundschreiben>();
         dienste.AddScoped<Programm.ProgrammDienst>();
+        dienste.AddScoped<Programm.InfomonitorDienst>();
+        dienste.AddScoped<Programm.SchluesselDienst>();
+        dienste.AddScoped<Durchfuehrung.UnterrichtsappDienst>();
         dienste.AddScoped<Programm.Terminnachricht>();
         dienste.AddScoped<Programm.MerkmalKatalogDienst>();
         dienste.AddScoped<Programm.QualifikationsDienst>();

@@ -7,13 +7,25 @@ Schritt. Im Test- und Schulungsbetrieb können Sie dieselben Abläufe als **gef�
 ## Aufbau der Oberfläche
 
 - **Links die Navigation**, gruppiert nach *Übersicht*, *Programm*, *Teilnahme* und *Verwaltung*. Punkte, die Ihre Rolle
-  nicht nutzen darf, sind ausgegraut – fahren Sie mit der Maus darüber (oder springen Sie mit der Tab-Taste darauf), dann
+  nicht nutzen darf, sind ausgegraut – fahren Sie mit der Maus darüber (oder springen Sie mit <kbd>Tab</kbd> darauf), dann
   steht dort, warum.
 - **Oben die Schnellsuche:** Name, Kursnummer, Rechnungsnummer oder Raum eintippen – die ersten Treffer erscheinen sofort,
   „Alle … Treffer anzeigen“ öffnet die vollständige Liste.
 - **Oben rechts Ihr Konto:** angemeldet als …, die **aktive Rolle** (wer mehrere Rollen hat, wechselt hier – Aufgaben und
   Rechte richten sich nach der aktiven Rolle), **Hilfe**, **Meine Einstellungen** (Ansprache Du/Sie) und **Abmelden**.
 - **Die Startseite** zeigt „Was steht an?“: Ihre Aufgaben, Zähler und was die Automatik heute schon erledigt hat.
+
+## Tastenkürzel
+
+| Kürzel | Wo | Wirkung |
+| --- | --- | --- |
+| <kbd>Strg</kbd>+<kbd>K</kbd> | überall in der Verwaltung | Schnellsuche öffnen |
+| <kbd>F8</kbd> | überall in der Verwaltung | Schnellauswahl für Anrufe und Anliegen |
+| <kbd>1</kbd> … <kbd>9</kbd> | in der Schnellauswahl | Punkt wählen |
+| <kbd>↑</kbd> <kbd>↓</kbd> | Vorschlagslisten (Schnellsuche, Personenauswahl) | Treffer wählen |
+| <kbd>Enter</kbd> | Vorschlagslisten | gewählten Treffer öffnen bzw. übernehmen |
+| <kbd>Esc</kbd> | Dialoge, Vorschlagslisten | schließen bzw. abbrechen (bei Rückfragen: nicht ausführen) |
+| <kbd>Tab</kbd> | überall | zum nächsten Feld; auf einer gesperrten Schaltfläche erscheint die Begründung |
 
 ## Grundprinzipien
 
@@ -167,6 +179,42 @@ BAMF steht im Postausgang (nur Teilnehmernummern).
 
 *Leitung, Verwaltungsleitung.* **Auswertungen** → Bericht wählen (z. B. Auslastung je Fachbereich) und filtern → Export
 als **Excel** oder CSV. Die Datei enthält echte Zahlen mit Autofilter; der Export wird protokolliert.
+
+## Rundschreiben
+
+In der **Personenliste** filtern (z. B. Rolle Teilnehmende, Fachbereich 5), dann „Alle … Treffer anschreiben“. Der Text entsteht im
+Editor mit Formatierung; **Gestaltung** (schlicht, Briefkopf, Winter, Frühling, Sommer) und **Anrede** wählen, Platzhalter
+{Anrede}, {Vorname}, {Nachname}, {Name} einsetzen. **Vorschau** zeigt die Mail mit Musterwerten, **Empfänger zählen** zeigt vor dem
+Versand, wie viele Mails entstehen. Gesendete Rundschreiben stehen darunter im Archiv: **Ansehen** oder **Als Vorlage übernehmen**
+(Zielgruppe und Empfänger werden neu bestimmt).
+
+## Schlüssel
+
+Unter **Programm → Schlüssel** stehen alle Schlüssel und Transponder mit Ort und – falls ausgegeben – wer sie seit wann hat.
+„+ Schlüssel hinzufügen“ legt einen an, **Ausgeben …** sucht die Kursleitung (auch mit Tippfehlern; Mitarbeitende per Häkchen),
+**Rückgabe eintragen** beendet die Ausgabe, **Verloren / aussondern** nimmt ihn außer Betrieb. Hat jemand einen Schlüssel, leitet
+am Ort aber sechs Wochen lang nichts mehr, steht nachts die Aufgabe „Schlüssel zurückfordern“ im Korb des Teilnehmerservice.
+
+## Unterrichts-Apps
+
+Unter **Teilnahme → Unterrichts-Apps** steht der Katalog: **eingebaut** (z. B. Podium, läuft auf dem Server der vhs, sofort nutzbar) und
+**angebunden** (externe Anbieter, erst nach **Freigeben** durch Verwaltungsleitung oder Leitung). Jede App nennt, wohin Daten gehen.
+Kursleitungen setzen eine App im Dozierendenportal bei ihrem Kurs ein (Titel, Auftrag); die Teilnehmenden finden sie im
+Teilnehmendenportal unter „Unterlagen“.
+
+## Schulungsbetrieb
+
+In Schulungen hat jede Person eine eigene Instanz mit eigener **Spielzeit** (violette Leiste oben). Auf der Seite **Spielzeit** lässt
+sich die Zeit anhalten, beschleunigen, vorstellen oder zu einer **Sprungmarke** der Schulungswoche springen (Montag 7:30 … eine Woche
+später). Details: `docs/schulungsbetrieb.md`.
+
+## Info-Monitore im Foyer
+
+Unter **Programm → Info-Monitore** legen Verwaltungsleitung, Leitung oder Systemverwaltung je Standort einen Bildschirm an
+(„+ Monitor hinzufügen“). Die Adresse erscheint einmal direkt nach dem Anlegen: am Bildschirm im Browser öffnen und auf Vollbild
+stellen (<kbd>F11</kbd>). Er zeigt die Kurse des Tages mit Uhrzeit und Raum, Ausfälle rot markiert, und lädt jede Minute neu.
+**Vorschau** öffnet die Ansicht im neuen Fenster (30 Minuten gültig), ohne die Adresse des Geräts zu ändern. Geht die Adresse
+verloren oder soll ein Gerät nichts mehr zeigen: **Neue Adresse** bzw. **Sperren**.
 
 ## Einstellungen
 

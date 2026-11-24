@@ -258,6 +258,7 @@ erDiagram
 ### Kurse, Termine und Orte
 
 - [Ferien](#ferien) – Schulferien und Feiertage (Serien lassen sie aus).
+- [Infomonitore](#infomonitore) – Bildschirme im Foyer („Heute im Haus“): Standort, Prüfwert der geheimen Adresse, Vorschau, Sperre.
 - [KursBuchungsrechte](#kursbuchungsrechte) – Buchungswege der Richtlinie des Kurses.
 - [KursEntgelte](#kursentgelte) – Entgelt eines Kurses (versioniert, z. B. Erhöhung ab Frühjahr).
 - [KursLehranforderungen](#kurslehranforderungen) – Anforderungen an die Lehrkräfte des Kurses.
@@ -278,6 +279,8 @@ erDiagram
 - [OrtMerkmale](#ortmerkmale) – Ausstattung und Zulassungen eines Orts (versioniert, mit Nachweis).
 - [Orte](#orte) – Liegenschaften, Gebäude, Räume, virtuelle Räume, Treffpunkte (Hierarchie).
 - [Qualifikationsausnahmen](#qualifikationsausnahmen) – Begründete Ausnahmen bei fehlender Qualifikation einer Lehrkraft.
+- [Schluessel](#schluessel) – Schlüssel und Transponder je Kursort (Nummer, Bezeichnung, außer Betrieb).
+- [Schluesselausgaben](#schluesselausgaben) – Ausgabe eines Schlüssels an Kursleitung oder Mitarbeitende mit Rückgabe; höchstens eine offene je Schlüssel.
 - [Semester](#semester) – Semester (Programmzeitraum) mit Kürzel.
 - [VeranstaltungOrte](#veranstaltungorte) – Orte eines Termins (hybrid: mehrere), optional eigene Höchstzahl.
 - [Veranstaltungen](#veranstaltungen) – Einzelne Termine eines Kurses (UTC-Zeiten), Lehrkraft, Ausfall.
@@ -289,6 +292,10 @@ erDiagram
     }
     Ferien {
         Guid Id PK
+    }
+    Infomonitore {
+        Guid Id PK
+        Guid OrtId FK
     }
     KursBuchungsrechte {
         Guid Id PK
@@ -367,8 +374,20 @@ erDiagram
     Orte {
         Guid Id PK
     }
+    Personen {
+        Guid Id PK
+    }
     Qualifikationsausnahmen {
         Guid Id PK
+    }
+    Schluessel {
+        Guid Id PK
+        Guid OrtId FK
+    }
+    Schluesselausgaben {
+        Guid Id PK
+        Guid PersonId FK
+        Guid SchluesselId FK
     }
     Semester {
         Guid Id PK
@@ -398,25 +417,36 @@ erDiagram
     Kurse ||--o{ Veranstaltungen : "KursId"
     Merkmale ||--o{ MerkmalInaktiveWerte : "MerkmalSchluessel"
     Merkmale ||--o{ MerkmalWerte : "MerkmalSchluessel"
+    Orte ||--o{ Infomonitore : "OrtId"
     Orte ||--o{ OrtKapazitaeten : "OrtId"
     Orte ||--o{ OrtMerkmale : "OrtId"
+    Orte ||--o{ Schluessel : "OrtId"
+    Personen ||--o{ Schluesselausgaben : "PersonId"
+    Schluessel ||--o{ Schluesselausgaben : "SchluesselId"
     Veranstaltungen ||--o{ VeranstaltungOrte : "VeranstaltungId"
 ```
 
 ### Anmeldung und Teilnahme
 
 - [Anwesenheiten](#anwesenheiten) – Anwesenheit je Termin und Person (Weg: Liste, QR, Selbst-Check-in).
+- [Appeinsaetze](#appeinsaetze) – Einsatz einer Unterrichts-App in einem Kurs durch die Kursleitung (Titel, Auftrag), für Teilnehmende im Portal sichtbar.
 - [Belegungen](#belegungen) – Anmeldung einer Person zu einem Kurs (Status, Weg, Entgelt, Kontingent).
 - [Dokumente](#dokumente) – Archiv erzeugter Briefe und Bescheinigungen (PDF mit SHA-256).
 - [Ermaessigungen](#ermaessigungen) – Ermäßigungsberechtigungen mit Nachweis und Zeitraum.
 - [KontingentEreignisse](#kontingentereignisse) – Ereignisse eines Kontingents (eingebucht, besucht, verfallen; nur anfügen).
 - [Listenabschluesse](#listenabschluesse) – Abschluss einer Anwesenheitsliste (wer, wann).
 - [Termincodes](#termincodes) – QR-Codes für den Check-in je Termin und Ort.
+- [Unterrichtsapps](#unterrichtsapps) – Katalog der Unterrichts-Apps (eingebaut wie Podium oder angebunden mit Freigabe) mit Hinweis, wohin Daten gehen.
 
 ```mermaid
 erDiagram
     Anwesenheiten {
         Guid Id PK
+    }
+    Appeinsaetze {
+        Guid Id PK
+        Guid AppId FK
+        Guid KursId FK
     }
     Belegungen {
         Guid Id PK
@@ -431,13 +461,22 @@ erDiagram
         Guid Id PK
         Guid BelegungId FK
     }
+    Kurse {
+        Guid Id PK
+        Guid KursId PK
+    }
     Listenabschluesse {
         Guid VeranstaltungId PK
     }
     Termincodes {
         String Code PK
     }
+    Unterrichtsapps {
+        Guid Id PK
+    }
     Belegungen ||--o{ KontingentEreignisse : "BelegungId"
+    Kurse ||--o{ Appeinsaetze : "KursId"
+    Unterrichtsapps ||--o{ Appeinsaetze : "AppId"
 ```
 
 ### Finanzen
@@ -663,6 +702,7 @@ erDiagram
 - [LoeschlaufPersonen](#loeschlaufpersonen) – Personen eines Löschlaufs (bis zur Ausführung).
 - [Postausgang](#postausgang) – Ausgehende Mails mit Status (Abbild der gesendeten Nachricht).
 - [Protokoll](#protokoll) – Auditprotokoll (nur anfügen, Pseudonyme statt Personendaten).
+- [Rundschreiben](#rundschreiben) – Archiv gesendeter Rundschreiben: Betreff, Text mit Platzhaltern, Gestaltung, Zielgruppe, Zahlen – Vorlage für neue.
 - [Vorlagen](#vorlagen) – Text- und Mailvorlagen (Anredestil).
 
 ```mermaid
@@ -705,6 +745,9 @@ erDiagram
         Guid Id PK
     }
     Protokoll {
+        Guid Id PK
+    }
+    Rundschreiben {
         Guid Id PK
     }
     Vorlagen {
@@ -1104,6 +1147,27 @@ Klasse: `VibeVHS.Domain.Programm.Ferienzeitraum`
 | Quelle | text |  |  |  |
 | Von | date | ja |  |  |
 
+## Infomonitore
+
+Bildschirme im Foyer („Heute im Haus“): Standort, Prüfwert der geheimen Adresse, Vorschau, Sperre. (Bereich: Kurse, Termine und Orte)
+
+Klasse: `VibeVHS.Domain.Programm.Infomonitor`
+
+| Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
+|---|---|---|---|---|
+| Id | uuid | ja | PK |  |
+| AngelegtAm | timestamp with time zone | ja |  |  |
+| GesperrtAm | timestamp with time zone |  |  |  |
+| Name | character varying(200) | ja |  |  |
+| OrtId | uuid |  | → Orte, Index |  |
+| Pruefwert | character varying(64) | ja | eindeutig |  |
+| Ueberschrift | character varying(200) |  |  |  |
+| VorschauBis | timestamp with time zone |  |  |  |
+| VorschauPruefwert | character varying(64) |  | Index |  |
+| ZuletztAbgerufen | timestamp with time zone |  |  |  |
+
+Indizes: `IX_Infomonitore_OrtId` (OrtId); `IX_Infomonitore_Pruefwert` (Pruefwert), eindeutig; `IX_Infomonitore_VorschauPruefwert` (VorschauPruefwert)
+
 ## KursBuchungsrechte
 
 Buchungswege der Richtlinie des Kurses. (Bereich: Kurse, Termine und Orte)
@@ -1482,6 +1546,43 @@ Klasse: `VibeVHS.Domain.Programm.Qualifikationsausnahme`
 
 Indizes: `IX_Qualifikationsausnahmen_KursId` (KursId)
 
+## Schluessel
+
+Schlüssel und Transponder je Kursort (Nummer, Bezeichnung, außer Betrieb). (Bereich: Kurse, Termine und Orte)
+
+Klasse: `VibeVHS.Domain.Programm.Schluessel`
+
+| Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
+|---|---|---|---|---|
+| Id | uuid | ja | PK |  |
+| AngelegtAm | timestamp with time zone | ja |  |  |
+| AusserBetriebGrund | character varying(300) |  |  |  |
+| AusserBetriebSeit | date |  |  |  |
+| Bezeichnung | character varying(200) | ja |  |  |
+| Nummer | character varying(50) | ja | eindeutig |  |
+| OrtId | uuid | ja | → Orte, Index |  |
+
+Indizes: `IX_Schluessel_Nummer` (Nummer), eindeutig; `IX_Schluessel_OrtId` (OrtId)
+
+## Schluesselausgaben
+
+Ausgabe eines Schlüssels an Kursleitung oder Mitarbeitende mit Rückgabe; höchstens eine offene je Schlüssel. (Bereich: Kurse, Termine und Orte)
+
+Klasse: `VibeVHS.Domain.Programm.Schluesselausgabe`
+
+| Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
+|---|---|---|---|---|
+| Id | uuid | ja | PK |  |
+| AusgegebenAm | date | ja |  |  |
+| AusgegebenVon | character varying(200) | ja |  |  |
+| Bemerkung | character varying(500) |  |  |  |
+| PersonId | uuid | ja | → Personen, Index |  |
+| SchluesselId | uuid | ja | → Schluessel, eindeutig |  |
+| ZurueckAm | date |  |  |  |
+| ZurueckVon | character varying(200) |  |  |  |
+
+Indizes: `IX_Schluesselausgaben_PersonId` (PersonId); `IX_Schluesselausgaben_offen` (SchluesselId), eindeutig, nur "ZurueckAm" IS NULL
+
 ## Semester
 
 Semester (Programmzeitraum) mit Kürzel. (Bereich: Kurse, Termine und Orte)
@@ -1560,6 +1661,25 @@ Klasse: `VibeVHS.Domain.Durchfuehrung.Anwesenheit`
 | Weg | character varying(40) | ja |  |  |
 
 Indizes: `IX_Anwesenheiten_KursId` (KursId); `IX_Anwesenheiten_PersonId` (PersonId); `IX_Anwesenheiten_VeranstaltungId_BelegungId` (VeranstaltungId, BelegungId), eindeutig
+
+## Appeinsaetze
+
+Einsatz einer Unterrichts-App in einem Kurs durch die Kursleitung (Titel, Auftrag), für Teilnehmende im Portal sichtbar. (Bereich: Anmeldung und Teilnahme)
+
+Klasse: `VibeVHS.Domain.Durchfuehrung.Appeinsatz`
+
+| Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
+|---|---|---|---|---|
+| Id | uuid | ja | PK |  |
+| AngelegtAm | timestamp with time zone | ja |  |  |
+| AppId | uuid | ja | → Unterrichtsapps, Index |  |
+| Auftrag | character varying(2000) |  |  |  |
+| BeendetAm | timestamp with time zone |  |  |  |
+| KursId | uuid | ja | → Kurse, Index |  |
+| PersonId | uuid | ja |  |  |
+| Titel | character varying(200) | ja |  |  |
+
+Indizes: `IX_Appeinsaetze_AppId` (AppId); `IX_Appeinsaetze_KursId` (KursId)
 
 ## Belegungen
 
@@ -1698,6 +1818,24 @@ Klasse: `VibeVHS.Domain.Durchfuehrung.Termincode`
 | VeranstaltungId | uuid | ja | Index |  |
 
 Indizes: `IX_Termincodes_VeranstaltungId_OrtId` (VeranstaltungId, OrtId)
+
+## Unterrichtsapps
+
+Katalog der Unterrichts-Apps (eingebaut wie Podium oder angebunden mit Freigabe) mit Hinweis, wohin Daten gehen. (Bereich: Anmeldung und Teilnahme)
+
+Klasse: `VibeVHS.Domain.Durchfuehrung.Unterrichtsapp`
+
+| Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
+|---|---|---|---|---|
+| Id | uuid | ja | PK |  |
+| Adresse | character varying(500) | ja |  |  |
+| AngelegtAm | timestamp with time zone | ja |  |  |
+| Beschreibung | character varying(1000) | ja |  |  |
+| Datenhinweis | character varying(500) | ja |  |  |
+| Einbindung | character varying(40) | ja |  |  |
+| FreigegebenAm | timestamp with time zone |  |  |  |
+| FreigegebenVon | character varying(200) |  |  |  |
+| Name | character varying(200) | ja |  |  |
 
 ## Bankverbindungen
 
@@ -2643,6 +2781,7 @@ Klasse: `VibeVHS.Application.Postausgang.AusgehendeNachricht`
 | ErstelltAm | timestamp with time zone | ja | Index |  |
 | Fehler | text |  |  |  |
 | Inhalt | text | ja |  |  |
+| InhaltHtml | text |  |  |  |
 | Kanal | character varying(40) | ja |  |  |
 | PersonId | uuid |  | Index |  |
 | Rueckmeldung | text |  |  |  |
@@ -2675,6 +2814,28 @@ Klasse: `VibeVHS.Application.Protokoll.AuditEintrag`
 | Zeitpunkt | timestamp with time zone | ja | Index |  |
 
 Indizes: `IX_Protokoll_ObjektTyp_ObjektId` (ObjektTyp, ObjektId); `IX_Protokoll_Zeitpunkt` (Zeitpunkt)
+
+## Rundschreiben
+
+Archiv gesendeter Rundschreiben: Betreff, Text mit Platzhaltern, Gestaltung, Zielgruppe, Zahlen – Vorlage für neue. (Bereich: System)
+
+Klasse: `VibeVHS.Domain.Vorlagen.GesendetesRundschreiben`
+
+| Spalte | Typ | Pflicht | Schlüssel/Verweis | Einstufung / Hinweis |
+|---|---|---|---|---|
+| Id | uuid | ja | PK |  |
+| Anredestil | character varying(40) | ja |  |  |
+| Betreff | character varying(300) | ja |  |  |
+| Eingereiht | integer | ja |  |  |
+| GesendetAm | timestamp with time zone | ja | Index |  |
+| GesendetVon | character varying(200) | ja |  |  |
+| Gestaltung | character varying(40) | ja |  |  |
+| Html | text | ja |  |  |
+| Uebersprungen | integer | ja |  |  |
+| Zielgruppe | character varying(500) | ja |  |  |
+| Zweck | character varying(40) | ja |  |  |
+
+Indizes: `IX_Rundschreiben_GesendetAm` (GesendetAm)
 
 ## Vorlagen
 

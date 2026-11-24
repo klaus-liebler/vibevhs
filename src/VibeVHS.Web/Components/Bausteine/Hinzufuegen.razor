@@ -1,0 +1,113 @@
+@*
+    Einheitliches Anlegen (QA-64, aus SchoolCraft FA-3229): Schaltfläche „+ ‹Objekt› hinzufügen“ öffnet einen modalen Dialog mit den Feldern
+    (ChildContent), OK und Abbrechen. OK nennt, was noch fehlt (Freigabe), solange es nicht geht; schlägt das Speichern fehl, bleibt der Dialog
+    mit allen Eingaben offen. Esc oder „Abbrechen“ schließt ohne zu speichern.
+*@
+<BegruendeterButton Text="@($"+ {Objekt} hinzufügen")" ButtonStyle="@ButtonStyle" Size="@Size" Freigabe="@Erlaubt" Click="Oeffnen" />
+
+@if (offen)
+{
+    <div class="vhs-modal-hintergrund" @onkeydown="Taste" tabindex="-1">
+        <div class="vhs-modal" role="dialog" aria-modal="true" aria-labelledby="@($"{id}-titel")">
+            <h2 id="@($"{id}-titel")">@(Titel ?? $"{Objekt} hinzufügen")</h2>
+            @if (Erklaerung is not null)
+            {
+                <p class="vhs-small vhs-muted">@Erklaerung</p>
+            }
+            @ChildContent
+            @if (fehler is not null)
+            {
+                <div class="vhs-alert vhs-crit" role="alert">@fehler</div>
+            }
+            <div class="vhs-row vhs-modal-knoepfe">
+                <BegruendeterButton Text="@(OkText ?? "OK")" Icon="check" Freigabe="@Bereit" Click="SpeichernAsync" IsBusy="@arbeitet" />
+                <RadzenButton Text="Abbrechen" ButtonStyle="ButtonStyle.Light" Click="Schliessen" />
+                <span class="vhs-small vhs-muted"><kbd>Esc</kbd> bricht ab</span>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>Was angelegt wird, im Nominativ ohne Artikel („Abwesenheit“, „Ferien“).</summary>
+    [Parameter, EditorRequired]
+    public string Objekt { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Titel { get; set; }
+
+    [Parameter]
+    public string? Erklaerung { get; set; }
+
+    [Parameter]
+    public string? OkText { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Darf die Person überhaupt anlegen? (Schaltfläche gesperrt mit Begründung.)</summary>
+    [Parameter]
+    public Freigabe? Erlaubt { get; set; }
+
+    /// <summary>Sind die Eingaben vollständig? Nein + Grund sperrt OK und nennt, was fehlt.</summary>
+    [Parameter]
+    public Freigabe? Bereit { get; set; }
+
+    /// <summary>Speichern; <c>true</c> schließt den Dialog. Ausnahmen (InvalidOperation, Argument) erscheinen im Dialog.</summary>
+    [Parameter, EditorRequired]
+    public Func<Task<bool>> Speichern { get; set; } = default!;
+
+    /// <summary>Beim Öffnen (z. B. Felder vorbelegen).</summary>
+    [Parameter]
+    public EventCallback BeimOeffnen { get; set; }
+
+    [Parameter]
+    public ButtonStyle ButtonStyle { get; set; } = ButtonStyle.Primary;
+
+    [Parameter]
+    public ButtonSize Size { get; set; } = ButtonSize.Medium;
+
+    private readonly string id = "dlg-" + Guid.NewGuid().ToString("N")[..8];
+    private bool offen, arbeitet;
+    private string? fehler;
+
+    private async Task Oeffnen()
+    {
+        fehler = null;
+        await BeimOeffnen.InvokeAsync();
+        offen = true;
+    }
+
+    private void Schliessen() => offen = false;
+
+    private void Taste(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            Schliessen();
+        }
+    }
+
+    private async Task SpeichernAsync()
+    {
+        arbeitet = true;
+        fehler = null;
+        try
+        {
+            if (await Speichern())
+            {
+                offen = false;
+                // Speichern ist kein EventCallback (es liefert ja/nein): die aufrufende Seite neu zeichnen, damit die geladene Liste erscheint.
+                await EventCallback.Factory.Create(Speichern.Target ?? this, () => { }).InvokeAsync();
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            fehler = ex.Message;
+        }
+        finally
+        {
+            arbeitet = false;
+        }
+    }
+}

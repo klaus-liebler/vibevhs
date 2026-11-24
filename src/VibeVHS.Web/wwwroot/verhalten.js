@@ -17,6 +17,51 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// Tastenkürzel (QA-59): Strg+K (bzw. ⌘K) → Alles-Suche, F8 → Schnellauswahl (Schaltfläche data-schnellauswahl).
+document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+        const suche = document.getElementById('vhs-allessuche');
+        if (suche) { e.preventDefault(); suche.focus(); suche.select(); }
+    } else if (e.key === 'F8' && !e.ctrlKey && !e.altKey) {
+        const knopf = document.querySelector('[data-schnellauswahl]');
+        if (knopf) { e.preventDefault(); knopf.click(); }
+    }
+});
+
+// Rückfrage vor dem Absenden statischer Formulare (Portale): eigener Dialog statt confirm(), damit die Schaltfläche die Folge nennt.
+document.addEventListener('submit', (e) => {
+    const form = e.target;
+    if (!form.matches || !form.matches('form[data-rueckfrage]') || form.dataset.bestaetigt === '1') { return; }
+    e.preventDefault();
+    const knopf = e.submitter || form.querySelector('[type=submit]');
+    const ja = form.dataset.rueckfrageJa || (knopf && knopf.textContent.trim()) || 'Ja';
+    const dlg = document.createElement('dialog');
+    dlg.className = 'vhs-rueckfrage-dialog';
+    dlg.setAttribute('aria-label', ja + '?');
+    const text = document.createElement('p');
+    text.textContent = form.dataset.rueckfrage;
+    const zeile = document.createElement('div');
+    zeile.className = 'vhs-row';
+    const nein = document.createElement('button');
+    nein.type = 'button'; nein.className = 'vhs-btn'; nein.textContent = 'Abbrechen';
+    const ok = document.createElement('button');
+    ok.type = 'button'; ok.className = 'vhs-btn vhs-btn-gefahr'; ok.textContent = ja;
+    zeile.append(ok, nein);
+    dlg.append(text, zeile);
+    document.body.append(dlg);
+    const schliessen = () => { dlg.close(); dlg.remove(); };
+    nein.addEventListener('click', schliessen);
+    dlg.addEventListener('cancel', () => dlg.remove());
+    ok.addEventListener('click', () => {
+        schliessen();
+        form.dataset.bestaetigt = '1';
+        if (form.requestSubmit) { form.requestSubmit(knopf || undefined); } else { form.submit(); }
+        delete form.dataset.bestaetigt;
+    });
+    dlg.showModal();
+    nein.focus();
+}, true);
+
 // Rücksprung zur Liste (Komponente ZurueckZurListe): Listen tragen data-liste="<schlüssel>", Zeilen data-zeile="<id>".
 //   Klick auf eine Zeile merkt Zeile und Scrollposition (sessionStorage, nur in diesem Tab).
 //   „← Zurück zur Liste“ oder Browser-Zurück → auf der Liste wird die Scrollposition wiederhergestellt, die Zeile

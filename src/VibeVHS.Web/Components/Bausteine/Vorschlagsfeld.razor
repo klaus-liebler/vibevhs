@@ -1,0 +1,144 @@
+@typeparam TItem
+@implements IDisposable
+
+@*
+    Eingabefeld mit Vorschlägen beim Tippen (QA-60): fehlertolerante Suche liefert der Aufrufer (z. B. Personen, Kurse); ↑ ↓ wählen,
+    Enter übernimmt, Esc schließt. Für Bildschirmleser als Combobox mit Listbox ausgezeichnet.
+*@
+<div class="vhs-vorschlag">
+    <input @ref="feld" id="@Id" type="search" class="vhs-input" @bind="text" @bind:event="oninput" @bind:after="SuchenVerzoegert" @onkeydown="TasteAsync"
+           @onkeydown:preventDefault="@abfangen" @onfocusout="ZuklappenSpaeter" disabled="@Disabled" autofocus="@AutoFokus"
+           role="combobox" aria-expanded="@(offen ? "true" : "false")" aria-controls="@($"{Id}-liste")" aria-label="@Bezeichnung"
+           aria-activedescendant="@(gewaehlt >= 0 ? $"{Id}-{gewaehlt}" : null)" placeholder="@Platzhalter" autocomplete="off" />
+    @if (offen && treffer.Count > 0)
+    {
+        <div class="vhs-ergebnisse" role="listbox" id="@($"{Id}-liste")">
+            @for (var i = 0; i < treffer.Count; i++)
+            {
+                var nr = i;
+                var t = treffer[nr];
+                <button type="button" id="@($"{Id}-{nr}")" role="option" aria-selected="@(nr == gewaehlt ? "true" : "false")"
+                        class="@(nr == gewaehlt ? "gewaehlt" : null)" @onmousedown="@(() => UebernehmenAsync(t))" @onmousedown:preventDefault>
+                    <span>@Titel(t)</span><small>@Zusatz?.Invoke(t)</small>
+                </button>
+            }
+            <div class="vhs-ergebnis-hinweis"><kbd>↑</kbd> <kbd>↓</kbd> wählen · <kbd>Enter</kbd> übernehmen · <kbd>Esc</kbd> schließen</div>
+        </div>
+    }
+    else if (offen && fertig && !string.IsNullOrWhiteSpace(text))
+    {
+        <div class="vhs-ergebnisse"><div class="vhs-ergebnis-gruppe">@KeineTreffer</div></div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public Func<string, Task<IReadOnlyList<TItem>>> Suchen { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Func<TItem, string> Titel { get; set; } = default!;
+
+    [Parameter]
+    public Func<TItem, string?>? Zusatz { get; set; }
+
+    [Parameter]
+    public EventCallback<TItem> Gewaehlt { get; set; }
+
+    [Parameter]
+    public string Id { get; set; } = "vorschlag-" + Guid.NewGuid().ToString("N")[..8];
+
+    [Parameter]
+    public string? Platzhalter { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Bezeichnung { get; set; } = string.Empty;
+
+    [Parameter]
+    public string KeineTreffer { get; set; } = "Keine Treffer – auch keine ähnliche Schreibweise";
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public bool AutoFokus { get; set; }
+
+    /// <summary>Text nach der Auswahl im Feld lassen (Standard) oder leeren (zum Hinzufügen mehrerer).</summary>
+    [Parameter]
+    public bool NachAuswahlLeeren { get; set; }
+
+    private ElementReference feld;
+    private string? text;
+    private bool offen, fertig, abfangen;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && AutoFokus && !Disabled)
+        {
+            await feld.FocusAsync();
+        }
+    }
+    private int gewaehlt = -1;
+    private IReadOnlyList<TItem> treffer = [];
+    private CancellationTokenSource? verzoegerung;
+
+    private async Task SuchenVerzoegert()
+    {
+        verzoegerung?.Cancel();
+        verzoegerung = new CancellationTokenSource();
+        var token = verzoegerung.Token;
+        fertig = false;
+        try
+        {
+            await Task.Delay(180, token);
+            treffer = string.IsNullOrWhiteSpace(text) ? [] : await Suchen(text!);
+            gewaehlt = treffer.Count > 0 ? 0 : -1;
+            offen = true;
+            fertig = true;
+        }
+        catch (TaskCanceledException)
+        {
+            // es wird noch getippt
+        }
+    }
+
+    private async Task TasteAsync(KeyboardEventArgs e)
+    {
+        abfangen = e.Key is "ArrowDown" or "ArrowUp" or "Enter" && offen && treffer.Count > 0;
+        switch (e.Key)
+        {
+            case "Escape":
+                offen = false;
+                break;
+            case "ArrowDown" when treffer.Count > 0:
+                offen = true;
+                gewaehlt = (gewaehlt + 1) % treffer.Count;
+                break;
+            case "ArrowUp" when treffer.Count > 0:
+                offen = true;
+                gewaehlt = gewaehlt <= 0 ? treffer.Count - 1 : gewaehlt - 1;
+                break;
+            case "Enter" when offen && treffer.Count > 0:
+                await UebernehmenAsync(treffer[Math.Max(0, gewaehlt)]);
+                break;
+        }
+    }
+
+    private async Task UebernehmenAsync(TItem t)
+    {
+        offen = false;
+        text = NachAuswahlLeeren ? null : Titel(t);
+        await Gewaehlt.InvokeAsync(t);
+    }
+
+    private async Task ZuklappenSpaeter()
+    {
+        await Task.Delay(200);
+        offen = false;
+    }
+
+    public void Dispose()
+    {
+        verzoegerung?.Cancel();
+        verzoegerung?.Dispose();
+    }
+}

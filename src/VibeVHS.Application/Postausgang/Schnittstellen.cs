@@ -13,6 +13,11 @@ public interface INachrichtenSpeicher
 
     Task<int> AnzahlAsync(NachrichtenStatus status, CancellationToken abbruch = default);
 
+    /// <summary>Archiv gesendeter Rundschreiben (QA-66), neueste zuerst.</summary>
+    Task<IReadOnlyList<Domain.Vorlagen.GesendetesRundschreiben>> RundschreibenAsync(int anzahl, CancellationToken abbruch = default);
+
+    void RundschreibenArchivieren(Domain.Vorlagen.GesendetesRundschreiben rundschreiben);
+
     Task SpeichernAsync(CancellationToken abbruch = default);
 }
 

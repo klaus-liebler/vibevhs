@@ -4,7 +4,9 @@
 @attribute [ExcludeFromInteractiveRouting]
 @layout PortalLayout
 @using VibeVHS.Application.Portal
+@using VibeVHS.Application.Durchfuehrung
 @inject DozentenportalDienst Portal
+@inject UnterrichtsappDienst Apps
 
 <PageTitle>Kurse und Unterlagen · Dozierendenportal</PageTitle>
 
@@ -44,6 +46,37 @@ else if (kurs is not null)
         <div class="vhs-alert vhs-crit" role="alert">@Fehler</div>
     }
     <section class="vhs-portal-karte">
+        <h2 style="font-size:18px">Unterrichts-Apps</h2>
+        <p class="vhs-small vhs-muted">Quiz, Übungen oder Lern-Apps für diesen Kurs. Teilnehmende sehen eingesetzte Apps im Teilnehmendenportal unter „Unterlagen“.</p>
+        @foreach (var z in einsaetze)
+        {
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--vhs-line)">
+                <span style="flex:1"><b>@z.Einsatz.Titel</b> · @z.App.Name<br /><span class="vhs-small vhs-muted">@(z.Einsatz.Auftrag ?? "") @z.App.Datenhinweis</span></span>
+                <a class="vhs-btn" href="@z.App.Adresse" target="_blank" rel="noopener">Öffnen</a>
+                <form method="post" @formname="@($"app-ende-{z.Einsatz.Id}")" @onsubmit="@(() => AppBeendenAsync(z.Einsatz.Id))"
+                      data-rueckfrage="@($"„{z.Einsatz.Titel}“ wird beendet und verschwindet aus dem Portal der Teilnehmenden.")" data-rueckfrage-ja="Beenden">
+                    <AntiforgeryToken />
+                    <button type="submit" class="vhs-btn">Entfernen</button>
+                </form>
+            </div>
+        }
+        <form method="post" @formname="app-einsetzen" @onsubmit="AppEinsetzenAsync" style="margin-top:8px">
+            <AntiforgeryToken />
+            <label for="app">App</label>
+            <select id="app" name="NeuerEinsatz.AppId" required>
+                @foreach (var a in katalog.Where(a => a.Nutzbar))
+                {
+                    <option value="@a.Id">@a.Name (@(a.Eingebaut ? "eingebaut – Daten bleiben bei der vhs" : "angebunden, freigegeben"))</option>
+                }
+            </select>
+            <label for="app-titel">Titel für die Teilnehmenden</label>
+            <input id="app-titel" name="NeuerEinsatz.Titel" maxlength="200" required placeholder="z. B. Vokabelquiz Lektion 3" />
+            <label for="app-auftrag">Auftrag (optional)</label>
+            <input id="app-auftrag" name="NeuerEinsatz.Auftrag" maxlength="500" placeholder="z. B. Bis Donnerstag einmal durchspielen" />
+            <button type="submit" class="vhs-btn">Einsetzen</button>
+        </form>
+    </section>
+    <section class="vhs-portal-karte">
         <h2 style="font-size:18px">Unterlage hochladen</h2>
         <form method="post" action="@($"portal/dozierende/kurs/{kurs.Id}/unterlagen")" enctype="multipart/form-data">
             <AntiforgeryToken />
@@ -72,7 +105,8 @@ else if (kurs is not null)
                 }
                 else
                 {
-                    <form method="post" @formname="@($"zurueck-{u.Id}")" @onsubmit="@(() => ZurueckziehenAsync(u.Id))">
+                    <form method="post" @formname="@($"zurueck-{u.Id}")" @onsubmit="@(() => ZurueckziehenAsync(u.Id))"
+                          data-rueckfrage="@($"„{u.Titel}“ wird zurückgezogen: Der Link für die Teilnehmenden funktioniert danach nicht mehr.")">
                         <AntiforgeryToken />
                         <button type="submit" class="vhs-btn">Zurückziehen</button>
                     </form>
@@ -98,6 +132,20 @@ else if (kurs is not null)
     private IReadOnlyList<PortalKurs> kurse = [];
     private VibeVHS.Domain.Programm.Kurs? kurs;
     private IReadOnlyList<PortalUnterlage> unterlagen = [];
+    private IReadOnlyList<VibeVHS.Domain.Durchfuehrung.Unterrichtsapp> katalog = [];
+    private IReadOnlyList<Appeinsatzzeile> einsaetze = [];
+
+    public sealed class Einsatzformular
+    {
+        public Guid AppId { get; set; }
+
+        public string? Titel { get; set; }
+
+        public string? Auftrag { get; set; }
+    }
+
+    [SupplyParameterFromForm(FormName = "app-einsetzen")]
+    private Einsatzformular? NeuerEinsatz { get; set; }
     private string? fehler;
 
     protected override async Task OnInitializedAsync()
@@ -108,6 +156,8 @@ else if (kurs is not null)
             {
                 kurs = await Portal.KursAsync(id);
                 unterlagen = await Portal.UnterlagenAsync(id);
+                katalog = await Apps.KatalogAsync();
+                einsaetze = await Apps.EinsaetzeAsync([id]);
             }
             else
             {
@@ -119,6 +169,29 @@ else if (kurs is not null)
             fehler = f.Message;
             HttpContext.Response.StatusCode = f.Status;
         }
+    }
+
+    private async Task AppEinsetzenAsync()
+    {
+        try
+        {
+            var k = await Portal.KursAsync(Id!.Value); // nur eigene Kurse
+            await Apps.EinsetzenAsync(k.Id, await Portal.IchAsync(), NeuerEinsatz!.AppId, NeuerEinsatz.Titel ?? string.Empty, NeuerEinsatz.Auftrag);
+            einsaetze = await Apps.EinsaetzeAsync([k.Id]);
+            Ok = "App eingesetzt; die Teilnehmenden sehen sie im Portal.";
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or PortalFehler)
+        {
+            Fehler = ex.Message;
+        }
+    }
+
+    private async Task AppBeendenAsync(Guid einsatzId)
+    {
+        var k = await Portal.KursAsync(Id!.Value);
+        await Apps.BeendenAsync(einsatzId, k.Id);
+        einsaetze = await Apps.EinsaetzeAsync([k.Id]);
+        Ok = "App entfernt.";
     }
 
     private async Task ZurueckziehenAsync(Guid unterlageId)

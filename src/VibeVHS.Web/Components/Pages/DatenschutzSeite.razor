@@ -46,6 +46,7 @@
                                     <BegruendeterButton Text="@(l.Freigabe1Kennung is null ? "Freigeben (1/2)" : "Freigeben (2/2) und ausführen")" Size="ButtonSize.Small" Icon="verified"
                                                         Freigabe="@FreigabeFuer(l)" Click="@(() => FreigebenAsync(l.Id))" IsBusy="@arbeitet" />
                                     <BegruendeterButton Text="Verwerfen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                                        Rueckfrage="Der Löschlauf wird verworfen; die Personen bleiben unverändert."
                                                         Freigabe="@(Freigabe.NurFuer(rolle, Rolle.Verwaltungsleitung, Rolle.Leitung, Rolle.Systemverwaltung))" Click="@(() => VerwerfenAsync(l.Id))" />
                                 </div>
                             }

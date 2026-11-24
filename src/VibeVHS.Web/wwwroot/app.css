@@ -371,3 +371,69 @@ a.vhs-chip { text-decoration: none; display: inline-flex; align-items: center; }
 .vhs-tourenliste li > div { flex: 1 1 320px; min-width: 0; }
 .vhs-tourenliste li button { flex: 0 0 auto; }
 @media (prefers-reduced-motion: reduce) { #vhs-tour-ring { transition: none; } }
+
+/* Rückfragen (QA-58): statische Formulare (verhalten.js) und Radzen-Dialog */
+.vhs-rueckfrage-dialog { border: 1px solid var(--vhs-line, #ccc); border-radius: 10px; padding: 18px 20px; max-width: 440px; box-shadow: 0 10px 30px rgba(0,0,0,.2); }
+.vhs-rueckfrage-dialog::backdrop { background: rgba(0,0,0,.35); }
+.vhs-rueckfrage-dialog p { margin: 0 0 14px; }
+.vhs-btn.vhs-btn-gefahr { border-color: #b42318; color: #b42318; }
+.vhs-btn.vhs-btn-gefahr:hover { background: #b42318; color: #fff; }
+
+/* Tastenkürzel (QA-59) */
+kbd { display: inline-block; min-width: 1.4em; padding: 1px 5px; border: 1px solid var(--vhs-line, #c8c8c8); border-bottom-width: 2px; border-radius: 4px;
+      background: var(--vhs-surface, #fafafa); font: 600 .85em/1.3 ui-monospace, SFMono-Regular, Consolas, monospace; text-align: center; white-space: nowrap; }
+
+/* Alles-Suche (QA-61) */
+.vhs-search-kuerzel { flex: none; font-size: 11px; color: var(--vhs-muted); white-space: nowrap; }
+.vhs-ergebnisse a.gewaehlt { background: var(--vhs-surface-2); outline: 2px solid var(--vhs-accent); outline-offset: -2px; }
+.vhs-ergebnisse a.vhs-ergebnis-alle { border-top: 1px solid var(--vhs-line); color: var(--vhs-accent); font-size: 13px; }
+.vhs-ergebnis-hinweis { font-size: 11px; color: var(--vhs-muted); padding: 5px 12px; border-top: 1px solid var(--vhs-line); }
+@media (max-width: 700px) { .vhs-search-kuerzel { display: none; } }
+
+/* Vorschlagsfeld und Personenauswahl (QA-60) */
+.vhs-vorschlag { position: relative; min-width: 260px; }
+.vhs-vorschlag .vhs-input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--vhs-line); border-radius: 7px; font: inherit; background: var(--vhs-surface); }
+.vhs-vorschlag .vhs-ergebnisse button { display: flex; gap: 8px; width: 100%; text-align: left; padding: 7px 12px; border: 0; background: transparent; font: inherit; color: var(--vhs-fg); cursor: pointer; }
+.vhs-vorschlag .vhs-ergebnisse button:hover, .vhs-vorschlag .vhs-ergebnisse button.gewaehlt { background: var(--vhs-surface-2); }
+.vhs-vorschlag .vhs-ergebnisse button.gewaehlt { outline: 2px solid var(--vhs-accent); outline-offset: -2px; }
+
+/* Schnellauswahl (QA-62) */
+.vhs-btn-schnell { gap: 6px; white-space: nowrap; }
+.vhs-btn-schnell kbd { font-size: 10px; }
+.vhs-schnell:focus { outline: none; }
+.vhs-schnell-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.vhs-schnell-punkt { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; padding: 10px 12px; border: 1px solid var(--vhs-line); border-radius: 8px; background: var(--vhs-surface); font: inherit; cursor: pointer; }
+.vhs-schnell-punkt:hover, .vhs-schnell-punkt:focus { border-color: var(--vhs-accent); background: var(--vhs-surface-2); }
+.vhs-schnell-punkt kbd { font-size: 1.1em; min-width: 1.8em; }
+
+/* Anlegen per Dialog (QA-64) */
+.vhs-modal-hintergrund { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: flex-start; justify-content: center; padding: 8vh 16px; z-index: 1000; overflow: auto; }
+.vhs-modal { background: var(--vhs-surface); border-radius: 12px; box-shadow: 0 16px 48px rgba(0,0,0,.25); padding: 20px 22px; width: min(640px, 100%); }
+.vhs-modal h2 { margin-top: 0; }
+.vhs-modal-knoepfe { margin-top: 14px; }
+
+/* Info-Monitor im Foyer (QA-65): groß, kontrastreich, aus der Ferne lesbar */
+.vhs-monitor { min-height: 100vh; box-sizing: border-box; padding: 3vh 4vw; background: #0f2233; color: #fff; font-size: clamp(18px, 2.2vw, 34px); }
+.vhs-monitor header h1 { font-size: 2.2em; margin: 0 0 .2em; }
+.vhs-monitor-kopf { display: flex; justify-content: space-between; opacity: .85; border-bottom: 2px solid rgba(255,255,255,.3); padding-bottom: .4em; margin-bottom: .6em; }
+.vhs-monitor h2 { font-size: 1.2em; margin: .8em 0 .3em; color: #9fd3ff; }
+.vhs-monitor-tabelle { width: 100%; border-collapse: collapse; }
+.vhs-monitor-tabelle th { text-align: left; font-size: .7em; opacity: .7; font-weight: 500; }
+.vhs-monitor-tabelle td { padding: .35em .5em .35em 0; border-bottom: 1px solid rgba(255,255,255,.12); vertical-align: top; }
+.vhs-monitor-tabelle tr.faellt-aus td { color: #ffb4a8; text-decoration: line-through; text-decoration-thickness: 1px; }
+.vhs-monitor-tabelle tr.faellt-aus .vhs-monitor-aus { text-decoration: none; display: inline-block; }
+.vhs-monitor-aus { margin-left: .5em; padding: .05em .4em; border-radius: .3em; background: #c0392b; color: #fff; font-size: .7em; font-weight: 600; }
+.vhs-monitor-nr { opacity: .6; font-size: .7em; margin-left: .4em; }
+.vhs-monitor-hinweis { font-size: 1.2em; opacity: .85; }
+.vhs-monitor-vorschau { background: #f5b301; color: #000; padding: .3em .6em; border-radius: .3em; margin-bottom: .6em; font-size: .6em; display: inline-block; }
+.vhs-monitor-leer { display: flex; flex-direction: column; justify-content: center; text-align: center; }
+.vhs-monitor-seite { margin: 0; padding: 0; }
+.vhs-monitor-seite .vhs-monitor { width: 100%; }
+
+/* Rundschreiben (QA-66) */
+.vhs-rundschreiben-vorschau { border: 1px solid var(--vhs-line); border-radius: 8px; overflow: hidden; max-height: 520px; overflow-y: auto; }
+.vhs-einschub { margin: 4px 0 10px 24px; background: var(--vhs-surface-2); }
+
+/* Spielzeitleiste (QA-68) */
+.vhs-spielzeit { position: sticky; top: 0; z-index: 60; grid-column: 1 / -1; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 5px 14px; background: #3b1f6b; color: #fff; font-size: 13px; }
+.vhs-spielzeit a { color: #ffd166; }

@@ -160,6 +160,47 @@ internal static class ProgrammMapping
             b.Navigation(o => o.Merkmale).HasField("_merkmale").UsePropertyAccessMode(PropertyAccessMode.Field).AutoInclude();
         });
 
+        mb.Entity<Schluessel>(b =>
+        {
+            b.ToTable("Schluessel");
+            b.HasKey(s => s.Id);
+            b.Property(s => s.Id).ValueGeneratedNever();
+            b.Property(s => s.Nummer).HasMaxLength(50);
+            b.Property(s => s.Bezeichnung).HasMaxLength(200);
+            b.Property(s => s.AusserBetriebGrund).HasMaxLength(300);
+            b.HasIndex(s => s.Nummer).IsUnique();
+            b.HasOne<Ort>().WithMany().HasForeignKey(s => s.OrtId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        mb.Entity<Schluesselausgabe>(b =>
+        {
+            b.ToTable("Schluesselausgaben");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.Id).ValueGeneratedNever();
+            b.Property(a => a.AusgegebenVon).HasMaxLength(200);
+            b.Property(a => a.ZurueckVon).HasMaxLength(200);
+            b.Property(a => a.Bemerkung).HasMaxLength(500);
+            b.HasOne<Schluessel>().WithMany().HasForeignKey(a => a.SchluesselId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<Domain.Personen.Person>().WithMany().HasForeignKey(a => a.PersonId).OnDelete(DeleteBehavior.Restrict);
+            // Höchstens eine offene Ausgabe je Schlüssel (Teilindex, zweite Linie hinter der Prüfung im Dienst).
+            b.HasIndex(a => a.SchluesselId).IsUnique().HasFilter("\"ZurueckAm\" IS NULL").HasDatabaseName("IX_Schluesselausgaben_offen");
+            b.HasIndex(a => a.PersonId);
+        });
+
+        mb.Entity<Infomonitor>(b =>
+        {
+            b.ToTable("Infomonitore");
+            b.HasKey(m => m.Id);
+            b.Property(m => m.Id).ValueGeneratedNever();
+            b.Property(m => m.Name).HasMaxLength(200);
+            b.Property(m => m.Ueberschrift).HasMaxLength(200);
+            b.Property(m => m.Pruefwert).HasMaxLength(64);
+            b.Property(m => m.VorschauPruefwert).HasMaxLength(64);
+            b.HasIndex(m => m.Pruefwert).IsUnique();
+            b.HasIndex(m => m.VorschauPruefwert);
+            b.HasOne<Ort>().WithMany().HasForeignKey(m => m.OrtId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         mb.Entity<Ferienzeitraum>(b =>
         {
             b.ToTable("Ferien");

@@ -1,0 +1,180 @@
+@page "/schluessel"
+@using VibeVHS.Application.Programm
+@using VibeVHS.Application.Personen
+@using VibeVHS.Domain.Programm
+@using VibeVHS.Domain.Personen
+@inject Vorgang Vorgang
+@inject NotificationService Hinweise
+@inject TimeProvider Uhr
+
+@* Schlüsselverwaltung (QA-67): Schlüssel je Kursort, Ausgabe an Kursleitungen oder Mitarbeitende, Rückgabe, außer Betrieb. *@
+
+<PageTitle>Schlüssel · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Schlüssel</h1>
+        <p class="vhs-sub">Schlüssel und Transponder für Schulen, Gemeindehäuser und Außenstellen: wer hat welchen seit wann. Leitet jemand am Ort
+            vorerst keine Veranstaltung mehr, entsteht nachts eine Aufgabe „Schlüssel zurückfordern“.</p>
+    </div>
+    <Hinzufuegen Objekt="Schlüssel" Titel="Schlüssel anlegen" Erlaubt="@recht" OkText="Anlegen" Speichern="AnlegenAsync"
+                 Bereit="@(string.IsNullOrWhiteSpace(nummer) || string.IsNullOrWhiteSpace(bezeichnung) ? Freigabe.Nein("Bitte Nummer und Bezeichnung angeben.") : ortId is null ? Freigabe.Nein("Bitte den Ort wählen.") : Freigabe.Ja)">
+        <div class="vhs-fields">
+            <RadzenFormField Text="Nummer *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="nummer" Immediate="true" Placeholder="S-12" /></RadzenFormField>
+            <RadzenFormField Text="Bezeichnung *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="bezeichnung" Immediate="true" Placeholder="Haupteingang und Raum 1.12" /></RadzenFormField>
+            <RadzenFormField Text="Ort *" Variant="Variant.Outlined">
+                <RadzenDropDown TValue="Guid?" @bind-Value="ortId" Data="@orte" TextProperty="Anzeige" ValueProperty="Id" AllowFiltering="true" Placeholder="Gebäude oder Raum" />
+            </RadzenFormField>
+        </div>
+    </Hinzufuegen>
+</div>
+
+@if (!recht.Erlaubt)
+{
+    <div class="vhs-alert">@recht.Begruendung</div>
+}
+else
+{
+    <section class="vhs-card">
+        <div class="vhs-list">
+            @if (zeilen.Count == 0)
+            {
+                <div class="vhs-muted">Noch keine Schlüssel erfasst. Oben „+ Schlüssel hinzufügen“ wählen.</div>
+            }
+            @foreach (var z in zeilen)
+            {
+                var s = z.Schluessel;
+                <div>
+                    <span class="vhs-grow">
+                        <b class="vhs-mono">@s.Nummer</b> · @s.Bezeichnung · <span class="vhs-muted">@z.Ort</span>
+                        <br />
+                        @if (!s.InBetrieb)
+                        {
+                            <StatusPille Stil="krit">außer Betrieb seit @s.AusserBetriebSeit?.ToString("dd.MM.yyyy")</StatusPille> <span class="vhs-small">@s.AusserBetriebGrund</span>
+                        }
+                        else if (z.Ausgabe is { } a)
+                        {
+                            <span class="vhs-small">bei <a href="@($"personen/{a.PersonId}")">@z.Inhaber</a> seit @a.AusgegebenAm.ToString("dd.MM.yyyy")@(a.Bemerkung is null ? "" : $" · {a.Bemerkung}")</span>
+                        }
+                        else
+                        {
+                            <span class="vhs-small vhs-muted">im Schlüsselschrank</span>
+                        }
+                    </span>
+                    @if (s.InBetrieb && z.Ausgabe is { } offen)
+                    {
+                        <BegruendeterButton Text="Rückgabe eintragen" Icon="assignment_return" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => ZurueckAsync(offen))" />
+                    }
+                    else if (s.InBetrieb)
+                    {
+                        <BegruendeterButton Text="Ausgeben …" Icon="vpn_key" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => AusgabeOeffnen(s))" />
+                    }
+                    @if (s.InBetrieb)
+                    {
+                        <BegruendeterButton Text="Verloren / aussondern" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" RueckfrageJa="Außer Betrieb nehmen"
+                                            Rueckfrage="@($"Schlüssel {s.Nummer} wird außer Betrieb genommen (z. B. verloren). Eine offene Ausgabe endet heute. Bei Verlust ggf. Schließanlage prüfen lassen.")"
+                                            Click="@(() => AusserBetriebAsync(s))" />
+                    }
+                </div>
+                @if (ausgabeFuer == s.Id)
+                {
+                    <div class="vhs-card vhs-einschub">
+                        <p class="vhs-small">Schlüssel <b>@s.Nummer</b> ausgeben an:</p>
+                        <label class="vhs-small"><input type="checkbox" @bind="auchMitarbeitende" /> auch Mitarbeitende (sonst nur Kursleitungen)</label>
+                        <Personenauswahl Id="@($"schluessel-{s.Id:N}")" AutoFokus="true" Kreis="@(new PersonenFilter(Rolle: auchMitarbeitende ? null : Personenrolle.Dozierende))"
+                                         Gewaehlt="@(p => empfaenger = p)" Bezeichnung="Kursleitung oder Mitarbeitende suchen" />
+                        <div class="vhs-row">
+                            <RadzenFormField Text="am" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly" @bind-Value="ausgabeAm" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+                            <RadzenFormField Text="Bemerkung" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="bemerkung" /></RadzenFormField>
+                            <BegruendeterButton Text="Ausgeben" Icon="check" Click="@(() => AusgebenAsync(s))"
+                                                Freigabe="@(empfaenger is null ? Freigabe.Nein("Bitte zuerst die Person wählen.") : Freigabe.Ja)" />
+                            <RadzenButton Text="Abbrechen" ButtonStyle="ButtonStyle.Light" Click="@(() => ausgabeFuer = null)" />
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private sealed record OrtWahl(Guid Id, string Anzeige);
+
+    private IReadOnlyList<Schluesselzeile> zeilen = [];
+    private IReadOnlyList<OrtWahl> orte = [];
+    private Freigabe recht = Freigabe.Ja;
+    private string? nummer, bezeichnung, bemerkung;
+    private Guid? ortId, ausgabeFuer;
+    private bool auchMitarbeitende;
+    private PersonZeile? empfaenger;
+    private DateOnly ausgabeAm;
+
+    private DateOnly Heute => DateOnly.FromDateTime(Uhr.GetLocalNow().Date);
+
+    protected override async Task OnInitializedAsync()
+    {
+        recht = Freigabe.NurFuer((await Vorgang.BenutzerAsync()).Rolle, SchluesselDienst.Rollen);
+        if (recht.Erlaubt)
+        {
+            await LadenAsync();
+        }
+    }
+
+    private async Task LadenAsync()
+    {
+        (zeilen, orte) = await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var liste = await d.GetRequiredService<SchluesselDienst>().ListeAsync();
+            var verzeichnis = await d.GetRequiredService<IProgrammSpeicher>().OrtsverzeichnisAsync();
+            var wahl = verzeichnis.Alle.Where(o => o.Art is Ortsart.Gebaeude or Ortsart.Raum or Ortsart.Liegenschaft)
+                .Select(o => new OrtWahl(o.Id, string.Join(" › ", verzeichnis.Pfad(o).Select(x => x.Name))))
+                .OrderBy(o => o.Anzeige, StringComparer.CurrentCulture).ToList();
+            return ((IReadOnlyList<Schluesselzeile>)liste, (IReadOnlyList<OrtWahl>)wahl);
+        });
+    }
+
+    private async Task<bool> AnlegenAsync()
+    {
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<SchluesselDienst>().AnlegenAsync(nummer!, bezeichnung!, ortId!.Value));
+        Hinweise.Notify(NotificationSeverity.Success, "Angelegt", $"Schlüssel {nummer}");
+        nummer = bezeichnung = null;
+        await LadenAsync();
+        return true;
+    }
+
+    private void AusgabeOeffnen(Schluessel s)
+    {
+        ausgabeFuer = s.Id;
+        empfaenger = null;
+        bemerkung = null;
+        ausgabeAm = Heute;
+    }
+
+    private async Task AusgebenAsync(Schluessel s)
+    {
+        try
+        {
+            await Vorgang.AusfuehrenAsync(async d => { await d.GetRequiredService<SchluesselDienst>().AusgebenAsync(s.Id, empfaenger!.Id, ausgabeAm, bemerkung); return 0; });
+            Hinweise.Notify(NotificationSeverity.Success, "Ausgegeben", $"Schlüssel {s.Nummer} an {empfaenger!.Anzeigename}");
+            ausgabeFuer = null;
+            await LadenAsync();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task ZurueckAsync(Schluesselausgabe a)
+    {
+        await Vorgang.AusfuehrenAsync(async d => { await d.GetRequiredService<SchluesselDienst>().ZurueckAsync(a.Id, Heute); return 0; });
+        Hinweise.Notify(NotificationSeverity.Success, "Zurück", "Rückgabe eingetragen.");
+        await LadenAsync();
+    }
+
+    private async Task AusserBetriebAsync(Schluessel s)
+    {
+        await Vorgang.AusfuehrenAsync(async d => { await d.GetRequiredService<SchluesselDienst>().AusserBetriebAsync(s.Id, "verloren bzw. ausgesondert"); return 0; });
+        await LadenAsync();
+    }
+}

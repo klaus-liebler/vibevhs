@@ -83,6 +83,47 @@ public class PersonenAbfrageTests
     }
 
     [Fact]
+    public async Task Unscharfe_Suche_findet_Tippfehler_und_ordnet_den_besten_Treffer_zuerst()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var t = await TestDatenbank.ErzeugenAsync();
+        await using (var db = t.NeuerKontext())
+        {
+            var jetzt = t.Uhr.GetLocalNow();
+            db.Personen.AddRange(
+                Person.Anlegen("Karl", "Brenner", new DateOnly(2026, 1, 1), jetzt),
+                Person.Anlegen("Peter", "Schmidt", new DateOnly(2026, 1, 1), jetzt),
+                Person.Anlegen("Petra", "Schmitt", new DateOnly(2026, 1, 1), jetzt),
+                Person.Anlegen("Ayşe", "Yılmaz", new DateOnly(2026, 1, 1), jetzt),
+                Person.Anlegen("Jan", "Kowalski", new DateOnly(2026, 1, 1), jetzt),
+                Person.Anlegen("Eva", "Hartmann", new DateOnly(2026, 1, 1), jetzt));
+            await db.SaveChangesAsync(ct);
+            await db.Database.ExecuteSqlRawAsync("ANALYZE", ct);
+        }
+
+        await using var db2 = t.NeuerKontext();
+        var abfrage = Abfrage(db2);
+        async Task<string[]> Vorschlag(string s) => (await abfrage.VorschlaegeAsync(s, new PersonenFilter(), 5, ct)).Select(z => z.Anzeigename).ToArray();
+
+        (await Vorschlag("Brnner")).ShouldBe(["Karl Brenner"]);                     // fehlender Buchstabe
+        (await Vorschlag("kowalsky")).ShouldBe(["Jan Kowalski"]);                  // falscher Buchstabe
+        (await Vorschlag("yilmas ayse")).ShouldBe(["Ayşe Yılmaz"]);                // Umschrift und Tippfehler
+        (await Vorschlag("Hartmn")).ShouldBe(["Eva Hartmann"]);                    // Anfang mit Fehler
+        (await Vorschlag("schmitt")).First().ShouldBe("Petra Schmitt");           // genaue Schreibweise zuerst …
+        (await Vorschlag("schmitt")).ShouldContain("Peter Schmidt");              // … die ähnliche danach
+        (await Vorschlag("xyz")).ShouldBeEmpty();
+
+        // Personenliste: genaue Suche findet „Schmit“ nicht als Tippfehler, unscharf schon
+        (await abfrage.ZaehlenAsync(new PersonenFilter("Brnner"), ct)).Gesamt.ShouldBe(0);
+        (await abfrage.ZaehlenAsync(new PersonenFilter("Brnner", Unscharf: true), ct)).Gesamt.ShouldBe(1);
+        (await abfrage.SeiteAsync(new PersonenFilter("Brnner", Unscharf: true), null, 10, ct)).Single().Anzeigename.ShouldBe("Karl Brenner");
+
+        // Rundschreiben und Export erreichen genau die Personen der (unscharfen) Liste
+        (await abfrage.RundschreibenZaehlenAsync(new PersonenFilter("Brnner", Unscharf: true), Kontaktzweck.Kursorganisation, ct)).Treffer.ShouldBe(1);
+        (await abfrage.PersonenAsync(new PersonenFilter("Brnner", Unscharf: true), ct).ToListAsync(ct)).Count.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Namensaenderung_aktualisiert_Suchindex_frueherer_Name_bleibt_auffindbar()
     {
         var ct = TestContext.Current.CancellationToken;

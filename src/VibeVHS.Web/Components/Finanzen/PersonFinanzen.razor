@@ -59,6 +59,7 @@
                     <StatusPille Stil="@(m.NutzbarAm(Heute) ? "gut" : "neutral")">@(m.Status == Mandatsstatus.Aktiv ? (m.NutzbarAm(Heute) ? "aktiv" : "verfallen") : "widerrufen")</StatusPille>
                     <span class="vhs-grow"><b class="vhs-mono">@m.Referenz</b> · @m.Kontoinhaber · @Iban.Maskiert(m.Iban) · unterschrieben @m.UnterschriebenAm.ToString("dd.MM.yyyy") · nächster Einzug @m.Sequenz</span>
                     <BegruendeterButton Text="Widerrufen" Size="ButtonSize.ExtraSmall" Variant="Variant.Text"
+                                        Rueckfrage="@($"Das SEPA-Mandat {m.Referenz} wird widerrufen. Danach sind keine Lastschriften mehr möglich; ein neues Mandat braucht eine neue Unterschrift.")"
                                         Freigabe="@(Mandate.Und(() => m.Status == Mandatsstatus.Aktiv ? Freigabe.Ja : Freigabe.Nein("Das Mandat ist bereits widerrufen.")))"
                                         Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<FinanzDienst>().MandatWiderrufenAsync(m.Id); return "Mandat widerrufen."; }, m.Referenz))" />
                 </div>

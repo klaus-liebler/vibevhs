@@ -6,6 +6,7 @@ using VibeVHS.Application.Sicherheit;
 using VibeVHS.Domain.Anmeldung;
 using VibeVHS.Domain.Datenschutz;
 using VibeVHS.Domain.Durchfuehrung;
+using VibeVHS.Domain.Gemeinsam;
 using VibeVHS.Domain.Programm;
 
 namespace VibeVHS.Application.Durchfuehrung;
@@ -215,6 +216,13 @@ public sealed class AnwesenheitDienst(
         var vorhanden = (await speicher.AnwesenheitenAsync(veranstaltungId, abbruch)).FirstOrDefault(a => a.BelegungId == belegungId);
         var weg = nacherfassung ? Erfassungsweg.Nacherfassung : Erfassungsweg.Liste;
         var bestaetigung = vorhanden?.Status == Anwesenheitsstatus.Unbestaetigt;
+
+        // QA-63: Berichtigung eines vorhandenen Eintrags – 30 Minuten frei für die eintragende Person, danach und an fremden Einträgen mit Grund.
+        if (vorhanden is not null && !bestaetigung && vorhanden.Status != status
+            && Korrekturregel.Pruefen(vorhanden.ErfasstVon == wer.Anzeige, vorhanden.ErfasstAm, jetzt, bemerkung) is { } korrektur)
+        {
+            throw new InvalidOperationException(korrektur);
+        }
         await KontingentBuchenAsync(b, kurs, v, status, bestaetigung ? null : vorhanden, jetzt, wer.Anzeige, abbruch);
 
         var min = status == Anwesenheitsstatus.Anwesend ? minuten ?? (bestaetigung ? vorhanden!.Minuten : liste.Dauer) : 0;

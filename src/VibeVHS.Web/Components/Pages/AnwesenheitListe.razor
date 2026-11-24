@@ -67,7 +67,13 @@
         </div>
         @if (nacherfassung)
         {
-            <RadzenFormField Text="Grund der Nacherfassung (Pflicht)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="grund" /></RadzenFormField>
+            <RadzenFormField Text="Grund der Nacherfassung (Pflicht)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="grund" Immediate="true" /></RadzenFormField>
+        }
+        else if (liste.Zeilen.Any(z => z.Anwesenheit is { Status: not Anwesenheitsstatus.Unbestaetigt }))
+        {
+            <RadzenFormField Text="Grund einer Berichtigung (nach 30 Minuten oder bei fremden Einträgen Pflicht)" Variant="Variant.Outlined" Style="min-width:420px">
+                <RadzenTextBox @bind-Value="grund" Immediate="true" />
+            </RadzenFormField>
         }
         @if (liste.Zeilen.Count == 0)
         {
@@ -169,7 +175,7 @@
 
     private Anwesenheitsliste? liste;
     private VibeVHS.Application.Programm.Namen namen = VibeVHS.Application.Programm.Namen.Leer;
-    private string? zugriff, grund, raumQr, raumOrt, raumLink, handeingabe;
+    private string? zugriff, grund, raumQr, raumOrt, raumLink, handeingabe, ich;
     private bool scannt;
     private CheckinAntwort? letzterScan;
     private VibeVHS.Application.Integration.Sichtvergleich? sichtvergleich;
@@ -216,6 +222,12 @@
             return Freigabe.Nein("Im Kontingent bereits verbucht (unveränderliche Ereignisse). Korrektur nur über die Verwaltung.");
         }
 
+        if (z.Anwesenheit is { Status: not Anwesenheitsstatus.Unbestaetigt } vorher && vorher.Status != status
+            && VibeVHS.Domain.Gemeinsam.Korrekturregel.Pruefen(vorher.ErfasstVon == ich, vorher.ErfasstAm, Uhr.GetLocalNow(), grund) is { } korrektur)
+        {
+            return Freigabe.Nein(korrektur.Replace("Bitte einen Grund angeben", "Bitte oben einen Grund angeben", StringComparison.Ordinal));
+        }
+
         return jetzt > v.Ende.AddHours(1) && string.IsNullOrWhiteSpace(grund) ? Freigabe.Nein("Nacherfassung: Bitte oben einen Grund angeben.") : Freigabe.Ja;
     });
 
@@ -229,6 +241,7 @@
             liste = await dienst.ListeAsync(Id);
             namen = liste is null ? namen : await d.GetRequiredService<VibeVHS.Application.Programm.IProgrammSpeicher>().FuerTermineAsync([liste.Veranstaltung]);
             zugriff = liste is null ? null : await dienst.ZugriffVerweigertAsync(liste.Kurs, liste.Veranstaltung);
+            ich = (await d.GetRequiredService<IAktuellerBenutzer>().ErmittelnAsync()).Anzeige;
         });
     }
 

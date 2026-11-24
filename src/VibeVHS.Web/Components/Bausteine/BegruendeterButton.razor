@@ -1,6 +1,8 @@
+@inject DialogService Dialoge
 @*
     Schaltfläche, die – wenn sie gesperrt ist – immer erklärt, warum.
     Die Begründung erscheint als Tooltip bei Maus-Hover und bei Tastaturfokus und wird Screenreadern vorgelesen.
+    Mit „Rueckfrage“ fragt sie vor der Aktion nach (Löschen, Entfernen, Stornieren …, QA-58); die bestätigende Schaltfläche heißt wie die Folge.
 *@
 @if (Freigabe is { Erlaubt: false })
 {
@@ -11,7 +13,7 @@
 else
 {
     <RadzenButton Text="@Text" Icon="@Icon" ButtonStyle="@ButtonStyle" Variant="@Variant" Size="@Size"
-                  Click="@Click" IsBusy="@IsBusy" BusyText="@(BusyText ?? Text)" />
+                  Click="@KlickAsync" IsBusy="@IsBusy" BusyText="@(BusyText ?? Text)" />
 }
 
 @code {
@@ -42,4 +44,27 @@ else
 
     [Parameter]
     public string? BusyText { get; set; }
+
+    /// <summary>Frage vor der Aktion (nennt Objekt und Folge); <c>null</c> = keine Rückfrage.</summary>
+    [Parameter]
+    public string? Rueckfrage { get; set; }
+
+    /// <summary>Titel der Rückfrage; Standard: Text der Schaltfläche mit Fragezeichen.</summary>
+    [Parameter]
+    public string? RueckfrageTitel { get; set; }
+
+    /// <summary>Text der bestätigenden Schaltfläche; Standard: Text dieser Schaltfläche (ohne „…“).</summary>
+    [Parameter]
+    public string? RueckfrageJa { get; set; }
+
+    private async Task KlickAsync(MouseEventArgs e)
+    {
+        if (Rueckfrage is { Length: > 0 } frage
+            && !await Dialoge.BestaetigenAsync(frage, RueckfrageTitel ?? Rueckfragen.Folge(Text) + "?", RueckfrageJa ?? Rueckfragen.Folge(Text)))
+        {
+            return;
+        }
+
+        await Click.InvokeAsync(e);
+    }
 }

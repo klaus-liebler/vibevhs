@@ -27,13 +27,14 @@
                 </tbody>
             </table>
         </div>
-        <div class="vhs-fields">
-            <RadzenFormField Text="Name *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="name" Placeholder="z. B. Herbstferien" /></RadzenFormField>
-            <RadzenFormField Text="erster Ferientag" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly?" @bind-Value="von" DateFormat="dd.MM.yyyy" /></RadzenFormField>
-            <RadzenFormField Text="letzter Ferientag" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly?" @bind-Value="bis" DateFormat="dd.MM.yyyy" /></RadzenFormField>
-        </div>
-        <BegruendeterButton Text="Ferien eintragen" Icon="add" Click="SpeichernAsync" Freigabe="@Freigabe" />
-        <p class="vhs-small vhs-muted">Neue Ferien wirken auf neu erzeugte Termine; bestehende Kurse ändern Sie über „Alle folgenden ändern“.</p>
+        <Hinzufuegen Objekt="Ferien" Titel="Ferien eintragen" Erlaubt="@RechtFreigabe" Bereit="@Freigabe" Speichern="SpeichernAsync" OkText="Eintragen"
+                     Erklaerung="Neue Ferien wirken auf neu erzeugte Termine; bestehende Kurse ändern Sie über „Alle folgenden ändern“.">
+            <div class="vhs-fields">
+                <RadzenFormField Text="Name *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="name" Placeholder="z. B. Herbstferien" Immediate="true" /></RadzenFormField>
+                <RadzenFormField Text="erster Ferientag" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly?" @bind-Value="von" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+                <RadzenFormField Text="letzter Ferientag" Variant="Variant.Outlined"><RadzenDatePicker TValue="DateOnly?" @bind-Value="bis" DateFormat="dd.MM.yyyy" /></RadzenFormField>
+            </div>
+        </Hinzufuegen>
     </section>
 
     <section class="vhs-card">
@@ -73,12 +74,15 @@
 
     private async Task LadenAsync() => ferien = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IProgrammSpeicher>().FerienAsync());
 
-    private async Task SpeichernAsync()
+    private Freigabe RechtFreigabe => VibeVHS.Application.Oberflaeche.Freigabe.NurFuer(rolle, Rolle.Verwaltungsleitung, Rolle.Leitung, Rolle.Systemverwaltung);
+
+    private async Task<bool> SpeichernAsync()
     {
         await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<ProgrammDienst>().FerienHinzufuegenAsync(new Ferienzeitraum(name!, von!.Value, bis!.Value, quelle: "manuell eingetragen")));
         Hinweise.Notify(NotificationSeverity.Success, "Eingetragen", $"{name} eingetragen.");
         name = null;
         von = bis = null;
         await LadenAsync();
+        return true;
     }
 }

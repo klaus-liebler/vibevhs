@@ -48,6 +48,28 @@ public class AufgabenTests
         return new(aufgaben, anmeldung, routinen);
     }
 
+    [Fact]
+    public async Task Rueckrufbitte_aus_der_Schnellauswahl_landet_im_Korb_des_Teilnehmerservice()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var t = await TestDatenbank.ErzeugenAsync();
+        await using var db = t.NeuerKontext();
+        var person = Person.Anlegen("Erika", "Muster", new DateOnly(2026, 1, 1), t.Uhr.GetLocalNow());
+        db.Personen.Add(person);
+        await db.SaveChangesAsync(ct);
+
+        var a = await Erzeugen(t, db, Tresen).Aufgaben.RueckrufAnlegenAsync(person.Id, "Erika Muster", "02572 123", "Fragt nach dem Kursort.", ct);
+        a.Titel.ShouldBe("Rückruf: Erika Muster (02572 123)");
+        a.Faellig.ShouldBe(DateOnly.FromDateTime(t.Uhr.GetLocalNow().Date));
+        a.Ziel.ShouldBe($"personen/{person.Id}");
+        a.Gruppe.ShouldBe(nameof(Rolle.Teilnehmerservice));
+        (await db.Protokoll.SingleAsync(e => e.Aktion == "Aufgabe.Rueckruf", ct)).Beschreibung.ShouldNotContain("Muster"); // nur Pseudonym
+
+        await Should.ThrowAsync<ArgumentException>(() => Erzeugen(t, db, Tresen).Aufgaben.RueckrufAnlegenAsync(null, "Anrufer", null, " ", ct));
+        await Should.ThrowAsync<InvalidOperationException>(() => Erzeugen(t, db, new Benutzer("x", "X", Rolle.Systemverwaltung)).Aufgaben
+            .RueckrufAnlegenAsync(null, "Anrufer", null, "Anliegen", ct));
+    }
+
     /// <summary>Kurs im Fachbereich 8, mindestens 3, höchstens 10 Plätze, Beginn Di 24.11.2026 (9 Tage nach „heute“).</summary>
     private static async Task<(Kurs Kurs, List<Person> Personen)> KursAsync(TestDatenbank t, int personen, DateOnly? start = null)
     {

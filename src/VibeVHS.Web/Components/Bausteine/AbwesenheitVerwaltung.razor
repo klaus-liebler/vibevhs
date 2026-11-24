@@ -8,9 +8,11 @@
 
 <div class="vhs-grid2">
     <section>
-        <h3>Abwesenheit eintragen</h3>
+        <h3>Abwesenheit</h3>
         <p class="vhs-small vhs-muted">Während Ihrer Abwesenheit sieht die Vertretung Ihre persönlichen Aufgaben („In Vertretung“); neue Zuweisungen an Sie gehen an die Vertretung.
-            Ohne Vertretung landen neue Aufgaben im Gruppenkorb. Bitte keinen Krankheitsgrund eintragen.</p>
+            Ohne Vertretung landen neue Aufgaben im Gruppenkorb.</p>
+        <Hinzufuegen Objekt="Abwesenheit" Titel="Abwesenheit eintragen" OkText="Eintragen" Speichern="EintragenAsync" Erklaerung="Bitte keinen Krankheitsgrund eintragen."
+                     Bereit="@(von is null || bis is null ? Freigabe.Nein("Bitte Beginn und Ende angeben.") : bis < von ? Freigabe.Nein("Das Ende liegt vor dem Beginn.") : Freigabe.Ja)">
         <div class="vhs-fields">
             @if (Benutzer.Rolle == Rolle.Leitung)
             {
@@ -23,10 +25,9 @@
             <RadzenFormField Text="Vertretung" Variant="Variant.Outlined">
                 <RadzenDropDown TValue="string" @bind-Value="vertretung" Data="@MoeglicheVertretungen" TextProperty="Name" ValueProperty="Login" AllowClear="true" Placeholder="keine (Gruppenkorb)" />
             </RadzenFormField>
-            <RadzenFormField Text="Hinweis (optional, z. B. „Urlaub“)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="grund" /></RadzenFormField>
+            <RadzenFormField Text="Hinweis (optional, z. B. „Urlaub“)" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="grund" Immediate="true" /></RadzenFormField>
         </div>
-        <BegruendeterButton Text="Abwesenheit eintragen" Icon="event_busy" Click="EintragenAsync"
-                            Freigabe="@(von is null || bis is null ? Freigabe.Nein("Bitte Beginn und Ende angeben.") : bis < von ? Freigabe.Nein("Das Ende liegt vor dem Beginn.") : Freigabe.Ja)" />
+        </Hinzufuegen>
     </section>
     <section>
         <h3>Laufend und geplant</h3>
@@ -39,6 +40,7 @@
                     <span class="vhs-grow"><b>@a.Name</b> · @a.Von.ToString("dd.MM.") – @a.Bis.ToString("dd.MM.yyyy") · Vertretung: @(a.VertretungName ?? "keine")@(a.Grund is null ? "" : $" · {a.Grund}")</span>
                     @if (a.Aktiv(heute)) { <StatusPille Stil="warn">abwesend</StatusPille> } else { <StatusPille Stil="neutral">geplant</StatusPille> }
                     <BegruendeterButton Text="@(a.Aktiv(heute) ? "Wieder da" : "Löschen")" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light"
+                                        Rueckfrage="@(a.Aktiv(heute) ? null : $"Die geplante Abwesenheit von {a.Name} ({a.Von:dd.MM.} – {a.Bis:dd.MM.yyyy}) wird gelöscht; die Vertretung entfällt.")"
                                         Freigabe="@(a.Login == Benutzer.Kennung || Benutzer.Rolle == Rolle.Leitung ? Freigabe.Ja : Freigabe.Nein("Nur die Person selbst oder die Leitung kann das ändern."))"
                                         Click="@(() => BeendenAsync(a.Id))" />
                 </div>
@@ -80,20 +82,14 @@
         => (abwesenheiten, konten) = await Vorgang.AusfuehrenAsync(async d =>
             (await d.GetRequiredService<AufgabenDienst>().AbwesenheitenAsync(), await d.GetRequiredService<IBenutzerkonten>().AlleAsync()));
 
-    private async Task EintragenAsync()
+    private async Task<bool> EintragenAsync()
     {
-        try
-        {
-            await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AufgabenDienst>().AbwesenheitEintragenAsync(fuer, von!.Value, bis!.Value, vertretung, grund));
-            Hinweise.Notify(NotificationSeverity.Success, "Eingetragen", vertretung is null ? "Neue Aufgaben bleiben im Gruppenkorb." : "Die Vertretung sieht Ihre Aufgaben unter „In Vertretung“.");
-            grund = null;
-            await LadenAsync();
-            await Geaendert.InvokeAsync();
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
-        {
-            Hinweise.Notify(NotificationSeverity.Warning, "Nicht möglich", ex.Message);
-        }
+        await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AufgabenDienst>().AbwesenheitEintragenAsync(fuer, von!.Value, bis!.Value, vertretung, grund));
+        Hinweise.Notify(NotificationSeverity.Success, "Eingetragen", vertretung is null ? "Neue Aufgaben bleiben im Gruppenkorb." : "Die Vertretung sieht Ihre Aufgaben unter „In Vertretung“.");
+        grund = null;
+        await LadenAsync();
+        await Geaendert.InvokeAsync();
+        return true;
     }
 
     private async Task BeendenAsync(Guid id)

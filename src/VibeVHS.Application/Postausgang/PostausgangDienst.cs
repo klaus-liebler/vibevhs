@@ -22,7 +22,7 @@ public sealed class PostausgangDienst(
     /// </summary>
     public async Task<AusgehendeNachricht> KundenmailEinreihenAsync(string eMail, string? anzeigename, string betreff,
         string text, string sprache, Guid? personId = null, CancellationToken abbruch = default,
-        (string Name, string Typ, string Inhalt)? anhang = null, IEnumerable<Mailanhang>? weitere = null)
+        (string Name, string Typ, string Inhalt)? anhang = null, IEnumerable<Mailanhang>? weitere = null, string? html = null)
     {
         var wer = await benutzer.ErmittelnAsync(abbruch);
         var id = Ids.Neu();
@@ -40,6 +40,14 @@ public sealed class PostausgangDienst(
         {
             nachricht.MitWeiteremAnhang(w);
         }
+
+        if (html is not null)
+        {
+            // Übersetzungslink auch im HTML-Teil (jede Mail an Kundinnen und Kunden, QA-21)
+            var hinweis = System.Net.WebUtility.HtmlEncode(MailBausteine.Uebersetzungshinweis(sprache, link)).ReplaceLineEndings("<br>");
+            nachricht.MitHtml($"{html}<p style=\"font-size: 12px; color: #6b7280; margin-top: 16px;\">{hinweis}</p>");
+        }
+
         speicher.Hinzufuegen(nachricht);
         await protokoll.ProtokollierenAsync("Postausgang.MailEingereiht",
             $"Mail an {(personId is { } p ? Domain.Datenschutz.Pseudonym.Person(p) : "externe Adresse")} in den Postausgang gelegt", nameof(AusgehendeNachricht), nachricht.Id,

@@ -67,6 +67,8 @@ public static class Aufgabentypen
     public const string PortalBuchhaltung = "portal-buchhaltung";
     public const string PortalFachbereich = "portal-fachbereich";
     public const string PortalDatenschutz = "portal-datenschutz";
+    public const string Rueckruf = "rueckruf";
+    public const string SchluesselRueckgabe = "schluessel-rueckgabe";
 
     public static IReadOnlyList<Aufgabentyp> Vorschlaege() =>
     [
@@ -111,6 +113,10 @@ public static class Aufgabentypen
         new(PortalDatenschutz, "Datenschutzanfrage (Teilnehmendenportal)",
             "Auskunft nach Art. 15 oder Löschung nach Art. 17 DSGVO: prüfen und bearbeiten (Frist ein Monat). Annehmen erzeugt die Auskunft bzw. führt die Löschprüfung aus.",
             nameof(Rolle.Verwaltungsleitung), jeFachbereich: false, eskalationNachTagen: 14),
+        new(SchluesselRueckgabe, "Schlüssel zurückfordern", "Eine Kursleitung hat einen Schlüssel, leitet am Ort aber vorerst keine Veranstaltung mehr: Rückgabe vereinbaren.",
+            nameof(Rolle.Teilnehmerservice), jeFachbereich: false, eskalationNachTagen: 14),
+        new(Rueckruf, "Rückrufbitte", "Anruf am Tresen oder Telefon, der nicht sofort erledigt werden konnte (Schnellauswahl): zurückrufen und das Anliegen klären.",
+            nameof(Rolle.Teilnehmerservice), jeFachbereich: false, eskalationNachTagen: 1),
         new(Ruecklastschrift, "Rücklastschrift klären", "Nach einer Rücklastschrift ist die Rechnung wieder offen: Kontakt aufnehmen, neues Mandat oder Überweisung.",
             nameof(Rolle.Buchhaltung), jeFachbereich: false, eskalationNachTagen: 7),
     ];

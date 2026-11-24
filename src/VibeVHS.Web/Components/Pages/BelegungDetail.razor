@@ -86,7 +86,8 @@
             <p class="vhs-small">@storno.Erklaerung Gebühr: <b>@storno.Gebuehr</b></p>
         }
         <div class="vhs-row">
-            <BegruendeterButton Text="Abmelden (stornieren)" Icon="event_busy" ButtonStyle="ButtonStyle.Danger" Click="StornierenAsync"
+            <BegruendeterButton Text="Abmelden (stornieren)" Icon="event_busy" ButtonStyle="ButtonStyle.Danger" Click="StornierenAsync" RueckfrageJa="Abmelden"
+                                Rueckfrage="Die Belegung wird storniert; der Platz wird frei und die Warteliste rückt nach. Die Person erhält eine Bestätigung."
                                 Freigabe="@(Buchen.Und(() => b.Offen ? Freigabe.Ja : Freigabe.Nein($"Die Belegung ist bereits {BelegungAnzeige.Status(b.Status)}.")))" />
         </div>
         <h3>Umbuchen</h3>

@@ -162,7 +162,8 @@
                                     }
                                     @if (t.Lichtbild)
                                     {
-                                        <BegruendeterButton Text="Lichtbild löschen" Size="ButtonSize.ExtraSmall" Variant="Variant.Text" Freigabe="@Bearbeiten"
+                                        <BegruendeterButton Text="Lichtbild löschen" Size="ButtonSize.ExtraSmall" Variant="Variant.Text" Freigabe="@Bearbeiten" RueckfrageJa="Löschen"
+                                                            Rueckfrage="Das Lichtbild wird endgültig gelöscht. Für den BAMF-Nachweis muss es danach neu aufgenommen werden."
                                                             Click="@(() => AusfuehrenAsync(d => d.GetRequiredService<IntegrationDienst>().LichtbildLoeschenAsync(pid, kursId), "Lichtbild gelöscht."))" />
                                     }
                                 </div>

@@ -39,10 +39,10 @@
             <input id="kal" readonly value="@kalenderLink" data-markieren />
         }
         <div class="vhs-row">
-            <form method="post" @formname="kalender" @onsubmit="KalenderAsync"><AntiforgeryToken /><button type="submit" class="vhs-btn">@(kalenderAktiv ? "Neue Adresse erzeugen (alte sperren)" : "Kalenderadresse erzeugen")</button></form>
+            <form method="post" @formname="kalender" @onsubmit="KalenderAsync" data-rueckfrage="@(kalenderAktiv ? "Die bisherige Kalenderadresse wird gesperrt. Kalender-Apps, die sie abonniert haben, zeigen keine neuen Termine mehr; tragen Sie dort die neue Adresse ein." : null)"><AntiforgeryToken /><button type="submit" class="vhs-btn">@(kalenderAktiv ? "Neue Adresse erzeugen (alte sperren)" : "Kalenderadresse erzeugen")</button></form>
             @if (kalenderAktiv)
             {
-                <form method="post" @formname="sperren" @onsubmit="KalenderSperrenAsync"><AntiforgeryToken /><button type="submit" class="vhs-btn">Abo sperren</button></form>
+                <form method="post" @formname="sperren" @onsubmit="KalenderSperrenAsync" data-rueckfrage="Die Kalenderadresse wird gesperrt. Kalender-Apps, die sie abonniert haben, zeigen danach keine Termine mehr." data-rueckfrage-ja="Sperren"><AntiforgeryToken /><button type="submit" class="vhs-btn">Abo sperren</button></form>
             }
             else
             {

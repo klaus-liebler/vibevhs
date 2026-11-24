@@ -1,0 +1,41 @@
+@using VibeVHS.Application.Personen
+@inject Vorgang Vorgang
+
+@*
+    Personenauswahl mit fehlertoleranter Suche (QA-60): Tippfehler, Umlaute und Wortanfänge, beste Treffer zuerst, nur im angegebenen Kreis
+    (z. B. nur Dozierende) und nur aktive Datensätze (gesperrte und anonymisierte Personen erscheinen nicht).
+*@
+<Vorschlagsfeld TItem="PersonZeile" Id="@Id" Suchen="SuchenAsync" Titel="@(p => p.Anzeigename)" Zusatz="Zusatz" Gewaehlt="Gewaehlt"
+               Platzhalter="@Platzhalter" Bezeichnung="@Bezeichnung" Disabled="@Disabled" AutoFokus="@AutoFokus" NachAuswahlLeeren="@NachAuswahlLeeren" />
+
+@code {
+    [Parameter]
+    public PersonenFilter Kreis { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<PersonZeile> Gewaehlt { get; set; }
+
+    [Parameter]
+    public string Id { get; set; } = "person-" + Guid.NewGuid().ToString("N")[..8];
+
+    [Parameter]
+    public string Platzhalter { get; set; } = "Name, Geburtsdatum oder E-Mail eintippen";
+
+    [Parameter]
+    public string Bezeichnung { get; set; } = "Person suchen";
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public bool AutoFokus { get; set; }
+
+    [Parameter]
+    public bool NachAuswahlLeeren { get; set; }
+
+    private Task<IReadOnlyList<PersonZeile>> SuchenAsync(string text)
+        => Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenAbfrage>().VorschlaegeAsync(text, Kreis, 8));
+
+    private static string? Zusatz(PersonZeile p)
+        => string.Join(" · ", new[] { p.Geburtsdatum?.ToString("dd.MM.yyyy"), p.Wohnort }.Where(x => !string.IsNullOrEmpty(x)));
+}

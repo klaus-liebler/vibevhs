@@ -420,7 +420,8 @@ else if (dubletten.Count > 0)
                         <span class="vhs-grow vhs-small">@VibeVHS.Domain.Durchfuehrung.TokenAnzeige.Art(z.Art) · erstellt @z.ErstelltAm.ToLocalTime().ToString("dd.MM.yyyy")@(z.ZuletztGenutzt is { } g ? $" · zuletzt genutzt {g.ToLocalTime():dd.MM.yyyy HH:mm}" : "")</span>
                         @if (z.Gueltig)
                         {
-                            <BegruendeterButton Text="Sperren" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@VerwaltenFreigabe" Click="@(() => ZugangSperrenAsync(z.Id))" />
+                            <BegruendeterButton Text="Sperren" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@VerwaltenFreigabe" Click="@(() => ZugangSperrenAsync(z.Id))"
+                                                Rueckfrage="Dieser Zugang wird gesperrt; der Link bzw. das Gerät funktioniert danach nicht mehr." />
                         }
                         else
                         {
@@ -430,6 +431,7 @@ else if (dubletten.Count > 0)
                 }
             </div>
             <BegruendeterButton Text="Alle Zugänge sperren" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="AlleZugaengeSperrenAsync"
+                                Rueckfrage="Alle Zugänge dieser Person werden gesperrt (Portal-Links, Kalender-Abos, Geräte)."
                                 Freigabe="@(VerwaltenFreigabe.Und(() => zugaenge.Any(z => z.Gueltig) ? Freigabe.Ja : Freigabe.Nein("Es gibt keine gültigen Zugänge.")))" />
         }
     </div>
@@ -889,7 +891,7 @@ else if (dubletten.Count > 0)
     {
         vmTreffer = string.IsNullOrWhiteSpace(vmSuche)
             ? []
-            : (await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenAbfrage>().SeiteAsync(new PersonenFilter(vmSuche), null, 8)))
+            : (await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenAbfrage>().VorschlaegeAsync(vmSuche, new PersonenFilter(), 8)))
                 .Where(t => t.Id != Id).ToList();
     }
 

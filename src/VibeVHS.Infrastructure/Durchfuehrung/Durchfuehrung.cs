@@ -13,6 +13,30 @@ internal static class DurchfuehrungMapping
 {
     public static void Anwenden(ModelBuilder mb)
     {
+        mb.Entity<Unterrichtsapp>(b =>
+        {
+            b.ToTable("Unterrichtsapps");
+            b.HasKey(a => a.Id);
+            b.Property(a => a.Id).ValueGeneratedNever();
+            b.Property(a => a.Name).HasMaxLength(200);
+            b.Property(a => a.Adresse).HasMaxLength(500);
+            b.Property(a => a.Beschreibung).HasMaxLength(1000);
+            b.Property(a => a.Datenhinweis).HasMaxLength(500);
+            b.Property(a => a.FreigegebenVon).HasMaxLength(200);
+        });
+
+        mb.Entity<Appeinsatz>(b =>
+        {
+            b.ToTable("Appeinsaetze");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Id).ValueGeneratedNever();
+            b.Property(e => e.Titel).HasMaxLength(200);
+            b.Property(e => e.Auftrag).HasMaxLength(2000);
+            b.HasOne<Unterrichtsapp>().WithMany().HasForeignKey(e => e.AppId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<Domain.Programm.Kurs>().WithMany().HasForeignKey(e => e.KursId).OnDelete(DeleteBehavior.Restrict);
+            b.HasIndex(e => e.KursId);
+        });
+
         mb.Entity<Anwesenheit>(b =>
         {
             b.ToTable("Anwesenheiten");

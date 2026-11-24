@@ -18,9 +18,17 @@ public sealed record Abschnitt(string Id, int Ebene, string TitelHtml, string Ti
 /// <summary>
 /// Markdown → HTML für Hilfe, Spezifikation, Doku und Impressum (Markdig). Sicher auch für Text aus den Einstellungen:
 /// HTML im Markdown wird nicht übernommen (als Text ausgegeben), Links nur http(s), mailto, Anker und relative Pfade.
+/// Einzige Ausnahme: Tastenkürzel in <c>&lt;kbd&gt;…&lt;/kbd&gt;</c> (QA-59) – ohne Attribute und nicht in Code.
 /// </summary>
 public static partial class MarkdownDarstellung
 {
+    [GeneratedRegex(@"<code>.*?</code>|&lt;(/?)kbd&gt;", RegexOptions.Singleline)]
+    private static partial Regex KbdOderCode();
+
+    /// <summary>Macht aus dem maskierten <c>&lt;kbd&gt;</c> wieder das Element; Code-Abschnitte bleiben unverändert.</summary>
+    internal static string Tasten(string html)
+        => KbdOderCode().Replace(html, m => m.Value.StartsWith("<code>", StringComparison.Ordinal) ? m.Value : $"<{m.Groups[1].Value}kbd>");
+
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .DisableHtml()
         .UsePipeTables()
@@ -40,7 +48,7 @@ public static partial class MarkdownDarstellung
         var renderer = new HtmlRenderer(schreiber);
         Pipeline.Setup(renderer);
         renderer.Render(dokument);
-        return schreiber.ToString();
+        return Tasten(schreiber.ToString());
     }
 
     /// <summary>Zerlegt das Dokument an den Überschriften der Ebenen 1–3 (für Inhaltsverzeichnis und Kommentare je Abschnitt).</summary>
@@ -85,7 +93,7 @@ public static partial class MarkdownDarstellung
 
             if (kopf is null)
             {
-                abschnitte.Add(new Abschnitt(string.Empty, 0, string.Empty, string.Empty, inhalt.ToString()));
+                abschnitte.Add(new Abschnitt(string.Empty, 0, string.Empty, string.Empty, Tasten(inhalt.ToString())));
                 return;
             }
 
@@ -93,8 +101,8 @@ public static partial class MarkdownDarstellung
             var titelRenderer = new HtmlRenderer(titel);
             Pipeline.Setup(titelRenderer);
             titelRenderer.WriteLeafInline(kopf);
-            var titelHtml = titel.ToString();
-            abschnitte.Add(new Abschnitt(kopf.GetAttributes().Id ?? string.Empty, kopf.Level, titelHtml, ReinerText(titelHtml), inhalt.ToString()));
+            var titelHtml = Tasten(titel.ToString());
+            abschnitte.Add(new Abschnitt(kopf.GetAttributes().Id ?? string.Empty, kopf.Level, titelHtml, ReinerText(titelHtml), Tasten(inhalt.ToString())));
         }
     }
 

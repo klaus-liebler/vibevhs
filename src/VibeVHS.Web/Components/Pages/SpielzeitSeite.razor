@@ -1,0 +1,106 @@
+@page "/spielzeit"
+@using VibeVHS.Application.Betrieb
+@using VibeVHS.Infrastructure.Betrieb
+@inject IServiceProvider Dienste
+@inject NotificationService Hinweise
+@inject DialogService Dialoge
+
+@* Spielzeit steuern (QA-68): anhalten, weiter, Tempo, vorstellen, zu einer Sprungmarke springen. Nur im Schulungsbetrieb. *@
+
+<PageTitle>Spielzeit · VibeVHS</PageTitle>
+
+<div class="vhs-head"><div><h1>Spielzeit</h1>
+    <p class="vhs-sub">Im Schulungsbetrieb hat jede Instanz ihre eigene Uhr. Fachlich zählt die Spielzeit („heute“, Fristen, nächtliche Automatik); Anmeldung,
+        Check-in-Codes für fremde Geräte und Wartezeiten laufen in echter Zeit. Zurück geht es nur über eine Sprungmarke – dann passt auch der Datenstand.</p></div></div>
+
+@if (betrieb is null)
+{
+    <div class="vhs-alert">Diese Instanz läuft nicht im Schulungsbetrieb (Einstellung Schulung:Aktiv).</div>
+}
+else
+{
+    var s = betrieb.Stand;
+    var recht = s.TeilnehmerSteuern ? Freigabe.Ja : Freigabe.Nein("Die Kursleitung steuert gerade die Spielzeit aller Instanzen.");
+    <section class="vhs-card">
+        <h2>@betrieb.Uhr.GetLocalNow().ToString("dddd, dd.MM.yyyy · HH:mm") Uhr · @(s.Tempo == 0 ? "angehalten" : $"Tempo {s.Tempo:0.##}×")</h2>
+        <div class="vhs-row">
+            @if (s.Tempo == 0)
+            {
+                <BegruendeterButton Text="Weiter" Icon="play_arrow" Freigabe="@recht" Click="@(() => Tun(() => betrieb.Uhr.Weiter()))" />
+            }
+            else
+            {
+                <BegruendeterButton Text="Anhalten" Icon="pause" Freigabe="@recht" Click="@(() => Tun(() => betrieb.Uhr.Anhalten()))" />
+            }
+            @foreach (var t in new[] { 0.1, 1, 10, 60 })
+            {
+                <BegruendeterButton Text="@($"{t:0.#}×")" Size="ButtonSize.Small" ButtonStyle="@(s.Tempo == t ? ButtonStyle.Primary : ButtonStyle.Light)" Freigabe="@recht"
+                                    Click="@(() => Tun(() => betrieb.Uhr.TempoSetzen(t)))" />
+            }
+        </div>
+        <div class="vhs-row">
+            <span class="vhs-small">Vorstellen:</span>
+            @foreach (var (text, dauer) in new[] { ("+1 Stunde", TimeSpan.FromHours(1)), ("+1 Tag", TimeSpan.FromDays(1)), ("+1 Woche", TimeSpan.FromDays(7)) })
+            {
+                <BegruendeterButton Text="@text" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@recht"
+                                    Click="@(() => Tun(() => betrieb.Uhr.Vorstellen(betrieb.Uhr.GetUtcNow() + dauer)))" />
+            }
+            <span class="vhs-small vhs-muted">Die Automatik (nachts, stündlich, morgens) läuft dabei je übersprungenem Zeitpunkt einmal.</span>
+        </div>
+    </section>
+
+    <section class="vhs-card">
+        <h2>Sprungmarken</h2>
+        <div class="vhs-list">
+            @foreach (var m in Schulungswoche.Marken)
+            {
+                <div>
+                    <span class="vhs-grow"><b>@m.Titel</b>@(s.Marke == m.Id ? " · aktuelle Ausgangsmarke" : "")<br /><span class="vhs-small vhs-muted">@m.Zustand</span></span>
+                    <BegruendeterButton Text="Hierhin springen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Freigabe="@recht" IsBusy="@springt"
+                                        Rueckfrage="@($"Der Datenstand dieser Instanz wird durch die Marke „{m.Titel}“ ersetzt; alles, was Sie seitdem erfasst haben, ist danach weg.")"
+                                        RueckfrageJa="Springen" Click="@(() => SpringenAsync(m))" />
+                </div>
+            }
+        </div>
+        @if (s.LetzterFehler is not null)
+        {
+            <div class="vhs-alert vhs-crit">@s.LetzterFehler</div>
+        }
+    </section>
+}
+
+@code {
+    private Schulungsbetrieb? betrieb;
+    private bool springt;
+
+    protected override void OnInitialized() => betrieb = Dienste.GetService<Schulungsbetrieb>();
+
+    private void Tun(Action aktion)
+    {
+        try
+        {
+            aktion();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task SpringenAsync(Sprungmarke m)
+    {
+        springt = true;
+        try
+        {
+            await betrieb!.SpringenAsync(m.Id);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Sprung nicht möglich", ex.Message);
+        }
+        finally
+        {
+            springt = false;
+        }
+    }
+}

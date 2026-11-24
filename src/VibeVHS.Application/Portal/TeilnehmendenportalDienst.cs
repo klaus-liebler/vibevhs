@@ -436,6 +436,14 @@ public sealed class TeilnehmendenportalDienst(
 
     // ---------- Unterlagen ----------
 
+    /// <summary>Kurse, in denen die angemeldete Person angemeldet ist (für Unterrichts-Apps im Portal, QA-69).</summary>
+    public async Task<IReadOnlyList<Guid>> KursIdsAsync(CancellationToken abbruch = default)
+    {
+        var ich = await IchAsync(abbruch);
+        return (await anmeldungen.BelegungenDerPersonAsync(ich, abbruch)).Where(x => x.Belegung.Status == Belegungsstatus.Angemeldet)
+            .Select(x => x.Belegung.KursId).Distinct().ToList();
+    }
+
     public async Task<IReadOnlyList<(Guid Id, string Kurs, string Titel, string Datei, long Groesse, DateTimeOffset Am)>> UnterlagenAsync(CancellationToken abbruch = default)
     {
         var ich = await IchAsync(abbruch);

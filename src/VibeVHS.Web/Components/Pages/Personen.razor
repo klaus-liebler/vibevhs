@@ -20,7 +20,7 @@
     <div class="vhs-row">
         <BegruendeterButton Text="Person anlegen" Icon="person_add" Click="@(() => { formularOffen = true; rundschreibenOffen = false; })" />
         <BegruendeterButton Text="@($"Alle {zahlen?.Gesamt ?? 0} Treffer anschreiben")" Icon="forward_to_inbox" ButtonStyle="ButtonStyle.Light"
-                            Freigabe="@RundschreibenFreigabe" Click="@(() => { rundschreibenOffen = true; formularOffen = false; vorschau = null; })" />
+                            Freigabe="@RundschreibenFreigabe" Click="@(async () => { rundschreibenOffen = true; formularOffen = false; vorschau = null; await ArchivLadenAsync(); })" />
         @if (zahlen is { Gesamt: > 0 })
         {
             <a class="rz-button rz-button-md rz-variant-filled rz-light rz-shade-default" href="@ExportAdresse" download
@@ -112,8 +112,29 @@
                 <RadzenRadioButtonListItem Text="Werbung (z. B. neues Programm)" Value="Kontaktzweck.Werbung" />
             </Items>
         </RadzenRadioButtonList>
-        <RadzenFormField Text="Betreff *" Variant="Variant.Outlined" Style="width:100%"><RadzenTextBox @bind-Value="betreff" /></RadzenFormField>
-        <RadzenFormField Text="Text *" Variant="Variant.Outlined" Style="width:100%"><RadzenTextArea @bind-Value="text" Rows="4" /></RadzenFormField>
+        <RadzenFormField Text="Betreff *" Variant="Variant.Outlined" Style="width:100%"><RadzenTextBox @bind-Value="betreff" Immediate="true" /></RadzenFormField>
+        <div class="vhs-row">
+            <RadzenFormField Text="Gestaltung" Variant="Variant.Outlined">
+                <RadzenDropDown TValue="VibeVHS.Domain.Vorlagen.Gestaltung" @bind-Value="gestaltung" @bind-Value:after="@(() => vorschauHtml = null)"
+                                Data="@Gestaltungen" TextProperty="Text" ValueProperty="Wert" />
+            </RadzenFormField>
+            <RadzenFormField Text="Anrede {Anrede}" Variant="Variant.Outlined">
+                <RadzenDropDown TValue="Anredestil" @bind-Value="anredestil" Data="@Anredestile" TextProperty="Text" ValueProperty="Wert" />
+            </RadzenFormField>
+            <span class="vhs-small vhs-muted" style="align-self:center">Platzhalter: {Anrede}, {Vorname}, {Nachname}, {Name} · Personen mit eigener Ansprache (Du/Sie) werden so angesprochen</span>
+        </div>
+        <RadzenHtmlEditor @bind-Value="text" @bind-Value:after="@(() => vorschauHtml = null)" Style="height:260px;width:100%" aria-label="Text des Rundschreibens">
+            <RadzenHtmlEditorUndo /><RadzenHtmlEditorRedo /><RadzenHtmlEditorSeparator />
+            <RadzenHtmlEditorBold /><RadzenHtmlEditorItalic /><RadzenHtmlEditorUnderline /><RadzenHtmlEditorSeparator />
+            <RadzenHtmlEditorFormatBlock /><RadzenHtmlEditorColor /><RadzenHtmlEditorSeparator />
+            <RadzenHtmlEditorAlignLeft /><RadzenHtmlEditorAlignCenter /><RadzenHtmlEditorAlignRight /><RadzenHtmlEditorSeparator />
+            <RadzenHtmlEditorUnorderedList /><RadzenHtmlEditorOrderedList /><RadzenHtmlEditorLink /><RadzenHtmlEditorUnlink /><RadzenHtmlEditorRemoveFormat />
+        </RadzenHtmlEditor>
+        @if (vorschauHtml is not null)
+        {
+            <h3>Vorschau mit Musterwerten</h3>
+            <div class="vhs-rundschreiben-vorschau">@((MarkupString)vorschauHtml)</div>
+        }
         @if (vorschau is { } v)
         {
             <div class="vhs-alert vhs-info">
@@ -122,11 +143,27 @@
             </div>
         }
         <div class="vhs-row">
+            <RadzenButton Text="Vorschau" Icon="visibility" ButtonStyle="ButtonStyle.Light" Click="MailvorschauAsync" />
             <RadzenButton Text="Empfänger zählen" Icon="calculate" ButtonStyle="ButtonStyle.Light" Click="VorschauAsync" IsBusy="@rechnet" />
             <BegruendeterButton Text="In den Postausgang legen" Icon="send" Click="RundschreibenSendenAsync" IsBusy="@sendet"
                                 Freigabe="@SendenFreigabe" />
             <RadzenButton Text="Abbrechen" ButtonStyle="ButtonStyle.Light" Click="@(() => rundschreibenOffen = false)" />
         </div>
+        @if (archiv.Count > 0)
+        {
+            <h3>Gesendete Rundschreiben</h3>
+            <div class="vhs-list">
+                @foreach (var r in archiv)
+                {
+                    <div>
+                        <span class="vhs-grow"><b>@r.Betreff</b><br /><span class="vhs-small vhs-muted">@r.GesendetAm.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @r.GesendetVon ·
+                            @r.Zielgruppe · @r.Eingereiht Mails · @VibeVHS.Domain.Vorlagen.Briefgestaltung.Anzeige(r.Gestaltung)</span></span>
+                        <RadzenButton Text="Ansehen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => ArchivAnsehenAsync(r))" />
+                        <RadzenButton Text="Als Vorlage übernehmen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => AlsVorlage(r))" />
+                    </div>
+                }
+            </div>
+        }
     </section>
 }
 
@@ -176,6 +213,10 @@
         </div>
     }
 
+    @if (filter.Unscharf)
+    {
+        <div class="vhs-alert" role="status">Keine genaue Schreibweise für „@filter.Suche“ gefunden – angezeigt werden Personen mit ähnlicher Schreibweise (z. B. Tippfehler, Schmidt/Schmitt).</div>
+    }
     <div class="vhs-vliste-kopf" aria-hidden="true">
         <span>Name</span><span>Geburtsdatum</span><span>Wohnort</span><span>Rollen</span><span>Status</span>
     </div>
@@ -284,8 +325,50 @@
     // Rundschreiben
     private bool rundschreibenOffen, rechnet, sendet;
     private Kontaktzweck zweck = Kontaktzweck.Kursorganisation;
-    private string? betreff, text;
+    private string? betreff, text, vorschauHtml;
     private RundschreibenVorschau? vorschau;
+    private VibeVHS.Domain.Vorlagen.Gestaltung gestaltung = VibeVHS.Domain.Vorlagen.Gestaltung.Briefkopf;
+    private Anredestil anredestil = Anredestil.Foermlich;
+    private IReadOnlyList<VibeVHS.Domain.Vorlagen.GesendetesRundschreiben> archiv = [];
+
+    private static readonly IReadOnlyList<(string Text, VibeVHS.Domain.Vorlagen.Gestaltung Wert)> GestaltungenListe =
+        Enum.GetValues<VibeVHS.Domain.Vorlagen.Gestaltung>().Select(g => (VibeVHS.Domain.Vorlagen.Briefgestaltung.Anzeige(g), g)).ToList();
+
+    private static System.Collections.IEnumerable Gestaltungen => GestaltungenListe.Select(x => new { x.Text, x.Wert }).ToList();
+
+    private static System.Collections.IEnumerable Anredestile => new[]
+    {
+        new { Text = "förmlich („Sehr geehrte Frau …“)", Wert = Anredestil.Foermlich },
+        new { Text = "freundlich („Guten Tag Frau …“)", Wert = Anredestil.Informell },
+    };
+
+    private async Task MailvorschauAsync()
+        => vorschauHtml = await Vorgang.AusfuehrenAsync(d => Task.FromResult(d.GetRequiredService<Rundschreiben>().VorschauHtml(text, gestaltung)));
+
+    private async Task ArchivLadenAsync()
+        => archiv = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<Rundschreiben>().ArchivAsync(20));
+
+    private async Task ArchivAnsehenAsync(VibeVHS.Domain.Vorlagen.GesendetesRundschreiben r)
+        => vorschauHtml = await Vorgang.AusfuehrenAsync(d => Task.FromResult(d.GetRequiredService<Rundschreiben>().VorschauHtml(r.Html, r.Gestaltung)));
+
+    /// <summary>Titel, Text, Gestaltung und Anrede übernehmen; Zielgruppe (Filter) und Empfängerzählung bleiben neu (QA-66).</summary>
+    private void AlsVorlage(VibeVHS.Domain.Vorlagen.GesendetesRundschreiben r)
+    {
+        (betreff, text, gestaltung, anredestil, zweck) = (r.Betreff, r.Html, r.Gestaltung, r.Anredestil, r.Zweck);
+        vorschau = null;
+        vorschauHtml = null;
+    }
+
+    /// <summary>Zielgruppe lesbar für das Archiv: Suche und gesetzte Filter.</summary>
+    private string ZielgruppeText()
+    {
+        var teile = new List<string>();
+        if (!string.IsNullOrWhiteSpace(filter.Suche)) teile.Add($"Suche „{filter.Suche}“");
+        if (filter.Rolle is { } r) teile.Add(PersonMerkmal.RollenAnzeige(r));
+        if (filter.Status is { } s) teile.Add(PersonenstatusAnzeige.Text(s));
+        if (filter.Fachbereich is { } fb) teile.Add($"FB {fb}");
+        return teile.Count == 0 ? "alle Personen" : string.Join(" · ", teile);
+    }
 
     private string? folgeTitel;
     private IReadOnlyList<NaechsterSchritt> folgeschritte = [];
@@ -337,7 +420,23 @@
     {
         var paare = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IDublettenSuche>().PaareAsync());
         dublettenIds = paare.SelectMany(p => new[] { p.A, p.B }).ToHashSet();
+        await ZaehlenAsync();
+    }
+
+    /// <summary>Zählt; findet eine Suche genau nichts, wird sie unscharf wiederholt (ähnliche Schreibweisen, QA-60).</summary>
+    private async Task ZaehlenAsync()
+    {
+        filter = filter with { Unscharf = false };
         zahlen = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenAbfrage>().ZaehlenAsync(filter));
+        if (zahlen is { Gesamt: 0 } && !string.IsNullOrWhiteSpace(filter.Suche))
+        {
+            var unscharf = filter with { Unscharf = true };
+            var z = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenAbfrage>().ZaehlenAsync(unscharf));
+            if (z is { Gesamt: > 0 })
+            {
+                (filter, zahlen) = (unscharf, z);
+            }
+        }
     }
 
     /// <summary>Virtualize fragt nach Positionen; geladen wird per Keyset in Blöcken, bis die Position erreicht ist.</summary>
@@ -379,7 +478,7 @@
         ende = false;
         ersteMs = null;
         vorschau = null;
-        zahlen = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IPersonenAbfrage>().ZaehlenAsync(filter));
+        await ZaehlenAsync();
         if (zustandSchreiben)
         {
             Ruecksprung.ZustandSetzen(Navigation, ListenUrl);
@@ -513,13 +612,16 @@
         sendet = true;
         try
         {
-            var ergebnis = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<Rundschreiben>().SendenAsync(filter, zweck, betreff!, text!));
+            var zielgruppe = ZielgruppeText();
+            var ergebnis = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<Rundschreiben>()
+                .SendenGestaltetAsync(filter, zweck, betreff!, text!, gestaltung, anredestil, zielgruppe));
             Hinweise.Notify(NotificationSeverity.Success, "Im Postausgang", $"{ergebnis.Eingereiht} Mails eingereiht, {ergebnis.Uebersprungen} übersprungen.");
             rundschreibenOffen = false;
             folgeTitel = $"{ergebnis.Eingereiht} Mails liegen im Postausgang.";
             folgeschritte = [new("Postausgang ansehen", "postausgang", Hauptschritt: true), new("Protokoll ansehen", "protokoll")];
-            betreff = text = null;
+            betreff = text = vorschauHtml = null;
             vorschau = null;
+            await ArchivLadenAsync();
         }
         finally
         {

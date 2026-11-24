@@ -61,6 +61,7 @@
                                     Freigabe="@(Buchen.Und(() => lauf.Status == Zahlungslaufstatus.Freigegeben ? Freigabe.Ja : lauf.Status == Zahlungslaufstatus.Vorschlag ? Freigabe.Nein("Erst freigeben – vorher gehen keine Vorabankündigungen raus.") : Freigabe.Nein("Die Datei wurde bereits erzeugt (Link unten).")))"
                                     Click="@(() => AusfuehrenAsync(async d => $"Datei {(await d.GetRequiredService<ZahlungsDienst>().ExportierenAsync(lauf.Id)).Datei} erzeugt – unten herunterladen.", "SEPA-Datei"))" />
                 <BegruendeterButton Text="Verwerfen" Icon="delete" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text"
+                                    Rueckfrage="Der Zahlungslauf wird verworfen; die Posten werden wieder offen."
                                     Freigabe="@(Buchen.Und(() => lauf.Status is Zahlungslaufstatus.Vorschlag or Zahlungslaufstatus.Freigegeben ? Freigabe.Ja : Freigabe.Nein("Ein exportierter Lauf ist bei der Bank; Korrekturen über Rückbuchung.")))"
                                     Click="@(() => AusfuehrenAsync(async d => { await d.GetRequiredService<ZahlungsDienst>().VerwerfenAsync(lauf.Id); return "Verworfen."; }, "Lauf"))" />
             </div>

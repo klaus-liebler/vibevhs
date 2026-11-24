@@ -1,0 +1,149 @@
+@page "/monitore"
+@using VibeVHS.Application.Programm
+@using VibeVHS.Domain.Programm
+@inject Vorgang Vorgang
+@inject NavigationManager Navigation
+@inject NotificationService Hinweise
+@inject IJSRuntime Js
+
+@* Info-Monitore im Foyer (QA-65): anlegen, Vorschau im neuen Fenster, neue Adresse, sperren. *@
+
+<PageTitle>Info-Monitore · VibeVHS</PageTitle>
+
+<div class="vhs-head">
+    <div>
+        <h1>Info-Monitore</h1>
+        <p class="vhs-sub">Bildschirme im Foyer zeigen „Heute im Haus“: Kurse des Tages mit Uhrzeit und Raum, Ausfälle rot markiert – nie Teilnehmende.
+            Jeder Bildschirm öffnet eine eigene geheime Adresse (Browser im Vollbild, Seite lädt jede Minute neu).</p>
+    </div>
+    <Hinzufuegen Objekt="Monitor" Titel="Info-Monitor anlegen" Erlaubt="@recht" OkText="Anlegen" Speichern="AnlegenAsync"
+                 Bereit="@(string.IsNullOrWhiteSpace(name) ? Freigabe.Nein("Bitte einen Namen angeben, z. B. „Foyer Emsdetten“.") : Freigabe.Ja)"
+                 Erklaerung="Die Adresse für den Bildschirm erscheint nur einmal direkt nach dem Anlegen. Geht sie verloren, erzeugen Sie eine neue.">
+        <div class="vhs-fields">
+            <RadzenFormField Text="Name *" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="name" Placeholder="Foyer Emsdetten" Immediate="true" /></RadzenFormField>
+            <RadzenFormField Text="Standort (Gebäude)" Variant="Variant.Outlined">
+                <RadzenDropDown TValue="Guid?" @bind-Value="ortId" Data="@gebaeude" TextProperty="Name" ValueProperty="Id" AllowClear="true" Placeholder="alle Standorte" />
+            </RadzenFormField>
+            <RadzenFormField Text="Überschrift" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="ueberschrift" Immediate="true" Placeholder="Heute im Haus" /></RadzenFormField>
+        </div>
+    </Hinzufuegen>
+</div>
+
+@if (!recht.Erlaubt)
+{
+    <div class="vhs-alert">@recht.Begruendung</div>
+}
+else
+{
+    @if (neueAdresse is not null)
+    {
+        <div class="vhs-alert vhs-info" role="status">
+            <b>Adresse für „@neueAdresse.Value.Name“</b> – jetzt am Bildschirm öffnen oder sicher notieren, sie wird nicht noch einmal angezeigt:<br />
+            <input class="vhs-input vhs-mono" readonly value="@neueAdresse.Value.Adresse" data-markieren style="width:100%;margin-top:6px" aria-label="Adresse des Bildschirms" />
+        </div>
+    }
+
+    <section class="vhs-card">
+        <div class="vhs-list">
+            @if (monitore.Count == 0)
+            {
+                <div class="vhs-muted">Noch kein Monitor angelegt. Oben „+ Monitor hinzufügen“ wählen.</div>
+            }
+            @foreach (var m in monitore)
+            {
+                <div>
+                    <span class="vhs-grow">
+                        <b>@m.Name</b> · @(m.OrtId is { } o ? gebaeude.FirstOrDefault(g => g.Id == o)?.Name ?? "Ort?" : "alle Standorte")
+                        <br /><span class="vhs-small vhs-muted">@(m.Ueberschrift ?? "Heute im Haus") · zuletzt abgerufen @(m.ZuletztAbgerufen?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "noch nie")</span>
+                    </span>
+                    @if (m.Gesperrt)
+                    {
+                        <StatusPille Stil="krit">gesperrt</StatusPille>
+                    }
+                    <BegruendeterButton Text="Vorschau" Icon="open_in_new" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => VorschauAsync(m))"
+                                        Freigabe="@(m.Gesperrt ? Freigabe.Nein("Gesperrte Monitore haben keine Vorschau. Erst entsperren.") : Freigabe.Ja)" />
+                    <BegruendeterButton Text="Neue Adresse" Icon="autorenew" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => NeueAdresseAsync(m))"
+                                        Rueckfrage="@($"Für „{m.Name}“ wird eine neue Adresse erzeugt. Der Bildschirm zeigt danach nichts mehr, bis die neue Adresse dort geöffnet ist.")"
+                                        RueckfrageJa="Neue Adresse erzeugen" />
+                    @if (m.Gesperrt)
+                    {
+                        <BegruendeterButton Text="Entsperren" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => SperrenAsync(m, false))" />
+                    }
+                    else
+                    {
+                        <BegruendeterButton Text="Sperren" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => SperrenAsync(m, true))"
+                                            Rueckfrage="@($"„{m.Name}“ wird gesperrt: Der Bildschirm zeigt danach nur noch einen Hinweis.")" />
+                    }
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private IReadOnlyList<Infomonitor> monitore = [];
+    private IReadOnlyList<Ort> gebaeude = [];
+    private Freigabe recht = Freigabe.Ja;
+    private string? name, ueberschrift;
+    private Guid? ortId;
+    private (string Name, string Adresse)? neueAdresse;
+
+    protected override async Task OnInitializedAsync()
+    {
+        recht = Freigabe.NurFuer((await Vorgang.BenutzerAsync()).Rolle, InfomonitorDienst.PflegeRollen);
+        if (recht.Erlaubt)
+        {
+            await LadenAsync();
+        }
+    }
+
+    private async Task LadenAsync()
+    {
+        (monitore, gebaeude) = await Vorgang.AusfuehrenAsync(async d =>
+        {
+            var liste = await d.GetRequiredService<InfomonitorDienst>().ListeAsync();
+            var orte = (await d.GetRequiredService<IProgrammSpeicher>().OrtsverzeichnisAsync()).Alle
+                .Where(o => o.Art is Ortsart.Gebaeude or Ortsart.Liegenschaft).OrderBy(o => o.Name, StringComparer.CurrentCulture).ToList();
+            return ((IReadOnlyList<Infomonitor>)liste, (IReadOnlyList<Ort>)orte);
+        });
+    }
+
+    private string Adresse(string geheimnis) => Navigation.ToAbsoluteUri($"monitor/{geheimnis}").ToString();
+
+    private async Task<bool> AnlegenAsync()
+    {
+        var (m, geheimnis) = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<InfomonitorDienst>().AnlegenAsync(name!, ortId, ueberschrift));
+        neueAdresse = (m.Name, Adresse(geheimnis));
+        name = ueberschrift = null;
+        ortId = null;
+        await LadenAsync();
+        return true;
+    }
+
+    private async Task VorschauAsync(Infomonitor m)
+    {
+        try
+        {
+            var geheimnis = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<InfomonitorDienst>().VorschauAsync(m.Id));
+            await Js.InvokeVoidAsync("open", Adresse(geheimnis), "_blank", "noopener");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+        }
+    }
+
+    private async Task NeueAdresseAsync(Infomonitor m)
+    {
+        var geheimnis = await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<InfomonitorDienst>().NeueAdresseAsync(m.Id));
+        neueAdresse = (m.Name, Adresse(geheimnis));
+        await LadenAsync();
+    }
+
+    private async Task SperrenAsync(Infomonitor m, bool sperren)
+    {
+        await Vorgang.AusfuehrenAsync(async d => { await d.GetRequiredService<InfomonitorDienst>().SperrenAsync(m.Id, sperren); return 0; });
+        Hinweise.Notify(NotificationSeverity.Success, sperren ? "Gesperrt" : "Entsperrt", m.Name);
+        await LadenAsync();
+    }
+}

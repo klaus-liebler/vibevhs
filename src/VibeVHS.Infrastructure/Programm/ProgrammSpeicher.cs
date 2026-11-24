@@ -5,6 +5,7 @@ using VibeVHS.Domain.Aufgaben;
 using VibeVHS.Domain.Gemeinsam;
 using VibeVHS.Domain.Programm;
 using VibeVHS.Infrastructure.Datenbank;
+using VibeVHS.Infrastructure.Personen;
 
 namespace VibeVHS.Infrastructure.Programm;
 
@@ -102,19 +103,32 @@ internal sealed class ProgrammSpeicher(VibeVhsDbContext db) : IProgrammSpeicher
     }
 
     /// <summary>
-    /// Volltextsuche über Kursnummer und Titel ohne gespeicherten Suchtext: die (kurzen) Spalten werden geladen und in C# normalisiert
-    /// (gleiche Normalisierung wie bei Personen: Umlaute, Akzente, Groß-/Kleinschreibung).
+    /// Volltextsuche über Kursnummer und Titel in der Datenbank (SQL-Funktion <c>suchtext</c>, gleiche Normalisierung wie bei Personen:
+    /// Umlaute, Akzente, Groß-/Kleinschreibung); jedes Wort muss enthalten sein. Kein gespeicherter Suchtext.
     /// </summary>
     internal static async Task<List<Guid>> SuchtrefferAsync(IQueryable<Kurs> kurse, IReadOnlyCollection<string> woerter, CancellationToken abbruch)
-        => (await kurse.Select(k => new { k.Id, k.Kursnummer, k.Titel }).ToListAsync(abbruch))
-            .Where(k => Suchtext.Normalisieren($"{k.Kursnummer} {k.Titel}") is var text && woerter.All(w => text.Contains(w, StringComparison.Ordinal)))
-            .Select(k => k.Id).ToList();
+    {
+        foreach (var w in woerter)
+        {
+            var muster = "%" + Personensicht.Suchmuster(w) + "%";
+            kurse = kurse.Where(k => EF.Functions.Like(SqlFunktionen.Suchtext(k.Kursnummer + " " + k.Titel), muster));
+        }
+
+        return await kurse.Select(k => k.Id).ToListAsync(abbruch);
+    }
 
     /// <summary>Wie <see cref="SuchtrefferAsync(IQueryable{Kurs}, IReadOnlyCollection{string}, CancellationToken)"/> für Orte (Name, Kurzname, Straße, Stadt).</summary>
     internal static async Task<List<Guid>> SuchtrefferAsync(IQueryable<Ort> orte, IReadOnlyCollection<string> woerter, CancellationToken abbruch)
-        => (await orte.Select(o => new { o.Id, o.Name, o.Kurzname, o.Strasse, o.Stadt }).ToListAsync(abbruch))
-            .Where(o => Suchtext.Normalisieren($"{o.Name} {o.Kurzname} {o.Strasse} {o.Stadt}") is var text && woerter.All(w => text.Contains(w, StringComparison.Ordinal)))
-            .Select(o => o.Id).ToList();
+    {
+        foreach (var w in woerter)
+        {
+            var muster = "%" + Personensicht.Suchmuster(w) + "%";
+            orte = orte.Where(o => EF.Functions.Like(SqlFunktionen.Suchtext(o.Name), muster) || EF.Functions.Like(SqlFunktionen.Suchtext(o.Kurzname), muster)
+                                   || EF.Functions.Like(SqlFunktionen.Suchtext(o.Strasse), muster) || EF.Functions.Like(SqlFunktionen.Suchtext(o.Stadt), muster));
+        }
+
+        return await orte.Select(o => o.Id).ToListAsync(abbruch);
+    }
 
     public Task<Kurs?> KursLadenAsync(Guid id, CancellationToken abbruch = default)
         => db.Kurse.Include(k => k.Veranstaltungen).FirstOrDefaultAsync(k => k.Id == id, abbruch);
@@ -186,8 +200,22 @@ internal sealed class ProgrammSpeicher(VibeVhsDbContext db) : IProgrammSpeicher
 }
 
 /// <summary>Globale Suche: Personen (Volltext), Kurse (Nummer/Titel), Orte (Name/Adresse).</summary>
-internal sealed class GlobaleSuche(VibeVhsDbContext db, IPersonenAbfrage personen) : IGlobaleSuche
+internal sealed class GlobaleSuche(VibeVhsDbContext db, IPersonenAbfrage personen, Application.Sicherheit.IAktuellerBenutzer benutzer) : IGlobaleSuche
 {
+    public async Task<IReadOnlyList<Suchtreffer>> KurseAsync(string text, int anzahl = 8, CancellationToken abbruch = default)
+    {
+        var woerter = Suchtext.Woerter(text);
+        if (woerter.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = await ProgrammSpeicher.SuchtrefferAsync(db.Kurse.AsNoTracking().IgnoreAutoIncludes(), woerter, abbruch);
+        return (await db.Kurse.AsNoTracking().IgnoreAutoIncludes().Where(k => ids.Contains(k.Id))
+                .OrderByDescending(k => k.Kursnummer).ThenBy(k => k.Id).Take(anzahl).Select(k => new { k.Id, k.Kursnummer, k.Titel, k.Status }).ToListAsync(abbruch))
+            .Select(k => new Suchtreffer(Treffertyp.Kurs, $"{k.Kursnummer} {k.Titel}", KursAnzeige.Status(k.Status), $"kurse/{k.Id}", k.Id)).ToList();
+    }
+
     public async Task<IReadOnlyList<Suchtreffer>> SuchenAsync(string text, int jeTyp = 5, CancellationToken abbruch = default)
     {
         var woerter = Suchtext.Woerter(text);
@@ -196,8 +224,16 @@ internal sealed class GlobaleSuche(VibeVhsDbContext db, IPersonenAbfrage persone
             return [];
         }
 
+        var rolle = (await benutzer.ErmittelnAsync(abbruch)).Rolle;
         var treffer = new List<Suchtreffer>();
-        foreach (var p in await personen.SeiteAsync(new PersonenFilter(text), null, jeTyp, abbruch))
+
+        // Funktionen zuerst, wenn der Titel genau passt („Mahnwesen“), sonst nach den Daten.
+        var funktionen = Application.Oberflaeche.Funktionskatalog.Alle.Where(f => f.Erlaubt(rolle)).ToList();
+        var passendeFunktionen = Unscharf.Ordnen(text, funktionen, f => $"{f.Titel} {f.Stichwoerter}", 3)
+            .Select(f => new Suchtreffer(Treffertyp.Funktion, f.Titel, "Funktion öffnen", f.Ziel)).ToList();
+
+        // Personen nur aktive Datensätze (gesperrte und anonymisierte nicht), fehlertolerant, beste Treffer zuerst.
+        foreach (var p in await personen.VorschlaegeAsync(text, new PersonenFilter(), jeTyp, abbruch))
         {
             treffer.Add(new Suchtreffer(Treffertyp.Person, p.Anzeigename,
                 string.Join(" · ", new[] { p.Geburtsdatum?.ToString("dd.MM.yyyy"), p.Wohnort }.Where(x => x is not null)), $"personen/{p.Id}"));
@@ -210,7 +246,7 @@ internal sealed class GlobaleSuche(VibeVhsDbContext db, IPersonenAbfrage persone
 
         foreach (var k in await kurse.OrderByDescending(k => k.Kursnummer).ThenBy(k => k.Id).Take(jeTyp).Select(k => new { k.Id, k.Kursnummer, k.Titel }).ToListAsync(abbruch))
         {
-            treffer.Add(new Suchtreffer(Treffertyp.Kurs, $"{k.Kursnummer} {k.Titel}", null, $"kurse/{k.Id}"));
+            treffer.Add(new Suchtreffer(Treffertyp.Kurs, $"{k.Kursnummer} {k.Titel}", null, $"kurse/{k.Id}", k.Id));
         }
 
         foreach (var o in await orte.OrderBy(o => o.Name).ThenBy(o => o.Id).Take(jeTyp).Select(o => new { o.Id, o.Name, o.Kurzname, o.Stadt, o.Art }).ToListAsync(abbruch))
@@ -219,6 +255,24 @@ internal sealed class GlobaleSuche(VibeVhsDbContext db, IPersonenAbfrage persone
                 o.Stadt ?? o.Art.ToString(), $"orte?id={o.Id}"));
         }
 
-        return treffer;
+        // Belege (Rechnungen, Gutschriften, Mahnungen …) nur mit Leserecht auf Finanzen: Nummer oder Empfänger.
+        if (rolle is { } r && Application.Finanzen.Finanzrollen.Lesen.Contains(r))
+        {
+            var nummer = text.Trim();
+            var muster = "%" + Personensicht.Suchmuster(text) + "%";
+            var belege = await db.Set<Domain.Finanzen.Beleg>().AsNoTracking()
+                .Where(b => b.Nummer != null && (b.Nummer.StartsWith(nummer) || EF.Functions.Like(SqlFunktionen.Suchwoerter(b.EmpfaengerName), muster)))
+                .OrderByDescending(b => b.Belegdatum).ThenByDescending(b => b.Id).Take(jeTyp)
+                .Select(b => new { b.Id, b.Nummer, b.Art, b.EmpfaengerName, b.BetragCent, b.Belegdatum }).ToListAsync(abbruch);
+            foreach (var b in belege)
+            {
+                treffer.Add(new Suchtreffer(Treffertyp.Beleg, $"{b.Nummer} {b.EmpfaengerName}",
+                    $"{b.Art} · {b.Belegdatum:dd.MM.yyyy} · {new Geld(b.BetragCent)}", $"finanzen?tab=belege&beleg={b.Id}"));
+            }
+        }
+
+        // Genau passende Funktion nach oben, sonst ans Ende.
+        var genau = passendeFunktionen.Where(f => Suchtext.Normalisieren(f.Titel).StartsWith(Suchtext.Normalisieren(text), StringComparison.Ordinal)).ToList();
+        return [.. genau, .. treffer, .. passendeFunktionen.Except(genau)];
     }
 }

@@ -1,0 +1,168 @@
+@using VibeVHS.Application.Personen
+@using VibeVHS.Application.Programm
+@using VibeVHS.Application.Aufgaben
+@inject Vorgang Vorgang
+@inject DialogService Dialoge
+@inject NavigationManager Navigation
+@inject NotificationService Hinweise
+
+@*
+    Schnellauswahl für Anrufe und Anliegen am Tresen (QA-62, aus SchoolCraft FK-16): fest nummerierte Punkte, Ziffer wählt, danach volle
+    Eingabehilfe (fehlertolerante Personen- und Kurssuche). Die Punkte führen in die vorhandenen Abläufe; nur die Rückrufbitte wird hier erfasst.
+*@
+<div class="vhs-schnell" tabindex="0" @ref="wurzel" @onkeydown="TasteAsync" aria-label="Schnellauswahl">
+    @if (punkt is null)
+    {
+        <p class="vhs-small vhs-muted">Ziffer drücken oder anklicken · <kbd>Esc</kbd> schließt</p>
+        <ol class="vhs-schnell-liste">
+            @foreach (var p in Punkte)
+            {
+                <li>
+                    <button type="button" class="vhs-schnell-punkt" @onclick="@(() => Waehlen(p.Nr))">
+                        <kbd>@p.Nr</kbd><span><b>@p.Titel</b><br /><span class="vhs-small vhs-muted">@p.Erklaerung</span></span>
+                    </button>
+                </li>
+            }
+        </ol>
+    }
+    else
+    {
+        var p = Punkte[punkt.Value - 1];
+        <p><button type="button" class="vhs-linkbutton" @onclick="@(() => Waehlen(null))">← zurück zur Auswahl</button></p>
+        <h3><kbd>@p.Nr</kbd> @p.Titel</h3>
+        @if (p.Person)
+        {
+            <label class="vhs-small" for="schnell-person">@(p.Nr == 4 ? "Wer ruft an? (falls bekannt)" : "Person")</label>
+            <Personenauswahl Id="schnell-person" AutoFokus="true" Gewaehlt="@(z => { person = z; anrufer ??= z.Anzeigename; })" />
+            @if (person is not null)
+            {
+                <p class="vhs-small">Gewählt: <b>@person.Anzeigename</b> @(person.Geburtsdatum?.ToString("dd.MM.yyyy"))</p>
+            }
+        }
+
+        @if (p.Kurs)
+        {
+            <label class="vhs-small" for="schnell-kurs">Kurs (Nummer oder Titel)</label>
+            <Vorschlagsfeld TItem="Suchtreffer" Id="schnell-kurs" AutoFokus="@(!p.Person)" Bezeichnung="Kurs suchen" Platzhalter="z. B. 26H-1201 oder Yoga"
+                            Suchen="KurseAsync" Titel="@(k => k.Titel)" Zusatz="@(k => k.Zusatz)" Gewaehlt="@(k => kurs = k)" />
+        }
+
+        @if (p.Nr == 4)
+        {
+            <div class="vhs-fields">
+                <RadzenFormField Text="Anrufer/in" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="anrufer" Immediate="true" /></RadzenFormField>
+                <RadzenFormField Text="Telefon für den Rückruf" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="telefon" Immediate="true" /></RadzenFormField>
+            </div>
+            <RadzenFormField Text="Anliegen" Variant="Variant.Outlined" Style="width:100%"><RadzenTextArea @bind-Value="anliegen" Rows="3" Immediate="true" /></RadzenFormField>
+        }
+
+        <div class="vhs-row" style="margin-top:12px">
+            <BegruendeterButton Text="@p.Aktion" Icon="arrow_forward" Freigabe="@Bereit(p)" Click="@(() => AusfuehrenAsync(p))" IsBusy="@arbeitet" />
+            <RadzenButton Text="Abbrechen" ButtonStyle="ButtonStyle.Light" Click="@(() => Dialoge.Close())" />
+        </div>
+    }
+    <p class="vhs-small vhs-muted" style="margin-top:14px">Notfälle: VibeVHS ersetzt weder den Notruf (112/110) noch die Alarmierung im Gebäude.</p>
+</div>
+
+@code {
+    private sealed record Punkt(int Nr, string Titel, string Erklaerung, string Aktion, bool Person, bool Kurs);
+
+    private static readonly Punkt[] Punkte =
+    [
+        new(1, "Anmeldung zu einem Kurs", "Person und Kurs wählen, weiter zur Anmeldung mit Zahlart", "Weiter zur Anmeldung", true, true),
+        new(2, "Abmeldung oder Storno", "Anmeldungen der Person öffnen und dort stornieren", "Anmeldungen öffnen", true, false),
+        new(3, "Kursleitung fällt aus", "Kurs öffnen, Termin ausfallen lassen und Teilnehmende informieren", "Kurs öffnen", false, true),
+        new(4, "Rückrufbitte", "Anliegen notieren – wird Aufgabe im Korb Teilnehmerservice", "Rückrufbitte anlegen", true, false),
+        new(5, "Name, Adresse oder Bankverbindung geändert", "Stammdaten der Person ab Datum ändern", "Stammdaten öffnen", true, false),
+        new(6, "Bescheinigung erneut ausgeben", "Dokumente der Person öffnen und nachdrucken", "Dokumente öffnen", true, false),
+    ];
+
+    private ElementReference wurzel;
+    private int? punkt;
+    private PersonZeile? person;
+    private Suchtreffer? kurs;
+    private string? anrufer, telefon, anliegen;
+    private bool arbeitet;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await wurzel.FocusAsync();
+        }
+    }
+
+    private void Waehlen(int? nr)
+    {
+        punkt = nr;
+        person = null;
+        kurs = null;
+        anrufer = telefon = anliegen = null;
+    }
+
+    private void TasteAsync(KeyboardEventArgs e)
+    {
+        if (punkt is null && e.Key.Length == 1 && char.IsDigit(e.Key[0]) && int.Parse(e.Key, System.Globalization.CultureInfo.InvariantCulture) is var nr
+            && nr >= 1 && nr <= Punkte.Length)
+        {
+            Waehlen(nr);
+        }
+    }
+
+    private Task<IReadOnlyList<Suchtreffer>> KurseAsync(string text)
+        => Vorgang.AusfuehrenAsync(d => d.GetRequiredService<IGlobaleSuche>().KurseAsync(text, 8));
+
+    private Freigabe Bereit(Punkt p)
+        => p.Nr == 4
+            ? (string.IsNullOrWhiteSpace(anrufer) ? Freigabe.Nein("Bitte angeben, wer angerufen hat.")
+                : string.IsNullOrWhiteSpace(anliegen) ? Freigabe.Nein("Bitte das Anliegen kurz notieren.") : Freigabe.Ja)
+            : p.Person && person is null ? Freigabe.Nein("Bitte zuerst die Person wählen.")
+            : p.Kurs && kurs is null ? Freigabe.Nein("Bitte zuerst den Kurs wählen.")
+            : Freigabe.Ja;
+
+    private async Task AusfuehrenAsync(Punkt p)
+    {
+        switch (p.Nr)
+        {
+            case 1:
+                Gehe($"anmeldung?person={person!.Id}&kurs={kurs!.Id}");
+                break;
+            case 2:
+                Gehe($"personen/{person!.Id}#anmeldungen");
+                break;
+            case 3:
+                Gehe($"kurse/{kurs!.Id}#termine-aendern");
+                break;
+            case 4:
+                arbeitet = true;
+                try
+                {
+                    await Vorgang.AusfuehrenAsync(d => d.GetRequiredService<AufgabenDienst>().RueckrufAnlegenAsync(person?.Id, anrufer!, telefon, anliegen!));
+                    Hinweise.Notify(NotificationSeverity.Success, "Rückrufbitte angelegt", "Sie steht als Aufgabe im Korb des Teilnehmerservice.");
+                    Dialoge.Close();
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+                {
+                    Hinweise.Notify(NotificationSeverity.Error, "Nicht möglich", ex.Message);
+                }
+                finally
+                {
+                    arbeitet = false;
+                }
+
+                break;
+            case 5:
+                Gehe($"personen/{person!.Id}#stammdaten-aendern");
+                break;
+            case 6:
+                Gehe($"personen/{person!.Id}#dokumente");
+                break;
+        }
+    }
+
+    private void Gehe(string ziel)
+    {
+        Dialoge.Close();
+        Navigation.NavigateTo(ziel);
+    }
+}

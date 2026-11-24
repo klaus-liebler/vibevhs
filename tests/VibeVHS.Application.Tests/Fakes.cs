@@ -50,6 +50,13 @@ internal sealed class SpeicherPostausgang : INachrichtenSpeicher
     public Task<int> AnzahlAsync(NachrichtenStatus status, CancellationToken abbruch = default)
         => Task.FromResult(Nachrichten.Count(n => n.Status == status));
 
+    public List<VibeVHS.Domain.Vorlagen.GesendetesRundschreiben> Archiv { get; } = [];
+
+    public Task<IReadOnlyList<VibeVHS.Domain.Vorlagen.GesendetesRundschreiben>> RundschreibenAsync(int anzahl, CancellationToken abbruch = default)
+        => Task.FromResult<IReadOnlyList<VibeVHS.Domain.Vorlagen.GesendetesRundschreiben>>(Archiv.AsEnumerable().Reverse().Take(anzahl).ToList());
+
+    public void RundschreibenArchivieren(VibeVHS.Domain.Vorlagen.GesendetesRundschreiben rundschreiben) => Archiv.Add(rundschreiben);
+
     public Task SpeichernAsync(CancellationToken abbruch = default)
     {
         Speichervorgaenge++;

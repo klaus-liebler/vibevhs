@@ -131,7 +131,7 @@
         </dl>
     </section>
 
-    <section class="vhs-card">
+    <section class="vhs-card" id="termine-aendern">
         <h2>Ändern</h2>
         <RadzenRadioButtonList TValue="string" @bind-Value="modus" Orientation="Orientation.Vertical">
             <Items>
@@ -205,6 +205,7 @@
                                         Freigabe="@(Freigabe.NurFuer(rolle, Rolle.Fachbereichsleitung, Rolle.Leitung).Und(() => !e.AusnahmeMoeglich ? Freigabe.Nein("Gesetzlich vorgeschrieben (z. B. BAMF-Zulassung): keine Ausnahme möglich. Nachweis eintragen oder andere Person einplanen.") : string.IsNullOrWhiteSpace(ausnahmeText) ? Freigabe.Nein("Bitte unten eine Begründung eingeben.") : Freigabe.Ja))" />
                 }
                 <BegruendeterButton Text="Entfernen" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => TeamEntfernenAsync(t.PersonId))"
+                                    Rueckfrage="@($"{namen.Team(kurs, t)} wird aus dem Kursteam von {kurs.Kursnummer} entfernt.")" RueckfrageTitel="Aus dem Kursteam entfernen?"
                                     Freigabe="@(Planen.Und(() => kurs.Veranstaltungen.Any(v => v.DozentId == t.PersonId && !v.Ausgefallen && v.Ende >= Uhr.GetLocalNow().LocalDateTime) ? Freigabe.Nein("Leitet noch künftige Veranstaltungen; diese zuerst einer anderen Person zuordnen.") : Freigabe.Ja))" />
             </div>
         }
