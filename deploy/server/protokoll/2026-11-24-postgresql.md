@@ -62,3 +62,5 @@ nichts weiter, der Server blieb unverändert (lesend geprüft: Datei vom 16.11.,
 ```
 ssh -t liebler "sudo cp -a /etc/nginx/snippets/vibevhs-ohne-passwort.conf /etc/nginx/snippets/vibevhs-ohne-passwort.conf.vor-monitor && sudo install -m 0644 /tmp/vibevhs-kit/nginx/vibevhs-ohne-passwort.conf /etc/nginx/snippets/vibevhs-ohne-passwort.conf && sudo nginx -t && sudo systemctl reload nginx && echo OK"
 ```
+
+Ergebnis (24.11.2026 22:24): Klaus meldet OK. Lesend geprüft: Monitor-Zeile vorhanden, Sicherung `.vor-monitor` liegt da; `/vibevhs/monitor/test` → 200 ohne Passwort, `/vibevhs/` → 401 (Passwort weiter aktiv).
