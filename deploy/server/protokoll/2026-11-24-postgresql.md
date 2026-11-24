@@ -45,3 +45,13 @@ Ausgabe: Kit hochgeladen; geprüft: `09-postgresql.sh` mit Abschnitt 3b, Unit mi
 ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/09-postgresql.sh"
 .\deploy\server\deploy.ps1 -DbNeu
 ```
+
+## Befehl 7 (ändernd, mit sudo – Klaus' Go 24.11.2026 22:22, führt Klaus aus): Info-Monitore ohne Zugangspasswort
+
+Snippet aus dem Kit einspielen, vorher sichern; bei Fehler in `nginx -t` die Sicherung zurück, sonst nginx neu laden.
+
+```
+ssh -t liebler "sudo bash -c 'f=/etc/nginx/snippets/vibevhs-ohne-passwort.conf; cp -a \$f \$f.vor-monitor && install -m 0644 /tmp/vibevhs-kit/nginx/vibevhs-ohne-passwort.conf \$f && if nginx -t; then systemctl reload nginx && echo OK; else cp -a \$f.vor-monitor \$f; echo ZURUECK; fi'"
+```
+
+Vorab lesend verglichen (`diff` Server ↔ Kit): nur Zusätze – die Monitor-Zeile und auskommentierte Impressum-Zeilen; keine Änderung auf dem Server geht verloren.
