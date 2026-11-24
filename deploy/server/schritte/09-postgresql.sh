@@ -52,6 +52,9 @@ printf 'ConnectionStrings__VibeVHS=Host=127.0.0.1;Port=%s;Database=vibevhs;Usern
 chown root:vibevhs "$APPENV"; chmod 0640 "$APPENV"
 ok "Verbindung in $APPENV eingetragen"
 
+# 3b. Unit mit Sicherung__PgBin und Kommentare__Altdatei (Schritt 06 spielt sie sonst nicht neu ein)
+if einspielen systemd/vibevhs.service /etc/systemd/system/vibevhs.service; then systemctl daemon-reload; fi
+
 # 4. pg_dump/pg_restore 17 auf dem Host
 if ! command -v /usr/lib/postgresql/17/bin/pg_dump >/dev/null 2>&1; then
     apt-get update -qq
