@@ -100,3 +100,19 @@ ssh liebler 'systemd-run --user --quiet --wait --pipe --collect -p "Environment=
 ```
 
 Ausgabe: `Testsystem /var/log/vibevhs liebler.iui.hs-osnabrueck.de`, exit=0 → die Umgebung kommt vollständig an.
+
+## Befehl 13 (ohne sudo, kurzlebige Benutzer-Unit): Umgebung von fraktionperfekt.service (mit Leerzeichen im Wert) an systemd-run
+
+```
+ssh liebler 'systemctl show fraktionperfekt -p Environment --value; systemd-run --user --quiet --wait --pipe --collect -p "Environment=$(systemctl show fraktionperfekt -p Environment --value)" sh -c "echo \"\$ConnectionStrings__FraktionPerfekt\" \$PathBase"; echo exit=$?'
+```
+
+Ausgabe: Wert mit Leerzeichen kommt in Anführungszeichen und wird korrekt übergeben (`Data Source=/var/lib/fraktionperfekt/fraktionperfekt.db /fraktionperfekt`), exit=0.
+
+## Befehl 14 (lesend): gemeinsame .NET-Runtime vorhanden?
+
+```
+ssh liebler 'ls /usr/lib/dotnet/shared/Microsoft.AspNetCore.App /usr/share/dotnet/shared/Microsoft.AspNetCore.App 2>&1; cat /etc/dotnet/install_location 2>&1'
+```
+
+Ausgabe: ASP.NET-Core-Runtime 11.0.0 unter /usr/lib/dotnet vorhanden. Hinweis: fraktionperfekt nennt dafür „VibeVHS-Schritt 09 (09-dotnet-runtime.sh)“ – dieses Skript gibt es im VibeVHS-Repo nicht, Nummer 09 ist jetzt PostgreSQL.
