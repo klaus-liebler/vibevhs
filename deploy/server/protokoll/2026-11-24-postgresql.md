@@ -55,3 +55,10 @@ ssh -t liebler "sudo bash -c 'f=/etc/nginx/snippets/vibevhs-ohne-passwort.conf; 
 ```
 
 Vorab lesend verglichen (`diff` Server ↔ Kit): nur Zusätze – die Monitor-Zeile und auskommentierte Impressum-Zeilen; keine Änderung auf dem Server geht verloren.
+
+Ergebnis: In PowerShell wurde `$f` trotz `\` vor dem Senden ersetzt (leer) → `cp: missing destination file operand`; wegen `&&` lief
+nichts weiter, der Server blieb unverändert (lesend geprüft: Datei vom 16.11., ohne Monitor-Zeile). Neue Fassung ohne Variablen:
+
+```
+ssh -t liebler "sudo cp -a /etc/nginx/snippets/vibevhs-ohne-passwort.conf /etc/nginx/snippets/vibevhs-ohne-passwort.conf.vor-monitor && sudo install -m 0644 /tmp/vibevhs-kit/nginx/vibevhs-ohne-passwort.conf /etc/nginx/snippets/vibevhs-ohne-passwort.conf && sudo nginx -t && sudo systemctl reload nginx && echo OK"
+```
