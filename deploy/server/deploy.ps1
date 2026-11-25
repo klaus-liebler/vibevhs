@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    VibeVHS auf liebler.iui.hs-osnabrueck.de ausrollen: self-contained Linux-Build, Kit und Archiv hochladen,
+    VibeVHS auf liebler.iui.hs-osnabrueck.de ausrollen: framework-abhängiger Linux-Build (Runtime einmalig auf dem Server, VibeVHS-Schritt 09), Kit und Archiv hochladen,
     auf dem Server mit sudo einspielen (vorige Version bleibt als Rückweg, Datenbank-Sicherung vorher, Gesundheitsprüfung danach).
 .EXAMPLE
     .\deploy\server\deploy.ps1                # bauen + hochladen + einspielen (fragt nach sudo-Passwort)
@@ -21,6 +21,8 @@ param(
     [switch] $NurBauen,
     # Nur den Prüflauf der neuen Version auf dem Server zeigen (Datenbankstand), nichts einspielen
     [switch] $Pruefen,
+    # Paket mit eigener .NET-Runtime (self-contained, ~70 statt ~20 MB) – nur, falls die gemeinsame Runtime fehlt
+    [switch] $MitRuntime,
     # Datenbank auf dem Server vor dem Start nach /var/lib/vibevhs/beiseite/ verschieben (nicht löschen); die Anwendung
     # legt sie neu an. Scheitert der Start, kommen vorige Version und vorige Datenbank automatisch zurück.
     [switch] $DbNeu,
@@ -54,10 +56,11 @@ if ($DbNeu -and -not $OhneRueckfrage) {
 
 if ($NurKit) { Kit-Hochladen; return }
 
-Write-Host "» dotnet publish (linux-x64, self-contained)" -ForegroundColor Cyan
+$eigeneRuntime = if ($MitRuntime) { "true" } else { "false" }
+Write-Host ("» dotnet publish (linux-x64, {0})" -f $(if ($MitRuntime) { "mit eigener Runtime" } else { "framework-abhängig" })) -ForegroundColor Cyan
 $build = Join-Path $ausgabe "vibevhs"
 if (Test-Path $build) { Remove-Item $build -Recurse -Force }
-dotnet publish (Join-Path $wurzel "src\VibeVHS.Web") -c Release -r linux-x64 --self-contained true -o $build -p:DebugType=None
+dotnet publish (Join-Path $wurzel "src\VibeVHS.Web") -c Release -r linux-x64 --self-contained $eigeneRuntime -o $build -p:DebugType=None
 if ($LASTEXITCODE -ne 0) { throw "Build fehlgeschlagen." }
 Remove-Item (Join-Path $build "appsettings.Development.json") -ErrorAction SilentlyContinue
 $archiv = Join-Path $ausgabe "vibevhs.tar.gz"

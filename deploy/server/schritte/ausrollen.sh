@@ -18,9 +18,10 @@
 #   4. Scheitert der Start, deutet das Skript das Log (bekannte Meldungen → Ursache und nächster Schritt) und geht zurück.
 #   5. Läuft die neue Version, nennt es Fehlermeldungen (ERR/FTL) aus dem Start, falls es welche gab.
 source "$(dirname "$0")/gemeinsam.sh"
+source "$(dirname "$0")/liebler-dotnet.sh"
 als_root
 
-DBC=vibevhs-db            # PostgreSQL-Container (Schritt 09)
+DBC=vibevhs-db            # PostgreSQL-Container (Schritt 10)
 DB=vibevhs                # Datenbank der Anwendung
 GESUND=http://127.0.0.1:5080/vibevhs/gesund
 EXIT_NEUAUFBAU=3          # deploy.ps1 bietet dann -DbNeu an
@@ -42,9 +43,9 @@ deuten() {
     [[ "$log" == *"Datenbankschema veraltet"* ]] && hinweise+=("Schema geändert, keine Migration → erneut mit: .\\deploy\\server\\deploy.ps1 -DbNeu")
     [[ "$log" == *"Kommentar-Datenbank"*"Schemaversion"* ]] && hinweise+=("Kommentar-Datenbank passt nicht → per Skript anpassen, NICHT neu aufbauen (echte Kommentare)")
     [[ "$log" =~ (address\ already\ in\ use|Failed\ to\ bind) ]] && hinweise+=("Port 5080 belegt → sudo ss -ltnp | grep 5080 (läuft noch ein alter Prozess?)")
-    [[ "$log" =~ (Failed\ to\ connect\ to\ 127\.0\.0\.1:5441|Connection\ refused) ]] && hinweise+=("PostgreSQL nicht erreichbar → sudo docker ps -a | grep $DBC; sudo docker start $DBC (Schritt 09)")
-    [[ "$log" == *"password authentication failed"* ]] && hinweise+=("Anmeldung an PostgreSQL abgelehnt → ConnectionStrings__VibeVHS in /etc/vibevhs/vibevhs.env prüfen (Schritt 09 setzt sie)")
-    [[ "$log" == *"ConnectionStrings:VibeVHS"* ]] && hinweise+=("Verbindungszeichenfolge fehlt oder ist unvollständig → /etc/vibevhs/vibevhs.env (Schritt 09)")
+    [[ "$log" =~ (Failed\ to\ connect\ to\ 127\.0\.0\.1:5441|Connection\ refused) ]] && hinweise+=("PostgreSQL nicht erreichbar → sudo docker ps -a | grep $DBC; sudo docker start $DBC (Schritt 10)")
+    [[ "$log" == *"password authentication failed"* ]] && hinweise+=("Anmeldung an PostgreSQL abgelehnt → ConnectionStrings__VibeVHS in /etc/vibevhs/vibevhs.env prüfen (Schritt 10 setzt sie)")
+    [[ "$log" == *"ConnectionStrings:VibeVHS"* ]] && hinweise+=("Verbindungszeichenfolge fehlt oder ist unvollständig → /etc/vibevhs/vibevhs.env (Schritt 10)")
     [[ "$log" =~ (Access\ to\ the\ path|Permission\ denied|UnauthorizedAccess) ]] && hinweise+=("Rechte → Besitzer von /var/lib/vibevhs, /var/log/vibevhs, /var/backups/vibevhs muss vibevhs sein (Schritt 06)")
     [[ "$log" =~ (OutOfMemory|oom-kill|Killed) ]] && hinweise+=("Speicher knapp → free -m; andere Dienste prüfen")
     [[ "$log" == *"status=203/EXEC"* ]] && hinweise+=("Programm nicht ausführbar → Archiv beschädigt oder falsche Plattform (linux-x64)")
@@ -92,18 +93,20 @@ if [[ "${1:-}" == "--zurueck" ]]; then
     exit 0
 fi
 
-# Voraussetzungen aus Schritt 06 (Dienstbenutzer, Verzeichnisse, Unit) und 09 (PostgreSQL) – sonst vor jeder Änderung abbrechen
+# Voraussetzungen aus Schritt 06 (Dienstbenutzer, Verzeichnisse, Unit) und 10 (PostgreSQL) – sonst vor jeder Änderung abbrechen
 id vibevhs >/dev/null 2>&1 && [[ -f /etc/systemd/system/vibevhs.service && -d /var/lib/vibevhs && -d /var/backups/vibevhs ]] \
     || fehler "Schritt 06 fehlt (Dienstbenutzer vibevhs, /var/lib/vibevhs, vibevhs.service) – erst einrichten, dann erneut ausrollen. Nichts geändert."
 docker exec "$DBC" pg_isready -U vibevhs >/dev/null 2>&1 \
-    || fehler "Schritt 09 fehlt oder Container $DBC läuft nicht (PostgreSQL) – sudo docker start $DBC bzw. Schritt 09, dann erneut ausrollen. Nichts geändert."
+    || fehler "Schritt 10 fehlt oder Container $DBC läuft nicht (PostgreSQL) – sudo docker start $DBC bzw. Schritt 10, dann erneut ausrollen. Nichts geändert."
 
 archiv="${1:?Pfad zum Archiv fehlt}"
 [[ -f "$archiv" ]] || fehler "Archiv $archiv fehlt"
 neu=$(mktemp -d /opt/vibevhs.neu.XXXX)
 trap '[[ -n "${neu:-}" && -d "$neu" ]] && rm -rf "$neu"' EXIT
 tar -xzf "$archiv" -C "$neu" --strip-components=1
-[[ -f "$neu/VibeVHS.Web" ]] || fehler "Archiv enthält kein VibeVHS.Web"
+[[ -f "$neu/VibeVHS.Web" ]] || { rm -rf "$neu"; fehler "Archiv enthält kein VibeVHS.Web"; }
+# Framework-abhängiges Paket: passende gemeinsame Runtime vorhanden? (VibeVHS-Schritt 09) – sonst nichts ändern
+dotnet_pruefen "$neu" "VibeVHS.Web" || { rm -rf "$neu"; fehler "Ausrollen abgebrochen: Runtime fehlt (siehe oben). Nichts geändert."; }
 # Unter Windows gebaute Archive tragen keine Unix-Rechte (alles 666/777): Rechte hier festlegen
 chown -R root:root "$neu"
 find "$neu" -type d -exec chmod 755 {} +

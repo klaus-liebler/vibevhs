@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Schritt 09: PostgreSQL 17 für VibeVHS (Umstellung von SQLite, 24.11.2026) – Datenbank als Container, Werkzeuge pg_dump/pg_restore 17 auf dem Host.
+# Schritt 10: PostgreSQL 17 für VibeVHS (Umstellung von SQLite, 24.11.2026) – Datenbank als Container, Werkzeuge pg_dump/pg_restore 17 auf dem Host.
 # Vor dem ersten Ausrollen einer Version mit PostgreSQL ausführen (danach: .\deploy\server\deploy.ps1 -DbNeu).
-# Start: ssh -t srvadmin@liebler.iui.hs-osnabrueck.de "sudo bash /tmp/vibevhs-kit/schritte/09-postgresql.sh"
-# Rückweg: sudo bash /tmp/vibevhs-kit/schritte/09-zurueck.sh (Container stoppen; Daten im Volume bleiben erhalten)
+# Start: ssh -t srvadmin@liebler.iui.hs-osnabrueck.de "sudo bash /tmp/vibevhs-kit/schritte/10-postgresql.sh"
+# Rückweg: sudo bash /tmp/vibevhs-kit/schritte/10-zurueck.sh (Container stoppen; Daten im Volume bleiben erhalten)
 #
 # - Container „vibevhs-db“ (postgres:17), nur auf 127.0.0.1:5441 erreichbar, Daten im Docker-Volume „vibevhs-db“, Neustart automatisch.
 # - Zufälliges Passwort, nur in /etc/vibevhs/postgres.env (root, 0600) und als Verbindungszeichenfolge in /etc/vibevhs/vibevhs.env (root:vibevhs, 0640).
@@ -73,4 +73,4 @@ ok "Werkzeuge: $(/usr/lib/postgresql/17/bin/pg_dump --version)"
 sudo -u vibevhs env PGPASSWORD="$POSTGRES_PASSWORD" /usr/lib/postgresql/17/bin/pg_dump -h 127.0.0.1 -p "$PORT" -U vibevhs -d vibevhs --schema-only >/dev/null \
     && ok "Probe: vibevhs kann sichern" || fehler "Probe-Sicherung als vibevhs fehlgeschlagen"
 
-ok "Schritt 09 fertig – jetzt ausrollen: .\\deploy\\server\\deploy.ps1 -DbNeu (alte Kommentare aus kommentare.db werden beim Start übernommen)"
+ok "Schritt 10 fertig – jetzt ausrollen: .\\deploy\\server\\deploy.ps1 -DbNeu (alte Kommentare aus kommentare.db werden beim Start übernommen)"

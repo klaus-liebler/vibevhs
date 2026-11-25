@@ -29,12 +29,19 @@ else
     trap - EXIT
 fi
 
-# nginx bleibt bis zum Wechsel (Schritt 03) aus
-systemctl disable --now nginx >/dev/null 2>&1 || true
+# nginx bleibt bis zum Wechsel (Schritt 03) aus – aber NUR, solange Apache noch ausliefert. Ist der Wechsel schon erfolgt
+# (Apache aus, nginx in Betrieb), bleibt nginx unangetastet: sonst wären Website und alle Apps dahinter weg.
+if systemctl is-active --quiet apache2; then
+    systemctl disable --now nginx >/dev/null 2>&1 || true
+elif systemctl is-active --quiet nginx; then
+    ok "nginx ist schon in Betrieb (Schritt 03 erledigt) – bleibt unverändert"
+fi
 systemctl enable --now atd >/dev/null 2>&1 || true
 
 info "Prüfung"
 nginx -v 2>&1 | sed 's/^/   /'
 ufw version | head -1 | sed 's/^/   /'
-systemctl is-active apache2 >/dev/null && ok "Apache läuft weiter (unverändert)" || warn "Apache läuft nicht?"
+if systemctl is-active --quiet apache2; then ok "Apache läuft weiter (unverändert)"
+elif systemctl is-active --quiet nginx; then ok "nginx läuft (unverändert)"
+else warn "Weder Apache noch nginx laufen – Website nicht erreichbar!"; fi
 ok "Schritt 02 fertig"

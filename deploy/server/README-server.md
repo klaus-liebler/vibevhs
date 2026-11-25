@@ -91,8 +91,8 @@ befristet (danach `sudo rm /etc/sudoers.d/srvadmin`).
 nginx, ufw, apache2-utils (htpasswd), at, sqlite3 (nur noch für Altdateien), curl, openssl und die passende `libicuNN` für .NET (kein certbot). nginx wird **nicht**
 gestartet (Apache belegt 80/443 noch). **Prüfen:** Ausgabe zeigt Versionen und „Apache läuft weiter“. Rückweg: nicht nötig.
 
-VibeVHS braucht **kein .NET auf dem Server**: `deploy.ps1` baut self-contained für linux-x64 (für Ubuntu 26.04 gibt es noch
-keine verlässliche Microsoft-Paketquelle).
+Die .NET-Runtime kommt mit **Schritt 09** einmalig für alle Apps auf den Server (siehe dort); bis dahin baut `deploy.ps1 -MitRuntime`
+self-contained für linux-x64.
 
 ---
 
@@ -178,7 +178,7 @@ Kestrel nur auf `127.0.0.1:5080`, `ASPNETCORE_ENVIRONMENT=Testsystem` (Pfad-Basi
 .\deploy\server\deploy.ps1
 ```
 
-Baut self-contained linux-x64 und lädt Kit und Archiv hoch. Auf dem Server (`schritte/ausrollen.sh`, seit 24.11.2026 „mitdenkend“):
+Baut linux-x64 (framework-abhängig, rund 20 MB; `-MitRuntime` = self-contained) und lädt Kit und Archiv hoch. Auf dem Server (`schritte/ausrollen.sh`, seit 24.11.2026 „mitdenkend“):
 
 1. **Prüflauf vor jeder Änderung:** Die neue Version läuft einmal als Dienstbenutzer mit der Umgebung des Dienstes
    (`VibeVHS.Web --datenbankstand`, ändert nichts) und meldet je Datenbank: *Aktuell*, *Neu* (fehlt/leer, wird angelegt),
@@ -230,21 +230,6 @@ Wegwerf-Datenbank, Seite *Betrieb*), dazu vor jedem Update `vor-update-*-vibevhs
 `docker exec vibevhs-db createdb -U vibevhs vibevhs` →
 `docker exec -i vibevhs-db pg_restore -U vibevhs -d vibevhs --no-owner < /var/backups/vibevhs/<sicherung>.dump` →
 `sudo systemctl start vibevhs`. Details: `docs/betrieb.md`.
-
----
-
-## 09 · PostgreSQL (Umstellung von SQLite, 24.11.2026)
-
-`ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/09-postgresql.sh"` – **vor** dem ersten Ausrollen einer Version mit PostgreSQL,
-danach `.\deploy\server\deploy.ps1 -DbNeu`.
-
-- Container `vibevhs-db` (`postgres:17`, `--restart unless-stopped`), nur `127.0.0.1:5441`, Daten im Docker-Volume `vibevhs-db`.
-- Zufälliges Passwort in `/etc/vibevhs/postgres.env` (root, 0600); die Verbindungszeichenfolge trägt das Skript in `/etc/vibevhs/vibevhs.env` ein.
-- `pg_dump`/`pg_restore` 17 auf dem Host (`postgresql-client-17`, notfalls aus apt.postgresql.org ⚑ prüfen), damit die Anwendung als
-  Benutzer `vibevhs` ohne Docker-Rechte sichern kann; das Skript prüft das zum Schluss mit einer Probe-Sicherung.
-- Beim ersten Start übernimmt die Anwendung die Kommentare aus `/var/lib/vibevhs/kommentare.db` in die Datenbank `vibevhs_kommentare`
-  und benennt die Datei in `kommentare.db.uebernommen` um. Die alte `vibevhs.db` bleibt liegen (nur Testdaten) und kann später weg.
-- Rückweg: `09-zurueck.sh` hält den Container an; eine ältere SQLite-Version mit `ausrollen.sh --zurueck` zurückholen.
 
 ---
 
@@ -324,3 +309,40 @@ Bei der Hochschul-IT nachfragen.
 Geklärt (16.11.2026): Von außen kommt nur MQTT (8883) – Node-RED 1880 wird geschlossen. 8181, 9443, 8000, 5666, 8883 bleiben
 erreichbar. Kein Let's Encrypt: Hochschulzertifikat für nginx und mosquitto; alle Geräte vertrauen öffentlichen Wurzeln.
 Nur `srvadmin` meldet sich per SSH an (`AllowUsers srvadmin` bleibt).
+
+---
+
+## 09 · Gemeinsame .NET-Runtime (für VibeVHS, FraktionPerfekt, Podium, ProfOMat)
+
+```powershell
+ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/09-dotnet-runtime.sh"
+```
+
+Installiert die ASP.NET-Core-Runtime 11.0 (`DOTNET_KANAL=11.0`) einmalig für alle .NET-Apps. Danach bauen die Kits framework-abhängig
+(Uploads rund 20 statt 70 MB) und `ausrollen.sh` prüft vor jeder Änderung, ob die nötige Runtime da ist (gemeinsames `liebler-dotnet.sh`).
+
+- **Quelle:** zuerst das signierte Ubuntu-Archiv (`aspnetcore-runtime-11.0`). Liefert Ubuntu 26.04 die Version nicht, bricht der Schritt
+  ohne Änderung ab und nennt die Optionen: `--backports` (Canonical-PPA `ppa:dotnet/backports`, bevorzugt) oder `--microsoft`
+  (Microsofts `dotnet-install.sh` nach `/usr/share/dotnet`, Notlösung). **Auf liebler (Ubuntu 26.04) war `--backports` nötig**
+  (eingerichtet am 23.11.2026, Runtime unter `/usr/lib/dotnet`); spätere Aufrufe ohne Option behalten diese Quelle. Meldet Launchpad
+  „503 Service Unavailable“, ist das ein vorübergehender Ausfall des PPA: einige Minuten warten, erneut starten (nichts wird halb installiert).
+- **Aktualisierung:** `dotnet-runtime-aktualisieren.timer` spielt nachts um 03:40 Patches ein und startet die .NET-Dienste nur bei einer
+  neuen Runtime-Version neu. Sicherheitspatches von .NET brauchen damit kein neues Ausrollen mehr.
+- **Prüfen:** Ausgabe von `dotnet --list-runtimes` am Ende; `systemctl list-timers dotnet-runtime-aktualisieren.timer`.
+- **Rückweg:** `09-zurueck.sh` (Timer aus, Runtime bleibt); `09-zurueck.sh --entfernen` löscht sie nur, wenn keine App in `/opt` mehr
+  framework-abhängig läuft – vorher die Apps mit `deploy.ps1 -MitRuntime` neu ausrollen.
+
+---
+
+## 10 · PostgreSQL (Umstellung von SQLite, 24.11.2026)
+
+`ssh -t liebler "sudo bash /tmp/vibevhs-kit/schritte/10-postgresql.sh"` – **vor** dem ersten Ausrollen einer Version mit PostgreSQL (auf liebler am 24.11.2026 noch als „Schritt 09“ gelaufen),
+danach `.\deploy\server\deploy.ps1 -DbNeu`.
+
+- Container `vibevhs-db` (`postgres:17`, `--restart unless-stopped`), nur `127.0.0.1:5441`, Daten im Docker-Volume `vibevhs-db`.
+- Zufälliges Passwort in `/etc/vibevhs/postgres.env` (root, 0600); die Verbindungszeichenfolge trägt das Skript in `/etc/vibevhs/vibevhs.env` ein.
+- `pg_dump`/`pg_restore` 17 auf dem Host (`postgresql-client-17`, notfalls aus apt.postgresql.org ⚑ prüfen), damit die Anwendung als
+  Benutzer `vibevhs` ohne Docker-Rechte sichern kann; das Skript prüft das zum Schluss mit einer Probe-Sicherung.
+- Beim ersten Start übernimmt die Anwendung die Kommentare aus `/var/lib/vibevhs/kommentare.db` in die Datenbank `vibevhs_kommentare`
+  und benennt die Datei in `kommentare.db.uebernommen` um. Die alte `vibevhs.db` bleibt liegen (nur Testdaten) und kann später weg.
+- Rückweg: `10-zurueck.sh` hält den Container an; eine ältere SQLite-Version mit `ausrollen.sh --zurueck` zurückholen.

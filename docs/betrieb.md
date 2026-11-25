@@ -3,7 +3,7 @@
 ## Datenbank
 
 PostgreSQL 17 (seit 24.11.2026, vorher SQLite). Entwicklung: `docker compose -f deploy/docker-compose.yml up -d` (Container `vibevhs-db-1`,
-`127.0.0.1:5441`, Verbindung in `appsettings.Development.json`). Testsystem: Container `vibevhs-db` (Schritt 09 in
+`127.0.0.1:5441`, Verbindung in `appsettings.Development.json`). Testsystem: Container `vibevhs-db` (Schritt 10 in
 `deploy/server/README-server.md`). Verbindung immer über `ConnectionStrings:VibeVHS`; die Kommentare liegen in der eigenen Datenbank
 `<haupt>_kommentare` (`ConnectionStrings:Kommentare` überschreibt das). Mandanten: je VHS eine eigene Datenbank (`Mandanten:<Kennung>:Datenbank`).
 

@@ -13,7 +13,7 @@ Stand: 21.11.2026 · Zielsystem heute: **Testsystem** `https://liebler.iui.hs-os
 ```mermaid
 flowchart LR
     subgraph Entwicklungsrechner [Entwicklungsrechner Windows, im VPN]
-        Q[Quellcode] -->|dotnet publish linux-x64<br/>self-contained| A[vibevhs.tar.gz]
+        Q[Quellcode] -->|dotnet publish linux-x64<br/>framework-abhängig| A[vibevhs.tar.gz]
         K[deploy/server = Kit] --> KT[vibevhs-kit.tar.gz]
     end
     A -->|scp| T1[/tmp/vibevhs.tar.gz/]
@@ -33,8 +33,9 @@ flowchart LR
 
 Kernpunkte:
 
-- **Gebaut wird auf dem Entwicklungsrechner**, nicht auf dem Server. `deploy.ps1` erzeugt einen *self-contained* Build für
-  linux-x64 – die .NET-Laufzeit steckt im Paket, auf dem Server ist **kein .NET installiert**.
+- **Gebaut wird auf dem Entwicklungsrechner**, nicht auf dem Server. `deploy.ps1` erzeugt einen *framework-abhängigen* Build für
+  linux-x64 – die .NET-Laufzeit liegt einmal gemeinsam für alle Apps auf dem Server (Schritt 09) und wird nachts aktualisiert;
+  mit `-MitRuntime` steckt sie wie früher im Paket (self-contained).
 - **Programm und Daten sind getrennt:** Das Programm liegt in `/opt/vibevhs` und wird bei jedem Update komplett ersetzt;
   Datenbank, Dokumente, Schlüssel, Logs und Sicherungen liegen woanders und bleiben stehen.
 - **Nach außen spricht nur nginx** (443, TLS mit dem Hochschulzertifikat, vorgeschaltetes Zugangspasswort). Die Anwendung lauscht
@@ -66,7 +67,7 @@ Kernpunkte:
 | Ubuntu (getestet: 26.04.1 LTS, x86_64, 2 CPU, 3,8 GiB RAM) | vorhanden |
 | Benutzer `srvadmin` mit sudo | vorhanden |
 | Pakete `nginx`, `ufw`, `apache2-utils` (htpasswd), `at`, `curl`, `ca-certificates`, `openssl`, `libicuNN` | Schritt 02 |
-| Docker (snap) mit Container `vibevhs-db` (`postgres:17`), `postgresql-client-17` (pg_dump/pg_restore) | Schritt 09 |
+| Docker (snap) mit Container `vibevhs-db` (`postgres:17`), `postgresql-client-17` (pg_dump/pg_restore) | Schritt 10 |
 | Hochschulzertifikat (GEANT TCS/HARICA) mit Kette und Schlüssel | Hochschul-IT; Schritt 03 legt es nach `/etc/ssl/liebler` |
 | Systemzeitzone `Europe/Berlin` | ist gesetzt (sonst zeigt VibeVHS UTC-Uhrzeiten, siehe Abschnitt 8) |
 
@@ -94,6 +95,8 @@ Das Kit kommt vorher mit `.\deploy\server\deploy.ps1 -NurKit` nach `/tmp/vibevhs
 | Ausrollen | Programm nach `/opt/vibevhs` (Abschnitt 6) | `ausrollen.sh --zurueck` |
 | 07 `firewall` | ufw ergänzen: 443/80 offen, 22 nur aus dem VPN, 1880 zu; automatischer Rückweg nach 10 min, falls man sich aussperrt | `07-zurueck.sh` |
 | 08 `certbot-aufraeumen` | Let's Encrypt/certbot entfernen (nach Rückfrage je Teil) | `08-zurueck.sh` |
+| 09 `dotnet-runtime` | gemeinsame ASP.NET-Core-Runtime 11.0 für alle .NET-Apps, nachts aktualisiert (`dotnet-runtime-aktualisieren.timer`) | `09-zurueck.sh` |
+| 10 `postgresql` | PostgreSQL 17 als Container `vibevhs-db` (nur 127.0.0.1:5441), pg_dump/pg_restore 17 auf dem Host | `10-zurueck.sh` |
 
 Schritt 03 nutzt ein **gemeinsames nginx-Schema** mit anderen Anwendungen auf demselben Server: `liebler.conf` enthält TLS und
 `include /etc/nginx/liebler.d/*.conf;`, jede Anwendung pflegt nur ihre eigene Datei darin. Ein erneuter Schritt 03 überschreibt
@@ -109,7 +112,7 @@ deshalb die Einträge anderer Anwendungen nicht.
 | `/opt/vibevhs.vorher/` | root | vorige Programmversion | wird zur Rückweg-Kopie |
 | `/opt/vibevhs.defekt/` | root | nach einem Rückweg: die verworfene Version (zur Analyse) | beim nächsten Rückweg überschrieben |
 | Container `vibevhs-db`, Volume `vibevhs-db` | root (Docker) | PostgreSQL 17: Datenbanken `vibevhs` (**Hauptdatenbank**) und `vibevhs_kommentare` (Kommentare zu Spezifikation und Doku) | `vibevhs` bleibt (außer `-DbNeu`: umbenannt in `vibevhs_alt_<Zeit>`), Kommentare bleiben **immer** |
-| `/etc/vibevhs/postgres.env` | root, 0600 | Passwort der Datenbank (Schritt 09) | bleibt |
+| `/etc/vibevhs/postgres.env` | root, 0600 | Passwort der Datenbank (Schritt 10) | bleibt |
 | `/var/lib/vibevhs/vibevhs.db`, `kommentare.db.uebernommen` | vibevhs | Altdateien aus der SQLite-Zeit (bis 23.11.2026) | können nach Prüfung weg |
 | `/var/lib/vibevhs/dokumente/` | vibevhs | Dokumentarchiv (Briefe, Bescheinigungen, Uploads) | bleibt |
 | `/var/lib/vibevhs/schluessel/` | vibevhs | ASP.NET-Data-Protection-Schlüssel (Anmelde-Cookies, Tokens) | bleibt – **nicht löschen**, sonst sind alle abgemeldet (und ggf. geschützte Links ungültig) |
@@ -156,7 +159,7 @@ ist **nur eine Vorlage** für den späteren Echtbetrieb und wird von `deploy.ps1
 |---|---|---|---|
 | `ASPNETCORE_ENVIRONMENT` | `Testsystem` | Unit | wählt `appsettings.Testsystem.json` |
 | `ASPNETCORE_URLS` | `http://127.0.0.1:5080` | Unit | nur lokal; nginx leitet weiter |
-| `ConnectionStrings__VibeVHS` | `Host=127.0.0.1;Port=5441;Database=vibevhs;Username=vibevhs;Password=…` | `vibevhs.env` (**Geheimnis**, Schritt 09) | Hauptdatenbank |
+| `ConnectionStrings__VibeVHS` | `Host=127.0.0.1;Port=5441;Database=vibevhs;Username=vibevhs;Password=…` | `vibevhs.env` (**Geheimnis**, Schritt 10) | Hauptdatenbank |
 | `ConnectionStrings__Kommentare` | (leer → Datenbank `vibevhs_kommentare` auf demselben Server) | – | Kommentar-Datenbank |
 | `Kommentare__Altdatei` | `/var/lib/vibevhs/kommentare.db` | Unit | alte Kommentare beim ersten Start einmal übernehmen |
 | `Sicherung__PgBin` | `/usr/lib/postgresql/17/bin` | Unit | pg_dump/pg_restore für Sicherung und Wiederherstellungstest |
@@ -202,7 +205,7 @@ Ein Update ist dasselbe wie das erste Ausrollen. Auf dem Entwicklungsrechner, im
 
 **Auf dem Entwicklungsrechner (`deploy.ps1`):**
 
-1. `dotnet publish src\VibeVHS.Web -c Release -r linux-x64 --self-contained true` nach `deploy\ausgabe\vibevhs`
+1. `dotnet publish src\VibeVHS.Web -c Release -r linux-x64 --self-contained false` nach `deploy\ausgabe\vibevhs` (`-MitRuntime`: `true`)
    (ohne PDB-Dateien), `appsettings.Development.json` wird entfernt, Ergebnis gepackt als `deploy\ausgabe\vibevhs.tar.gz`.
 2. Kit (`deploy/server`) packen und nach `/tmp/vibevhs-kit` hochladen (der Ordner wird jedes Mal sauber ersetzt).
 3. Archiv nach `/tmp/vibevhs.tar.gz` hochladen.
@@ -379,9 +382,9 @@ ist. Kurzprüfung: `zertifikat-ablauf --kurz`. Empfehlung: zusätzlich einen Che
 ### Sicherheitsupdates
 
 - **Betriebssystem:** `unattended-upgrades` ist auf dem Server aktiv (Sicherheitsupdates von Ubuntu, inkl. nginx, OpenSSL, ICU).
-- **.NET-Laufzeit:** steckt im self-contained Build und wird **nicht** vom Betriebssystem aktualisiert. Sicherheitsupdates von .NET
-  kommen nur mit einem neuen Ausrollen. Deshalb nach jedem .NET-Patchday (meist zweiter Dienstag im Monat) SDK auf dem
-  Entwicklungsrechner aktualisieren und neu ausrollen – auch ohne fachliche Änderung.
+- **.NET-Laufzeit:** gemeinsam für alle Apps auf dem Server (Schritt 09); `dotnet-runtime-aktualisieren.timer` spielt Patches nachts
+  ein und startet die Dienste nur bei neuer Version neu – kein neues Ausrollen nötig. Nur Pakete mit `-MitRuntime` (self-contained)
+  bleiben auf dem Stand ihres Builds.
 - NuGet-Pakete der Anwendung ebenso: Update im Repository, Tests, ausrollen.
 
 ### Firewall und Netz

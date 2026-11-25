@@ -1,0 +1,11 @@
+# Nachts 03:40 (nach den Sicherungen 01:30-02:00, außerhalb von Vorlesungen) - VibeVHS-Schritt 09
+[Unit]
+Description=ASP.NET-Core-Runtime nachts aktualisieren
+
+[Timer]
+OnCalendar=*-*-* 03:40:00
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

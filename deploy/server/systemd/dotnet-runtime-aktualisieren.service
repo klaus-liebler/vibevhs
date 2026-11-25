@@ -1,0 +1,9 @@
+# Gemeinsame .NET-Runtime aktualisieren (VibeVHS-Schritt 09 → /etc/systemd/system/dotnet-runtime-aktualisieren.service)
+[Unit]
+Description=ASP.NET-Core-Runtime aktualisieren und .NET-Dienste bei neuer Version neu starten
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/dotnet-runtime-aktualisieren.sh
