@@ -1,0 +1,983 @@
+{
+ "titel": "Eine turbulente Woche an der vhs",
+ "folien": [
+  {
+   "id": "titel",
+   "hintergrund": "hell",
+   "logo": "bilder/vibevhs-logo-hell.png",
+   "logo2": "bilder/logo-vhs-egs.png",
+   "eyebrow": "VibeVHS im Alltag",
+   "h1": "Eine turbulente Woche an der vhs",
+   "lead": "Fünf Tage am Tresen, im Büro und unterwegs – mit Volkshochschule Emsdetten Greven Saerbeck als Beispiel.",
+   "fuss": "Echte Bildschirmfotos der laufenden Anwendung · Teilnehmende und Kursleitungen sind erfunden",
+   "fuss_rechts": "[Datum · Vortragende/r]",
+   "notiz": "Wir begleiten das Team der vhs durch eine Woche. Alle Bilder sind echte Bildschirmfotos aus einem Testsystem. Die Namen der Mitarbeitenden stammen von der Teamseite der vhs, alle Teilnehmenden, Kursleitungen und Daten sind erfunden. Jedes Kapitel ist ein Tag – man kann Tage überspringen."
+  },
+  {
+   "id": "figuren",
+   "hintergrund": "hell",
+   "eyebrow": "Wer mitspielt",
+   "h2": "Das Team dieser Woche",
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "karten": [
+    {
+     "marke": "Leitung",
+     "titel": "Dr. Kai Lüken, Gisela Junkerkalefeld",
+     "text": "Leitung und stellvertretende Leitung"
+    },
+    {
+     "marke": "Fachbereiche",
+     "titel": "Varvara Schatz, Dr. Heike Steinhorst",
+     "text": "Programmplanung, Kursleitungen, Qualität"
+    },
+    {
+     "marke": "Verwaltung",
+     "titel": "Sonja Eickelkamp, Katja Friesen, Celine Wilken, Linda Lüke",
+     "text": "Verwaltungsleitung, Teilnehmerservice, Buchhaltung"
+    },
+    {
+     "marke": "Integration und IT",
+     "titel": "Sylvia Beckmann, Amy Behrla",
+     "text": "Integrationskurs-Team, IT und Digitale vhs"
+    }
+   ],
+   "lead": "Dazu erfundene Teilnehmende (u. a. Olena Kovalenko, Nadia Haddad, Sabine Weber) und Kursleitungen (u. a. Ruben Daubner).",
+   "notiz": "Die Rollen entsprechen den Zuständigkeiten auf der Teamseite; jede Rolle sieht in VibeVHS ihre eigenen Körbe und Rechte."
+  },
+  {
+   "id": "kapitel-montag",
+   "hintergrund": "tief",
+   "eyebrow": "Montag, 23. November",
+   "kapitel": "Volle Kurse, ein Doppelgänger und eine Absage",
+   "lead": "Der Tresen öffnet. Über Nacht hat VibeVHS schon gearbeitet – und bis zum Abend kommt einiges dazu.",
+   "szenen": [
+    "Was über Nacht passiert ist",
+    "Was liegen geblieben ist",
+    "Der Korb des Teams",
+    "Yoga ist ausgebucht",
+    "Warteliste statt Absage",
+    "Und was jetzt?",
+    "Gibt es Frau Kowalenko schon?",
+    "Anwesenheit im Integrationskurs",
+    "„Gesund kochen“ hat zu wenige Anmeldungen",
+    "Absagen – mit Grund",
+    "Abgesagt und benachrichtigt",
+    "Ein Platz wird frei",
+    "Nachrücken – automatisch",
+    "Die Absage im Postausgang",
+    "Ein Bildschirm für das Foyer",
+    "Wohin heute Abend?",
+    "Die Abendkurse laufen",
+    "Eine Anwesenheitsliste"
+   ],
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Kapitel Montag, 23. November: Der Tresen öffnet. Über Nacht hat VibeVHS schon gearbeitet – und bis zum Abend kommt einiges dazu. Zum Überspringen bis zum nächsten Kapiteltrenner weiterklicken."
+  },
+  {
+   "id": "mo-0730-start",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 7:30 · Verwaltungsleitung · Sonja Eickelkamp",
+   "h2": "Was über Nacht passiert ist",
+   "text": "Die Startseite fasst zusammen, was die Automatik erledigt hat: Mahnvorschläge, Lastschriftlauf, Honorarentwürfe, festgeschriebene Belege. Was eine Freigabe braucht, ist als „Prüfung nötig“ markiert.",
+   "bild": "bilder/mo-0730-start.jpg",
+   "bereiche": [
+    "Startseite",
+    "Automatik",
+    "Protokoll"
+   ],
+   "gewinn": {
+    "marke": "Für die Verwaltung",
+    "satz": "Der Tag beginnt mit einer Liste, nicht mit einer Suche."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Jeder automatische Schritt steht mit Uhrzeit im Protokoll. Gleichartige Schritte werden zusammengefasst, damit die Startseite lesbar bleibt."
+  },
+  {
+   "id": "mo-0740-leitung",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 7:40 · Leitung · Dr. Kai Lüken",
+   "h2": "Was liegen geblieben ist",
+   "text": "Die Leitung sieht, welche Aufgaben in den Körben überfällig sind und an sie eskaliert wurden – mit Grund und Fälligkeit. Übernehmen oder zuweisen geht mit einem Klick.",
+   "bild": "bilder/mo-0740-leitung.jpg",
+   "bereiche": [
+    "Aufgaben",
+    "Eskalation"
+   ],
+   "gewinn": {
+    "marke": "Für die Leitung",
+    "satz": "Nichts versandet: Was liegen bleibt, landet automatisch auf dem richtigen Tisch."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Eskalationsfristen stellt die Verwaltung je Aufgabenart ein (Aufgaben → Regeln)."
+  },
+  {
+   "id": "mo-0745-ik-korb",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 7:45 · Integrationskurs-Team · Sylvia Beckmann",
+   "h2": "Der Korb des Teams",
+   "text": "Zwei Integrationskurse warten auf die Kursbeginn-Meldung ans BAMF, eine Ausweiskontrolle ist offen, eine Raumzulassung läuft ab. Jede Karte sagt, was zu tun ist.",
+   "bild": "bilder/mo-0745-ik-korb.jpg",
+   "bereiche": [
+    "Aufgaben",
+    "Integrationskurse"
+   ],
+   "gewinn": {
+    "marke": "Für das Team",
+    "satz": "Der Gruppenkorb ersetzt Post-its und Zurufe – mit Vertretung bei Urlaub."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Aufgaben entstehen aus Regeln und schließen sich selbst, wenn die Ursache behoben ist."
+  },
+  {
+   "id": "mo-0830-yoga-voll",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 8:30 · Teilnehmerservice · Katja Friesen",
+   "h2": "Yoga ist ausgebucht",
+   "text": "Nadia Haddad möchte zu „Yoga am Abend“. Schon in der Kursauswahl steht: 16 von 16 Plätzen belegt, drei warten.",
+   "bild": "bilder/mo-0830-yoga-voll.jpg",
+   "bereiche": [
+    "Anmeldung am Tresen"
+   ],
+   "gewinn": {
+    "marke": "Für die Teilnehmenden",
+    "satz": "Eine ehrliche Auskunft in Sekunden – noch am Tresen."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Die Buchungsprüfung zeigt bei jedem Kurs, ob und warum er buchbar ist."
+  },
+  {
+   "id": "mo-0831-zahlung",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 8:31 · Teilnehmerservice",
+   "h2": "Warteliste statt Absage",
+   "text": "VibeVHS schlägt die Warteliste vor (Platz 4). Wer darf, kann bewusst überbuchen – das wird protokolliert. Das Entgelt ist gesperrt und erklärt, warum.",
+   "bild": "bilder/mo-0831-zahlung.jpg",
+   "bereiche": [
+    "Anmeldung",
+    "Warteliste"
+   ],
+   "gewinn": {
+    "marke": "Für die Verwaltung",
+    "satz": "Ausnahmen sind möglich, aber nie unbemerkt."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Gesperrte Felder erklären per Tooltip, warum sie nicht änderbar sind."
+  },
+  {
+   "id": "mo-0832-warteliste",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 8:32 · Teilnehmerservice",
+   "h2": "Und was jetzt?",
+   "text": "Gespeichert und protokolliert. „Wie geht es weiter?“ bietet die sinnvollen Folgeschritte an: Bestätigung ansehen, weitere Anmeldung, zur Person, zum Kurs.",
+   "bild": "bilder/mo-0832-warteliste.jpg",
+   "bereiche": [
+    "Folgeschritte"
+   ],
+   "gewinn": {
+    "marke": "Für die Verwaltung",
+    "satz": "Nach jedem Schritt der nächste – ohne Suchen im Menü."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Frau Haddad hat keine E-Mail-Adresse; VibeVHS weist darauf hin, die Bestätigung auszudrucken."
+  },
+  {
+   "id": "mo-0930-dublette",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 9:30 · Teilnehmerservice",
+   "h2": "Gibt es Frau Kowalenko schon?",
+   "text": "Eine Teilnehmerin soll neu angelegt werden. Mit dem Geburtsdatum erkennt VibeVHS: Olena Kovalenko gibt es schon – ein Buchstabe Unterschied.",
+   "bild": "bilder/mo-0930-dublette.jpg",
+   "bereiche": [
+    "Personen",
+    "Dubletten"
+   ],
+   "gewinn": {
+    "marke": "Für die Verwaltung",
+    "satz": "Keine doppelten Personen, keine doppelten Mahnungen."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Speichern ist erst möglich, wenn bestätigt ist, dass es eine andere Person ist. Schreibweisen wie Yilmaz/Yılmaz gelten als gleich."
+  },
+  {
+   "id": "mo-0935-ik-anwesenheit",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 9:35 · Integrationskurs-Team · Sylvia Beckmann",
+   "h2": "Anwesenheit im Integrationskurs",
+   "text": "Im Integrationskurs ist die Anwesenheit abrechnungsrelevant. Selbst-Check-ins werden bestätigt, Minuten und Unterrichtseinheiten je Person gezählt.",
+   "bild": "bilder/mo-0935-ik-anwesenheit.jpg",
+   "bereiche": [
+    "Anwesenheit",
+    "Integrationskurse"
+   ],
+   "gewinn": {
+    "marke": "Für das Team",
+    "satz": "Die BAMF-Abrechnung stimmt, weil die Liste stimmt."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Beim Sichtvergleich mit dem Lichtbild kann „Zweifel“ vermerkt werden; dann ist die Anwesenheit vorläufig und es entsteht eine Aufgabe Ausweiskontrolle."
+  },
+  {
+   "id": "mo-1030-kochen",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 10:30 · Fachbereichsleitung · Varvara Schatz",
+   "h2": "„Gesund kochen“ hat zu wenige Anmeldungen",
+   "text": "Am Donnerstag sollte der Kochkurs starten. Die Mindestteilnehmerzahl ist nicht erreicht.",
+   "bild": "bilder/mo-1030-kochen.jpg",
+   "bereiche": [
+    "Kurse",
+    "Mindestteilnehmerzahl"
+   ],
+   "gewinn": {
+    "marke": "Für die Fachbereiche",
+    "satz": "Die Entscheidung fällt rechtzeitig, nicht am Abend in der Lehrküche."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Die Aufgabe „absagen oder durchführen?“ entsteht automatisch vor Kursbeginn."
+  },
+  {
+   "id": "mo-1032-absage",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 10:32 · Fachbereichsleitung",
+   "h2": "Absagen – mit Grund",
+   "text": "Die Bestätigung nennt, wie viele Personen und Termine betroffen sind. Ohne Grund bleibt der Knopf gesperrt – der Grund steht in der Absage.",
+   "bild": "bilder/mo-1032-absage.jpg",
+   "bereiche": [
+    "Kurse",
+    "Absage"
+   ],
+   "gewinn": {
+    "marke": "Für die Teilnehmenden",
+    "satz": "Alle erfahren es sofort und mit Begründung."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Offene Belegungen werden ohne Gebühr aufgehoben, Rechnungen im nächsten Lauf storniert."
+  },
+  {
+   "id": "mo-1033-abgesagt",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 10:33 · Fachbereichsleitung",
+   "h2": "Abgesagt und benachrichtigt",
+   "text": "Der Kurs ist abgesagt, die künftigen Termine fallen aus, die Lehrküche ist wieder frei. Die Absagen liegen im Postausgang.",
+   "bild": "bilder/mo-1033-abgesagt.jpg",
+   "bereiche": [
+    "Kurse",
+    "Postausgang"
+   ],
+   "gewinn": {
+    "marke": "Für die Verwaltung",
+    "satz": "Ein Klick statt zwölf Telefonate."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Die Absage lässt sich nicht zurücknehmen – darauf weist die Bestätigung hin."
+  },
+  {
+   "id": "mo-1130-abmelden",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 11:30 · Teilnehmerservice · Katja Friesen",
+   "h2": "Ein Platz wird frei",
+   "text": "Zoé Hannecker zieht nach Münster und meldet sich von Yoga ab. Der Grund kommt in die Belegung.",
+   "bild": "bilder/mo-1130-abmelden.jpg",
+   "bereiche": [
+    "Belegung",
+    "Abmeldung"
+   ],
+   "gewinn": {
+    "marke": "Für die Teilnehmenden",
+    "satz": "Abmelden geht am Telefon in einer Minute."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Abmeldebedingungen und Gebühren richtet VibeVHS nach den Geschäftsbedingungen."
+  },
+  {
+   "id": "mo-1131-nachruecken",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 11:31 · Teilnehmerservice",
+   "h2": "Nachrücken – automatisch",
+   "text": "Sabine Weber, Platz 1 der Warteliste, bekommt sofort ein Nachrückangebot mit Frist.",
+   "bild": "bilder/mo-1131-nachruecken.jpg",
+   "bereiche": [
+    "Warteliste",
+    "Postausgang"
+   ],
+   "gewinn": {
+    "marke": "Für die Teilnehmenden",
+    "satz": "Wer wartet, ist zuerst dran – fair und ohne Liste auf Papier."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Läuft die Frist ab, geht das Angebot an die nächste Person."
+  },
+  {
+   "id": "mo-1135-mail-absage",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 11:35 · Teilnehmerservice",
+   "h2": "Die Absage im Postausgang",
+   "text": "Jede Mail an Teilnehmende enthält einen Link zur Übersetzung in die gewünschte Sprache. Im Testsystem verlässt nichts das Haus.",
+   "bild": "bilder/mo-1135-mail-absage.jpg",
+   "bereiche": [
+    "Postausgang",
+    "Mehrsprachigkeit"
+   ],
+   "gewinn": {
+    "marke": "Für die Teilnehmenden",
+    "satz": "Verstanden werden, auch ohne Deutschkenntnisse."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Mails und Schnittstellenaufrufe stehen mit vollem Text im Postausgang; jede Zustellung im Protokoll."
+  },
+  {
+   "id": "mo-1730-monitore",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 17:30 · IT · Amy Behrla",
+   "h2": "Ein Bildschirm für das Foyer",
+   "text": "Bevor die Abendkurse beginnen, richtet Amy Behrla einen Info-Monitor ein. Die geheime Adresse erscheint nur einmal; ein Fernseher mit Browser genügt.",
+   "bild": "bilder/mo-1730-monitore.jpg",
+   "bereiche": [
+    "Info-Monitore"
+   ],
+   "gewinn": {
+    "marke": "Für die IT",
+    "satz": "Kein eigenes Digital-Signage-System nötig."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Geht die Adresse verloren, wird eine neue erzeugt; die alte lässt sich sperren."
+  },
+  {
+   "id": "mo-1825-monitor",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 18:25 · Foyer",
+   "h2": "Wohin heute Abend?",
+   "text": "Der Monitor zeigt die Kurse der nächsten Stunden mit Raum – Raumänderungen und Ausfälle hervorgehoben, ohne Namen von Teilnehmenden.",
+   "bild": "bilder/mo-1825-monitor.jpg",
+   "bereiche": [
+    "Info-Monitore"
+   ],
+   "gewinn": {
+    "marke": "Für die Teilnehmenden",
+    "satz": "Der richtige Raum, ohne am Tresen zu fragen."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "mo-1830-anwesenheit",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 18:30 · Abenddienst · Katja Friesen",
+   "h2": "Die Abendkurse laufen",
+   "text": "Acht Veranstaltungen heute. Die Kursleitungen erfassen die Anwesenheit selbst, Teilnehmende checken per QR-Code ein.",
+   "bild": "bilder/mo-1830-anwesenheit.jpg",
+   "bereiche": [
+    "Anwesenheit",
+    "Check-in"
+   ],
+   "gewinn": {
+    "marke": "Für die Kursleitungen",
+    "satz": "Keine Papierlisten, die am Monatsende abgetippt werden."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Für Integrationskurse ist die Anwesenheit abrechnungsrelevant; dort bestätigt die Kursleitung den Selbst-Check-in."
+  },
+  {
+   "id": "mo-1832-liste",
+   "hintergrund": "hell",
+   "eyebrow": "Montag 18:32 · Abenddienst",
+   "h2": "Eine Anwesenheitsliste",
+   "text": "Wer ist da, wer hat sich entschuldigt? Die Liste rechnet Minuten und Unterrichtseinheiten und wird am Ende abgeschlossen.",
+   "bild": "bilder/mo-1832-liste.jpg",
+   "bereiche": [
+    "Anwesenheit"
+   ],
+   "gewinn": {
+    "marke": "Für die Teilnehmenden",
+    "satz": "Die Bescheinigung stimmt – weil die Liste stimmt."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Nach dem Abschluss sind Änderungen Nacherfassungen mit Grund."
+  },
+  {
+   "id": "kapitel-dienstag",
+   "hintergrund": "tief",
+   "eyebrow": "Dienstag, 24. November",
+   "kapitel": "BAMF, Lehrfreigabe und ein Krankheitsfall",
+   "lead": "Integrationskurse brauchen Nachweise, ein Sprachkurs eine Lehrfreigabe – und Herr Daubner wird krank.",
+   "szenen": [
+    "Die erste Nacht",
+    "Kursbeginn melden? Noch nicht.",
+    "Spanisch – aber nur Italienisch freigegeben",
+    "Eine Ausnahme – begründet",
+    "Ausnahme erteilt",
+    "Ausfall melden vom Handy",
+    "Gemeldet",
+    "Anliegen der Kursleitungen",
+    "Der Ausfall im Detail",
+    "Zur Kenntnis genommen"
+   ],
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Kapitel Dienstag, 24. November: Integrationskurse brauchen Nachweise, ein Sprachkurs eine Lehrfreigabe – und Herr Daubner wird krank. Zum Überspringen bis zum nächsten Kapiteltrenner weiterklicken."
+  },
+  {
+   "id": "di-0830-start",
+   "hintergrund": "hell",
+   "eyebrow": "Dienstag 8:30 · Verwaltungsleitung · Sonja Eickelkamp",
+   "h2": "Die erste Nacht",
+   "text": "Die Automatik ist durchgelaufen: Erinnerungen vor Kursbeginn, Aufgaben, Rechnungen. Alles steht auf der Startseite.",
+   "bild": "bilder/di-0830-start.jpg",
+   "bereiche": [
+    "Startseite",
+    "Automatik"
+   ],
+   "gewinn": {
+    "marke": "Für die Verwaltung",
+    "satz": "Routine läuft von selbst – und ist trotzdem dokumentiert."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Im Betrieb laufen die Routinen nachts, stündlich und morgens; im Testsystem nach Spielzeit."
+  },
+  {
+   "id": "di-0840-ik",
+   "hintergrund": "hell",
+   "eyebrow": "Dienstag 8:40 · Integrationskurs-Team · Sylvia Beckmann",
+   "h2": "Kursbeginn melden? Noch nicht.",
+   "text": "„Kursbeginn an das BAMF melden“ ist gesperrt. Der Hinweis nennt die Personen, deren Ausweisprüfung fehlt.",
+   "bild": "bilder/di-0840-ik.jpg",
+   "bereiche": [
+    "Integrationskurse",
+    "BAMF"
+   ],
+   "gewinn": {
+    "marke": "Für das Team",
+    "satz": "Gesperrte Knöpfe sagen, was fehlt – und wo."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Ausweise werden im Original geprüft, nie kopiert; Lichtbilder nur für den Sichtvergleich, mit Löschfrist."
+  },
+  {
+   "id": "di-1030-lehrfreigabe",
+   "hintergrund": "hell",
+   "eyebrow": "Dienstag 10:30 · Fachbereichsleitung · Dr. Heike Steinhorst",
+   "h2": "Spanisch – aber nur Italienisch freigegeben",
+   "text": "Nathanael Roloff soll ab Mittwoch Spanisch unterrichten, hat aber nur die Lehrfreigabe für Italienisch. VibeVHS zeigt es am Kurs.",
+   "bild": "bilder/di-1030-lehrfreigabe.jpg",
+   "bereiche": [
+    "Kurse",
+    "Qualifikationen"
+   ],
+   "gewinn": {
+    "marke": "Für die Fachbereiche",
+    "satz": "Qualität wird geprüft, bevor die erste Stunde beginnt."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Ab dem ersten betroffenen Termin steht „nicht geeignet“ am Kurs; die Aufgabe dazu war schon an die Leitung eskaliert."
+  },
+  {
+   "id": "di-1032-ausnahme",
+   "hintergrund": "hell",
+   "eyebrow": "Dienstag 10:32 · Fachbereichsleitung",
+   "h2": "Eine Ausnahme – begründet",
+   "text": "Frau Steinhorst weiß: Herr Roloff spricht fließend Spanisch, die Eignungsprüfung steht an. „Ausnahme erteilen“ wird erst klickbar, wenn eine Begründung dasteht.",
+   "bild": "bilder/di-1032-ausnahme.jpg",
+   "bereiche": [
+    "Kurse",
+    "Ausnahmen"
+   ],
+   "gewinn": {
+    "marke": "Für die Fachbereiche",
+    "satz": "Menschen entscheiden – das System sorgt dafür, dass es dokumentiert ist."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Ausnahmen darf nur die Fachbereichsleitung erteilen; der Grund steht im Protokoll und in der Datenhistorie."
+  },
+  {
+   "id": "di-1033-ausnahme-erteilt",
+   "hintergrund": "hell",
+   "eyebrow": "Dienstag 10:33 · Fachbereichsleitung",
+   "h2": "Ausnahme erteilt",
+   "text": "Der Kurs kann am Mittwoch stattfinden. Die eskalierte Aufgabe schließt sich von selbst.",
+   "bild": "bilder/di-1033-ausnahme-erteilt.jpg",
+   "bereiche": [
+    "Kurse",
+    "Aufgaben"
+   ],
+   "gewinn": {
+    "marke": "Für die Teilnehmenden",
+    "satz": "Der Spanischkurs fällt nicht aus."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "di-1130-ausfall-app",
+   "hintergrund": "hell",
+   "eyebrow": "Dienstag 11:30 · Kursleitung · Ruben Daubner",
+   "h2": "Ausfall melden vom Handy",
+   "text": "Herr Daubner ist krank. Im Dozierendenportal meldet er den Ausfall für Mittwoch – mit Grund.",
+   "bild": "bilder/di-1130-ausfall-app.jpg",
+   "bereiche": [
+    "Dozierendenportal"
+   ],
+   "gewinn": {
+    "marke": "Für die Kursleitungen",
+    "satz": "Kein Anruf auf dem Anrufbeantworter um 7 Uhr."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Das Portal ist eine Web-App ohne App-Store; Anmeldung per Link."
+  },
+  {
+   "id": "di-1131-ausfall-gemeldet",
+   "hintergrund": "hell",
+   "eyebrow": "Dienstag 11:31 · Kursleitung",
+   "h2": "Gemeldet",
+   "text": "Die Meldung geht als Anliegen an die Verwaltung. Herr Daubner sieht den Stand.",
+   "bild": "bilder/di-1131-ausfall-gemeldet.jpg",
+   "bereiche": [
+    "Dozierendenportal"
+   ],
+   "gewinn": {
+    "marke": "Für die Kursleitungen",
+    "satz": "Gemeldet heißt angekommen."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "di-1140-anliegen",
+   "hintergrund": "hell",
+   "eyebrow": "Dienstag 11:40 · Verwaltungsleitung · Sonja Eickelkamp",
+   "h2": "Anliegen der Kursleitungen",
+   "text": "Ausfälle, Bankverbindungen, Nachweise: Was Kursleitungen im Portal melden, landet hier – und als Aufgabe im Korb.",
+   "bild": "bilder/di-1140-anliegen.jpg",
+   "bereiche": [
+    "Anliegen"
+   ],
+   "gewinn": {
+    "marke": "Für die Verwaltung",
+    "satz": "Eine Stelle für alles, was Kursleitungen melden."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "di-1141-anliegen-detail",
+   "hintergrund": "hell",
+   "eyebrow": "Dienstag 11:41 · Verwaltungsleitung",
+   "h2": "Der Ausfall im Detail",
+   "text": "Kurs, Termin, Grund und wer betroffen ist – auf einen Blick.",
+   "bild": "bilder/di-1141-anliegen-detail.jpg",
+   "bereiche": [
+    "Anliegen",
+    "Termine"
+   ],
+   "gewinn": {
+    "marke": "Für die Teilnehmenden",
+    "satz": "Niemand steht vor verschlossener Tür."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "di-1142-kenntnis",
+   "hintergrund": "hell",
+   "eyebrow": "Dienstag 11:42 · Verwaltungsleitung",
+   "h2": "Zur Kenntnis genommen",
+   "text": "Die Entscheidung ist dokumentiert; Herr Daubner sieht sie im Portal.",
+   "bild": "bilder/di-1142-kenntnis.jpg",
+   "bereiche": [
+    "Anliegen",
+    "Protokoll"
+   ],
+   "gewinn": {
+    "marke": "Für die Kursleitungen",
+    "satz": "Rückmeldung ohne Telefonkette."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "kapitel-mittwoch",
+   "hintergrund": "tief",
+   "eyebrow": "Mittwoch, 25. November",
+   "kapitel": "Geld, das ankommt – und Geld, das fehlt",
+   "lead": "Linda Lüke bringt die Finanzen in Ordnung: Kontoauszug, Mahnungen, Honorare. Abends bucht eine Teilnehmerin selbst.",
+   "szenen": [
+    "Was ist zu tun?",
+    "Der Kontoauszug ordnet sich fast selbst",
+    "Vorschlag gebucht",
+    "Mahnungen mit Augenmaß",
+    "Freigegeben",
+    "Honorare",
+    "Meine vhs auf dem Handy",
+    "Selbst buchen"
+   ],
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Kapitel Mittwoch, 25. November: Linda Lüke bringt die Finanzen in Ordnung: Kontoauszug, Mahnungen, Honorare. Abends bucht eine Teilnehmerin selbst. Zum Überspringen bis zum nächsten Kapiteltrenner weiterklicken."
+  },
+  {
+   "id": "mi-0830-finanzen",
+   "hintergrund": "hell",
+   "eyebrow": "Mittwoch 8:30 · Buchhaltung · Linda Lüke",
+   "h2": "Was ist zu tun?",
+   "text": "Offene Forderungen, Überfälliges, Honorare, Belege – und eine Liste der nächsten Schritte.",
+   "bild": "bilder/mi-0830-finanzen.jpg",
+   "bereiche": [
+    "Finanzen"
+   ],
+   "gewinn": {
+    "marke": "Für die Buchhaltung",
+    "satz": "Der Überblick, bevor die erste Excel-Datei geöffnet ist."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Belege werden nach GoBD festgeschrieben: lückenlos nummeriert, Storno statt Änderung."
+  },
+  {
+   "id": "mi-0840-kontoauszug",
+   "hintergrund": "hell",
+   "eyebrow": "Mittwoch 8:40 · Buchhaltung",
+   "h2": "Der Kontoauszug ordnet sich fast selbst",
+   "text": "Eindeutige Zahlungen sind schon gebucht. Bei zweien passt der Betrag nicht genau – VibeVHS macht einen Vorschlag.",
+   "bild": "bilder/mi-0840-kontoauszug.jpg",
+   "bereiche": [
+    "Kontoauszüge",
+    "camt.053"
+   ],
+   "gewinn": {
+    "marke": "Für die Buchhaltung",
+    "satz": "Nur die unklaren Fälle brauchen einen Menschen."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Doppelt eingelesene Auszüge werden erkannt (Prüfsumme und Auszugs-ID)."
+  },
+  {
+   "id": "mi-0845-gebucht",
+   "hintergrund": "hell",
+   "eyebrow": "Mittwoch 8:45 · Buchhaltung",
+   "h2": "Vorschlag gebucht",
+   "text": "Ein Klick bestätigt den Vorschlag. Rücklastschriften erscheinen mit Grund und lösen eine Aufgabe aus.",
+   "bild": "bilder/mi-0845-gebucht.jpg",
+   "bereiche": [
+    "Kontoauszüge"
+   ],
+   "gewinn": {
+    "marke": "Für die Buchhaltung",
+    "satz": "Weniger Abgleich, mehr Überblick."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "mi-0900-mahnung",
+   "hintergrund": "hell",
+   "eyebrow": "Mittwoch 9:00 · Buchhaltung",
+   "h2": "Mahnungen mit Augenmaß",
+   "text": "Der Mahnvorschlag nennt Rechnung, Stufe und Gebühr. Einzelne Posten lassen sich ausschließen; Rechnungen im laufenden Lastschrifteinzug werden nie gemahnt.",
+   "bild": "bilder/mi-0900-mahnung.jpg",
+   "bereiche": [
+    "Mahnwesen"
+   ],
+   "gewinn": {
+    "marke": "Für die Teilnehmenden",
+    "satz": "Erst eine freundliche Erinnerung, dann die Mahnung."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "mi-0901-gemahnt",
+   "hintergrund": "hell",
+   "eyebrow": "Mittwoch 9:01 · Buchhaltung",
+   "h2": "Freigegeben",
+   "text": "Die Zahlungserinnerungen gehen mit Übersetzungslink in den Postausgang.",
+   "bild": "bilder/mi-0901-gemahnt.jpg",
+   "bereiche": [
+    "Mahnwesen",
+    "Postausgang"
+   ],
+   "gewinn": {
+    "marke": "Für die Buchhaltung",
+    "satz": "Vorschlag von der Automatik, Entscheidung vom Menschen."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "mi-0930-honorar",
+   "hintergrund": "hell",
+   "eyebrow": "Mittwoch 9:30 · Buchhaltung",
+   "h2": "Honorare",
+   "text": "Aus den stattgefundenen Terminen entstehen Honorarentwürfe je Kursleitung – nach dem Honorarmodell des Vertrags.",
+   "bild": "bilder/mi-0930-honorar.jpg",
+   "bereiche": [
+    "Honorare"
+   ],
+   "gewinn": {
+    "marke": "Für die Kursleitungen",
+    "satz": "Pünktlich und nachvollziehbar abgerechnet."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Bereits abgerechnete Termine werden nie doppelt berechnet."
+  },
+  {
+   "id": "mi-1730-portal",
+   "hintergrund": "hell",
+   "eyebrow": "Mittwoch 17:30 · Teilnehmerin · Olena Kovalenko",
+   "h2": "Meine vhs auf dem Handy",
+   "text": "Olena Kovalenko sieht ihre nächsten Termine, checkt per Link ein und hat ihren Ausweis immer dabei.",
+   "bild": "bilder/mi-1730-portal.jpg",
+   "bereiche": [
+    "Teilnehmendenportal"
+   ],
+   "gewinn": {
+    "marke": "Für die Teilnehmenden",
+    "satz": "Alles zur vhs an einem Ort – ohne Konto-Passwort."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "mi-1735-buchen",
+   "hintergrund": "hell",
+   "eyebrow": "Mittwoch 17:35 · Teilnehmerin",
+   "h2": "Selbst buchen",
+   "text": "Mit Kursnummer oder Suche bucht sie selbst – auch für ihren Sohn Taras, für den sie eine Vollmacht hat.",
+   "bild": "bilder/mi-1735-buchen.jpg",
+   "bereiche": [
+    "Teilnehmendenportal",
+    "Vollmachten"
+   ],
+   "gewinn": {
+    "marke": "Für die Teilnehmenden",
+    "satz": "Weniger Schlange am Tresen."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "kapitel-donnerstag",
+   "hintergrund": "tief",
+   "eyebrow": "Donnerstag, 26. November",
+   "kapitel": "Planen, bescheinigen, schützen",
+   "lead": "Das Frühjahrsprogramm wächst, eine Teilnehmerin braucht eine Bescheinigung, und der Datenschutz räumt auf.",
+   "szenen": [
+    "Ein Kurs für das Frühjahr",
+    "Eine Bescheinigung, bitte",
+    "Datenschutz mit vier Augen"
+   ],
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Kapitel Donnerstag, 26. November: Das Frühjahrsprogramm wächst, eine Teilnehmerin braucht eine Bescheinigung, und der Datenschutz räumt auf. Zum Überspringen bis zum nächsten Kapiteltrenner weiterklicken."
+  },
+  {
+   "id": "do-0900-kurs-neu",
+   "hintergrund": "hell",
+   "eyebrow": "Donnerstag 9:30 · Fachbereichsleitung · Dr. Heike Steinhorst",
+   "h2": "Ein Kurs für das Frühjahr",
+   "text": "Spanisch A2 soll weitergehen. Die Kursart verlangt eine Lehrfreigabe für Spanisch: Herr Roloff erscheint mit Warnzeichen. Termine, Ferien und Räume rechnet die Vorschau, sobald eine geeignete Kursleitung gewählt ist.",
+   "bild": "bilder/do-0900-kurs-neu.jpg",
+   "bereiche": [
+    "Kurs anlegen",
+    "Qualifikationen"
+   ],
+   "gewinn": {
+    "marke": "Für die Fachbereiche",
+    "satz": "Planen mit Leitplanken statt mit Bauchgefühl."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Die Vorschau zeigt jeden Termin, ausgelassene Ferien und Feiertage und Raumkonflikte, bevor gespeichert wird."
+  },
+  {
+   "id": "do-1100-person",
+   "hintergrund": "hell",
+   "eyebrow": "Donnerstag 11:30 · Teilnehmerservice · Celine Wilken",
+   "h2": "Eine Bescheinigung, bitte",
+   "text": "Olena Kovalenko braucht ihre Teilnahmebescheinigung für das Jobcenter. Der Nachdruck ist das archivierte Original – mit QR-Code „Translate this letter in your language“.",
+   "bild": "bilder/do-1100-person.jpg",
+   "bereiche": [
+    "Personen",
+    "Bescheinigungen"
+   ],
+   "gewinn": {
+    "marke": "Für die Teilnehmenden",
+    "satz": "In zwei Minuten am Tresen ausgedruckt."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Jedes Dokument liegt mit Prüfsumme (SHA-256) im Archiv."
+  },
+  {
+   "id": "do-1400-datenschutz",
+   "hintergrund": "hell",
+   "eyebrow": "Donnerstag 14:30 · Stellv. Leitung · Gisela Junkerkalefeld",
+   "h2": "Datenschutz mit vier Augen",
+   "text": "Wer lange nicht mehr da war, wird nach Frist anonymisiert. Der Löschlauf braucht zwei Freigaben.",
+   "bild": "bilder/do-1400-datenschutz.jpg",
+   "bereiche": [
+    "Datenschutz"
+   ],
+   "gewinn": {
+    "marke": "Für alle",
+    "satz": "DSGVO nicht als Projekt, sondern als Routine."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Exporte und Zugriffe auf gesperrte Personen werden protokolliert."
+  },
+  {
+   "id": "kapitel-freitag",
+   "hintergrund": "tief",
+   "eyebrow": "Freitag, 27. November",
+   "kapitel": "Rückblick und Ausblick",
+   "lead": "Die Leitung schaut auf die Zahlen, die IT auf den Betrieb – und das Protokoll erzählt die ganze Woche.",
+   "szenen": [
+    "Wie war die Woche?",
+    "Das Dashboard",
+    "Auswertungen",
+    "Der Betrieb",
+    "Die nächste Woche kündigt sich an",
+    "Das Protokoll der Woche",
+    "Hilfe und geführte Touren"
+   ],
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": "Kapitel Freitag, 27. November: Die Leitung schaut auf die Zahlen, die IT auf den Betrieb – und das Protokoll erzählt die ganze Woche. Zum Überspringen bis zum nächsten Kapiteltrenner weiterklicken."
+  },
+  {
+   "id": "fr-0800-leitung",
+   "hintergrund": "hell",
+   "eyebrow": "Freitag 8:30 · Leitung · Dr. Kai Lüken",
+   "h2": "Wie war die Woche?",
+   "text": "Die Körbe sind leerer als am Montag. Was noch offen ist, steht oben.",
+   "bild": "bilder/fr-0800-leitung.jpg",
+   "bereiche": [
+    "Startseite",
+    "Aufgaben"
+   ],
+   "gewinn": {
+    "marke": "Für die Leitung",
+    "satz": "Führen mit Überblick statt mit Rundmails."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "fr-0900-dashboard",
+   "hintergrund": "hell",
+   "eyebrow": "Freitag 8:45 · Leitung",
+   "h2": "Das Dashboard",
+   "text": "Anmeldungen, Auslastung, Umsatz – gerechnet aus den echten Daten, jederzeit aktuell.",
+   "bild": "bilder/fr-0900-dashboard.jpg",
+   "bereiche": [
+    "Dashboard"
+   ],
+   "gewinn": {
+    "marke": "Für die Leitung",
+    "satz": "Zahlen, wenn man sie braucht – nicht erst zum Jahresbericht."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "fr-1000-auswertung",
+   "hintergrund": "hell",
+   "eyebrow": "Freitag 9:00 · Leitung",
+   "h2": "Auswertungen",
+   "text": "Kursliste, Auslastung, Statistik für den Landesverband. Jeder Export wird protokolliert.",
+   "bild": "bilder/fr-1000-auswertung.jpg",
+   "bereiche": [
+    "Auswertungen",
+    "Statistik"
+   ],
+   "gewinn": {
+    "marke": "Für die Leitung",
+    "satz": "Die Volkshochschulstatistik auf Knopfdruck."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "fr-1100-betrieb",
+   "hintergrund": "hell",
+   "eyebrow": "Freitag 11:30 · IT · Amy Behrla",
+   "h2": "Der Betrieb",
+   "text": "Sicherung, Schnittstellen, Zeitpläne der Automatik: alles auf einer Seite.",
+   "bild": "bilder/fr-1100-betrieb.jpg",
+   "bereiche": [
+    "Betrieb"
+   ],
+   "gewinn": {
+    "marke": "Für die IT",
+    "satz": "Selbst betrieben, im kommunalen Rechenzentrum."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "fr-1300-aufgaben",
+   "hintergrund": "hell",
+   "eyebrow": "Freitag 13:30 · Fachbereichsleitung · Varvara Schatz",
+   "h2": "Die nächste Woche kündigt sich an",
+   "text": "Mindestteilnehmerzahlen, Kursbeginne, ablaufende Nachweise: Der Korb füllt sich für Montag – rechtzeitig.",
+   "bild": "bilder/fr-1300-aufgaben.jpg",
+   "bereiche": [
+    "Aufgaben"
+   ],
+   "gewinn": {
+    "marke": "Für die Verwaltung",
+    "satz": "Vorausschauend statt hinterher."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "fr-1400-protokoll",
+   "hintergrund": "hell",
+   "eyebrow": "Freitag 14:00 · Verwaltungsleitung · Sonja Eickelkamp",
+   "h2": "Das Protokoll der Woche",
+   "text": "Jeder Schritt dieser Woche – von Menschen und von der Automatik – steht im Protokoll, ohne Personendaten im Klartext.",
+   "bild": "bilder/fr-1400-protokoll.jpg",
+   "bereiche": [
+    "Protokoll"
+   ],
+   "gewinn": {
+    "marke": "Für alle",
+    "satz": "Nachvollziehbar heißt: man muss sich nicht erinnern."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "fr-1500-hilfe",
+   "hintergrund": "hell",
+   "eyebrow": "Freitag 15:00 · Alle",
+   "h2": "Hilfe und geführte Touren",
+   "text": "Wer etwas Neues lernt, startet eine geführte Tour an der echten Oberfläche.",
+   "bild": "bilder/fr-1500-hilfe.jpg",
+   "bereiche": [
+    "Hilfe",
+    "Touren"
+   ],
+   "gewinn": {
+    "marke": "Für alle",
+    "satz": "Sicher ausprobieren, bevor es ernst wird."
+   },
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "notiz": ""
+  },
+  {
+   "id": "schluss",
+   "hintergrund": "tief",
+   "eyebrow": "Eine Woche, ein System",
+   "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
+   "aussage": [
+    {
+     "text": "Egal, was los ist: VibeVHS nimmt der Verwaltung die Routine ab. "
+    },
+    {
+     "text": "Damit Zeit für die Menschen bleibt.",
+     "gelb": true
+    }
+   ],
+   "pillen": [
+    "Routinen laufen von selbst, mit Protokoll",
+    "Gesperrtes erklärt sich",
+    "Nach jedem Schritt der nächste",
+    "In jeder Sprache verständlich",
+    "Selbst betrieben, DSGVO-konform"
+   ],
+   "notiz": "Zusammenfassung: Jedes Ereignis der Woche hat das nächste ausgelöst – ohne doppelte Eingaben."
+  }
+ ]
+}
