@@ -60,6 +60,8 @@ else
     }
 
     private static RenderFragment Tabelle(IReadOnlyList<Monitorzeile> zeilen) => @<table class="vhs-monitor-tabelle">
+        @* Feste Spaltenbreiten: „Jetzt“ und „Heute noch“ stehen genau untereinander *@
+        <colgroup><col class="vhs-monitor-zeit" /><col /><col class="vhs-monitor-raum" /></colgroup>
         <thead><tr><th>Zeit</th><th>Kurs</th><th>Raum</th></tr></thead>
         <tbody>
             @foreach (var z in zeilen)

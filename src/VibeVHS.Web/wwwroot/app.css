@@ -417,9 +417,12 @@ kbd { display: inline-block; min-width: 1.4em; padding: 1px 5px; border: 1px sol
 .vhs-monitor header h1 { font-size: 2.2em; margin: 0 0 .2em; }
 .vhs-monitor-kopf { display: flex; justify-content: space-between; opacity: .85; border-bottom: 2px solid rgba(255,255,255,.3); padding-bottom: .4em; margin-bottom: .6em; }
 .vhs-monitor h2 { font-size: 1.2em; margin: .8em 0 .3em; color: #9fd3ff; }
-.vhs-monitor-tabelle { width: 100%; border-collapse: collapse; }
+.vhs-monitor-tabelle { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.vhs-monitor-zeit { width: 16%; }
+.vhs-monitor-raum { width: 30%; }
+.vhs-monitor-tabelle td.vhs-mono { font-size: 1em; font-family: inherit; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .vhs-monitor-tabelle th { text-align: left; font-size: .7em; opacity: .7; font-weight: 500; }
-.vhs-monitor-tabelle td { padding: .35em .5em .35em 0; border-bottom: 1px solid rgba(255,255,255,.12); vertical-align: top; }
+.vhs-monitor-tabelle td { padding: .35em .5em .35em 0; border-bottom: 1px solid rgba(255,255,255,.12); vertical-align: baseline; }
 .vhs-monitor-tabelle tr.faellt-aus td { color: #ffb4a8; text-decoration: line-through; text-decoration-thickness: 1px; }
 .vhs-monitor-tabelle tr.faellt-aus .vhs-monitor-aus { text-decoration: none; display: inline-block; }
 .vhs-monitor-aus { margin-left: .5em; padding: .05em .4em; border-radius: .3em; background: #c0392b; color: #fff; font-size: .7em; font-weight: 600; }
