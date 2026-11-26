@@ -198,40 +198,6 @@ const I = (n) => path.join(HIER, 'symbole', n + '.png');
     s.addNotes('Begrüßung. VibeVHS ist eine webbasierte Verwaltung für Volkshochschulen, entwickelt mit der vhs Emsdetten Greven Saerbeck als Pilot. In den nächsten 30 Minuten zeige ich, was die Software heute aus Sicht der Nutzerinnen und Nutzer kann – Verwaltung, Kursleitungen und Teilnehmende. Alle Screenshots stammen aus dem aktuellen Stand mit fiktiven Testdaten.');
   }
 
-  // Sicherheit und Betrieb – Zielbild (aus Klaus' Fassung vom 26.11.2026 übernommen)
-  pres.addSection({ title: 'Sicherheit und Betrieb' });
-  {
-    const s = pres.addSlide({ masterName: 'TITEL_DUNKEL', sectionTitle: 'Sicherheit und Betrieb' });
-    s.addShape(pres.shapes.OVAL, { x: -2.5, y: 3.2, w: 7, h: 7, fill: { color: '0E7C86', transparency: 70 }, line: { type: 'none' }, objectName: 'deko-kreis' });
-    s.addImage({ path: LOGO, x: 5.92, y: 1.15, w: 1.5, h: 1.5, altText: 'VibeVHS-Logo', objectName: 'logo' });
-    s.addText('Sicherheit und Betrieb', { x: 1.0, y: 2.95, w: 11.33, h: 1.0, fontSize: 48, bold: true, color: C.background1, align: 'center', margin: 0, isTextBox: true, objectName: 'titel' });
-    s.addText('Für Technik, Datenschutz und IT-Betrieb. Wer nur die Funktionen sehen will, überspringt die nächsten zwei Folien.', { x: 1.5, y: 4.05, w: 10.33, h: 0.75, fontSize: 18, color: 'BFE3E0', align: 'center', margin: 0, isTextBox: true, objectName: 'untertitel' });
-    s.addText('Gezeigt wird das Zielbild – heute teilweise umgesetzt. Den ehrlichen Ist-Stand nennt docs/sicherheit-und-betrieb.md.', { x: 2.0, y: 5.5, w: 9.33, h: 0.75, fontSize: 16, bold: true, color: C.background1, align: 'center', margin: 0, isTextBox: true, objectName: 'hinweis' });
-  }
-  {
-    const s = inhalt('Sicherheit und Betrieb · Zielbild', 'So wird VibeVHS sicher betrieben', 'Sicherheit und Betrieb');
-    const w = 2.85, g = 0.23, h = 1.92;
-    const v = [
-      ['netz', 'Netz', 'Jeder Reverse Proxy passt, nur 443 offen; die Verwaltung lässt sich auf VHS-Netz oder VPN beschränken.'],
-      ['gesperrt', 'Ausrollen', 'Docker, self-contained oder framework-abhängig; Prüfung vorab, Countdown, Rückweg jederzeit.'],
-      ['gebaeude', 'Webschutz', 'TLS nach Mozilla, strenge CSP und Sicherheitsköpfe aus der Anwendung, Ratenbegrenzung.'],
-      ['schutz', 'Anmeldung', 'SAML 2.0, OIDC, Passkey sowie Passwort mit TOTP – je Instanz schaltbar, nebeneinander.'],
-      ['touch', 'Rechte', 'Geprüft im Dienst, geringste Rechte, vier Augen bei Folgenreichem, Notfallkonto.'],
-      ['fertig', 'Daten', 'IBAN und Aufenthaltsangaben feldverschlüsselt; Schlüssel als systemd-Credential, rotierbar.'],
-      ['auto', 'Sicherung', 'Täglich, mit age verschlüsselt, Kopie außer Haus und automatische Rücksicherungsprobe.'],
-      ['verwaltung', 'Überwachung', 'Syslog an jeden Log-Server, OpenTelemetry, Prometheus, /gesund für jedes Monitoring.'],
-    ];
-    v.forEach(([icon, titel, text], i) => karteKompakt(s, 0.6 + (i % 4) * (w + g), 1.6 + Math.floor(i / 4) * (h + 0.2), w, h, icon, titel, text, { schrift: 13 }));
-    s.addShape(pres.shapes.ROUNDED_RECTANGLE, { x: 0.6, y: 5.85, w: 12.13, h: 0.75, rectRadius: 0.15, fill: { color: C.accent5 }, line: { type: 'none' }, objectName: 'zielbild' });
-    s.addText('Zielbild! – im Prototypen noch nicht vollständig umgesetzt!.', { x: 0.95, y: 5.85, w: 11.5, h: 0.75, fontSize: 18, bold: true, color: C.accent1, valign: 'middle', margin: 0, isTextBox: true, objectName: 'zielbild-text' });
-  }
-  {
-    const s = inhalt('Sicherheit und Betrieb · Zielbild', 'Was Betreiber und Prüfende bekommen', 'Sicherheit und Betrieb');
-    spalte(s, 0.6, 'flagge', 'Anmeldung', ['SAML 2.0: Shibboleth, Entra ID, ADFS', 'OIDC: Entra ID, Keycloak, Google', 'Passkey ohne Passwort', 'Passwort nur mit zweitem Faktor (TOTP)', 'Zweiter Faktor Pflicht für die Verwaltung'], false);
-    spalte(s, 4.74, 'deploy', 'Anbindung', ['Logs per Syslog an Graylog, Loki, SIEM', 'Metriken und Traces per OpenTelemetry', '/metrics nur für das Monitoring-Netz', '/gesund für Checkmk, Zabbix, Icinga', 'Prüfsumme und SBOM je Version'], true);
-    spalte(s, 8.88, 'klaeren', 'Für Audits', ['Rolle „Revision“, nur lesend', 'Sicherheitsprotokoll, hash-verkettet', 'Sicherheitsbericht als Export', 'Befristetes Serverkonto „pruefer“', 'Testinstanz und security.txt'], false);
-  }
-
   pres.addSection({ title: 'Überblick' });
   // 2 Ziele
   {
