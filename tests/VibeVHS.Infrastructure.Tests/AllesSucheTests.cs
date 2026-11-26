@@ -48,4 +48,27 @@ public sealed class AllesSucheTests
         // Belege nur mit Leserecht auf Finanzen: ohne Recht keine Belegtreffer (auch keine Gruppe)
         (await SuchenAsync(t, Fachbereich, "R-2026")).ShouldNotContain(x => x.Typ == Treffertyp.Beleg);
     }
+
+    [Fact]
+    public async Task Findet_Personen_auch_ueber_frueheren_Namen_Geburtsdatum_und_EMail()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var t = await TestDatenbank.ErzeugenAsync();
+        await using (var db = t.NeuerKontext())
+        {
+            var anna = Person.Anlegen("Anna", "Schmidt", new DateOnly(2020, 1, 1), t.Uhr.GetLocalNow().AddYears(-6), new DateOnly(1986, 8, 19), "anna.becker@example.org");
+            anna.NameAendernAb("Anna", "Becker", new DateOnly(2025, 6, 1), "Heirat", t.Uhr.GetLocalNow());
+            db.Personen.Add(anna);
+            db.Personen.Add(Person.Anlegen("Bernd", "Brot", new DateOnly(2020, 1, 1), t.Uhr.GetLocalNow(), new DateOnly(1970, 1, 1)));
+            await db.SaveChangesAsync(ct);
+        }
+
+        // Die Datenbank findet diese Personen über Versionen, Geburtsdatum und E-Mail – der Anzeigename ähnelt der Eingabe dabei nicht.
+        foreach (var eingabe in new[] { "schmidt anna", "19.08.1986", "anna.becker@example.org" })
+        {
+            var treffer = await SuchenAsync(t, Tresen, eingabe);
+            treffer.ShouldContain(x => x.Typ == Treffertyp.Person && x.Titel == "Anna Becker", eingabe);
+            treffer.ShouldNotContain(x => x.Typ == Treffertyp.Person && x.Titel == "Bernd Brot", eingabe);
+        }
+    }
 }

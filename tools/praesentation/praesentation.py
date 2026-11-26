@@ -218,9 +218,10 @@ def kapitel(folie, f, s):
         y += hh + 48
     szenen = f.get('szenen', [])
     halb = (len(szenen) + 1) // 2
+    schritt = min(40, (990 - y) / max(halb, 1))  # Liste endet über der Fußzeile, auch bei vielen Szenen
     for i, z in enumerate(szenen):
         sp = 128 + (i // halb) * 820
-        text(folie, sp, y + (i % halb) * 40, 800, 36, '›  ' + z, 16, s.stark)
+        text(folie, sp, y + (i % halb) * schritt, 800, 36, '›  ' + z, 16, s.stark)
 
 
 def karten(folie, f, s):

@@ -189,7 +189,16 @@ internal sealed class PersonenAbfrage(VibeVhsDbContext db, IDublettenSuche duble
 
         // Kandidaten aus der Datenbank (genau und ähnlich, Trigramm-Index), Reihenfolge nach Bewertung (Unscharf) statt nach Name.
         var kandidaten = await SeiteAsync(kreis with { Suche = eingabe, Unscharf = true }, null, 200, abbruch);
-        return Domain.Gemeinsam.Unscharf.Ordnen(eingabe, kandidaten, z => z.Anzeigename, anzahl);
+        var geordnet = Domain.Gemeinsam.Unscharf.Ordnen(eingabe, kandidaten, z => z.Anzeigename, anzahl);
+        if (geordnet.Count >= anzahl)
+        {
+            return geordnet;
+        }
+
+        // Genaue Treffer über frühere Namen, Geburtsdatum, E-Mail oder Wohnort ähneln dem heutigen Namen oft nicht – sie kommen danach.
+        var gesehen = geordnet.Select(z => z.Id).ToHashSet();
+        var genau = await SeiteAsync(kreis with { Suche = eingabe, Unscharf = false }, null, anzahl, abbruch);
+        return [.. geordnet, .. genau.Where(z => gesehen.Add(z.Id)).Take(anzahl - geordnet.Count)];
     }
 
     public Task<Filterzahlen> ZaehlenAsync(PersonenFilter filter, CancellationToken abbruch = default)
