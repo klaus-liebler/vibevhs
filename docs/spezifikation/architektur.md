@@ -4,6 +4,21 @@ Stand: 17.11.2026
 
 Dieses Dokument ist Schritt 2 von 4. Es setzt die [Anforderungsanalyse](https://claude.ai/artifact/5zHT9KccZeiUj1xS1BmKNG) technisch um: Endausbau mit Portalen im Blick, implementiert wird zuerst die Verwaltung.
 
+## Sicherheit und Betrieb im Überblick (für Technik)
+
+> Ist-Stand im Code, nicht Zielbild. Wer nur die Fachlichkeit lesen will, überspringt diesen Abschnitt.
+
+| Ebene | Stand in einem Satz |
+|---|---|
+| Netz | Testsystem `https://liebler.iui.hs-osnabrueck.de/vibevhs/` hinter nginx-Basic-Auth; SSH nur aus dem VPN, Node-RED nur lokal. |
+| Webserver (nginx) | TLS 1.2/1.3, HTTPS-Umleitung, `server_tokens off`, Basic Auth; HSTS in nginx noch aus, die Anwendung setzt es. |
+| Anwendung | Rechte im Dienst, EF Core, strenge CSP, Rate-Limits auf öffentlichen Seiten und der Shop-API; Kestrel nur auf `127.0.0.1:5080`. |
+| Anmeldung | **Mock-Anmeldung** (Konto und Rolle wählen) hinter dem Zugangspasswort; OIDC/SAML der Kommune geplant. |
+| Daten | SQLite; **keine Feldverschlüsselung** (Konzept sieht sie für IBAN und Aufenthaltsdaten vor). |
+| Betrieb | systemd mit Härtung, Runtime-Updates per Timer, Zertifikatsablauf-Wächter, Sicherung und Litestream-Vorlage; Logs nur lokal. |
+
+Ausführlich: [sicherheit-und-betrieb.md](../sicherheit-und-betrieb.md).
+
 ## Architektur
 
 VibeVHS ist ein modularer Monolith: eine Anwendung, ein Docker-Image, eine PostgreSQL-Datenbank (seit 24.11.2026, vorher SQLite). Das passt zu einer einzelnen VHS und zum kommunalen Betrieb, und die Fachmodule bleiben trotzdem sauber getrennt.
@@ -383,6 +398,9 @@ Die referentielle Integrität bleibt erhalten, weil **nie eine Zeile gelöscht w
 **Auskunft nach Art. 15** erzeugt ein PDF und eine maschinenlesbare JSON-Datei mit allen Daten inklusive Historie, Dokumenten, Empfängern (Schnittstellen) und Fristen.
 
 **Datensicherungen:** Anonymisierte Daten können in älteren Sicherungen noch stehen. Stufe 1 begrenzt deshalb die Aufbewahrung der Sicherungen und dokumentiert das. Als Ausbaustufe ist **Crypto-Shredding** vorgesehen: Personendaten werden mit einem Schlüssel je Person verschlüsselt; wird der Schlüssel vernichtet, sind die Daten auch in alten Sicherungen unlesbar.
+
+> **Ist-Stand 26.11.2026:** Die Tabelle beschreibt das Zielbild. Im Code sind OIDC, Feldverschlüsselung (IBAN, Aufenthaltsdaten) und
+> Docker Secrets noch nicht umgesetzt; was heute gilt, steht in [sicherheit-und-betrieb.md](../sicherheit-und-betrieb.md).
 
 ## Integrationskonzept
 
