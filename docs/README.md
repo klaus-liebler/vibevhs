@@ -7,6 +7,22 @@ Teilnehmende, eingebunden in die kommunale Infrastruktur, DSGVO-konform, mit Sch
 Alle geplanten Schnittstellen nach außen (Mail, Messaging, VHS-Systeme, Stadtverwaltung, Finanzen, BAMF) mit Stand:
 [schnittstellen.md](schnittstellen.md).
 
+## Sicherheit und Betrieb (für Technik)
+
+> Für IT-Betrieb, Datenschutz und technisch Interessierte – ehrlicher Stand mit ✅/⚠️/❌. Wer nur die Funktionen sehen will,
+> springt weiter zu [Konzepte](#konzepte).
+
+| Ebene | Stand in einem Satz |
+|---|---|
+| Netz | Testsystem `https://liebler.iui.hs-osnabrueck.de/vibevhs/` hinter nginx-Basic-Auth; SSH nur aus dem VPN, Node-RED nur lokal. |
+| Webserver (nginx) | TLS 1.2/1.3, HTTPS-Umleitung, `server_tokens off`, Basic Auth; HSTS in nginx noch aus, die Anwendung setzt es. |
+| Anwendung | Rechte im Dienst, EF Core, strenge CSP, Rate-Limits auf öffentlichen Seiten und der Shop-API; Kestrel nur auf `127.0.0.1:5080`. |
+| Anmeldung | **Mock-Anmeldung** (Konto und Rolle wählen) hinter dem Zugangspasswort; OIDC/SAML der Kommune geplant. |
+| Daten | SQLite; **keine Feldverschlüsselung** (Konzept sieht sie für IBAN und Aufenthaltsdaten vor). |
+| Betrieb | systemd mit Härtung, Runtime-Updates per Timer, Zertifikatsablauf-Wächter, Sicherung und Litestream-Vorlage; Logs nur lokal. |
+
+Ausführlich mit Fundstellen im Code und offenen Punkten: [sicherheit-und-betrieb.md](sicherheit-und-betrieb.md).
+
 ## Konzepte
 
 **Regel:** Spezifikation liegt in [`docs/spezifikation/`](spezifikation/README.md) und ist führend; bei fachlichen Änderungen die betroffene Spezifikationsdatei im selben Commit mitpflegen (FA-/NFA-Nummern nie neu vergeben). Die Claude Docs/Artifacts sind ein Archiv (Stand 17.11.2026).
