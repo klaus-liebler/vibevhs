@@ -32,9 +32,9 @@ namespace VibeVHS.Infrastructure.Tests;
 /// <summary>Integrationskurse (I7): Kursbeginn, Identitätsprüfung mit Sichtvergleich, UE je Abschnitt, BAMF-Abrechnung, Fahrtkosten, Prüfungen.</summary>
 public class IntegrationTests
 {
-    private static readonly Benutzer Ik = new("ines.middendorf", "Ines Middendorf", Rolle.IntegrationskursTeam);
-    private static readonly Benutzer Tresen = new("katja.friesen", "Katja Friesen", Rolle.Teilnehmerservice);
-    private static readonly Benutzer Buchhaltung = new("linda.lueke", "Linda Lüke", Rolle.Buchhaltung);
+    private static readonly Benutzer Ik = new("ines.mittendorf", "Ines Mittendorf", Rolle.IntegrationskursTeam);
+    private static readonly Benutzer Tresen = new("katja.friedsen", "Katja Friedsen", Rolle.Teilnehmerservice);
+    private static readonly Benutzer Buchhaltung = new("linda.luetke", "Linda Lütke", Rolle.Buchhaltung);
 
     private sealed class TestBenutzer(Benutzer b) : IAktuellerBenutzer
     {

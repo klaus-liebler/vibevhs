@@ -1,7 +1,7 @@
 # „Eine turbulente Woche an der vhs“
 
 Präsentation für Verwaltungsmitarbeitende (nach dem Vorbild der SchoolCraft-„Schulwoche“): Montag bis Freitag im Alltag der vhs EGS,
-mit **echten Bildschirmfotos** der laufenden Anwendung. Mitarbeitende tragen die Namen der Teamseite der vhs (ohne Kontaktdaten),
+mit **echten Bildschirmfotos** der laufenden Anwendung. Mitarbeitende tragen verfremdete Namen (Vorname echt, Nachname geändert, ohne Kontaktdaten),
 Teilnehmende und Kursleitungen sind erfunden (Demodaten).
 
 | Datei | Inhalt |

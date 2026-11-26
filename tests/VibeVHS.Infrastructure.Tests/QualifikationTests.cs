@@ -12,7 +12,7 @@ namespace VibeVHS.Infrastructure.Tests;
 
 public class QualifikationTests
 {
-    private static readonly Benutzer Fbl = new("varvara.schatz", "Varvara Schatz", Rolle.Fachbereichsleitung);
+    private static readonly Benutzer Fbl = new("varvara.schatte", "Varvara Schatte", Rolle.Fachbereichsleitung);
 
     private sealed class TestBenutzer(Benutzer b) : IAktuellerBenutzer
     {
@@ -119,7 +119,7 @@ public class QualifikationTests
 
         await using (var db = t.NeuerKontext())
         {
-            var teilnehmerservice = new Benutzer("katja.friesen", "Katja Friesen", Rolle.Teilnehmerservice);
+            var teilnehmerservice = new Benutzer("katja.friedsen", "Katja Friedsen", Rolle.Teilnehmerservice);
             await Should.ThrowAsync<InvalidOperationException>(() => Dienst(t, db, teilnehmerservice).TeamHinzufuegenAsync(kurs.Id, ohne.Id, false, "Vertretung", ct));
             await Dienst(t, db).TeamHinzufuegenAsync(kurs.Id, ohne.Id, false, "Vertretung im Dezember, Lizenz beantragt", ct);
         }

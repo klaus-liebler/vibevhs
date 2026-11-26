@@ -26,7 +26,7 @@ public class AufgabeTests
     public void Uebernehmen_Zurueckgeben_Erledigen()
     {
         var a = Neu();
-        a.Uebernehmen("varvara.schatz", "Varvara Schatz", Jetzt);
+        a.Uebernehmen("varvara.schatte", "Varvara Schatte", Jetzt);
         a.Status.ShouldBe(Aufgabenstatus.InBearbeitung);
         a.Zurueckgeben();
         a.Status.ShouldBe(Aufgabenstatus.Offen);
@@ -44,7 +44,7 @@ public class AufgabeTests
     public void Automatisch_geschlossen_kann_wieder_geoeffnet_werden_und_behaelt_den_Bearbeiter()
     {
         var a = Neu();
-        a.Uebernehmen("varvara.schatz", "Varvara Schatz", Jetzt);
+        a.Uebernehmen("varvara.schatte", "Varvara Schatte", Jetzt);
         a.Eskalieren(Jetzt);
         a.AutomatischSchliessen("Mindestzahl erreicht", Jetzt);
         a.Status.ShouldBe(Aufgabenstatus.Geschlossen);

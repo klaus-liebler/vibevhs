@@ -12,7 +12,7 @@ namespace VibeVHS.Infrastructure.Tests;
 public sealed class InfomonitorTests
 {
     private static readonly Benutzer Verwaltungsleitung = new("vera.leit", "Vera Leit", Rolle.Verwaltungsleitung);
-    private static readonly Benutzer Tresen = new("katja.friesen", "Katja Friesen", Rolle.Teilnehmerservice);
+    private static readonly Benutzer Tresen = new("katja.friedsen", "Katja Friedsen", Rolle.Teilnehmerservice);
 
     private sealed class TestBenutzer(Benutzer b) : IAktuellerBenutzer
     {

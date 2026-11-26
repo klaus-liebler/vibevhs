@@ -20,7 +20,7 @@ namespace VibeVHS.Infrastructure.Tests;
 
 public class DurchfuehrungTests
 {
-    private static readonly Benutzer Tresen = new("katja.friesen", "Katja Friesen", Rolle.Teilnehmerservice);
+    private static readonly Benutzer Tresen = new("katja.friedsen", "Katja Friedsen", Rolle.Teilnehmerservice);
     private static readonly TimeSpan Mez = TimeSpan.FromHours(1);
 
     private sealed class TestBenutzer(Benutzer b) : IAktuellerBenutzer

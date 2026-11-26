@@ -39,7 +39,7 @@ public class ZugangsschutzTests
 
 public class RollenTests
 {
-    private static Benutzerkonto Steinhorst() => new("heike.steinhorst", "Dr. Heike Steinhorst", "Fachbereichsleitung",
+    private static Benutzerkonto Steinkamp() => new("heike.steinkamp", "Dr. Heike Steinkamp", "Fachbereichsleitung",
         [Rolle.Fachbereichsleitung, Rolle.IntegrationskursTeam], [5, 4], Guid.NewGuid());
 
     [Theory]
@@ -63,19 +63,19 @@ public class RollenTests
     [Fact]
     public void Nach_der_Anmeldung_ist_die_erste_Rolle_aktiv_und_alle_bleiben_verfuegbar()
     {
-        var principal = MockAnmeldung.Anmelden(Steinhorst().AlsBenutzer(), "Test");
+        var principal = MockAnmeldung.Anmelden(Steinkamp().AlsBenutzer(), "Test");
 
         var benutzer = MockAnmeldung.AlsBenutzer(principal)!;
         benutzer.Rolle.ShouldBe(Rolle.Fachbereichsleitung);
         benutzer.Rollen.ShouldBe([Rolle.Fachbereichsleitung, Rolle.IntegrationskursTeam]);
         benutzer.ZustaendigeFachbereiche.ShouldBe([4, 5]);
-        benutzer.Name.ShouldBe("Dr. Heike Steinhorst");
+        benutzer.Name.ShouldBe("Dr. Heike Steinkamp");
     }
 
     [Fact]
     public void Rollenwechsel_nur_zu_eigenen_Rollen()
     {
-        var principal = MockAnmeldung.Anmelden(Steinhorst().AlsBenutzer(), "Test");
+        var principal = MockAnmeldung.Anmelden(Steinkamp().AlsBenutzer(), "Test");
 
         var gewechselt = MockAnmeldung.RolleWechseln(principal, Rolle.IntegrationskursTeam, "Test");
         MockAnmeldung.AlsBenutzer(gewechselt)!.Rolle.ShouldBe(Rolle.IntegrationskursTeam);

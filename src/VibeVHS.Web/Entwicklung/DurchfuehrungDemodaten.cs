@@ -145,7 +145,7 @@ internal static class DurchfuehrungDemodaten
             teilnehmende.AddRange((await db.Personen.IgnoreAutoIncludes().Where(p => tnRolle.Contains(p.Id) && p.Id != olena.Id)
                     .NachNameSortiert(db, heuteTag).Select(p => new { p.Id, p.AngelegtAm }).ToListAsync())
                 .Where(p => p.AngelegtAm < vor2025).Select(p => p.Id).Take(7));
-            var tresen = new Buchender("Katja Friesen", "katja.friesen", "Teilnehmerservice");
+            var tresen = new Buchender("Katja Friedsen", "katja.friedsen", "Teilnehmerservice");
             foreach (var pid in teilnehmende)
             {
                 var b = Belegung.Anlegen(kurs, pid, false, Buchungsweg.Tresen, tresen, null, Zahlart.Lastschrift, z.DTO(2025, 3, 3, 10, 0));

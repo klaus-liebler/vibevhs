@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace VibeVHS.Domain.Personen;
 
 /// <summary>
-/// Akademische Grade und Titel, die versehentlich im Vor- oder Nachnamen stehen („Dr. Kai“, „Prof. Dr. Lüken“), erkennen und abtrennen.
+/// Akademische Grade und Titel, die versehentlich im Vor- oder Nachnamen stehen („Dr. Kai“, „Prof. Dr. Lüdeking“), erkennen und abtrennen.
 /// Erkannt werden nur führende Teile, die wie ein Titel aussehen (Dr., Prof., Dipl.-Ing., Dr. med., Mag., PD, Priv.-Doz. …),
 /// damit Namen wie „St. John“ oder Initialen („J. R.“) nicht fälschlich zerlegt werden.
 /// </summary>

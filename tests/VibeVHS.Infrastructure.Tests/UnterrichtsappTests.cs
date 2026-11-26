@@ -12,8 +12,8 @@ namespace VibeVHS.Infrastructure.Tests;
 /// <summary>Unterrichts-Apps (QA-69): Podium eingebaut und sofort nutzbar, angebundene Apps erst nach Freigabe, Einsatz je Kurs.</summary>
 public sealed class UnterrichtsappTests
 {
-    private static readonly Benutzer Fachbereich = new("varvara.schatz", "Varvara Schatz", Rolle.Fachbereichsleitung);
-    private static readonly Benutzer Leitung = new("kai.lueken", "Dr. Kai Lüken", Rolle.Leitung);
+    private static readonly Benutzer Fachbereich = new("varvara.schatte", "Varvara Schatte", Rolle.Fachbereichsleitung);
+    private static readonly Benutzer Leitung = new("kai.luedeking", "Dr. Kai Lüdeking", Rolle.Leitung);
 
     private sealed class TestBenutzer(Benutzer b) : IAktuellerBenutzer
     {

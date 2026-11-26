@@ -9,7 +9,7 @@ public class KommentarDienstTests
 {
     private static readonly Benutzer Leitung = new("sschulte", "S. Schulte", Rolle.Leitung);
     private static readonly Benutzer Systemverwaltung = new("admin", "A. Admin", Rolle.Systemverwaltung);
-    private static readonly Benutzer Teilnehmerservice = new("kfriesen", "Katja Friesen", Rolle.Teilnehmerservice);
+    private static readonly Benutzer Teilnehmerservice = new("kfriesen", "Katja Friedsen", Rolle.Teilnehmerservice);
 
     private readonly SpeicherKommentare _speicher = new();
     private readonly FakeTimeProvider _uhr = new(new DateTimeOffset(2026, 11, 17, 10, 0, 0, TimeSpan.Zero));

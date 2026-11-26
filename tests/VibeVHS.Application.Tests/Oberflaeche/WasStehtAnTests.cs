@@ -15,10 +15,10 @@ public class WasStehtAnTests
     [Fact]
     public void Fachbereichsleitung_sieht_nur_ihre_eigenen_Fachbereiche()
     {
-        var schatz = new Benutzer("varvara.schatz", "Varvara Schatz", Rolle.Fachbereichsleitung,
+        var schatte = new Benutzer("varvara.schatte", "Varvara Schatte", Rolle.Fachbereichsleitung,
             [Rolle.Fachbereichsleitung], [2, 3, 6, 7]);
 
-        var schritte = WasStehtAn.Fuer(schatz, Alle, Ruhig);
+        var schritte = WasStehtAn.Fuer(schatte, Alle, Ruhig);
 
         var fbTitel = schritte.Where(s => s.Titel.StartsWith("FB ", StringComparison.Ordinal)).Select(s => s.Titel).ToList();
         fbTitel.Count.ShouldBe(4);
@@ -29,10 +29,10 @@ public class WasStehtAnTests
     [Fact]
     public void Gleiche_Person_in_anderer_Rolle_sieht_keine_Fachbereichseintraege()
     {
-        var steinhorst = new Benutzer("heike.steinhorst", "Dr. Heike Steinhorst", Rolle.IntegrationskursTeam,
+        var steinkamp = new Benutzer("heike.steinkamp", "Dr. Heike Steinkamp", Rolle.IntegrationskursTeam,
             [Rolle.Fachbereichsleitung, Rolle.IntegrationskursTeam], [4, 5]);
 
-        var schritte = WasStehtAn.Fuer(steinhorst, Alle, Ruhig);
+        var schritte = WasStehtAn.Fuer(steinkamp, Alle, Ruhig);
 
         schritte.ShouldNotContain(s => s.Titel.StartsWith("FB ", StringComparison.Ordinal));
         schritte.ShouldContain(s => s.Titel == "BAMF-Meldungen prüfen");

@@ -22,22 +22,22 @@
    "karten": [
     {
      "marke": "Leitung",
-     "titel": "Dr. Kai Lüken, Gisela Junkerkalefeld",
+     "titel": "Dr. Kai Lüdeking, Gisela Junkerholt",
      "text": "Leitung und stellvertretende Leitung"
     },
     {
      "marke": "Fachbereiche",
-     "titel": "Varvara Schatz, Dr. Heike Steinhorst",
+     "titel": "Varvara Schatte, Dr. Heike Steinkamp",
      "text": "Programmplanung, Kursleitungen, Qualität"
     },
     {
      "marke": "Verwaltung",
-     "titel": "Sonja Eickelkamp, Katja Friesen, Celine Wilken, Linda Lüke",
+     "titel": "Sonja Eickelberg, Katja Friedsen, Celine Wilkes, Linda Lütke",
      "text": "Verwaltungsleitung, Teilnehmerservice, Buchhaltung"
     },
     {
      "marke": "Integration und IT",
-     "titel": "Sylvia Beckmann, Amy Behrla",
+     "titel": "Sylvia Bergmann, Amy Behrens",
      "text": "Integrationskurs-Team, IT und Digitale vhs"
     }
    ],
@@ -76,7 +76,7 @@
   {
    "id": "mo-0730-start",
    "hintergrund": "hell",
-   "eyebrow": "Montag 7:30 · Verwaltungsleitung · Sonja Eickelkamp",
+   "eyebrow": "Montag 7:30 · Verwaltungsleitung · Sonja Eickelberg",
    "h2": "Was über Nacht passiert ist",
    "text": "Die Startseite fasst zusammen, was die Automatik erledigt hat: Mahnvorschläge, Lastschriftlauf, Honorarentwürfe, festgeschriebene Belege. Was eine Freigabe braucht, ist als „Prüfung nötig“ markiert.",
    "bild": "bilder/mo-0730-start.jpg",
@@ -95,7 +95,7 @@
   {
    "id": "mo-0740-leitung",
    "hintergrund": "hell",
-   "eyebrow": "Montag 7:40 · Leitung · Dr. Kai Lüken",
+   "eyebrow": "Montag 7:40 · Leitung · Dr. Kai Lüdeking",
    "h2": "Was liegen geblieben ist",
    "text": "Die Leitung sieht, welche Aufgaben in den Körben überfällig sind und an sie eskaliert wurden – mit Grund und Fälligkeit. Übernehmen oder zuweisen geht mit einem Klick.",
    "bild": "bilder/mo-0740-leitung.jpg",
@@ -113,7 +113,7 @@
   {
    "id": "mo-0745-ik-korb",
    "hintergrund": "hell",
-   "eyebrow": "Montag 7:45 · Integrationskurs-Team · Sylvia Beckmann",
+   "eyebrow": "Montag 7:45 · Integrationskurs-Team · Sylvia Bergmann",
    "h2": "Der Korb des Teams",
    "text": "Zwei Integrationskurse warten auf die Kursbeginn-Meldung ans BAMF, eine Ausweiskontrolle ist offen, eine Raumzulassung läuft ab. Jede Karte sagt, was zu tun ist.",
    "bild": "bilder/mo-0745-ik-korb.jpg",
@@ -131,7 +131,7 @@
   {
    "id": "mo-0830-yoga-voll",
    "hintergrund": "hell",
-   "eyebrow": "Montag 8:30 · Teilnehmerservice · Katja Friesen",
+   "eyebrow": "Montag 8:30 · Teilnehmerservice · Katja Friedsen",
    "h2": "Yoga ist ausgebucht",
    "text": "Nadia Haddad möchte zu „Yoga am Abend“. Schon in der Kursauswahl steht: 16 von 16 Plätzen belegt, drei warten.",
    "bild": "bilder/mo-0830-yoga-voll.jpg",
@@ -201,7 +201,7 @@
   {
    "id": "mo-0935-ik-anwesenheit",
    "hintergrund": "hell",
-   "eyebrow": "Montag 9:35 · Integrationskurs-Team · Sylvia Beckmann",
+   "eyebrow": "Montag 9:35 · Integrationskurs-Team · Sylvia Bergmann",
    "h2": "Anwesenheit im Integrationskurs",
    "text": "Im Integrationskurs ist die Anwesenheit abrechnungsrelevant. Selbst-Check-ins werden bestätigt, Minuten und Unterrichtseinheiten je Person gezählt.",
    "bild": "bilder/mo-0935-ik-anwesenheit.jpg",
@@ -219,7 +219,7 @@
   {
    "id": "mo-1030-kochen",
    "hintergrund": "hell",
-   "eyebrow": "Montag 10:30 · Fachbereichsleitung · Varvara Schatz",
+   "eyebrow": "Montag 10:30 · Fachbereichsleitung · Varvara Schatte",
    "h2": "„Gesund kochen“ hat zu wenige Anmeldungen",
    "text": "Am Donnerstag sollte der Kochkurs starten. Die Mindestteilnehmerzahl ist nicht erreicht.",
    "bild": "bilder/mo-1030-kochen.jpg",
@@ -273,7 +273,7 @@
   {
    "id": "mo-1130-abmelden",
    "hintergrund": "hell",
-   "eyebrow": "Montag 11:30 · Teilnehmerservice · Katja Friesen",
+   "eyebrow": "Montag 11:30 · Teilnehmerservice · Katja Friedsen",
    "h2": "Ein Platz wird frei",
    "text": "Zoé Hannecker zieht nach Münster und meldet sich von Yoga ab. Der Grund kommt in die Belegung.",
    "bild": "bilder/mo-1130-abmelden.jpg",
@@ -327,9 +327,9 @@
   {
    "id": "mo-1730-monitore",
    "hintergrund": "hell",
-   "eyebrow": "Montag 17:30 · IT · Amy Behrla",
+   "eyebrow": "Montag 17:30 · IT · Amy Behrens",
    "h2": "Ein Bildschirm für das Foyer",
-   "text": "Bevor die Abendkurse beginnen, richtet Amy Behrla einen Info-Monitor ein. Die geheime Adresse erscheint nur einmal; ein Fernseher mit Browser genügt.",
+   "text": "Bevor die Abendkurse beginnen, richtet Amy Behrens einen Info-Monitor ein. Die geheime Adresse erscheint nur einmal; ein Fernseher mit Browser genügt.",
    "bild": "bilder/mo-1730-monitore.jpg",
    "bereiche": [
     "Info-Monitore"
@@ -361,7 +361,7 @@
   {
    "id": "mo-1830-anwesenheit",
    "hintergrund": "hell",
-   "eyebrow": "Montag 18:30 · Abenddienst · Katja Friesen",
+   "eyebrow": "Montag 18:30 · Abenddienst · Katja Friedsen",
    "h2": "Die Abendkurse laufen",
    "text": "Acht Veranstaltungen heute. Die Kursleitungen erfassen die Anwesenheit selbst, Teilnehmende checken per QR-Code ein.",
    "bild": "bilder/mo-1830-anwesenheit.jpg",
@@ -417,7 +417,7 @@
   {
    "id": "di-0830-start",
    "hintergrund": "hell",
-   "eyebrow": "Dienstag 8:30 · Verwaltungsleitung · Sonja Eickelkamp",
+   "eyebrow": "Dienstag 8:30 · Verwaltungsleitung · Sonja Eickelberg",
    "h2": "Die erste Nacht",
    "text": "Die Automatik ist durchgelaufen: Erinnerungen vor Kursbeginn, Aufgaben, Rechnungen. Alles steht auf der Startseite.",
    "bild": "bilder/di-0830-start.jpg",
@@ -435,7 +435,7 @@
   {
    "id": "di-0840-ik",
    "hintergrund": "hell",
-   "eyebrow": "Dienstag 8:40 · Integrationskurs-Team · Sylvia Beckmann",
+   "eyebrow": "Dienstag 8:40 · Integrationskurs-Team · Sylvia Bergmann",
    "h2": "Kursbeginn melden? Noch nicht.",
    "text": "„Kursbeginn an das BAMF melden“ ist gesperrt. Der Hinweis nennt die Personen, deren Ausweisprüfung fehlt.",
    "bild": "bilder/di-0840-ik.jpg",
@@ -453,7 +453,7 @@
   {
    "id": "di-1030-lehrfreigabe",
    "hintergrund": "hell",
-   "eyebrow": "Dienstag 10:30 · Fachbereichsleitung · Dr. Heike Steinhorst",
+   "eyebrow": "Dienstag 10:30 · Fachbereichsleitung · Dr. Heike Steinkamp",
    "h2": "Spanisch – aber nur Italienisch freigegeben",
    "text": "Nathanael Roloff soll ab Mittwoch Spanisch unterrichten, hat aber nur die Lehrfreigabe für Italienisch. VibeVHS zeigt es am Kurs.",
    "bild": "bilder/di-1030-lehrfreigabe.jpg",
@@ -473,7 +473,7 @@
    "hintergrund": "hell",
    "eyebrow": "Dienstag 10:32 · Fachbereichsleitung",
    "h2": "Eine Ausnahme – begründet",
-   "text": "Frau Steinhorst weiß: Herr Roloff spricht fließend Spanisch, die Eignungsprüfung steht an. „Ausnahme erteilen“ wird erst klickbar, wenn eine Begründung dasteht.",
+   "text": "Frau Steinkamp weiß: Herr Roloff spricht fließend Spanisch, die Eignungsprüfung steht an. „Ausnahme erteilen“ wird erst klickbar, wenn eine Begründung dasteht.",
    "bild": "bilder/di-1032-ausnahme.jpg",
    "bereiche": [
     "Kurse",
@@ -541,7 +541,7 @@
   {
    "id": "di-1140-anliegen",
    "hintergrund": "hell",
-   "eyebrow": "Dienstag 11:40 · Verwaltungsleitung · Sonja Eickelkamp",
+   "eyebrow": "Dienstag 11:40 · Verwaltungsleitung · Sonja Eickelberg",
    "h2": "Anliegen der Kursleitungen",
    "text": "Ausfälle, Bankverbindungen, Nachweise: Was Kursleitungen im Portal melden, landet hier – und als Aufgabe im Korb.",
    "bild": "bilder/di-1140-anliegen.jpg",
@@ -596,7 +596,7 @@
    "hintergrund": "tief",
    "eyebrow": "Mittwoch, 25. November",
    "kapitel": "Geld, das ankommt – und Geld, das fehlt",
-   "lead": "Linda Lüke bringt die Finanzen in Ordnung: Kontoauszug, Mahnungen, Honorare. Abends bucht eine Teilnehmerin selbst.",
+   "lead": "Linda Lütke bringt die Finanzen in Ordnung: Kontoauszug, Mahnungen, Honorare. Abends bucht eine Teilnehmerin selbst.",
    "szenen": [
     "Was ist zu tun?",
     "Der Kontoauszug ordnet sich fast selbst",
@@ -608,12 +608,12 @@
     "Selbst buchen"
    ],
    "fuss": "Eine turbulente Woche an der vhs · echte Bildschirmfotos, Testdaten",
-   "notiz": "Kapitel Mittwoch, 25. November: Linda Lüke bringt die Finanzen in Ordnung: Kontoauszug, Mahnungen, Honorare. Abends bucht eine Teilnehmerin selbst. Zum Überspringen bis zum nächsten Kapiteltrenner weiterklicken."
+   "notiz": "Kapitel Mittwoch, 25. November: Linda Lütke bringt die Finanzen in Ordnung: Kontoauszug, Mahnungen, Honorare. Abends bucht eine Teilnehmerin selbst. Zum Überspringen bis zum nächsten Kapiteltrenner weiterklicken."
   },
   {
    "id": "mi-0830-finanzen",
    "hintergrund": "hell",
-   "eyebrow": "Mittwoch 8:30 · Buchhaltung · Linda Lüke",
+   "eyebrow": "Mittwoch 8:30 · Buchhaltung · Linda Lütke",
    "h2": "Was ist zu tun?",
    "text": "Offene Forderungen, Überfälliges, Honorare, Belege – und eine Liste der nächsten Schritte.",
    "bild": "bilder/mi-0830-finanzen.jpg",
@@ -766,7 +766,7 @@
   {
    "id": "do-0900-kurs-neu",
    "hintergrund": "hell",
-   "eyebrow": "Donnerstag 9:30 · Fachbereichsleitung · Dr. Heike Steinhorst",
+   "eyebrow": "Donnerstag 9:30 · Fachbereichsleitung · Dr. Heike Steinkamp",
    "h2": "Ein Kurs für das Frühjahr",
    "text": "Spanisch A2 soll weitergehen. Die Kursart verlangt eine Lehrfreigabe für Spanisch: Herr Roloff erscheint mit Warnzeichen. Termine, Ferien und Räume rechnet die Vorschau, sobald eine geeignete Kursleitung gewählt ist.",
    "bild": "bilder/do-0900-kurs-neu.jpg",
@@ -784,7 +784,7 @@
   {
    "id": "do-1100-person",
    "hintergrund": "hell",
-   "eyebrow": "Donnerstag 11:30 · Teilnehmerservice · Celine Wilken",
+   "eyebrow": "Donnerstag 11:30 · Teilnehmerservice · Celine Wilkes",
    "h2": "Eine Bescheinigung, bitte",
    "text": "Olena Kovalenko braucht ihre Teilnahmebescheinigung für das Jobcenter. Der Nachdruck ist das archivierte Original – mit QR-Code „Translate this letter in your language“.",
    "bild": "bilder/do-1100-person.jpg",
@@ -802,7 +802,7 @@
   {
    "id": "do-1400-datenschutz",
    "hintergrund": "hell",
-   "eyebrow": "Donnerstag 14:30 · Stellv. Leitung · Gisela Junkerkalefeld",
+   "eyebrow": "Donnerstag 14:30 · Stellv. Leitung · Gisela Junkerholt",
    "h2": "Datenschutz mit vier Augen",
    "text": "Wer lange nicht mehr da war, wird nach Frist anonymisiert. Der Löschlauf braucht zwei Freigaben.",
    "bild": "bilder/do-1400-datenschutz.jpg",
@@ -837,7 +837,7 @@
   {
    "id": "fr-0800-leitung",
    "hintergrund": "hell",
-   "eyebrow": "Freitag 8:30 · Leitung · Dr. Kai Lüken",
+   "eyebrow": "Freitag 8:30 · Leitung · Dr. Kai Lüdeking",
    "h2": "Wie war die Woche?",
    "text": "Die Körbe sind leerer als am Montag. Was noch offen ist, steht oben.",
    "bild": "bilder/fr-0800-leitung.jpg",
@@ -890,7 +890,7 @@
   {
    "id": "fr-1100-betrieb",
    "hintergrund": "hell",
-   "eyebrow": "Freitag 11:30 · IT · Amy Behrla",
+   "eyebrow": "Freitag 11:30 · IT · Amy Behrens",
    "h2": "Der Betrieb",
    "text": "Sicherung, Schnittstellen, Zeitpläne der Automatik: alles auf einer Seite.",
    "bild": "bilder/fr-1100-betrieb.jpg",
@@ -907,7 +907,7 @@
   {
    "id": "fr-1300-aufgaben",
    "hintergrund": "hell",
-   "eyebrow": "Freitag 13:30 · Fachbereichsleitung · Varvara Schatz",
+   "eyebrow": "Freitag 13:30 · Fachbereichsleitung · Varvara Schatte",
    "h2": "Die nächste Woche kündigt sich an",
    "text": "Mindestteilnehmerzahlen, Kursbeginne, ablaufende Nachweise: Der Korb füllt sich für Montag – rechtzeitig.",
    "bild": "bilder/fr-1300-aufgaben.jpg",
@@ -924,7 +924,7 @@
   {
    "id": "fr-1400-protokoll",
    "hintergrund": "hell",
-   "eyebrow": "Freitag 14:00 · Verwaltungsleitung · Sonja Eickelkamp",
+   "eyebrow": "Freitag 14:00 · Verwaltungsleitung · Sonja Eickelberg",
    "h2": "Das Protokoll der Woche",
    "text": "Jeder Schritt dieser Woche – von Menschen und von der Automatik – steht im Protokoll, ohne Personendaten im Klartext.",
    "bild": "bilder/fr-1400-protokoll.jpg",

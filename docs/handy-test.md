@@ -51,10 +51,10 @@ Handy und PC müssen im **selben WLAN/LAN** sein. Gäste-WLANs trennen Geräte o
 
 1. `https://<LAN-IP>:7189` öffnen und die Zertifikatswarnung bestätigen („Erweitert → Weiter zu …“).
 2. Damit ein Termin im Check-in-Fenster liegt (30 Min. vor bis 30 Min. nach Beginn):
-   1. Als **Varvara Schatz** (Fachbereichsleitung) anmelden.
+   1. Als **Varvara Schatte** (Fachbereichsleitung) anmelden.
    2. Einen Kurs öffnen, z. B. *26H-301 Rhetorik*.
    3. Unter „Ändern“ eine **Zusätzliche Einzelveranstaltung** für heute anlegen, Beginn in ca. 10 Minuten.
-3. Als **Katja Friesen** (Teilnehmerservice) über **Anmeldung** eine Person mit E-Mail-Adresse in diesen Kurs anmelden, z. B. *Sabine Weber*.
+3. Als **Katja Friedsen** (Teilnehmerservice) über **Anmeldung** eine Person mit E-Mail-Adresse in diesen Kurs anmelden, z. B. *Sabine Weber*.
 4. **Postausgang** öffnen und die Anmeldebestätigung anklicken. Unter dem Mailtext steht „Persönlichen Check-in-Link aufs Handy holen“: Der QR-Code enthält den persönlichen Link.
 5. **Anwesenheit** öffnen, den Termin wählen und auf **Termin-QR A 1.12** klicken. Der QR-Code bleibt auf dem Bildschirm stehen.
 

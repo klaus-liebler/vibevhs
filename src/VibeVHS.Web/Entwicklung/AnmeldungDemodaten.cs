@@ -31,9 +31,9 @@ internal static class AnmeldungDemodaten
         var kurse = await db.Kurse.Include(k => k.Veranstaltungen).Where(k => k.ArchiviertAm == null).ToListAsync();
         var konten = await db.Benutzerkonten.AsNoTracking().ToListAsync();
         string Name(string login, string ersatz) => konten.FirstOrDefault(k => k.Login == login)?.Name ?? ersatz;
-        var tresen = new[] { Name("katja.friesen", "Katja Friesen"), Name("celine.wilken", "Celine Wilken"), Name("linda.lueke", "Linda Lüke") }
+        var tresen = new[] { Name("katja.friedsen", "Katja Friedsen"), Name("celine.wilkes", "Celine Wilkes"), Name("linda.luetke", "Linda Lütke") }
             .Select(n => new Buchender(n, null, "Teilnehmerservice")).ToArray();
-        var ikTeam = new Buchender(Name("sylvia.beckmann", "Sylvia Beckmann"), "sylvia.beckmann", "Integrationskurs-Team");
+        var ikTeam = new Buchender(Name("sylvia.bergmann", "Sylvia Bergmann"), "sylvia.bergmann", "Integrationskurs-Team");
 
         var kontoPersonen = await db.Benutzerkonten.AsNoTracking().Where(k => k.PersonId != null).Select(k => k.PersonId!.Value).ToListAsync();
         var heuteTag = DateOnly.FromDateTime(uhr.GetLocalNow().Date);

@@ -15,8 +15,8 @@ namespace VibeVHS.Infrastructure.Tests;
 /// <summary>Schlüsselverwaltung (QA-67): Ausgabe nur an Kursleitungen/Mitarbeitende, eine offene Ausgabe je Schlüssel, Aufgabe zum Zurückfordern.</summary>
 public sealed class SchluesselTests
 {
-    private static readonly Benutzer Tresen = new("katja.friesen", "Katja Friesen", Rolle.Teilnehmerservice);
-    private static readonly Benutzer Buchhaltung = new("linda.lueke", "Linda Lüke", Rolle.Buchhaltung);
+    private static readonly Benutzer Tresen = new("katja.friedsen", "Katja Friedsen", Rolle.Teilnehmerservice);
+    private static readonly Benutzer Buchhaltung = new("linda.luetke", "Linda Lütke", Rolle.Buchhaltung);
 
     private sealed class TestBenutzer(Benutzer b) : IAktuellerBenutzer
     {

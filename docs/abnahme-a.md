@@ -20,24 +20,24 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
 
 | Nr. | Aufgabe | Testkonto (Rolle) | Richtzeit |
 |---|---|---|---|
-| 1 | Person anlegen und Namensänderung | Katja Friesen (Teilnehmerservice) | 6 min |
-| 2 | Kurs per Schnellweg anlegen | Varvara Schatz (Fachbereichsleitung) | 7 min |
-| 3 | Tresenanmeldung mit Lastschrift | Katja Friesen (Teilnehmerservice) | 6 min |
-| 4 | Voller Kurs: Warteliste | Katja Friesen (Teilnehmerservice) | 5 min |
-| 5 | Anwesenheit erfassen (Check-in) | Katja Friesen (Teilnehmerservice) | 5 min |
-| 6 | Bescheinigung nachdrucken | Katja Friesen (Teilnehmerservice) | 3 min |
-| 7 | Aufgabenkorb: übernehmen und zuweisen | Varvara Schatz (Fachbereichsleitung) | 4 min |
-| 8 | Mindestteilnehmerzahl: Kurs absagen | Varvara Schatz (Fachbereichsleitung) | 5 min |
-| 9 | Rechnung stornieren | Linda Lüke (Buchhaltung) | 4 min |
-| 10 | Lastschriftlauf freigeben | Linda Lüke (Buchhaltung) | 6 min |
-| 11 | Integrationskurs: Ausweisprüfung und Kursbeginn | Sylvia Beckmann (Integrationskurs-Team) | 6 min |
-| 12 | Auswertung exportieren | Sonja Eickelkamp (Verwaltungsleitung) | 3 min |
+| 1 | Person anlegen und Namensänderung | Katja Friedsen (Teilnehmerservice) | 6 min |
+| 2 | Kurs per Schnellweg anlegen | Varvara Schatte (Fachbereichsleitung) | 7 min |
+| 3 | Tresenanmeldung mit Lastschrift | Katja Friedsen (Teilnehmerservice) | 6 min |
+| 4 | Voller Kurs: Warteliste | Katja Friedsen (Teilnehmerservice) | 5 min |
+| 5 | Anwesenheit erfassen (Check-in) | Katja Friedsen (Teilnehmerservice) | 5 min |
+| 6 | Bescheinigung nachdrucken | Katja Friedsen (Teilnehmerservice) | 3 min |
+| 7 | Aufgabenkorb: übernehmen und zuweisen | Varvara Schatte (Fachbereichsleitung) | 4 min |
+| 8 | Mindestteilnehmerzahl: Kurs absagen | Varvara Schatte (Fachbereichsleitung) | 5 min |
+| 9 | Rechnung stornieren | Linda Lütke (Buchhaltung) | 4 min |
+| 10 | Lastschriftlauf freigeben | Linda Lütke (Buchhaltung) | 6 min |
+| 11 | Integrationskurs: Ausweisprüfung und Kursbeginn | Sylvia Bergmann (Integrationskurs-Team) | 6 min |
+| 12 | Auswertung exportieren | Sonja Eickelberg (Verwaltungsleitung) | 3 min |
 
 ---
 
 ## 1. Person anlegen und Namensänderung
 
-- **Testkonto:** Katja Friesen · **Startpunkt:** Startseite → **Person anlegen**
+- **Testkonto:** Katja Friedsen · **Startpunkt:** Startseite → **Person anlegen**
 - **Aufgabe:** Legen Sie *Mira Albers*, geboren 12.03.1992, mit E-Mail und Anschrift in Emsdetten an. Frau Albers hat
   geheiratet und heißt ab dem 1. des Monats *Mira Albers-Kühn*, ihr Geburtsname ist *Albers* – tragen Sie das über
   **Stammdaten ändern** auf der Personenseite ein.
@@ -53,7 +53,7 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
 
 ## 2. Kurs per Schnellweg anlegen
 
-- **Testkonto:** Varvara Schatz · **Startpunkt:** **Kurse** → **Kurs anlegen**
+- **Testkonto:** Varvara Schatte · **Startpunkt:** **Kurse** → **Kurs anlegen**
 - **Aufgabe:** Legen Sie für Fachbereich 7 den Kurs „Rückenfit am Abend“ (Kursart *Bewegungskurs*) an: mittwochs
   18:00–19:30, 10 Termine, Ort *B 1.01 Bewegungsraum*, 98 €, mindestens 6, höchstens 14 Personen, mit einer geeigneten
   Kursleitung. Prüfen Sie die Vorschau und veröffentlichen Sie den Kurs.
@@ -68,7 +68,7 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
 
 ## 3. Tresenanmeldung mit Lastschrift
 
-- **Testkonto:** Katja Friesen · **Startpunkt:** Personenseite von *Mira Albers-Kühn* (Aufgabe 1)
+- **Testkonto:** Katja Friedsen · **Startpunkt:** Personenseite von *Mira Albers-Kühn* (Aufgabe 1)
 - **Aufgabe:** Erfassen Sie für Frau Albers-Kühn ein SEPA-Lastschriftmandat (Bereich „SEPA-Lastschriftmandat“, IBAN
   `DE89 3704 0044 0532 0130 00`, heute unterschrieben). Melden Sie sie dann über **Anmeldung** im Kurs aus Aufgabe 2
   an, Zahlart **Lastschrift**.
@@ -82,7 +82,7 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
 
 ## 4. Voller Kurs: Warteliste
 
-- **Testkonto:** Katja Friesen · **Startpunkt:** **Anmeldung**
+- **Testkonto:** Katja Friedsen · **Startpunkt:** **Anmeldung**
 - **Aufgabe:** Melden Sie *Sabine Weber* in *26H-801 Yoga am Abend* an (der Kurs ist ausgebucht). Melden Sie danach
   eine angemeldete Person des Kurses ab und sehen Sie nach, was mit der Warteliste passiert.
 - **Erwartung:**
@@ -94,7 +94,7 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
 
 ## 5. Anwesenheit erfassen (Check-in)
 
-- **Testkonto:** Katja Friesen · **Startpunkt:** **Anwesenheit**
+- **Testkonto:** Katja Friedsen · **Startpunkt:** **Anwesenheit**
 - **Aufgabe:** Öffnen Sie eine Veranstaltung von heute (falls heute keine stattfindet: im Kurs aus Aufgabe 2 unter
   „Ändern“ eine zusätzliche Einzelveranstaltung in 10 Minuten anlegen). Erfassen Sie zwei Personen als anwesend, eine
   davon 30 Minuten verspätet, und schließen Sie die Liste ab. Optional: **Termin-QR** anzeigen (Check-in mit dem Handy,
@@ -108,7 +108,7 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
 
 ## 6. Bescheinigung nachdrucken
 
-- **Testkonto:** Katja Friesen · **Startpunkt:** **Personen** → *Olena Kovalenko*
+- **Testkonto:** Katja Friedsen · **Startpunkt:** **Personen** → *Olena Kovalenko*
 - **Aufgabe:** Olena braucht ihre Teilnahmebescheinigung für *25F-501* noch einmal. Drucken Sie sie nach.
 - **Erwartung:**
   - Der Nachdruck ist das archivierte Original (Prüfsumme wird geprüft), mit dem QR-Code „Translate this letter in your language“.
@@ -119,7 +119,7 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
 
 ## 7. Aufgabenkorb: übernehmen und zuweisen
 
-- **Testkonto:** Varvara Schatz · **Startpunkt:** Startseite „Was steht an?“
+- **Testkonto:** Varvara Schatte · **Startpunkt:** Startseite „Was steht an?“
 - **Aufgabe:** Übernehmen Sie eine Aufgabe aus Ihrem Gruppenkorb. Weisen Sie eine zweite Aufgabe einer Kollegin zu.
   Prüfen Sie, warum „Erledigt“ bei einer nicht übernommenen Aufgabe gesperrt ist.
 - **Erwartung:**
@@ -132,7 +132,7 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
 
 ## 8. Mindestteilnehmerzahl: Kurs absagen
 
-- **Testkonto:** Varvara Schatz · **Startpunkt:** Startseite, Aufgabe „26H-703 Gesund kochen mit wenig Geld: … absagen oder durchführen?“
+- **Testkonto:** Varvara Schatte · **Startpunkt:** Startseite, Aufgabe „26H-703 Gesund kochen mit wenig Geld: … absagen oder durchführen?“
 - **Aufgabe:** Entscheiden Sie: Der Kurs wird abgesagt. Prüfen Sie anschließend den Postausgang.
 - **Erwartung:**
   - Absagen ist erst nach „Übernehmen“ möglich (Tooltip).
@@ -146,7 +146,7 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
 
 ## 9. Rechnung stornieren
 
-- **Testkonto:** Linda Lüke · **Startpunkt:** **Finanzen** → **Belege**
+- **Testkonto:** Linda Lütke · **Startpunkt:** **Finanzen** → **Belege**
 - **Aufgabe:** Eine Teilnehmerin hat aus Kulanz das Entgelt erlassen bekommen. Stornieren Sie ihre Rechnung (beliebige
   offene Rechnung wählen) mit Begründung.
 - **Erwartung:**
@@ -158,7 +158,7 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
 
 ## 10. Lastschriftlauf freigeben
 
-- **Testkonto:** Linda Lüke · **Startpunkt:** **Finanzen** → **Übersicht**
+- **Testkonto:** Linda Lütke · **Startpunkt:** **Finanzen** → **Übersicht**
 - **Aufgabe:** Führen Sie die Finanzroutinen aus (die Rechnung aus Aufgabe 3 entsteht), öffnen Sie dann
   **Lastschrift & Überweisung**, prüfen Sie den Vorschlag, geben Sie ihn frei und erzeugen Sie die SEPA-Datei.
 - **Erwartung:**
@@ -171,7 +171,7 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
 
 ## 11. Integrationskurs: Ausweisprüfung und Kursbeginn
 
-- **Testkonto:** Sylvia Beckmann · **Startpunkt:** **Integrationskurse** → *26H-401*
+- **Testkonto:** Sylvia Bergmann · **Startpunkt:** **Integrationskurse** → *26H-401*
 - **Aufgabe:** Der Kursstart ist gesperrt. Finden Sie heraus warum, prüfen Sie die fehlenden Ausweise (Original
   vorgelegt, stimmt mit der Berechtigung überein) und melden Sie den Kursbeginn an das BAMF.
 - **Erwartung:**
@@ -184,7 +184,7 @@ Moderation: Pro Aufgabe die Zeit (Start bis „fertig“ oder Abbruch) und Beoba
 
 ## 12. Auswertung exportieren
 
-- **Testkonto:** Sonja Eickelkamp · **Startpunkt:** **Auswertungen**
+- **Testkonto:** Sonja Eickelberg · **Startpunkt:** **Auswertungen**
 - **Aufgabe:** Exportieren Sie die Auslastung je Fachbereich für das laufende Semester als Excel-Datei und öffnen Sie sie.
 - **Erwartung:**
   - Die Tabelle erscheint sofort; der Export enthält echte Zahlen (Prozent, Euro) mit Autofilter.

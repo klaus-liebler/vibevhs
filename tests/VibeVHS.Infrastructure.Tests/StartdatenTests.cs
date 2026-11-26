@@ -57,7 +57,7 @@ public class StartdatenTests
         await using var db = t.NeuerKontext();
         await t.Lader(db).AusDateiLadenAsync(Datei, ct);
 
-        var konto = await db.Benutzerkonten.SingleAsync(k => k.Login == "heike.steinhorst", ct);
+        var konto = await db.Benutzerkonten.SingleAsync(k => k.Login == "heike.steinkamp", ct);
         konto.Rollen.ShouldBe([Rolle.Fachbereichsleitung, Rolle.IntegrationskursTeam]);
         konto.Fachbereiche.ShouldBe([4, 5]);
 
@@ -66,11 +66,11 @@ public class StartdatenTests
         person.Rollen.HasFlag(Personenrolle.Mitarbeitende).ShouldBeTrue();
         var name = person.AktuellerName(t.Uhr.GetLocalNow());
         name.Vorname.ShouldBe("Heike");
-        name.Nachname.ShouldBe("Steinhorst");
+        name.Nachname.ShouldBe("Steinkamp");
 
-        var schatz = await db.Benutzerkonten.SingleAsync(k => k.Login == "varvara.schatz", ct);
-        schatz.Fachbereiche.ShouldBe([2, 3, 6, 7]);
-        (await db.Benutzerkonten.SingleAsync(k => k.Login == "amy.behrla", ct)).Rollen.ShouldContain(Rolle.Systemverwaltung);
+        var schatte = await db.Benutzerkonten.SingleAsync(k => k.Login == "varvara.schatte", ct);
+        schatte.Fachbereiche.ShouldBe([2, 3, 6, 7]);
+        (await db.Benutzerkonten.SingleAsync(k => k.Login == "amy.behrens", ct)).Rollen.ShouldContain(Rolle.Systemverwaltung);
     }
 
     [Fact]
@@ -110,8 +110,8 @@ public class StartdatenTests
     }
 
     [Theory]
-    [InlineData("Dr. Kai Lüken", "Dr.", "Kai", "Lüken")]
-    [InlineData("Gisela Junkerkalefeld", null, "Gisela", "Junkerkalefeld")]
+    [InlineData("Dr. Kai Lüdeking", "Dr.", "Kai", "Lüdeking")]
+    [InlineData("Gisela Junkerholt", null, "Gisela", "Junkerholt")]
     [InlineData("Prof. Dr. Anna Maria Becker", "Prof. Dr.", "Anna Maria", "Becker")]
     public void Namen_werden_in_Titel_Vorname_Nachname_zerlegt(string name, string? titel, string vorname, string nachname)
     {

@@ -6,10 +6,10 @@ namespace VibeVHS.Domain.Tests.Personen;
 public class TitelerkennungTests
 {
     [Theory]
-    [InlineData("Dr. Kai", "Lüken", "Dr.", "Kai", "Lüken")]
+    [InlineData("Dr. Kai", "Lüdeking", "Dr.", "Kai", "Lüdeking")]
     [InlineData("Prof. Dr. Anna", "Berg", "Prof. Dr.", "Anna", "Berg")]
     [InlineData("Dipl.-Ing. Jens", "Ahlers", "Dipl.-Ing.", "Jens", "Ahlers")]
-    [InlineData("Kai", "Dr. Lüken", "Dr.", "Kai", "Lüken")]
+    [InlineData("Kai", "Dr. Lüdeking", "Dr.", "Kai", "Lüdeking")]
     [InlineData("Dr. med. Eva", "Kranz", "Dr. med.", "Eva", "Kranz")]
     [InlineData("Mag. Lisa", "Huber", "Mag.", "Lisa", "Huber")]
     [InlineData("J. R.", "Tolkien", null, "J. R.", "Tolkien")]

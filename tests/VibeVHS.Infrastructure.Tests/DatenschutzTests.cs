@@ -16,9 +16,9 @@ namespace VibeVHS.Infrastructure.Tests;
 
 public class DatenschutzTests
 {
-    private static readonly Benutzer Verwaltungsleitung = new("sonja.eickelkamp", "Sonja Eickelkamp", Rolle.Verwaltungsleitung);
-    private static readonly Benutzer Leitung = new("kai.lueken", "Dr. Kai Lüken", Rolle.Leitung);
-    private static readonly Benutzer Buchhaltung = new("linda.lueke", "Linda Lüke", Rolle.Buchhaltung);
+    private static readonly Benutzer Verwaltungsleitung = new("sonja.eickelberg", "Sonja Eickelberg", Rolle.Verwaltungsleitung);
+    private static readonly Benutzer Leitung = new("kai.luedeking", "Dr. Kai Lüdeking", Rolle.Leitung);
+    private static readonly Benutzer Buchhaltung = new("linda.luetke", "Linda Lütke", Rolle.Buchhaltung);
 
     private sealed class TestBenutzer(Benutzer b) : IAktuellerBenutzer
     {

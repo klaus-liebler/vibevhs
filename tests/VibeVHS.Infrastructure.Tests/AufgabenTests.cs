@@ -20,8 +20,8 @@ namespace VibeVHS.Infrastructure.Tests;
 /// <summary>Aufgabenmodul (I5): Regeln, Gruppenkorb, Übernehmen/Zuweisen, Eskalation, automatisches Schließen, Routinen.</summary>
 public class AufgabenTests
 {
-    private static readonly Benutzer Tresen = new("katja.friesen", "Katja Friesen", Rolle.Teilnehmerservice);
-    private static readonly Benutzer FblSprachen = new("varvara.schatz", "Varvara Schatz", Rolle.Fachbereichsleitung, [Rolle.Fachbereichsleitung], [8]);
+    private static readonly Benutzer Tresen = new("katja.friedsen", "Katja Friedsen", Rolle.Teilnehmerservice);
+    private static readonly Benutzer FblSprachen = new("varvara.schatte", "Varvara Schatte", Rolle.Fachbereichsleitung, [Rolle.Fachbereichsleitung], [8]);
     private static readonly Benutzer FblSprachen2 = new("tom.berg", "Tom Berg", Rolle.Fachbereichsleitung, [Rolle.Fachbereichsleitung], [8]);
     private static readonly Benutzer FblGesundheit = new("ina.wolf", "Ina Wolf", Rolle.Fachbereichsleitung, [Rolle.Fachbereichsleitung], [3]);
     private static readonly Benutzer Leitung = new("eva.lang", "Eva Lang", Rolle.Leitung);
@@ -203,11 +203,11 @@ public class AufgabenTests
             (await Erzeugen(t, db, FblSprachen).Aufgaben.UebersichtAsync(ct)).Meine.Single().Id.ShouldBe(id);
             var kollegin = await Erzeugen(t, db, FblSprachen2).Aufgaben.UebersichtAsync(ct);
             kollegin.Gruppenkorb.ShouldBeEmpty();
-            kollegin.BeiKollegen.Single().BearbeiterName.ShouldBe("Varvara Schatz");
+            kollegin.BeiKollegen.Single().BearbeiterName.ShouldBe("Varvara Schatte");
             await Should.ThrowAsync<InvalidOperationException>(() => Erzeugen(t, db, FblSprachen2).Aufgaben.ErledigenAsync(id, null, ct));
 
             var kandidaten = await Erzeugen(t, db, FblSprachen).Aufgaben.KandidatenAsync(id, ct);
-            kandidaten.Select(k => k.Login).ShouldBe(["tom.berg", "varvara.schatz"], ignoreOrder: true); // nicht FB 3
+            kandidaten.Select(k => k.Login).ShouldBe(["tom.berg", "varvara.schatte"], ignoreOrder: true); // nicht FB 3
             await Should.ThrowAsync<InvalidOperationException>(() => Erzeugen(t, db, FblSprachen).Aufgaben.ZuweisenAsync(id, Leitung.Kennung, ct));
             await Erzeugen(t, db, FblSprachen).Aufgaben.ZuweisenAsync(id, "tom.berg", ct);
         }

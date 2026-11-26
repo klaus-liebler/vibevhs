@@ -12,7 +12,7 @@ namespace VibeVHS.Infrastructure.Tests;
 /// <summary>Rundschreiben mit Editor, Gestaltung, Anreden und Archiv (QA-66).</summary>
 public sealed class RundschreibenTests
 {
-    private static readonly Benutzer Tresen = new("katja.friesen", "Katja Friesen", Rolle.Teilnehmerservice);
+    private static readonly Benutzer Tresen = new("katja.friedsen", "Katja Friedsen", Rolle.Teilnehmerservice);
 
     private sealed class TestBenutzer(Benutzer b) : IAktuellerBenutzer
     {
@@ -64,7 +64,7 @@ public sealed class RundschreibenTests
             var archiv = await Dienst(t, db2).ArchivAsync(abbruch: ct);
             archiv.Single().Html.ShouldContain("{Anrede}");                    // Platzhalter bleiben fürs Wiederverwenden
             archiv.Single().Zielgruppe.ShouldBe("Suche „Muster“");
-            archiv.Single().GesendetVon.ShouldContain("Katja Friesen");
+            archiv.Single().GesendetVon.ShouldContain("Katja Friedsen");
         }
     }
 

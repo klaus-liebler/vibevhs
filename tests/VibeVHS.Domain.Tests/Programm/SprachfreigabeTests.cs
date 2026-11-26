@@ -70,7 +70,7 @@ public class SprachfreigabeTests
         e.Code.ShouldBe(Eignungscode.MerkmalFehlt);
         e.Begruendung.ShouldBe("„Lehrfreigabe Sprachkurs (Eignungsprüfung der vhs): Englisch“ fehlt.");
 
-        var ausnahme = new Qualifikationsausnahme(Guid.NewGuid(), p.Id, Freigabe, "Muttersprachlerin, Hospitation folgt im Januar", "Heike Steinhorst", Jetzt);
+        var ausnahme = new Qualifikationsausnahme(Guid.NewGuid(), p.Id, Freigabe, "Muttersprachlerin, Hospitation folgt im Januar", "Heike Steinkamp", Jetzt);
         Dozentenpruefung.AmTag(p, ["sprachfreigabe=Englisch"], Katalog, Tag, Jetzt, [ausnahme]).Code.ShouldBe(Eignungscode.Ausnahme);
     }
 

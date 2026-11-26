@@ -7,7 +7,7 @@
 // aufnahmen.json: Liste von Schritten, jeweils optional:
 //   "springen": "ausgangslage"      Sprungmarke (Datenstand wird ersetzt!), Kopf X-Schulung-Schluessel aus SCHULUNG_SCHLUESSEL
 //   "vorstellen": ["+1 Stunde", …]   Knöpfe der Seite /spielzeit nacheinander (Automatik läuft je übersprungenem Zeitpunkt)
-//   "konto": "Sonja Eickelkamp"     Testanmeldung (Name auf /anmelden); "rolle": "Teilnehmerservice" wechselt die aktive Rolle
+//   "konto": "Sonja Eickelberg"     Testanmeldung (Name auf /anmelden); "rolle": "Teilnehmerservice" wechselt die aktive Rolle
 //   "pfad": "/personen"             Seite laden (ohne pfad: auf der aktuellen Seite bleiben)
 //   "tippe": [["Feld", "Text"], …]   Eingabefeld per Beschriftung, Platzhalter oder aria-label füllen
 //   "klick": ["Knopftext", …]       nacheinander klicken ("liste:Name" öffnet Radzen-Auswahl, "wahl:Text" wählt Eintrag, "css:Selektor")

@@ -78,7 +78,7 @@ public class DozentenpruefungTests
         ohneAusnahme.Geeignet.ShouldBeFalse();
         ohneAusnahme.AusnahmeMoeglich.ShouldBeTrue();
 
-        var ausnahme = new Qualifikationsausnahme(kursId, p.Id, Telc, "Prüfung nur als Zweitprüferin unter Aufsicht", "Varvara Schatz (Fachbereichsleitung)", Jetzt);
+        var ausnahme = new Qualifikationsausnahme(kursId, p.Id, Telc, "Prüfung nur als Zweitprüferin unter Aufsicht", "Varvara Schatte (Fachbereichsleitung)", Jetzt);
         var mit = Dozentenpruefung.AmTag(p, ["telc-pruefer"], Katalog, tag, Jetzt, [ausnahme]);
         mit.Code.ShouldBe(Eignungscode.Ausnahme);
         mit.Geeignet.ShouldBeTrue();

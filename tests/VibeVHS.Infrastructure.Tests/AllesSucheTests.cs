@@ -14,8 +14,8 @@ public sealed class AllesSucheTests
         public ValueTask<Benutzer> ErmittelnAsync(CancellationToken abbruch = default) => ValueTask.FromResult(b);
     }
 
-    private static readonly Benutzer Tresen = new("katja.friesen", "Katja Friesen", Rolle.Teilnehmerservice);
-    private static readonly Benutzer Fachbereich = new("varvara.schatz", "Varvara Schatz", Rolle.Fachbereichsleitung);
+    private static readonly Benutzer Tresen = new("katja.friedsen", "Katja Friedsen", Rolle.Teilnehmerservice);
+    private static readonly Benutzer Fachbereich = new("varvara.schatte", "Varvara Schatte", Rolle.Fachbereichsleitung);
     private static readonly Benutzer Buchhaltung = new("bernd.buch", "Bernd Buch", Rolle.Buchhaltung);
 
     private static async Task<IReadOnlyList<Suchtreffer>> SuchenAsync(TestDatenbank t, Benutzer wer, string text)

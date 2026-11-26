@@ -20,9 +20,9 @@ namespace VibeVHS.Infrastructure.Tests;
 public class BetriebTests
 {
     private static readonly Benutzer Leitung = new("eva.lang", "Eva Lang", Rolle.Leitung);
-    private static readonly Benutzer FblFb8 = new("varvara.schatz", "Varvara Schatz", Rolle.Fachbereichsleitung, [Rolle.Fachbereichsleitung], [8]);
-    private static readonly Benutzer System = new("amy.behrla", "Amy Behrla", Rolle.Systemverwaltung);
-    private static readonly Benutzer Tresen = new("katja.friesen", "Katja Friesen", Rolle.Teilnehmerservice);
+    private static readonly Benutzer FblFb8 = new("varvara.schatte", "Varvara Schatte", Rolle.Fachbereichsleitung, [Rolle.Fachbereichsleitung], [8]);
+    private static readonly Benutzer System = new("amy.behrens", "Amy Behrens", Rolle.Systemverwaltung);
+    private static readonly Benutzer Tresen = new("katja.friedsen", "Katja Friedsen", Rolle.Teilnehmerservice);
 
     private sealed class TestBenutzer(Benutzer b) : IAktuellerBenutzer
     {
@@ -309,7 +309,7 @@ public class BetriebTests
         var b = new TestBenutzer(System);
         var dienst = new ImportDienst(new DublettenSuche(db), new PersonenSpeicher(db), new ImportSpeicher(db), new AuditProtokoll(db, b, t.Uhr), b, t.Uhr);
 
-        var ohneSpalte = ImportDienst.Lesen("a.csv", Encoding.UTF8.GetBytes("Nr;Name;Vorname\n1;Lüken;Dr. Kai\n2;Dr. Berg;Anna\n3;Ahlers;Jens\n"));
+        var ohneSpalte = ImportDienst.Lesen("a.csv", Encoding.UTF8.GetBytes("Nr;Name;Vorname\n1;Lüdeking;Dr. Kai\n2;Dr. Berg;Anna\n3;Ahlers;Jens\n"));
         var probe = await dienst.ProbelaufAsync(ohneSpalte, ImportDienst.ZuordnungVorschlagen(ohneSpalte.Spalten), ct);
         probe.Zeilen[0].Hinweis.ShouldContain("Titel „Dr.“");
         await dienst.ImportierenAsync(ohneSpalte, ImportDienst.ZuordnungVorschlagen(ohneSpalte.Spalten), ct);
@@ -322,8 +322,8 @@ public class BetriebTests
         var personen = await db.Personen.Include(p => p.Namen).AsNoTracking().ToListAsync(ct);
         var jetzt = t.Uhr.GetLocalNow();
         string Name(Person p) => $"{p.Titel}|{p.AktuellerName(jetzt).Vorname}|{p.AktuellerName(jetzt).Nachname}";
-        personen.Select(Name).Order().ShouldBe(["|Jens|Ahlers", "Dr.|Anna|Berg", "Dr.|Kai|Lüken", "Prof. Dr.|Eva|Kranz"]);
-        personen.Single(p => p.Titel == "Dr." && p.Anzeigename.Contains("Kai")).Anzeigename.ShouldBe("Dr. Kai Lüken");
+        personen.Select(Name).Order().ShouldBe(["|Jens|Ahlers", "Dr.|Anna|Berg", "Dr.|Kai|Lüdeking", "Prof. Dr.|Eva|Kranz"]);
+        personen.Single(p => p.Titel == "Dr." && p.Anzeigename.Contains("Kai")).Anzeigename.ShouldBe("Dr. Kai Lüdeking");
     }
 
     [Fact]

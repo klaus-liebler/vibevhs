@@ -112,7 +112,7 @@ public sealed class StartdatenLader(VibeVhsDbContext db, IAuditProtokoll protoko
         return ergebnis;
     }
 
-    /// <summary>"Dr. Kai Lüken" → ("Dr.", "Kai", "Lüken"). Der Nachname ist das letzte Wort.</summary>
+    /// <summary>"Dr. Kai Lüdeking" → ("Dr.", "Kai", "Lüdeking"). Der Nachname ist das letzte Wort.</summary>
     public static (string? Titel, string Vorname, string Nachname) NameZerlegen(string name)
     {
         var (titel, rest, _) = Titelerkennung.Abtrennen(name, null);

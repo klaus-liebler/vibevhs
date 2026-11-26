@@ -29,10 +29,10 @@ namespace VibeVHS.Infrastructure.Tests;
 /// <summary>Finanzen (I6): Belege nach GoBD, Teilnehmerkonto, SEPA, camt.053, Mahnwesen, Honorare, Prüfexport.</summary>
 public class FinanzTests
 {
-    private static readonly Benutzer Tresen = new("katja.friesen", "Katja Friesen", Rolle.Teilnehmerservice);
-    private static readonly Benutzer Buchhaltung = new("linda.lueke", "Linda Lüke", Rolle.Buchhaltung);
+    private static readonly Benutzer Tresen = new("katja.friedsen", "Katja Friedsen", Rolle.Teilnehmerservice);
+    private static readonly Benutzer Buchhaltung = new("linda.luetke", "Linda Lütke", Rolle.Buchhaltung);
     private static readonly Benutzer Pruefer = new("pruefung", "Betriebsprüfung", Rolle.Pruefung);
-    private static readonly Benutzer Vl = new("sonja.eickelkamp", "Sonja Eickelkamp", Rolle.Verwaltungsleitung);
+    private static readonly Benutzer Vl = new("sonja.eickelberg", "Sonja Eickelberg", Rolle.Verwaltungsleitung);
 
     private sealed class TestBenutzer(Benutzer b) : IAktuellerBenutzer
     {

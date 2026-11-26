@@ -12,7 +12,7 @@ internal static class Testkurse
     public static readonly DateOnly Heute = DateOnly.FromDateTime(Jetzt.Date);
     public static readonly Semester Herbst = new("Herbst 2026", "26H", new DateOnly(2026, 8, 24), new DateOnly(2027, 1, 31));
     public static readonly Guid Raum = Guid.NewGuid();
-    public static readonly Buchender Tresen = new("Katja Friesen", "katja.friesen", "Teilnehmerservice");
+    public static readonly Buchender Tresen = new("Katja Friedsen", "katja.friedsen", "Teilnehmerservice");
 
     public static Kurs Kurs(Buchungsrichtlinie? richtlinie = null, Sichtbarkeit sichtbarkeit = Sichtbarkeit.Oeffentlich, int max = 12,
         Kursstatus status = Kursstatus.Veroeffentlicht, DateOnly? start = null, int termine = 6, long cent = 9800)
@@ -239,7 +239,7 @@ public class BelegungTests
         var b = Belegung.Anlegen(Testkurse.Kurs(), Guid.NewGuid(), false, Buchungsweg.Tresen,
             Testkurse.Tresen with { BevollmaechtigterId = mutter, BevollmaechtigterName = "Ayşe Demir", VollmachtId = vollmacht }, null, Zahlart.Bar,
             Testkurse.Jetzt);
-        b.GebuchtVon.ShouldBe("Katja Friesen");
+        b.GebuchtVon.ShouldBe("Katja Friedsen");
         b.GebuchtInRolle.ShouldBe("Teilnehmerservice");
         b.BevollmaechtigterId.ShouldBe(mutter);
         b.VollmachtId.ShouldBe(vollmacht);
